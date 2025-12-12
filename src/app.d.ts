@@ -17,6 +17,8 @@ import type {
 import type { ElectronAPIExtension } from "../electron/main/generated/preload-services";
 
 declare global {
+	const __APP_VERSION__: string;
+
 	namespace App {}
 
 	interface Window {
