@@ -964,5 +964,13 @@
 	"text_write_file": "write file",
 	"title_agent_task_infos": "Mission Details",
 	"text_duration": "Duration",
-	"text_turns": "Turns"
+	"text_turns": "Turns",
+	"prompt_variable_input": "User Input",
+	"prompt_variable_date": "Current Date",
+	"prompt_variable_time": "Current Time",
+	"prompt_variable_datetime": "Date Time",
+	"prompt_variable_now": "Current Timestamp",
+	"prompt_variable_model_id": "Model ID",
+	"prompt_editor_clear": "Clear",
+	"prompt_editor_clear_confirm": "Are you sure you want to clear the editor content?"
 }
