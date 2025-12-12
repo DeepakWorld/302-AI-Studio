@@ -1,5 +1,6 @@
 import { m } from "$lib/paraglide/messages";
 import { chatState } from "$lib/stores/chat-state.svelte";
+import { codeAgentState } from "$lib/stores/code-agent";
 import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 import { sidebarSearchState } from "$lib/stores/sidebar-search-state.svelte";
@@ -156,6 +157,11 @@ export class ShortcutActionsHandler {
 	}
 
 	private handleToggleModelPanel(): void {
+		// Don't allow model selection when code agent is deleted
+		if (codeAgentState.isDeleted) {
+			return;
+		}
+
 		const hasConfiguredProviders = persistedProviderState.current.some(
 			(provider) => provider.enabled && provider.apiKey && provider.apiKey.trim() !== "",
 		);
@@ -190,8 +196,8 @@ export class ShortcutActionsHandler {
 
 	private async handleDeleteCurrentThread(): Promise<void> {
 		// Get current active tab's threadId using real window tabs
-		const currentTabs = tabBarState.getCurrentWindowTabs();
-		const activeTab = currentTabs.find((tab) => tab.active);
+		const currentTabs = await tabBarState.getCurrentWindowTabs();
+		const activeTab = currentTabs?.find((tab) => tab.active);
 		const threadId = activeTab?.threadId;
 
 		// Check if there's a valid thread to delete (not shell and not undefined)

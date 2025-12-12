@@ -5,6 +5,7 @@ import {
 	type ThreadParmas,
 } from "@shared/types";
 import { storageService, StorageService } from ".";
+import { emitter } from "../broadcast-service";
 
 export class ThreadStorage extends StorageService<ThreadMetadata> {
 	constructor() {
@@ -63,6 +64,8 @@ export class ThreadStorage extends StorageService<ThreadMetadata> {
 			// Delete the actual thread data file
 			const threadKey = "app-thread:" + threadId;
 			await storageService.removeItemInternal(threadKey);
+			await storageService.removeItemInternal("app-chat-messages:" + threadId);
+			emitter.emit("thread:thread-deleted", { threadId });
 		} catch (error) {
 			console.error(`Failed to delete thread ${threadId}:`, error);
 			throw error;
@@ -166,6 +169,100 @@ export class ThreadStorage extends StorageService<ThreadMetadata> {
 		} catch (error) {
 			console.error("Failed to get threads:", error);
 			return null;
+		}
+	}
+
+	/**
+	 * Delete all threads that have a specific apiKeyHash
+	 * Used when logging out to clean up sessions associated with a specific account
+	 * @param apiKeyHash - The hash of the API key to match
+	 * @returns Object containing count of deleted threads and their IDs
+	 */
+	async deleteThreadsByApiKeyHash(
+		apiKeyHash: string,
+	): Promise<{ deletedCount: number; deletedThreadIds: string[] }> {
+		try {
+			// IMPORTANT:
+			// Do NOT rely on ThreadStorage metadata (threadIds). We only add threadIds when a message is sent
+			// (see threadService.addThread usage), so "new / empty" chats may not be tracked in metadata yet.
+			// To guarantee we delete *all* sessions associated with apiKeyHash, we scan persisted thread files.
+			const allKeys = await storageService.getKeysInternal();
+			const threadKeys = allKeys.filter((key) => key.startsWith("app-thread:"));
+
+			const deletedThreadIds: string[] = [];
+			for (const threadKey of threadKeys) {
+				// Defensive: normalize potential ".json" suffix from storage drivers
+				const rawId = threadKey.slice("app-thread:".length);
+				const threadId = rawId.endsWith(".json") ? rawId.slice(0, -".json".length) : rawId;
+
+				const thread = (await storageService.getItemInternal(
+					"app-thread:" + threadId,
+				)) as ThreadParmas | null;
+				if (!thread) continue;
+
+				// Back-compat:
+				// - Older boot-created initial tabs may have no apiKeyHash persisted.
+				// - Treat 302AI-selected threads without apiKeyHash as associated, so logout cleanup
+				//   behaves as users expect (clears those sessions too).
+				const isAssociatedByHash = thread.apiKeyHash === apiKeyHash;
+				const isAssociatedLegacy =
+					!thread.apiKeyHash && (thread as ThreadParmas).selectedModel?.providerId === "302AI";
+
+				if (isAssociatedByHash || isAssociatedLegacy) {
+					try {
+						await this.deleteThread(threadId);
+						deletedThreadIds.push(threadId);
+						console.log(`[ThreadStorage] Deleted thread ${threadId} with matching apiKeyHash`);
+					} catch (error) {
+						console.error(`Failed to delete thread ${threadId}:`, error);
+					}
+				}
+			}
+
+			return { deletedCount: deletedThreadIds.length, deletedThreadIds };
+		} catch (error) {
+			console.error("Failed to delete threads by apiKeyHash:", error);
+			return { deletedCount: 0, deletedThreadIds: [] };
+		}
+	}
+
+	/**
+	 * Clear selectedModel references from all threads for deleted models
+	 * Used when models are deleted to prevent stale references
+	 * @param deletedModelIds - Set of model IDs that were deleted
+	 * @returns Number of threads that had their selectedModel cleared
+	 */
+	async clearDeletedModelReferences(deletedModelIds: Set<string>): Promise<number> {
+		try {
+			const metadata = await this.getThreadMetadata();
+			if (!metadata) return 0;
+
+			let clearedCount = 0;
+
+			for (const threadId of metadata.threadIds) {
+				try {
+					const threadKey = "app-thread:" + threadId;
+					const thread = (await storageService.getItemInternal(threadKey)) as ThreadParmas;
+					if (thread && thread.selectedModel && deletedModelIds.has(thread.selectedModel.id)) {
+						// Clear the selectedModel reference
+						await storageService.setItemInternal(threadKey, {
+							...thread,
+							selectedModel: null,
+						});
+						clearedCount++;
+						console.log(
+							`[ThreadStorage] Cleared selectedModel reference for deleted model ${thread.selectedModel.id} in thread ${threadId}`,
+						);
+					}
+				} catch (error) {
+					console.warn(`Failed to clear model reference in thread ${threadId}:`, error);
+				}
+			}
+
+			return clearedCount;
+		} catch (error) {
+			console.error("Failed to clear deleted model references:", error);
+			return 0;
 		}
 	}
 }

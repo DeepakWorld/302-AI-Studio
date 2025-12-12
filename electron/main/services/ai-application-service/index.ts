@@ -27,6 +27,9 @@ export class AiApplicationService {
 		emitter.on("general-settings:language-changed", ({ language }) => {
 			this.initAiApplications(language);
 		});
+		emitter.on("provider:302ai-provider-changed", ({ apiKey }) => {
+			this.handle302AIProviderChange(apiKey);
+		});
 	}
 
 	// ******************************* Private Methods ******************************* //
@@ -108,6 +111,13 @@ export class AiApplicationService {
 		}
 	}
 
+	private async handle302AIProviderChange(updatedApiKey: string) {
+		broadcastService.broadcastChannelToAll("ai-applications:loading", true);
+		const lang = await generalSettingsService.getLanguage();
+		await this.updateAiApplicationUrlMap(this.aiApplicationList, lang, updatedApiKey);
+		broadcastService.broadcastChannelToAll("ai-applications:loading", false);
+	}
+
 	// ******************************* IPC Methods ******************************* //
 	async getAiApplicationUrl(
 		_event: IpcMainInvokeEvent,
@@ -126,15 +136,15 @@ export class AiApplicationService {
 		};
 	}
 
-	async handle302AIProviderChange(
-		_event: IpcMainInvokeEvent,
-		updatedApiKey: string,
-	): Promise<void> {
-		broadcastService.broadcastChannelToAll("ai-applications:loading", true);
-		const lang = await generalSettingsService.getLanguage();
-		await this.updateAiApplicationUrlMap(this.aiApplicationList, lang, updatedApiKey);
-		broadcastService.broadcastChannelToAll("ai-applications:loading", false);
-	}
+	// async handle302AIProviderChange(
+	// 	_event: IpcMainInvokeEvent,
+	// 	updatedApiKey: string,
+	// ): Promise<void> {
+	// 	broadcastService.broadcastChannelToAll("ai-applications:loading", true);
+	// 	const lang = await generalSettingsService.getLanguage();
+	// 	await this.updateAiApplicationUrlMap(this.aiApplicationList, lang, updatedApiKey);
+	// 	broadcastService.broadcastChannelToAll("ai-applications:loading", false);
+	// }
 
 	async handleAiApplicationReload(_event: IpcMainInvokeEvent, tabId: string): Promise<void> {
 		const tabView = tabService.getTabView(tabId);

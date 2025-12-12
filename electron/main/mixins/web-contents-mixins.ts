@@ -87,6 +87,11 @@ export const withLifecycleHandlers = (
 export const withExternalLinkHandler = (view: WebContentsView): void => {
 	// Handle links opened via window.open or target="_blank"
 	view.webContents.setWindowOpenHandler(({ url }) => {
+		// Allow Firebase authentication popups
+		if (url.includes("firebaseapp.com/__/auth/handler") || url.includes("accounts.google.com")) {
+			return { action: "allow" };
+		}
+
 		// Check if it's an external URL (http/https)
 		if (url.startsWith("http://") || url.startsWith("https://")) {
 			shell.openExternal(url);
@@ -100,6 +105,11 @@ export const withExternalLinkHandler = (view: WebContentsView): void => {
 	view.webContents.on("will-navigate", (event, url) => {
 		// Get the current URL
 		const currentUrl = view.webContents.getURL();
+
+		// Allow Firebase authentication redirects
+		if (url.includes("firebaseapp.com") || url.includes("accounts.google.com")) {
+			return; // Allow navigation for auth flows
+		}
 
 		// Check if it's an external URL (http/https) and different from current domain
 		if (url.startsWith("http://") || url.startsWith("https://")) {

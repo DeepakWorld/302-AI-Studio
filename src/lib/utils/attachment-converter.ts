@@ -5,6 +5,7 @@ import type { FileUIPart } from "ai";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { compressFile } from "./file-compressor";
+import { officeMimeTypes } from "./file-preview";
 
 export type MessagePart = FileUIPart | { type: "text"; text: string };
 
@@ -31,16 +32,6 @@ function isPdfFile(attachment: AttachmentFile): boolean {
 function isOfficeDocumentFile(attachment: AttachmentFile): boolean {
 	const { type, name } = attachment;
 	const lowerName = name.toLowerCase();
-
-	// Check by MIME type
-	const officeMimeTypes = [
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-		"application/vnd.ms-excel", // .xls
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-		"application/msword", // .doc
-		"application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
-		"application/vnd.ms-powerpoint", // .ppt
-	];
 
 	if (officeMimeTypes.includes(type)) return true;
 
@@ -125,15 +116,30 @@ async function readPdfFile(attachment: AttachmentFile): Promise<string> {
 	}
 }
 
+/**
+ * Decode base64 string to UTF-8 text
+ * Uses TextDecoder to properly handle multi-byte UTF-8 characters (e.g., Chinese)
+ */
+function decodeBase64ToUtf8(base64: string): string {
+	const binaryString = atob(base64);
+	const bytes = new Uint8Array(binaryString.length);
+	for (let i = 0; i < binaryString.length; i++) {
+		bytes[i] = binaryString.charCodeAt(i);
+	}
+	return new TextDecoder("utf-8").decode(bytes);
+}
+
 async function readTextFile(attachment: AttachmentFile): Promise<string> {
-	if (attachment.file) {
+	// First try to read from file if it's a valid File object
+	if (attachment.file && typeof attachment.file.text === "function") {
 		return await attachment.file.text();
 	}
 
+	// Then try to read from preview (data URL)
 	if (attachment.preview && typeof attachment.preview === "string") {
-		if (attachment.preview.startsWith("data:text/")) {
+		if (attachment.preview.startsWith("data:")) {
 			const base64Content = attachment.preview.split(",")[1];
-			return atob(base64Content);
+			return decodeBase64ToUtf8(base64Content);
 		} else {
 			const response = await fetch(attachment.preview);
 			return await response.text();

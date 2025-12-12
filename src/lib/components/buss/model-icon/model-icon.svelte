@@ -217,7 +217,7 @@
 	class={cn(
 		"h-4 w-4 rounded-full",
 		!forceDark && !isColorIcon && "dark:brightness-0 dark:invert dark:filter",
-		className,
+		iconUrl !== ai302Icon && className,
 	)}
 	alt={modelName || "Model Icon"}
 	onerror={handleError}

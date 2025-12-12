@@ -11,12 +11,16 @@
 		thread: ThreadParmas;
 		isActive: boolean;
 		isFavorite: boolean;
+		isCodeAgent?: boolean;
+		sandboxId?: string;
+		sessionId?: string;
 		onThreadClick: (threadId: string) => void;
 		onToggleFavorite: (threadId: string) => void;
 		onRenameThread: (threadId: string, currentName: string) => void;
 		onThreadGenerateTitle: (threadId: string) => void;
 		onThreadClearMessages: (threadId: string) => void;
 		onThreadDelete: (threadId: string) => void;
+		onThreadDeleteWithDialog?: (threadId: string, sandboxId: string, sessionId: string) => void;
 	}
 
 	let {
@@ -24,12 +28,16 @@
 		thread,
 		isActive,
 		isFavorite,
+		isCodeAgent = false,
+		sandboxId = "",
+		sessionId = "",
 		onThreadClick,
 		onToggleFavorite,
 		onRenameThread,
 		onThreadGenerateTitle,
 		onThreadClearMessages,
 		onThreadDelete,
+		onThreadDeleteWithDialog = () => {},
 	}: Props = $props();
 
 	let isHovered = $state(false);
@@ -43,6 +51,16 @@
 	function handleToggleFavorite(threadId: string, e: Event) {
 		e.stopPropagation();
 		onToggleFavorite(threadId);
+	}
+
+	function handleDelete() {
+		// If it's a code agent thread and we have sandbox/session info, use the dialog
+		if (isCodeAgent && sandboxId && sessionId && onThreadDeleteWithDialog) {
+			onThreadDeleteWithDialog(threadId, sandboxId, sessionId);
+		} else {
+			// Otherwise use the normal delete
+			onThreadDelete(threadId);
+		}
 	}
 </script>
 
@@ -109,7 +127,7 @@
 
 		<ContextMenu.Separator />
 
-		<ContextMenu.Item onSelect={() => onThreadDelete(threadId)}>
+		<ContextMenu.Item onSelect={handleDelete}>
 			{m.title_button_delete()}
 		</ContextMenu.Item>
 	</ContextMenu.Content>

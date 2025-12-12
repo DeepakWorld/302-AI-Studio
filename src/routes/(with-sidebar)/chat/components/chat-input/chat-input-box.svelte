@@ -1,26 +1,79 @@
 <script lang="ts">
 	import sendMessageIcon from "$lib/assets/send-message.svg";
+	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { ModelSelect } from "$lib/components/buss/model-select";
 	import { Button } from "$lib/components/ui/button";
 	import { Separator } from "$lib/components/ui/separator";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils";
-	import { compressFile } from "$lib/utils/file-compressor";
-	import type { AttachmentFile } from "@shared/types";
+	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
+	import type { AttachmentFile, Model } from "@shared/types";
 	import { nanoid } from "nanoid";
+	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
 	import { match } from "ts-pattern";
 	import { AttachmentThumbnailBar } from "../attachment";
-	import { MAX_ATTACHMENT_COUNT } from "../attachment/attachment-uploader.svelte";
 	import ChatActions from "./chat-actions.svelte";
+	import SendMessageButton from "./code-agent/send-message-button.svelte";
 	import StreamingIndicator from "./streaming-indicator.svelte";
 
 	let openModelSelect = $state<() => void>();
 	let isComposing = $state(false); // 跟踪输入法composition状态
+	let textareaRef = $state<HTMLTextAreaElement | null>(null);
+	let isCodeAgentModelChanging = $state(false);
+
+	// 自动聚焦到输入框
+	function focusInput() {
+		if (textareaRef) {
+			// 使用 requestAnimationFrame 确保 DOM 已更新
+			requestAnimationFrame(() => {
+				textareaRef?.focus();
+			});
+		}
+	}
+
+	// 组件挂载时自动聚焦
+	onMount(() => {
+		focusInput();
+
+		// 监听页面可见性变化（tab 切换时触发）
+		const handleVisibilityChange = () => {
+			// 当页面变为可见时，自动聚焦输入框
+			if (document.visibilityState === "visible") {
+				// 延迟一点确保 tab 切换动画完成
+				setTimeout(() => {
+					focusInput();
+				}, 50);
+			}
+		};
+
+		// 监听窗口获得焦点事件（用户切回应用时）
+		const handleWindowFocus = () => {
+			focusInput();
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		window.addEventListener("focus", handleWindowFocus);
+
+		return () => {
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+			window.removeEventListener("focus", handleWindowFocus);
+		};
+	});
+
+	// 监听会话 ID 变化，切换会话时自动聚焦
+	$effect(() => {
+		// 监听 chatState.id 的变化
+		const _currentThreadId = chatState.id;
+		// 当会话切换时，自动聚焦输入框
+		focusInput();
+	});
 
 	$effect(() => {
 		if (modelPanelState.isOpen && openModelSelect) {
@@ -40,103 +93,61 @@
 		await window.electronAPI.windowService.handleOpenSettingsWindow("/settings/model-settings");
 	}
 
-	function handleSendMessage() {
-		match({
-			isEmpty: chatState.inputValue.trim() === "" && chatState.attachments.length === 0,
-			noProviders: !hasConfiguredProviders(),
-			noModel: chatState.selectedModel === null,
-		})
-			.with({ isEmpty: true }, () => {
-				toast.warning(m.toast_empty_message());
+	async function handleSendMessage() {
+		// 如果不满足发送条件，直接返回，不执行任何操作
+		if (!chatState.sendMessageEnabled) {
+			return;
+		}
+
+		const fn = () =>
+			match({
+				isEmpty: chatState.inputValue.trim() === "" && chatState.attachments.length === 0,
+				noProviders: !hasConfiguredProviders(),
+				noModel: chatState.selectedModel === null,
 			})
-			.with({ noProviders: true }, () => {
-				toast.info(m.toast_no_provider_configured(), {
-					action: {
-						label: m.text_button_go_to_settings(),
-						onClick: () => handleGoToModelSettings(),
-					},
-				});
-			})
-			.with({ noModel: true }, () => {
-				toast.warning(m.toast_no_model(), {
-					action: {
-						label: m.text_button_select_model(),
-						onClick: () => {
-							if (!hasConfiguredProviders()) {
-								toast.info(m.toast_no_provider_configured(), {
-									action: {
-										label: m.text_button_go_to_settings(),
-										onClick: () => handleGoToModelSettings(),
-									},
-								});
-								return;
-							}
-							openModelSelect?.();
+				.with({ isEmpty: true }, () => {
+					toast.warning(m.toast_empty_message());
+				})
+				.with({ noProviders: true }, () => {
+					toast.info(m.toast_no_provider_configured(), {
+						action: {
+							label: m.text_button_go_to_settings(),
+							onClick: () => handleGoToModelSettings(),
 						},
-					},
+					});
+				})
+				.with({ noModel: true }, () => {
+					toast.warning(m.toast_no_model(), {
+						action: {
+							label: m.text_button_select_model(),
+							onClick: () => {
+								if (!hasConfiguredProviders()) {
+									toast.info(m.toast_no_provider_configured(), {
+										action: {
+											label: m.text_button_go_to_settings(),
+											onClick: () => handleGoToModelSettings(),
+										},
+									});
+									return;
+								}
+								openModelSelect?.();
+							},
+						},
+					});
+				})
+				.otherwise(() => {
+					if (chatState.hasMessages) {
+						chatState.sendMessage();
+					} else {
+						document.startViewTransition(() => chatState.sendMessage());
+					}
 				});
-			})
-			.otherwise(() => {
-				if (chatState.hasMessages) {
-					chatState.sendMessage();
-				} else {
-					document.startViewTransition(() => chatState.sendMessage());
-				}
-			});
-	}
 
-	async function generatePreview(file: File): Promise<string | undefined> {
-		if (file.type.startsWith("image/")) {
-			try {
-				// Compress image to ensure base64 size < 1MB before storage
-				const compressedDataURL = await compressFile(file);
-				return compressedDataURL;
-			} catch (error) {
-				console.error("[ChatInputBox] Failed to compress image:", error);
-				// Fallback to original if compression fails
-				return new Promise((resolve) => {
-					const reader = new FileReader();
-					reader.onload = (e) => resolve(e.target?.result as string);
-					reader.onerror = () => resolve(undefined);
-					reader.readAsDataURL(file);
-				});
-			}
+		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
+			await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+		} else {
+			fn();
 		}
-
-		// Generate data URL for PDF files
-		if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-			return new Promise((resolve) => {
-				const reader = new FileReader();
-				reader.onload = (e) => resolve(e.target?.result as string);
-				reader.onerror = () => resolve(undefined);
-				reader.readAsDataURL(file);
-			});
-		}
-
-		// Generate data URL for Office documents (Excel, Word, PowerPoint)
-		if (
-			file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-			file.type === "application/vnd.ms-excel" ||
-			file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-			file.type === "application/msword" ||
-			file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-			file.type === "application/vnd.ms-powerpoint" ||
-			file.name.toLowerCase().endsWith(".xlsx") ||
-			file.name.toLowerCase().endsWith(".xls") ||
-			file.name.toLowerCase().endsWith(".docx") ||
-			file.name.toLowerCase().endsWith(".doc") ||
-			file.name.toLowerCase().endsWith(".pptx") ||
-			file.name.toLowerCase().endsWith(".ppt")
-		) {
-			return new Promise((resolve) => {
-				const reader = new FileReader();
-				reader.onload = (e) => resolve(e.target?.result as string);
-				reader.onerror = () => resolve(undefined);
-				reader.readAsDataURL(file);
-			});
-		}
-
-		return undefined;
 	}
 
 	async function handlePaste(event: ClipboardEvent) {
@@ -156,8 +167,15 @@
 
 		event.preventDefault();
 
+		processFiles(files);
+	}
+
+	async function processFiles(files: File[]) {
 		for (const file of files) {
 			if (chatState.attachments.length >= MAX_ATTACHMENT_COUNT) {
+				toast.warning(
+					m.toast_max_attachments_reached?.() || `已达到最大附件数量：${MAX_ATTACHMENT_COUNT}`,
+				);
 				break;
 			}
 
@@ -167,7 +185,7 @@
 			// 立即创建附件对象并添加到列表
 			const attachment: AttachmentFile = {
 				id: attachmentId,
-				name: file.name || `pasted-file-${Date.now()}`,
+				name: file.name || `file-${Date.now()}`,
 				type: file.type,
 				size: file.size,
 				file,
@@ -181,12 +199,27 @@
 			chatState.setAttachmentLoading(attachmentId, true);
 
 			// 异步生成预览（不阻塞UI）
-			generatePreview(file).then((preview) => {
+			generateFilePreview(file).then((preview) => {
 				// 更新附件的预览
 				chatState.updateAttachment(attachmentId, { preview });
 				// 标记加载完成
 				chatState.setAttachmentLoading(attachmentId, false);
 			});
+		}
+	}
+
+	async function handleModelSelect(model: Model) {
+		if (codeAgentState.inCodeAgentMode) {
+			isCodeAgentModelChanging = true;
+			const isOK = await codeAgentState.handleCodeAgentModelChange(model);
+			if (!isOK) {
+				toast.error(m.toast_code_agent_model_change_failed());
+			} else {
+				chatState.handleSelectedModelChange(model);
+			}
+			isCodeAgentModelChanging = false;
+		} else {
+			chatState.handleSelectedModelChange(model);
 		}
 	}
 </script>
@@ -201,49 +234,50 @@
 			"transition-[color,box-shadow]",
 			"flex max-h-chat-max-h min-h-chat-min-h w-full flex-col justify-between rounded-chat border p-chat-pad pb-1.5",
 			"focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:outline-hidden",
-			"bg-input",
+			"bg-input overflow-hidden",
 		)}
 		data-layoutid="chat-input-box"
 	>
-		<Textarea
-			class={cn(
-				"w-full resize-none p-0",
-				"border-none shadow-none focus-within:ring-0 focus-within:outline-hidden focus-visible:ring-0",
-			)}
-			bind:value={chatState.inputValue}
-			placeholder={m.placeholder_input_chat()}
-			onkeydown={(e) => {
-				if (e.key === "Enter" && !e.shiftKey && !isComposing) {
-					handleSendMessage();
-					e.preventDefault();
-				}
-			}}
-			oncompositionstart={() => {
-				isComposing = true;
-			}}
-			oncompositionend={() => {
-				isComposing = false;
-			}}
-			onpaste={handlePaste}
-		/>
+		<div class="min-h-0 flex-1 overflow-auto">
+			<Textarea
+				bind:ref={textareaRef}
+				class={cn(
+					"w-full resize-none p-0",
+					"border-none shadow-none focus-within:ring-0 focus-within:outline-hidden focus-visible:ring-0",
+				)}
+				bind:value={chatState.inputValue}
+				onkeydown={(e) => {
+					if (e.key === "Enter" && !e.shiftKey && !isComposing) {
+						handleSendMessage();
+						e.preventDefault();
+					}
+				}}
+				placeholder={m.placeholder_input_chat()}
+				oncompositionstart={() => {
+					isComposing = true;
+				}}
+				oncompositionend={() => {
+					isComposing = false;
+				}}
+				onpaste={handlePaste}
+				disabled={codeAgentState.isDeleted}
+			/>
+		</div>
 
-		<div class="mt-1.5 flex flex-row justify-between">
-			<ChatActions />
+		<div class="mt-1.5 flex flex-row justify-between gap-2 min-w-0 overflow-hidden shrink-0">
+			<div class="flex items-center gap-2 shrink-0">
+				<ChatActions disabled={codeAgentState.isDeleted} />
+			</div>
 
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2 min-w-0">
 				<ModelSelect
 					selectedModel={chatState.selectedModel}
-					onModelSelect={(model) => chatState.handleSelectedModelChange(model)}
+					onModelSelect={(model) => handleModelSelect(model)}
 				>
 					{#snippet trigger({ onclick })}
 						{((openModelSelect = () => {
 							if (!hasConfiguredProviders()) {
-								toast.info(m.toast_no_provider_configured(), {
-									action: {
-										label: m.text_button_go_to_settings(),
-										onClick: () => handleGoToModelSettings(),
-									},
-								});
+								handleGoToModelSettings();
 								return;
 							}
 							onclick();
@@ -251,42 +285,51 @@
 						"")}
 						<Button
 							variant="ghost"
-							class="text-sm text-foreground/50 hover:!bg-chat-action-hover max-w-[200px]"
+							class="relative text-sm text-foreground/50 hover:!bg-chat-action-hover min-w-0 max-w-[300px] !shrink overflow-visible"
 							onclick={() => {
 								if (!hasConfiguredProviders()) {
-									toast.info(m.toast_no_provider_configured(), {
-										action: {
-											label: m.text_button_go_to_settings(),
-											onClick: () => handleGoToModelSettings(),
-										},
-									});
+									handleGoToModelSettings();
 									return;
 								}
 								openModelSelect?.();
 							}}
+							disabled={isCodeAgentModelChanging || codeAgentState.isDeleted}
 						>
-							<p class="truncate">
-								{chatState.selectedModel?.name ?? m.text_button_select_model()}
-							</p>
+							{#if !hasConfiguredProviders()}
+								<span
+									class="absolute top-0 right-0 size-2 rounded-full bg-red-500 pointer-events-none"
+								></span>
+							{/if}
+							{#if isCodeAgentModelChanging}
+								<LdrsLoader type="line-spinner" size={16} />
+							{:else}
+								<p class="truncate">
+									{chatState.selectedModel?.name ?? m.text_button_select_model()}
+								</p>
+							{/if}
 						</Button>
 					{/snippet}
 				</ModelSelect>
 
 				<Separator
 					orientation="vertical"
-					class="rounded-2xl data-[orientation=vertical]:h-1/2 data-[orientation=vertical]:w-0.5"
+					class="shrink-0 rounded-2xl data-[orientation=vertical]:h-1/2 data-[orientation=vertical]:w-0.5"
 				/>
 
-				<button
-					disabled={!chatState.sendMessageEnabled}
-					class={cn(
-						"flex size-9 items-center justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
-						"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",
-					)}
-					onclick={handleSendMessage}
-				>
-					<img src={sendMessageIcon} alt="plane" class="size-5" />
-				</button>
+				{#if codeAgentState.enabled && codeAgentState.isFreshTab}
+					<SendMessageButton onClick={handleSendMessage} />
+				{:else}
+					<button
+						disabled={!chatState.sendMessageEnabled}
+						class={cn(
+							"shrink-0 flex size-9 items-center justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
+							"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",
+						)}
+						onclick={handleSendMessage}
+					>
+						<img src={sendMessageIcon} alt="plane" class="size-5" />
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>

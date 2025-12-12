@@ -15,9 +15,20 @@ const localeMap: Record<ParaglideLocale, Locale> = {
 };
 
 export function formatTimeAgo(createTime: string, localeCode: ParaglideLocale) {
+	// Handle empty or invalid date strings
+	if (!createTime) {
+		return m.text_just_now();
+	}
+
+	const date = new Date(createTime);
+	// Check if date is valid
+	if (isNaN(date.getTime())) {
+		return m.text_just_now();
+	}
+
 	const locale = localeMap[localeCode];
 	const now = new Date();
-	const diff = now.getTime() - new Date(createTime).getTime();
+	const diff = now.getTime() - date.getTime();
 	const seconds = Math.floor(diff / 1000);
 
 	const customLocale = {
@@ -38,7 +49,7 @@ export function formatTimeAgo(createTime: string, localeCode: ParaglideLocale) {
 		return m.text_just_now();
 	}
 
-	return formatDistanceToNow(new Date(createTime), {
+	return formatDistanceToNow(date, {
 		addSuffix: true,
 		locale: customLocale,
 	});

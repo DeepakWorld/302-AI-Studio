@@ -10,6 +10,8 @@
 	import * as Select from "$lib/components/ui/select/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { persistedModelState, providerState } from "$lib/stores/provider-state.svelte.js";
+	import { userState } from "$lib/stores/user-state.svelte";
+	import { getFilteredModels } from "$lib/utils/model-filters.js";
 	import { Eye, EyeOff } from "@lucide/svelte";
 	import type { Model, ModelCreateInput, ModelProvider } from "@shared/types";
 	import { onMount } from "svelte";
@@ -61,7 +63,12 @@
 	);
 	let showApiKey = $state(false);
 
-	const sortedModels = $derived.by(() => providerState.getSortedModels());
+	// 使用统一的过滤方法：对于 302AI provider，只包含 isFeatured === true 或 isAddedByUser === true 的模型；其他 provider 不应用过滤
+	const sortedModels = $derived.by(() => {
+		return getFilteredModels(persistedModelState.current).sort((a, b) =>
+			a.name.localeCompare(b.name),
+		);
+	});
 
 	let formData = $derived.by<ModelProvider>(() => {
 		if (currentProvider) {
@@ -137,6 +144,17 @@
 		isLoadingModels = false;
 	}
 
+	function fillApiKeyFromAccount() {
+		// Prefer ssoApiKey (from SSO callback) over userInfo.api_key (from fetched account info)
+		// The SSO callback returns the actual API key that should be used
+		const apiKeyToUse = userState.ssoApiKey || userState.userInfo?.api_key;
+		if (apiKeyToUse) {
+			formData.apiKey = apiKeyToUse;
+			handleInputChange();
+			toast.success(m.text_provider_update_success({ name: formData.name }));
+		}
+	}
+
 	function handleAddModel() {
 		dialogMode = "add";
 		editingModel = undefined;
@@ -165,7 +183,8 @@
 
 		try {
 			if (dialogMode === "add") {
-				const newModel = await providerState.addModel({
+				// 确保传递 isAddedByUser 字段
+				const createInput: ModelCreateInput = {
 					id: data.id,
 					name: data.name,
 					remark: data.remark,
@@ -175,7 +194,9 @@
 					custom: true,
 					enabled: data.enabled,
 					collected: false,
-				});
+					isAddedByUser: true,
+				};
+				const newModel = await providerState.addModel(createInput);
 
 				toast.success(m.text_model_add_success({ name: newModel.name }));
 			} else if (editingModel) {
@@ -345,7 +366,7 @@
 					</Button>
 				</div>
 				{#if !formData.custom && formData.websites.apiKey}
-					<p class="text-muted-foreground text-xs">
+					<p class="text-muted-foreground flex items-center gap-2 text-xs">
 						<a
 							href={formData.websites.apiKey}
 							target="_blank"
@@ -357,6 +378,22 @@
 						>
 							{m.text_get_api_key()}
 						</a>
+						{#if formData.id === "302AI"}
+							<span class="text-muted-foreground/50">|</span>
+							{#if userState.isLoggedIn}
+								<button
+									class="text-primary cursor-pointer hover:underline"
+									onclick={fillApiKeyFromAccount}
+								>
+									<!-- @ts-expect-error - text_use_account_api_key may not exist in all locales -->
+									{m.text_use_account_api_key()}
+								</button>
+							{:else}
+								<a href="/settings/account-settings" class="text-primary hover:underline">
+									{m.text_login_to_get_api_key()}
+								</a>
+							{/if}
+						{/if}
 					</p>
 				{/if}
 			</div>

@@ -85,10 +85,50 @@ if (process.contextIsolated) {
 				ipcRenderer.on("broadcast-event", listener);
 				return () => ipcRenderer.removeListener("broadcast-event", listener);
 			},
+			onShowToast: (
+				callback: (data: { type: string; message: string; threadId?: string }) => void,
+			) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "show-toast") {
+						callback(eventData.data as { type: string; message: string; threadId?: string });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
 			onTriggerSendMessage: (callback: (data: { threadId: string }) => void) => {
 				const listener = (_: unknown, eventData: BroadcastEventData) => {
 					if (eventData.broadcastEvent === "trigger-send-message") {
 						callback(eventData.data as { threadId: string });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
+			onSidebarStateChanged: (callback: (data: { open: boolean }) => void) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "sidebar-state-changed") {
+						callback(eventData.data as { open: boolean });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
+			onApplyDefaultModel: (callback: (data: { model: unknown }) => void) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "apply-default-model") {
+						callback(eventData.data as { model: unknown });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
+			onModelsDeleted: (
+				callback: (data: { deletedModelIds: string[]; providerId?: string }) => void,
+			) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "models-deleted") {
+						callback(eventData.data as { deletedModelIds: string[]; providerId?: string });
 					}
 				};
 				ipcRenderer.on("broadcast-event", listener);
@@ -164,6 +204,12 @@ if (process.contextIsolated) {
 				const listener = (_: unknown, data: { tabId: string; threadId: string }) => callback(data);
 				ipcRenderer.on("tab:generate-title", listener);
 				return () => ipcRenderer.removeListener("tab:generate-title", listener);
+			},
+			onSandboxCreated: (callback: (data: { threadId: string; sandboxId: string }) => void) => {
+				const listener = (_: unknown, data: { threadId: string; sandboxId: string }) =>
+					callback(data);
+				ipcRenderer.on("code-agent:sandbox-created", listener);
+				return () => ipcRenderer.removeListener("code-agent:sandbox-created", listener);
 			},
 			aiApplication: {
 				onAiApplicationsLoading: (callback: (loading: boolean) => void) => {

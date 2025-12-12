@@ -16,12 +16,24 @@ export function normalizeKeys(input: InputEventLike): string[] {
 	// Add modifiers in canonical order
 	if (input.control) keys.push("Ctrl");
 	if (input.meta) keys.push(isMac ? "Cmd" : "Meta");
-	if (input.alt) keys.push("Alt");
+	if (input.alt) keys.push(isMac ? "Option" : "Alt");
 	if (input.shift) keys.push("Shift");
 
 	// Add regular key (normalized)
+	// Skip if it's only a modifier key
 	if (input.key && !["Control", "Meta", "Alt", "Shift"].includes(input.key)) {
 		let keyName = input.key;
+
+		// On macOS, Option+key produces special characters (e.g., Option+W = ∑)
+		// Use the physical key code to get the actual key pressed
+		if (isMac && input.alt && input.code) {
+			// Extract the key from the code (e.g., "KeyW" -> "W", "KeyA" -> "A")
+			if (input.code.startsWith("Key")) {
+				keyName = input.code.slice(3); // "KeyW" -> "W"
+			} else if (input.code.startsWith("Digit")) {
+				keyName = input.code.slice(5); // "Digit1" -> "1"
+			}
+		}
 
 		// Normalize special keys
 		if (keyName === " ") keyName = "Space";

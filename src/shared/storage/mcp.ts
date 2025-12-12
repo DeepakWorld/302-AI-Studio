@@ -21,6 +21,14 @@ export interface McpServer {
 	createdAt: Date;
 	updatedAt: Date;
 	advancedSettings?: McpServerAdvancedSettings;
+	/** Whether this MCP server is associated with the logged-in account (auto-imported on login) */
+	associatedWithAccount?: boolean;
+	/** Original URL when first imported, used to detect critical field changes */
+	originalUrl?: string | null;
+	/** Original type when first imported, used to detect critical field changes */
+	originalType?: McpServerType;
+	/** Original command when first imported, used to detect critical field changes */
+	originalCommand?: string | null;
 }
 
 export interface McpServerWithRelations extends McpServer {

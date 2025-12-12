@@ -2,9 +2,12 @@ import { getAllModels, getModelsByProvider } from "$lib/api/models.js";
 import { DEFAULT_PROVIDERS } from "$lib/datas/providers.js";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages.js";
+import { getFilteredModels } from "$lib/utils/model-filters.js";
 import type { Model, ModelCreateInput, ModelProvider, ModelUpdateInput } from "@shared/types";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
+import { preferencesSettings } from "./preferences-settings.state.svelte";
+import { sessionState } from "./session-state.svelte";
 
 export const persistedProviderState = new PersistedState<ModelProvider[]>(
 	"app-providers",
@@ -14,7 +17,7 @@ export const persistedProviderState = new PersistedState<ModelProvider[]>(
 );
 export const persistedModelState = new PersistedState<Model[]>("app-models", [], true, 500);
 
-const { aiApplicationService } = window.electronAPI;
+const { providerService } = window.electronAPI;
 
 $effect.root(() => {
 	$effect(() => {
@@ -67,8 +70,8 @@ class ProviderState {
 			p.id === id ? { ...p, ...updates } : p,
 		);
 
-		if (updates.apiKey && updates.apiType === "302ai") {
-			await aiApplicationService.handle302AIProviderChange(updates.apiKey);
+		if (updates.apiKey && id === "302AI") {
+			await providerService.handle302AIProviderChange(updates.apiKey);
 		}
 	}
 	removeProvider(id: string) {
@@ -117,10 +120,36 @@ class ProviderState {
 
 		const existingModel = persistedModelState.current.find((m) => m.id === input.id);
 		if (existingModel) {
-			throw new Error(`Model with ID "${input.id}" already exists`);
+			// 检查 isAddedByUser 字段
+			const isAddedByUser = (existingModel as Model & { isAddedByUser?: boolean }).isAddedByUser;
+			// 如果 isAddedByUser 为 true，说明已经被用户添加过，不允许重复添加
+			if (isAddedByUser === true) {
+				throw new Error(`Model with ID "${input.id}" already exists`);
+			}
+			// 如果 isAddedByUser 为 false 或 undefined，则更新该模型，将 isAddedByUser 设置为 true
+			const updateSuccess = this.updateModel(existingModel.id, {
+				id: input.id,
+				name: input.name,
+				remark: input.remark,
+				providerId: input.providerId,
+				capabilities: input.capabilities,
+				type: input.type,
+				custom: input.custom,
+				enabled: input.enabled,
+				collected: input.collected,
+				isFeatured: input.isFeatured,
+				isAddedByUser: true,
+			});
+			if (updateSuccess) {
+				const updatedModel = persistedModelState.current.find((m) => m.id === input.id);
+				if (updatedModel) {
+					return updatedModel;
+				}
+			}
+			return existingModel;
 		}
 
-		const model: Model = {
+		const model: Model & { isAddedByUser?: boolean } = {
 			id: input.id,
 			name: input.name,
 			remark: input.remark || "",
@@ -130,6 +159,8 @@ class ProviderState {
 			custom: input.custom || false,
 			enabled: input.enabled ?? true,
 			collected: input.collected || false,
+			isFeatured: input.isFeatured || false,
+			isAddedByUser: input.isAddedByUser || false,
 		};
 		persistedModelState.current = [...persistedModelState.current, model];
 
@@ -179,6 +210,7 @@ class ProviderState {
 			custom: input.custom || false,
 			enabled: input.enabled ?? true,
 			collected: input.collected || false,
+			isFeatured: input.isFeatured || false,
 		}));
 		persistedModelState.current = [...persistedModelState.current, ...newModels];
 
@@ -204,16 +236,62 @@ class ProviderState {
 
 		return true;
 	}
-	removeModelsByProvider(providerId: string): number {
+	async removeModelsByProvider(providerId: string): Promise<number> {
 		const originalLength = persistedModelState.current.length;
+		const modelsToRemove = persistedModelState.current.filter((m) => m.providerId === providerId);
+		const deletedModelIds = modelsToRemove.map((m) => m.id);
+		const deletedModelIdSet = new Set(deletedModelIds);
+
 		persistedModelState.current = persistedModelState.current.filter(
 			(m) => m.providerId !== providerId,
 		);
 		const removedCount = originalLength - persistedModelState.current.length;
+
+		// Clear selectedModel references from all threads for deleted models
+		if (removedCount > 0 && deletedModelIds.length > 0) {
+			// Clear global model references if they point to a deleted model
+			const latestUsedModel = sessionState.latestUsedModel;
+			if (latestUsedModel && deletedModelIdSet.has(latestUsedModel.id)) {
+				sessionState.latestUsedModel = null;
+				console.log(`[Provider] Cleared latestUsedModel reference for deleted model`);
+			}
+
+			const newSessionModel = preferencesSettings.newSessionModel;
+			if (newSessionModel && deletedModelIdSet.has(newSessionModel.id)) {
+				preferencesSettings.setNewSessionModel(null);
+				console.log(`[Provider] Cleared newSessionModel reference for deleted model`);
+			}
+
+			const titleGenModel = preferencesSettings.state.titleGenerationModel;
+			if (titleGenModel && deletedModelIdSet.has(titleGenModel.id)) {
+				preferencesSettings.setTitleGenerationModel(null);
+				console.log(`[Provider] Cleared titleGenerationModel reference for deleted model`);
+			}
+
+			try {
+				const { threadService, broadcastService } = window.electronAPI;
+				const clearedCount = await threadService.clearDeletedModelReferences(deletedModelIds);
+				if (clearedCount > 0) {
+					console.log(
+						`[Provider] Cleared selectedModel references in ${clearedCount} thread(s) for deleted models`,
+					);
+				}
+
+				// Broadcast to all tabs to clear their in-memory selectedModel
+				// Include providerId so tabs can clear even if modelId shape mismatches
+				await broadcastService.broadcastToAll("models-deleted", {
+					deletedModelIds,
+					providerId,
+				});
+			} catch (error) {
+				console.error("[Provider] Failed to clear deleted model references:", error);
+			}
+		}
+
 		return removedCount;
 	}
-	clearModelsByProvider(providerId: string): number {
-		return this.removeModelsByProvider(providerId);
+	async clearModelsByProvider(providerId: string): Promise<number> {
+		return await this.removeModelsByProvider(providerId);
 	}
 	async fetchModelsForProvider(provider: ModelProvider): Promise<boolean> {
 		try {
@@ -233,9 +311,15 @@ class ProviderState {
 					})
 					.concat(result.data.models);
 
+				// 对于 302AI provider，只统计 isFeatured === true 或 isAddedByUser === true 的模型数量
+				const displayCount =
+					latestProvider.id === "302AI"
+						? getFilteredModels(result.data.models).length
+						: result.data.models.length;
+
 				toast.success(
 					m.text_fetch_models_success({
-						count: result.data.models.length.toString(),
+						count: displayCount.toString(),
 						provider: latestProvider.name,
 					}),
 				);
@@ -275,6 +359,68 @@ class ProviderState {
 		if (!provider) return false;
 
 		return await this.fetchModelsForProvider(provider);
+	}
+
+	/**
+	 * Create a backup copy of an existing provider with a suffix added to its name.
+	 * @param providerId - The ID of the provider to backup
+	 * @param nameSuffix - The suffix to add to the provider name (e.g., "旧" or "Old")
+	 * @returns The newly created backup provider, or null if the original provider was not found
+	 */
+	createProviderBackup(providerId: string, nameSuffix: string): ModelProvider | null {
+		const originalProvider = this.getProvider(providerId);
+		if (!originalProvider) return null;
+
+		const timestamp = Date.now();
+		const backupProvider: ModelProvider = {
+			...originalProvider,
+			id: `${providerId}-backup-${timestamp}`,
+			name: `${originalProvider.name} - ${nameSuffix}`,
+			custom: true, // Mark as custom so it can be removed
+		};
+
+		this.addProvider(backupProvider);
+
+		// Copy models from original provider to backup provider
+		const originalModels = persistedModelState.current.filter(
+			(model) => model.providerId === providerId,
+		);
+		if (originalModels.length > 0) {
+			const backupModels: Model[] = originalModels.map((model) => ({
+				...model,
+				id: `${model.id}-backup-${timestamp}`,
+				providerId: backupProvider.id,
+			}));
+			persistedModelState.current = [...persistedModelState.current, ...backupModels];
+		}
+
+		return backupProvider;
+	}
+
+	/**
+	 * Clear the API key from the 302.AI provider if it matches the given key
+	 * Also clears all models associated with the provider
+	 * Used when logging out to unlink the associated API key
+	 * @param associatedApiKey - The API key to compare against
+	 * @returns true if the key was cleared, false if it didn't match or provider not found
+	 */
+	async clearAssociatedApiKey(associatedApiKey: string): Promise<boolean> {
+		const provider = this.getProvider("302AI");
+		if (!provider) return false;
+
+		// Only clear if the current API key matches the associated key
+		if (provider.apiKey === associatedApiKey) {
+			this.updateProvider("302AI", { apiKey: "" });
+			// Also clear all models for this provider
+			const removedCount = await this.removeModelsByProvider("302AI");
+			console.log(
+				`[Provider] Cleared associated API key and ${removedCount} models from 302.AI provider`,
+			);
+			return true;
+		}
+
+		console.log("[Provider] API key mismatch, not clearing (user may have modified it)");
+		return false;
 	}
 }
 

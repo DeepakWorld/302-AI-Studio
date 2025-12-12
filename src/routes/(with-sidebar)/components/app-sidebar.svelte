@@ -1,16 +1,22 @@
 <script lang="ts">
+	import { updateSessionNote } from "$lib/api/sandbox-session";
+	import { validate302Provider } from "$lib/api/webserve-deploy";
 	import * as Collapsible from "$lib/components/ui/collapsible";
 	import { Input } from "$lib/components/ui/input";
 	import * as Sidebar from "$lib/components/ui/sidebar";
 	import { m } from "$lib/paraglide/messages";
+	import { persistedClaudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { sidebarSearchState } from "$lib/stores/sidebar-search-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { threadsState } from "$lib/stores/threads-state.svelte";
 	import { TIME_GROUP_ORDER, TimeGroup } from "$lib/types/time-group";
 	import type { MessagePart } from "$lib/utils/attachment-converter";
 	import { ChevronDown } from "@lucide/svelte";
+	import type { CodeAgentConfigMetadata, CodeAgentMetadata } from "@shared/storage/code-agent";
 	import { onMount } from "svelte";
 	import RenameDialog from "./rename-dialog.svelte";
+	import ThreadDeleteDialog from "./thread-delete-dialog.svelte";
 	import ThreadItem from "./thread-item.svelte";
 
 	let searchQuery = $state("");
@@ -25,6 +31,10 @@
 	let renameDialogOpen = $state(false);
 	let renameTargetThreadId = $state<string | null>(null);
 	let renameTargetName = $state("");
+	let deleteDialogOpen = $state(false);
+	let deleteTargetThreadId = $state<string | null>(null);
+	let deleteSandboxId = $state<string | null>(null);
+	let deleteSessionId = $state<string | null>(null);
 
 	onMount(() => {
 		// Register focus callback
@@ -152,31 +162,123 @@
 		return groups;
 	});
 
+	// Helper function to check if a thread has code agent enabled
+	async function isCodeAgentThread(threadId: string): Promise<{
+		isCodeAgent: boolean;
+		sandboxId?: string;
+		sessionId?: string;
+	}> {
+		try {
+			const configKey = `CodeAgentStorage:code-agent-config-state-${threadId}`;
+			const config = await window.electronAPI.storageService.getItem(configKey);
+
+			if (
+				(config as CodeAgentConfigMetadata)?.enabled &&
+				(config as CodeAgentConfigMetadata)?.currentAgentId === "claude-code"
+			) {
+				// Get the Claude Code state for this thread
+				const claudeStateKey = `CodeAgentStorage:claude-code-agent-state-${threadId}`;
+				const claudeState = await window.electronAPI.storageService.getItem(claudeStateKey);
+
+				const sandboxId = (claudeState as CodeAgentMetadata)?.sandboxId;
+				const currentSessionId = (claudeState as CodeAgentMetadata)?.currentSessionId;
+
+				if (sandboxId && currentSessionId) {
+					// Wait for sandbox state to be hydrated before accessing
+					if (!persistedClaudeCodeSandboxState.isHydrated) {
+						await persistedClaudeCodeSandboxState.refresh();
+					}
+
+					// Find the real session id from sessionInfos
+					const sandbox = persistedClaudeCodeSandboxState.current.find(
+						(s) => s.sandboxId === sandboxId,
+					);
+					if (sandbox) {
+						const session = sandbox.sessionInfos.find((s) => s.sessionId === currentSessionId);
+						if (session) {
+							return {
+								isCodeAgent: true,
+								sandboxId: sandboxId,
+								sessionId: session.sessionId,
+							};
+						}
+						// Session not found in sessionInfos
+						// console.error(
+						// 	`Session ${currentSessionId} not found in sandbox ${sandboxId} sessionInfos`,
+						// );
+						return { isCodeAgent: false };
+					}
+					// Sandbox not found in local state
+					// console.error(`Sandbox ${sandboxId} not found in local state`);
+					return { isCodeAgent: false };
+				}
+			}
+		} catch (error) {
+			console.error("Error checking code agent status:", error);
+		}
+
+		return { isCodeAgent: false };
+	}
+
 	async function handleThreadClick(threadId: string) {
-		// Use getCurrentWindowTabs() to get real tabs in current window
-		const currentTabs = tabBarState.getCurrentWindowTabs();
-		const existingTab = currentTabs.find((tab) => tab.threadId === threadId);
+		const currentTabs = await tabBarState.getAllTabs();
+		const existingTab = currentTabs?.find((tab) => tab.threadId === threadId);
 		if (existingTab) {
-			// Tab exists in current window, activate it
 			await tabBarState.handleActivateTab(existingTab.id);
 		} else {
-			// Tab doesn't exist, create or focus in other window
 			await tabBarState.handleNewTabForExistingThread(threadId);
 		}
 	}
 
 	async function handleThreadDelete(threadId: string) {
-		// Use getCurrentWindowTabs() to get real tabs in current window
-		const currentTabs = tabBarState.getCurrentWindowTabs();
-		const relatedTab = currentTabs.find((tab) => tab.threadId === threadId);
-		if (relatedTab) {
-			await tabBarState.handleTabClose(relatedTab.id);
+		// Check if it's a code agent thread
+		const { isCodeAgent, sandboxId, sessionId } = await isCodeAgentThread(threadId);
+
+		if (isCodeAgent && sandboxId && sessionId) {
+			// Show the dialog for code agent threads
+			deleteTargetThreadId = threadId;
+			deleteSandboxId = sandboxId;
+			deleteSessionId = sessionId;
+			deleteDialogOpen = true;
+		} else {
+			// Direct deletion for normal threads
+			await performThreadDeletion(threadId);
+		}
+	}
+
+	async function performThreadDeletion(threadId: string) {
+		// Get ALL tabs across all windows, not just current window
+		const allTabs = await tabBarState.getAllTabs();
+		const existingTab = allTabs?.find((tab) => tab.threadId === threadId);
+
+		if (existingTab) {
+			await tabBarState.handleTabClose(existingTab.id);
 		}
 
 		const success = await threadsState.deleteThread(threadId);
 		if (!success) {
 			console.error("Failed to delete thread:", threadId);
 		}
+	}
+
+	function handleThreadDeleteWithDialog(threadId: string, sandboxId: string, sessionId: string) {
+		deleteTargetThreadId = threadId;
+		deleteSandboxId = sandboxId;
+		deleteSessionId = sessionId;
+		deleteDialogOpen = true;
+	}
+
+	async function handleDeleteDialogConfirm(_deleteRemoteSession: boolean) {
+		if (!deleteTargetThreadId) return;
+
+		// Perform the thread deletion
+		await performThreadDeletion(deleteTargetThreadId);
+
+		// Close dialog and reset state
+		deleteDialogOpen = false;
+		deleteTargetThreadId = null;
+		deleteSandboxId = null;
+		deleteSessionId = null;
 	}
 
 	function openRenameDialog() {
@@ -201,15 +303,31 @@
 		const trimmedName = newName.trim();
 		if (!trimmedName) return;
 
+		// Get agent info for updating session note
+		const agentInfo = await isCodeAgentThread(renameTargetThreadId);
+
 		await threadsState.renameThread(renameTargetThreadId, trimmedName);
-		tabBarState.updateTabTitle(renameTargetThreadId, trimmedName);
+		await tabBarState.updateTabTitle(renameTargetThreadId, trimmedName);
+
+		// Update session note for code agent threads (preserves original sessionId)
+		if (agentInfo.isCodeAgent && agentInfo.sandboxId && agentInfo.sessionId) {
+			const providerResult = validate302Provider(persistedProviderState.current);
+			if (providerResult.valid && providerResult.provider) {
+				updateSessionNote(providerResult.provider, {
+					note: trimmedName,
+					sandbox_id: agentInfo.sandboxId,
+					session_id: agentInfo.sessionId,
+				});
+			}
+		}
+
 		closeRenameDialog();
 	}
 
 	async function handleThreadGenerateTitle(threadId: string) {
 		// Use getCurrentWindowTabs() to get real tabs in current window
-		const currentTabs = tabBarState.getCurrentWindowTabs();
-		const relatedTab = currentTabs.find((tab) => tab.threadId === threadId);
+		const currentTabs = await tabBarState.getCurrentWindowTabs();
+		const relatedTab = currentTabs?.find((tab) => tab.threadId === threadId);
 
 		if (relatedTab?.type === "chat" && relatedTab.threadId) {
 			const { tabService } = window.electronAPI;
@@ -219,8 +337,8 @@
 
 	async function handleThreadClearMessages(threadId: string) {
 		// Use getCurrentWindowTabs() to get real tabs in current window
-		const currentTabs = tabBarState.getCurrentWindowTabs();
-		const relatedTab = currentTabs.find((tab) => tab.threadId === threadId);
+		const currentTabs = await tabBarState.getCurrentWindowTabs();
+		const relatedTab = currentTabs?.find((tab) => tab.threadId === threadId);
 
 		if (relatedTab?.type === "chat" && relatedTab.threadId) {
 			const { tabService } = window.electronAPI;
@@ -243,19 +361,26 @@
 			<Sidebar.GroupContent class="flex flex-col gap-y-1 px-3">
 				{#if searchQuery.trim()}
 					{#await filteredThreadList then threads}
-						{#each threads as { threadId, thread, isFavorite } (threadId)}
-							<ThreadItem
-								{threadId}
-								{thread}
-								{isFavorite}
-								isActive={threadId === threadsState.activeThreadId}
-								onThreadClick={handleThreadClick}
-								onToggleFavorite={() => threadsState.toggleFavorite(threadId)}
-								onRenameThread={handleRenameThread}
-								onThreadGenerateTitle={handleThreadGenerateTitle}
-								onThreadClearMessages={handleThreadClearMessages}
-								onThreadDelete={handleThreadDelete}
-							/>
+						{#each threads as threadData (threadData.threadId)}
+							{@const { threadId, thread, isFavorite } = threadData}
+							{#await isCodeAgentThread(threadId) then agentInfo}
+								<ThreadItem
+									{threadId}
+									{thread}
+									{isFavorite}
+									isActive={threadId === threadsState.activeThreadId}
+									isCodeAgent={agentInfo.isCodeAgent}
+									sandboxId={agentInfo.sandboxId || ""}
+									sessionId={agentInfo.sessionId || ""}
+									onThreadClick={handleThreadClick}
+									onToggleFavorite={() => threadsState.toggleFavorite(threadId)}
+									onRenameThread={handleRenameThread}
+									onThreadGenerateTitle={handleThreadGenerateTitle}
+									onThreadClearMessages={handleThreadClearMessages}
+									onThreadDelete={handleThreadDelete}
+									onThreadDeleteWithDialog={handleThreadDeleteWithDialog}
+								/>
+							{/await}
 						{/each}
 					{/await}
 				{:else if groupedThreadList}
@@ -275,19 +400,26 @@
 									/>
 								</Collapsible.Trigger>
 								<Collapsible.Content class="flex flex-col gap-y-1">
-									{#each group as { threadId, thread, isFavorite } (threadId)}
-										<ThreadItem
-											{threadId}
-											{thread}
-											{isFavorite}
-											isActive={threadId === threadsState.activeThreadId}
-											onThreadClick={handleThreadClick}
-											onToggleFavorite={() => threadsState.toggleFavorite(threadId)}
-											onRenameThread={handleRenameThread}
-											onThreadGenerateTitle={handleThreadGenerateTitle}
-											onThreadClearMessages={handleThreadClearMessages}
-											onThreadDelete={handleThreadDelete}
-										/>
+									{#each group as threadData (threadData.threadId)}
+										{@const { threadId, thread, isFavorite } = threadData}
+										{#await isCodeAgentThread(threadId) then agentInfo}
+											<ThreadItem
+												{threadId}
+												{thread}
+												{isFavorite}
+												isActive={threadId === threadsState.activeThreadId}
+												isCodeAgent={agentInfo.isCodeAgent}
+												sandboxId={agentInfo.sandboxId || ""}
+												sessionId={agentInfo.sessionId || ""}
+												onThreadClick={handleThreadClick}
+												onToggleFavorite={() => threadsState.toggleFavorite(threadId)}
+												onRenameThread={handleRenameThread}
+												onThreadGenerateTitle={handleThreadGenerateTitle}
+												onThreadClearMessages={handleThreadClearMessages}
+												onThreadDelete={handleThreadDelete}
+												onThreadDeleteWithDialog={handleThreadDeleteWithDialog}
+											/>
+										{/await}
 									{/each}
 								</Collapsible.Content>
 							</Collapsible.Root>
@@ -307,4 +439,18 @@
 		renameTargetName = value;
 		handleRenameConfirm(value);
 	}}
+/>
+
+<ThreadDeleteDialog
+	bind:open={deleteDialogOpen}
+	threadId={deleteTargetThreadId || ""}
+	sandboxId={deleteSandboxId || ""}
+	sessionId={deleteSessionId || ""}
+	onClose={() => {
+		deleteDialogOpen = false;
+		deleteTargetThreadId = null;
+		deleteSandboxId = null;
+		deleteSessionId = null;
+	}}
+	onConfirm={handleDeleteDialogConfirm}
 />

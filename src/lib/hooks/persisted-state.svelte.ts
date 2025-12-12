@@ -204,4 +204,20 @@ export class PersistedState<T extends StorageValue> {
 			);
 		});
 	}
+
+	// Force refresh from storage (useful after main process updates)
+	async refresh(): Promise<void> {
+		try {
+			const existingValue = await this.#storage?.getItemAsync(this.#key);
+			if (existingValue != null && !isEqual(existingValue, this.#current)) {
+				this.#current = existingValue;
+				this.#update?.();
+			}
+		} catch (error) {
+			console.error(
+				`Error when refreshing persisted store "${this.#key}" from Electron storage`,
+				error,
+			);
+		}
+	}
 }

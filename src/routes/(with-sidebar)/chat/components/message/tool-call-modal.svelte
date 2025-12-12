@@ -130,6 +130,7 @@
 			<div class="flex flex-col gap-2">
 				<div class="h-[400px] overflow-hidden">
 					<StaticCodeBlock
+						canCollapse={false}
 						code={formatJson(part.input)}
 						language="json"
 						title={m.tool_call_parameters()}
@@ -143,6 +144,7 @@
 				{#if part.state === "output-available"}
 					<div class="h-[400px] overflow-hidden">
 						<StaticCodeBlock
+							canCollapse={false}
 							code={formatJson(part.output)}
 							language="json"
 							title={m.tool_call_result()}

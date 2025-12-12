@@ -31,6 +31,8 @@
 		language: string | null;
 		meta: string | null;
 		theme?: string | null;
+		messageId?: string;
+		messagePartIndex?: number;
 	}
 
 	const props: Props = $props();
@@ -153,7 +155,18 @@
 	};
 
 	const toggleHtmlPreview = () => {
-		htmlPreviewState.togglePreview(props.code);
+		if (props.messageId === undefined || props.messagePartIndex === undefined) {
+			return;
+		}
+		const languageForPreview = resolvedLanguage === "plaintext" ? null : resolvedLanguage;
+		htmlPreviewState.togglePreview({
+			code: props.code,
+			language: languageForPreview,
+			messageId: props.messageId,
+			messagePartIndex: props.messagePartIndex,
+			blockId: props.blockId,
+			meta: props.meta ?? null,
+		});
 	};
 
 	const buildTokenStyle = (token: ThemedToken): string | undefined => {
@@ -306,6 +319,7 @@
 	const ensureLanguage = (): boolean => {
 		const raw = props.language?.toLowerCase().trim() || "plaintext";
 		const effectiveLang = LANGUAGE_ALIASES[raw] ?? raw;
+
 		if (resolvedLanguage !== effectiveLang) {
 			resolvedLanguage = effectiveLang;
 			ensureLanguageLoaded(effectiveLang).catch((error) => {
@@ -398,7 +412,7 @@
 	$effect(() => {
 		if (!highlighter) return;
 		// Re-render when theme prop or app theme changes
-		persistedThemeState.current.shouldUseDarkColors; // Access to track changes
+		void persistedThemeState.current.shouldUseDarkColors; // Access to track changes
 		if (updateTheme()) {
 			resetState();
 			syncCode(props.code);
@@ -438,14 +452,14 @@
 					</ButtonWithTooltip>
 				</div>
 			</div>
-			{#if !isCollapsed}
-				<pre
-					class="shiki !m-0 !rounded-none !border-0"
-					data-theme={props.theme ?? resolvedTheme}
-					data-meta={props.meta ?? undefined}>
-					<code>{props.code}</code>
-				</pre>
-			{/if}
+			<pre
+				class="shiki !m-0 !rounded-none !border-0 overflow-x-auto {isCollapsed
+					? 'max-h-[120px] overflow-y-auto'
+					: ''}"
+				data-theme={props.theme ?? resolvedTheme}
+				data-meta={props.meta ?? undefined}>
+				<code class="block w-max">{props.code}</code>
+			</pre>
 		</div>
 	{/if}
 {:else if props.code.trim() && lines.length > 0}
@@ -472,7 +486,7 @@
 						{/if}
 					</ButtonWithTooltip>
 				{/if}
-				{#if isHtmlCode}
+				{#if isHtmlCode && props.messageId !== undefined && props.messagePartIndex !== undefined}
 					<ButtonWithTooltip
 						class="text-muted-foreground hover:!bg-chat-action-hover"
 						tooltip={htmlPreviewState.isVisible ? "Close preview" : "Preview HTML"}
@@ -494,25 +508,25 @@
 				</ButtonWithTooltip>
 			</div>
 		</div>
-		{#if !isCollapsed}
-			{#if showSvgPreview && isSvgCode}
-				<div class="p-4 bg-background flex items-center justify-center min-h-[200px]">
-					{@html props.code}
-				</div>
-			{:else}
-				<pre
-					class="shiki !m-0 !rounded-none !border-0"
-					data-language={resolvedLanguage}
-					data-theme={resolvedTheme}
-					data-meta={props.meta ?? undefined}
-					style={preStyle}>
-					<code style={codeStyle}>
-						{#each lines as line (line.id)}
-							<span class="line" data-line={line.number}>{@html line.html}</span>
-						{/each}
-					</code>
-				</pre>
-			{/if}
+		{#if showSvgPreview && isSvgCode}
+			<div class="p-4 bg-background flex items-center justify-center min-h-[200px]">
+				{@html props.code}
+			</div>
+		{:else}
+			<pre
+				class="shiki !m-0 !rounded-none !border-0 overflow-x-auto {isCollapsed
+					? 'max-h-[120px] overflow-y-auto'
+					: ''}"
+				data-language={resolvedLanguage}
+				data-theme={resolvedTheme}
+				data-meta={props.meta ?? undefined}
+				style={preStyle}>
+				<code style={codeStyle} class="block w-max">
+					{#each lines as line (line.id)}
+						<span class="line" data-line={line.number}>{@html line.html}</span>
+					{/each}
+				</code>
+			</pre>
 		{/if}
 	</div>
 {/if}

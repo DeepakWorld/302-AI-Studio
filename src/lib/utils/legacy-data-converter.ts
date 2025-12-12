@@ -53,6 +53,7 @@ export function convertModels(legacyModels: LegacyModel[]): Model[] {
 			custom: legacy.custom,
 			enabled: legacy.enabled,
 			collected: legacy.collected,
+			isFeatured: false,
 		};
 		return model;
 	});

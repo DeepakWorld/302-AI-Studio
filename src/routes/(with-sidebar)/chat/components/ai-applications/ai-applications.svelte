@@ -113,7 +113,7 @@
 								placeholder={m.placeholder_input_search()}
 							/>
 						</Sheet.Header>
-						<div class="flex flex-col gap-y-1 px-3 flex-1 overflow-y-auto min-h-0">
+						<div class="flex flex-col gap-y-1 px-3 pb-3 flex-1 overflow-y-auto min-h-0">
 							{#if isSearching}
 								{#each filteredAppList as aiApplication (aiApplication.id)}
 									<AiApplicationItem

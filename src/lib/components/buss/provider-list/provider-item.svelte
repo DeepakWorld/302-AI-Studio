@@ -15,6 +15,7 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { persistedModelState } from "$lib/stores/provider-state.svelte.js";
 	import { cn } from "$lib/utils";
+	import { getFilteredModels } from "$lib/utils/model-filters.js";
 	import { CircleAlert, Cloud, X } from "@lucide/svelte";
 	import type { ModelProvider } from "@shared/types";
 
@@ -33,9 +34,15 @@
 		if (!provider.apiKey || provider.apiKey.trim() === "") {
 			return m.text_provider_not_configured();
 		}
-		const modelCount = persistedModelState.current.filter(
+		// 对于 302AI provider，使用过滤后的模型列表计算数量（只计算 isFeatured === true 或 isAddedByUser === true 的模型）
+		// 对于其他 provider，计算所有模型的数量
+		const allProviderModels = persistedModelState.current.filter(
 			(m) => m.providerId === provider.id,
-		).length;
+		);
+		const modelCount =
+			provider.id === "302AI"
+				? getFilteredModels(allProviderModels).length
+				: allProviderModels.length;
 		return m.text_provider_models_count({ count: modelCount.toString() });
 	});
 

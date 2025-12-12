@@ -27,7 +27,7 @@ function getModelsEndpoint(provider: ModelProvider): string {
 		case "openai":
 		case "302ai":
 			if (baseUrl.endsWith("/v1")) {
-				return `${baseUrl}/models?llm=1`;
+				return `${baseUrl}/models?llm=1&include_custom_models=1`;
 			}
 			return `${baseUrl}/v1/models?llm=1`;
 		case "anthropic":
@@ -73,42 +73,64 @@ function getRequestHeaders(provider: ModelProvider): Record<string, string> {
 }
 
 /**
+ * API model response item interface
+ */
+interface ApiModelItem {
+	id: string;
+	name?: string;
+	is_featured?: boolean;
+	is_custom_model?: boolean;
+	[key: string]: unknown;
+}
+
+/**
  * Parse models response based on provider type
  */
 function parseModelsResponse(
 	provider: ModelProvider,
-	data: { data?: { id: string }[]; models?: { name: string }[]; [key: string]: unknown },
+	data: { data?: ApiModelItem[]; models?: ApiModelItem[]; [key: string]: unknown },
 ): Model[] {
-	let modelNames: string[] = [];
+	let modelItems: ApiModelItem[] = [];
 
 	switch (provider.apiType.toLowerCase()) {
 		case "openai":
 		case "302ai":
 		default:
-			modelNames = (data.data || []).map((model) => model.id);
+			modelItems = data.data || [];
 			break;
 
 		case "anthropic":
-			modelNames = (data.data || []).map((model) => model.id);
+			modelItems = data.data || [];
 			break;
 
 		case "gemini":
 		case "google":
-			modelNames = (data.models || []).map((model) => model.name.replace("models/", ""));
+			modelItems = (data.models || []).map((model) => ({
+				...model,
+				id: (model.name || "").replace("models/", ""),
+			}));
 			break;
 	}
-	return modelNames.map((modelName) => {
+
+	return modelItems.map((modelItem) => {
+		const modelName = modelItem.id;
 		const capabilities = parseModelCapabilities(modelName);
+		// 如果 is_custom_model 为 true，将 isAddedByUser 设置为 true，这样这些模型就能在过滤后的列表中显示出来
+		const isAddedByUser = modelItem.is_custom_model === true;
+
 		return {
 			id: modelName,
 			name: modelName,
 			remark: "",
 			providerId: provider.id,
 			capabilities,
-			type: "language",
+			type: "language" as const,
 			custom: false,
 			enabled: true,
 			collected: false,
+			isFeatured: modelItem.is_featured ?? false,
+			isAddedByUser,
+			is_custom_model: modelItem.is_custom_model ?? false,
 		};
 	});
 }

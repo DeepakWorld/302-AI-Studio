@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*.*.*"
+      - "v*.*.*-beta"
+      - "v*.*.*-beta.*"
 
 permissions:
   contents: write
@@ -17,7 +19,7 @@ jobs:
         include:
           - os: macos-latest
             arch: arm64
-          - os: macos-13
+          - os: macos-15-intel
             arch: x64
           # - os: macos-latest
           #   arch: universal
@@ -62,6 +64,8 @@ jobs:
         run: pnpm --filter @302ai/studio-plugin-sdk run build
 
       - name: Run quality checks
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           npx eslint electron/main/
           pnpm run check
@@ -74,9 +78,22 @@ jobs:
         run: |
           # Extract version from tag
           VERSION=${GITHUB_REF#refs/tags/}
+
+          # Determine if this is a beta release
+          IS_BETA=false
+          PRERELEASE_FLAG="--prerelease"
+          if [[ "$VERSION" == *"-beta"* ]]; then
+            IS_BETA=true
+            echo "This is a beta release"
+          fi
+
           # Create release if it doesn't exist
           if ! gh release view "$VERSION" >/dev/null 2>&1; then
-            gh release create "$VERSION" --title "$VERSION" --notes "Release $VERSION" --prerelease
+            if [ "$IS_BETA" = true ]; then
+              gh release create "$VERSION" --title "$VERSION (Beta)" --notes "Beta Release $VERSION" $PRERELEASE_FLAG
+            else
+              gh release create "$VERSION" --title "$VERSION" --notes "Release $VERSION" $PRERELEASE_FLAG
+            fi
           fi
 
       - name: Build and release

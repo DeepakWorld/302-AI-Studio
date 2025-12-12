@@ -8,6 +8,8 @@ import mitt from "mitt";
 export const emitter = mitt<{
 	"persisted-state:sync": { sendKey: string; syncValue: any; sourceWebContentsId: number };
 	"general-settings:language-changed": { language: LanguageCode };
+	"provider:302ai-provider-changed": { apiKey: string };
+	"thread:thread-deleted": { threadId: string };
 }>();
 
 export class BroadcastService {

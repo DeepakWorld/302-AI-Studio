@@ -1,7 +1,7 @@
+import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "@shared/storage/mcp";
-import { experimental_createMCPClient as createMCPClient } from "ai";
 import { type IpcMainInvokeEvent } from "electron";
 
 interface MCPClientWrapper {

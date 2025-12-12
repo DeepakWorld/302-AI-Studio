@@ -14,9 +14,10 @@
 		options: SegmentedOption[];
 		selectedKey: string | null;
 		onSelect: (key: string) => void;
+		disabled?: boolean;
 	}
 
-	const { options, selectedKey, onSelect }: Props = $props();
+	const { options, selectedKey, onSelect, disabled }: Props = $props();
 
 	let thumbStyle: { left: string; width: string } = $state({ left: "", width: "" });
 	const itemElements: HTMLElement[] = $state([]);
@@ -74,8 +75,10 @@
 				class={cn(
 					"h-seg-thumb relative z-2 flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-md text-sm",
 					isActive ? "text-accent-foreground" : "text-secondary-foreground hover:bg-tab-hover z-1",
+					disabled && "cursor-not-allowed opacity-50",
 				)}
 				type="button"
+				{disabled}
 				onmousedown={() => handleSelect(option.key)}
 				aria-pressed={isActive}
 			>

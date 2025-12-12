@@ -1,12 +1,11 @@
 import { isDev } from "@electron/main/constants";
-import type { ImportResult } from "@shared/types";
+import type { BackupInfo, ImportResult } from "@shared/types";
 import archiver from "archiver";
 import { type IpcMainInvokeEvent, app, dialog } from "electron";
 import extract from "extract-zip";
 import { createWriteStream, existsSync } from "fs";
 import { cp, mkdir, readdir, readFile, rm } from "fs/promises";
 import { join } from "path";
-import type { BackupInfo } from "@shared/types";
 import { userDataManager } from "../app-service/user-data-manager";
 import { importLegacyJson } from "./legacy-import";
 
@@ -401,6 +400,43 @@ export class DataService {
 		const triplitPath = join(app.getPath("userData"), "../", "302 AI Studio", "triplit");
 		console.log(triplitPath);
 		return existsSync(triplitPath);
+	}
+
+	/**
+	 * Select a folder and create a zip file for upload
+	 * @returns Object with zip file path and folder name, or null if cancelled
+	 */
+	async zipFolderForUpload(
+		_event: IpcMainInvokeEvent,
+	): Promise<{ zipPath: string; folderName: string } | null> {
+		try {
+			// Show folder selection dialog
+			const { canceled, filePaths } = await dialog.showOpenDialog({
+				title: "Select Folder to Upload",
+				properties: ["openDirectory"],
+			});
+
+			if (canceled || filePaths.length === 0) {
+				return null;
+			}
+
+			const selectedFolderPath = filePaths[0];
+			const folderName = selectedFolderPath.split(/[/\\]/).pop() || "folder";
+
+			// Create temp directory for zip file
+			const tempDir = app.getPath("temp");
+			const timestamp = Date.now();
+			const zipFileName = `${folderName}-upload-${timestamp}.zip`;
+			const zipPath = join(tempDir, zipFileName);
+
+			// Create zip file
+			await this.createZipFromFolder(selectedFolderPath, zipPath);
+
+			return { zipPath, folderName };
+		} catch (error) {
+			console.error("Failed to create zip for upload:", error);
+			throw error;
+		}
 	}
 }
 

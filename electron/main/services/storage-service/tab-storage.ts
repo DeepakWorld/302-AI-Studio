@@ -4,6 +4,8 @@ import { isEmpty } from "es-toolkit/compat";
 import { nanoid } from "nanoid";
 import { storageService, StorageService } from ".";
 import { generalSettingsService } from "../settings-service";
+import { providerStorage } from "./provider-storage";
+import { sessionStorage } from "./session-storage";
 
 export class TabStorage extends StorageService<TabState> {
 	constructor() {
@@ -44,9 +46,14 @@ export class TabStorage extends StorageService<TabState> {
 		}
 	}
 
-	async getTabs(windowId: string): Promise<Tab[] | null> {
+	async getTabsByWindowId(windowId: string): Promise<Tab[] | null> {
 		const result = await this.getItemInternal("tab-bar-state");
 		return result ? result[windowId].tabs : null;
+	}
+
+	async getAllTabs(): Promise<Tab[] | null> {
+		const result = await this.getItemInternal("tab-bar-state");
+		return result ? Object.values(result).flatMap((windowTabs) => windowTabs.tabs) : null;
 	}
 
 	async getActiveTabId(windowId: string): Promise<string | null> {
@@ -74,6 +81,17 @@ export class TabStorage extends StorageService<TabState> {
 				active: true,
 				threadId,
 			};
+
+			// Get default model same as handleNewTab in tab-service
+			const [preferencesSettingsData, latestUsedModel, apiKeyHash] = await Promise.all([
+				storageService.getItemInternal("PreferencesSettingsStorage:state"),
+				sessionStorage.getLatestUsedModel(),
+				providerStorage.get302AIApiKeyHash(),
+			]);
+			const preferencesSettings = preferencesSettingsData as unknown as {
+				newSessionModel?: ThreadParmas["selectedModel"];
+			} | null;
+
 			const initThread: ThreadParmas = {
 				id: threadId,
 				title,
@@ -89,9 +107,10 @@ export class TabStorage extends StorageService<TabState> {
 				isThinkingActive: false,
 				isOnlineSearchActive: false,
 				isMCPActive: false,
-				selectedModel: null,
+				selectedModel: preferencesSettings?.newSessionModel ?? latestUsedModel,
 				isPrivateChatActive: false,
 				updatedAt: new Date(),
+				apiKeyHash,
 			};
 			allWindowsTabs.push([initTab]);
 
@@ -148,6 +167,10 @@ export class TabStorage extends StorageService<TabState> {
 		if (isNull(tabState)) return;
 		delete tabState[windowId];
 		await this.setItemInternal("tab-bar-state", tabState);
+	}
+
+	async getPersistedTabState(): Promise<TabState | null> {
+		return this.getItemInternal("tab-bar-state");
 	}
 }
 

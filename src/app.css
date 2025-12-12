@@ -197,6 +197,12 @@
 	[data-slot="dialog-content"][data-model-dialog] {
 		max-width: 42rem !important;
 	}
+	[data-slot="dialog-content"][data-login-dialog] {
+		max-width: 400px !important;
+	}
+	[data-slot="dialog-content"][data-logout-dialog] {
+		max-width: 400px !important;
+	}
 }
 
 /* Design System tokens for new buss components */

@@ -85,24 +85,26 @@
 					onclick={() => handleServerClick(server.id)}
 				>
 					<div class="flex w-full items-center justify-between gap-x-10">
-						<div class="flex items-center gap-3">
-							<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+						<div class="flex min-w-0 items-center gap-3">
+							<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
 								{#if server.icon}
 									<span class="text-xl">{server.icon}</span>
 								{:else}
 									<Server class="text-muted-fg h-5 w-5" />
 								{/if}
 							</div>
-							<div class="flex flex-col gap-1">
+							<div class="flex min-w-0 flex-col gap-1">
 								<h3 class="text-setting-fg text-left text-sm font-medium">
 									{server.name || server.id}
 								</h3>
 								{#if server.description}
-									<p class="text-muted-fg text-left text-xs">{server.description}</p>
+									<p class="text-muted-fg truncate text-left text-xs" title={server.description}>
+										{server.description}
+									</p>
 								{/if}
 							</div>
 						</div>
-						<div class="text-setting-fg text-sm">
+						<div class="shrink-0 text-setting-fg text-sm">
 							{server.enabled ? m.mcp_enabled() : m.mcp_disabled()}
 						</div>
 					</div>

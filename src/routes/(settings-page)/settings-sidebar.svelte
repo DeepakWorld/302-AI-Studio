@@ -11,6 +11,11 @@
 			labelKey: m.text_button_settings_general(),
 		},
 		{
+			name: "account-settings",
+			path: "/settings/account-settings",
+			labelKey: m.text_button_settings_account(),
+		},
+		{
 			name: "preferences-settings",
 			path: "/settings/preferences-settings",
 			labelKey: m.text_button_settings_preferences(),
@@ -24,6 +29,11 @@
 			name: "model-settings",
 			path: "/settings/model-settings",
 			labelKey: m.text_button_settings_models(),
+		},
+		{
+			name: "agent-settings",
+			path: "/settings/agent-settings",
+			labelKey: "Agent",
 		},
 		{
 			name: "mcp-settings",

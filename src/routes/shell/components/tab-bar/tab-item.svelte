@@ -24,11 +24,20 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { cn } from "$lib/utils";
-	import { Ghost, LayoutGrid, MessageCircle, Settings, X } from "@lucide/svelte";
+	import {
+		Ghost,
+		HatGlasses,
+		LayoutGrid,
+		MessageCircle,
+		MonitorSmartphone,
+		Settings,
+		X,
+	} from "@lucide/svelte";
 	import type { Tab } from "@shared/types";
 	import { onDestroy } from "svelte";
 
 	const { handleAiApplicationReload } = window.electronAPI.aiApplicationService;
+	const { storageService } = window.electronAPI;
 
 	const {
 		tab,
@@ -49,6 +58,7 @@
 	let triggerRef = $state<HTMLElement | null>(null);
 	let isCompact = $state(false);
 	let windowTabsInfo = $derived(tabBarState.windowTabsInfo);
+	let hasMessages = $state(false);
 
 	$effect(() => {
 		if (!triggerRef?.parentElement) return;
@@ -73,12 +83,41 @@
 		}
 	});
 
+	// Check if the tab has messages for screenshot functionality
+	$effect(() => {
+		if (tab.type === "chat" && tab.threadId) {
+			(async () => {
+				try {
+					const messages = await storageService.getItem(`app-chat-messages:${tab.threadId}`);
+					hasMessages = Array.isArray(messages) && messages.length > 0;
+				} catch (error) {
+					console.warn("Failed to check messages for tab:", error);
+					hasMessages = false;
+				}
+			})();
+		} else {
+			hasMessages = false;
+		}
+	});
+
 	onDestroy(() => {
 		window.cancelAnimationFrame?.(0);
 	});
 
 	const handleScreenshot = async () => {
 		if (tab.type === "chat" && tab.threadId) {
+			// Check if there are messages before taking screenshot
+			if (!hasMessages) {
+				// Broadcast toast message to tab view (content area) so it displays on top
+				// Include threadId so only the current tab shows the toast
+				await window.electronAPI?.broadcastService?.broadcastToAll("show-toast", {
+					type: "warning",
+					message: m.screenshot_no_messages(),
+					threadId: tab.threadId,
+				});
+				return;
+			}
+
 			await window.electronAPI?.broadcastService?.broadcastToAll("trigger-screenshot", {
 				threadId: tab.threadId,
 			});
@@ -98,6 +137,10 @@
 		<Settings />
 	{:else if tabType === "aiApplications"}
 		<LayoutGrid />
+	{:else if tabType === "codeAgent"}
+		<HatGlasses />
+	{:else if tabType === "htmlPreview"}
+		<MonitorSmartphone />
 	{/if}
 {/snippet}
 

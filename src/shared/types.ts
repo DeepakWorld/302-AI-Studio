@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { StorageValue } from "@302ai/unstorage";
-
 export * from "@302ai/unstorage";
 export * from "./storage/ai-applications";
+export * from "./storage/code-agent";
 export * from "./storage/general-settings";
 export * from "./storage/mcp";
 export * from "./storage/provider";
@@ -18,6 +17,7 @@ export * from "@302ai/studio-plugin-sdk";
 
 // Import specific types for use in this file
 import type { Model, ModelCapability, ModelType } from "@302ai/studio-plugin-sdk";
+import type { StorageValue } from "@302ai/unstorage";
 
 // Application-specific plugin types (not in SDK)
 export type PluginSource =
@@ -90,6 +90,8 @@ export interface ModelCreateInput {
 	custom?: boolean;
 	enabled?: boolean;
 	collected?: boolean;
+	isFeatured?: boolean;
+	isAddedByUser?: boolean;
 }
 
 export interface ModelUpdateInput {
@@ -102,6 +104,8 @@ export interface ModelUpdateInput {
 	custom?: boolean;
 	enabled?: boolean;
 	collected?: boolean;
+	isFeatured?: boolean;
+	isAddedByUser?: boolean;
 }
 
 export interface MCPServer {
@@ -138,6 +142,8 @@ export interface ThreadParmas {
 	isPrivateChatActive: boolean;
 	updatedAt: Date;
 	autoSendOnLoad?: boolean; // Flag to auto-send message when thread loads (for branch and send)
+	/** Hash of the API key used when creating this thread, used to track account association */
+	apiKeyHash?: string;
 }
 
 export interface ThreadData {
@@ -152,7 +158,11 @@ export type BroadcastEvent =
 	| "theme-changed"
 	| "settings-updated"
 	| "trigger-screenshot"
-	| "trigger-send-message";
+	| "trigger-send-message"
+	| "show-toast"
+	| "sidebar-state-changed"
+	| "apply-default-model"
+	| "models-deleted";
 
 export interface BroadcastEventData {
 	broadcastEvent: BroadcastEvent;

@@ -5,6 +5,7 @@ import {
 	storageService,
 	pluginService,
 	generalSettingsService,
+	codeAgentService,
 	ghostWindowService,
 	windowService,
 	shortcutService,
@@ -14,6 +15,8 @@ import {
 	dataService,
 	externalLinkService,
 	mcpService,
+	providerService,
+	ssoService,
 	threadService,
 	updaterService,
 } from "../services";
@@ -145,6 +148,42 @@ export function registerIpcHandlers() {
 		generalSettingsService.handleLanguageChanged(event, language),
 	);
 
+	// codeAgentService service registration
+	ipcMain.handle(
+		"codeAgentService:updateClaudeCodeSandboxModel",
+		(event, threadId, sandbox_id, llm_model) =>
+			codeAgentService.updateClaudeCodeSandboxModel(event, threadId, sandbox_id, llm_model),
+	);
+	ipcMain.handle("codeAgentService:checkClaudeCodeSandbox", (event, sandboxId) =>
+		codeAgentService.checkClaudeCodeSandbox(event, sandboxId),
+	);
+	ipcMain.handle("codeAgentService:updateClaudeCodeSandboxesByIpc", (event) =>
+		codeAgentService.updateClaudeCodeSandboxesByIpc(event),
+	);
+	ipcMain.handle("codeAgentService:updateClaudeCodeSessions", (event, sandboxId) =>
+		codeAgentService.updateClaudeCodeSessions(event, sandboxId),
+	);
+	ipcMain.handle(
+		"codeAgentService:updateClaudeCodeCurrentSessionIdByThreadId",
+		(event, threadId, sessionId) =>
+			codeAgentService.updateClaudeCodeCurrentSessionIdByThreadId(event, threadId, sessionId),
+	);
+	ipcMain.handle("codeAgentService:updateClaudeCodeSandboxRemark", (event, sandbox_id, remark) =>
+		codeAgentService.updateClaudeCodeSandboxRemark(event, sandbox_id, remark),
+	);
+	ipcMain.handle("codeAgentService:createClaudeCodeSandboxByIpc", (event, threadId, sandboxName) =>
+		codeAgentService.createClaudeCodeSandboxByIpc(event, threadId, sandboxName),
+	);
+	ipcMain.handle("codeAgentService:deleteClaudeCodeSandboxByIpc", (event, sandbox_id) =>
+		codeAgentService.deleteClaudeCodeSandboxByIpc(event, sandbox_id),
+	);
+	ipcMain.handle("codeAgentService:deleteClaudeCodeSession", (event, sandbox_id, session_id) =>
+		codeAgentService.deleteClaudeCodeSession(event, sandbox_id, session_id),
+	);
+	ipcMain.handle("codeAgentService:findClaudeCodeSandboxWithValidDisk", (event, threadId) =>
+		codeAgentService.findClaudeCodeSandboxWithValidDisk(event, threadId),
+	);
+
 	// ghostWindowService service registration
 	ipcMain.handle("ghostWindowService:startTracking", (event) =>
 		ghostWindowService.startTracking(event),
@@ -189,13 +228,19 @@ export function registerIpcHandlers() {
 	ipcMain.handle("tabService:handleNewTabWithThread", (event, threadId, title, type, active) =>
 		tabService.handleNewTabWithThread(event, threadId, title, type, active),
 	);
-	ipcMain.handle("tabService:handleNewTab", (event, title, type, active, href) =>
-		tabService.handleNewTab(event, title, type, active, href),
+	ipcMain.handle(
+		"tabService:handleNewTab",
+		(event, title, type, active, href, content, previewId) =>
+			tabService.handleNewTab(event, title, type, active, href, content, previewId),
 	);
 	ipcMain.handle("tabService:handleActivateTab", (event, tabId) =>
 		tabService.handleActivateTab(event, tabId),
 	);
 	ipcMain.handle("tabService:getActiveTab", (event) => tabService.getActiveTab(event));
+	ipcMain.handle("tabService:getAllTabsForCurrentWindow", (event) =>
+		tabService.getAllTabsForCurrentWindow(event),
+	);
+	ipcMain.handle("tabService:getAllTabs", (event) => tabService.getAllTabs(event));
 	ipcMain.handle("tabService:handleTabClose", (event, tabId, newActiveTabId) =>
 		tabService.handleTabClose(event, tabId, newActiveTabId),
 	);
@@ -213,7 +258,6 @@ export function registerIpcHandlers() {
 				shouldSwitchActive,
 			),
 	);
-	ipcMain.handle("tabService:handleTabCloseAll", (event) => tabService.handleTabCloseAll(event));
 	ipcMain.handle("tabService:handleShellViewLevel", (event, up) =>
 		tabService.handleShellViewLevel(event, up),
 	);
@@ -230,9 +274,6 @@ export function registerIpcHandlers() {
 	// aiApplicationService service registration
 	ipcMain.handle("aiApplicationService:getAiApplicationUrl", (event, applicationId) =>
 		aiApplicationService.getAiApplicationUrl(event, applicationId),
-	);
-	ipcMain.handle("aiApplicationService:handle302AIProviderChange", (event, updatedApiKey) =>
-		aiApplicationService.handle302AIProviderChange(event, updatedApiKey),
 	);
 	ipcMain.handle("aiApplicationService:handleAiApplicationReload", (event, tabId) =>
 		aiApplicationService.handleAiApplicationReload(event, tabId),
@@ -262,6 +303,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("dataService:checkOldVersionData", (event) =>
 		dataService.checkOldVersionData(event),
 	);
+	ipcMain.handle("dataService:zipFolderForUpload", (event) =>
+		dataService.zipFolderForUpload(event),
+	);
 
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
@@ -275,6 +319,20 @@ export function registerIpcHandlers() {
 	ipcMain.handle("mcpService:closeServer", (event, serverId) =>
 		mcpService.closeServer(event, serverId),
 	);
+
+	// providerService service registration
+	ipcMain.handle("providerService:handle302AIProviderChange", (event, apiKey) =>
+		providerService.handle302AIProviderChange(event, apiKey),
+	);
+
+	// ssoService service registration
+	ipcMain.handle("ssoService:openSsoLogin", (event, serverPort, language) =>
+		ssoService.openSsoLogin(event, serverPort, language),
+	);
+	ipcMain.handle("ssoService:waitForSsoCallback", (event, timeoutMs) =>
+		ssoService.waitForSsoCallback(event, timeoutMs),
+	);
+	ipcMain.handle("ssoService:cancelSsoLogin", (event) => ssoService.cancelSsoLogin(event));
 
 	// threadService service registration
 	ipcMain.handle("threadService:addThread", (event, threadId) =>
@@ -296,6 +354,12 @@ export function registerIpcHandlers() {
 	ipcMain.handle("threadService:removeFavorite", (event, threadId) =>
 		threadService.removeFavorite(event, threadId),
 	);
+	ipcMain.handle("threadService:deleteThreadsByApiKeyHash", (event, apiKeyHash) =>
+		threadService.deleteThreadsByApiKeyHash(event, apiKeyHash),
+	);
+	ipcMain.handle("threadService:clearDeletedModelReferences", (event, deletedModelIds) =>
+		threadService.clearDeletedModelReferences(event, deletedModelIds),
+	);
 
 	// updaterService service registration
 	ipcMain.handle("updaterService:checkForUpdatesManually", (event) =>
@@ -307,6 +371,12 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("updaterService:setAutoUpdate", (event, enabled) =>
 		updaterService.setAutoUpdate(event, enabled),
+	);
+	ipcMain.handle("updaterService:setUpdateChannel", (event, channel) =>
+		updaterService.setUpdateChannel(event, channel),
+	);
+	ipcMain.handle("updaterService:getUpdateChannel", (event) =>
+		updaterService.getUpdateChannel(event),
 	);
 }
 
@@ -357,6 +427,16 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("pluginService:executeAfterSendMessageHook");
 	ipcMain.removeHandler("pluginService:executeErrorHook");
 	ipcMain.removeHandler("generalSettingsService:handleLanguageChanged");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxModel");
+	ipcMain.removeHandler("codeAgentService:checkClaudeCodeSandbox");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxesByIpc");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSessions");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeCurrentSessionIdByThreadId");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxRemark");
+	ipcMain.removeHandler("codeAgentService:createClaudeCodeSandboxByIpc");
+	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSandboxByIpc");
+	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSession");
+	ipcMain.removeHandler("codeAgentService:findClaudeCodeSandboxWithValidDisk");
 	ipcMain.removeHandler("ghostWindowService:startTracking");
 	ipcMain.removeHandler("ghostWindowService:stopTracking");
 	ipcMain.removeHandler("ghostWindowService:updateInsertIndex");
@@ -373,16 +453,16 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("tabService:handleNewTab");
 	ipcMain.removeHandler("tabService:handleActivateTab");
 	ipcMain.removeHandler("tabService:getActiveTab");
+	ipcMain.removeHandler("tabService:getAllTabsForCurrentWindow");
+	ipcMain.removeHandler("tabService:getAllTabs");
 	ipcMain.removeHandler("tabService:handleTabClose");
 	ipcMain.removeHandler("tabService:handleTabCloseOthers");
 	ipcMain.removeHandler("tabService:handleTabCloseOffside");
-	ipcMain.removeHandler("tabService:handleTabCloseAll");
 	ipcMain.removeHandler("tabService:handleShellViewLevel");
 	ipcMain.removeHandler("tabService:replaceTabContent");
 	ipcMain.removeHandler("tabService:handleClearTabMessages");
 	ipcMain.removeHandler("tabService:handleGenerateTabTitle");
 	ipcMain.removeHandler("aiApplicationService:getAiApplicationUrl");
-	ipcMain.removeHandler("aiApplicationService:handle302AIProviderChange");
 	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReload");
 	ipcMain.removeHandler("appService:getTheme");
 	ipcMain.removeHandler("appService:setTheme");
@@ -397,9 +477,14 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:deleteBackup");
 	ipcMain.removeHandler("dataService:openBackupDirectory");
 	ipcMain.removeHandler("dataService:checkOldVersionData");
+	ipcMain.removeHandler("dataService:zipFolderForUpload");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
+	ipcMain.removeHandler("providerService:handle302AIProviderChange");
+	ipcMain.removeHandler("ssoService:openSsoLogin");
+	ipcMain.removeHandler("ssoService:waitForSsoCallback");
+	ipcMain.removeHandler("ssoService:cancelSsoLogin");
 	ipcMain.removeHandler("threadService:addThread");
 	ipcMain.removeHandler("threadService:getThreads");
 	ipcMain.removeHandler("threadService:getThread");
@@ -407,8 +492,12 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("threadService:renameThread");
 	ipcMain.removeHandler("threadService:addFavorite");
 	ipcMain.removeHandler("threadService:removeFavorite");
+	ipcMain.removeHandler("threadService:deleteThreadsByApiKeyHash");
+	ipcMain.removeHandler("threadService:clearDeletedModelReferences");
 	ipcMain.removeHandler("updaterService:checkForUpdatesManually");
 	ipcMain.removeHandler("updaterService:quitAndInstall");
 	ipcMain.removeHandler("updaterService:isUpdateDownloaded");
 	ipcMain.removeHandler("updaterService:setAutoUpdate");
+	ipcMain.removeHandler("updaterService:setUpdateChannel");
+	ipcMain.removeHandler("updaterService:getUpdateChannel");
 }

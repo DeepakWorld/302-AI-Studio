@@ -34,7 +34,15 @@ declare global {
 			};
 			onThemeChange: (callback: (theme: Theme) => void) => () => void;
 			onScreenshotTriggered: (callback: (data: { threadId: string }) => void) => () => void;
+			onShowToast: (
+				callback: (data: { type: string; message: string; threadId?: string }) => void,
+			) => () => void;
 			onTriggerSendMessage: (callback: (data: { threadId: string }) => void) => () => void;
+			onSidebarStateChanged: (callback: (data: { open: boolean }) => void) => () => void;
+			onApplyDefaultModel: (callback: (data: { model: unknown }) => void) => () => void;
+			onModelsDeleted: (
+				callback: (data: { deletedModelIds: string[]; providerId?: string }) => void,
+			) => () => void;
 			onThreadListUpdate: (callback: (eventData: BroadcastEventData) => void) => () => void;
 			onShellWindowFullscreenChange: (
 				callback: (payload: ShellWindowFullscreenChange) => void,
@@ -46,6 +54,9 @@ declare global {
 			) => () => void;
 			onTabGenerateTitle: (
 				callback: (data: { tabId: string; threadId: string }) => void,
+			) => () => void;
+			onSandboxCreated: (
+				callback: (data: { threadId: string; sandboxId: string }) => void,
 			) => () => void;
 			onPersistedStateSync: <T>(key: string, callback: (syncValue: T) => void) => () => void;
 			updater: {

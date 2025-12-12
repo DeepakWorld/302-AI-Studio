@@ -524,6 +524,7 @@
 								<StaticCodeBlock
 									code={JSON.stringify(selectedTool.inputSchema, null, 2)}
 									language="json"
+									canCollapse={false}
 									showCollapseButton={false}
 								/>
 							</div>

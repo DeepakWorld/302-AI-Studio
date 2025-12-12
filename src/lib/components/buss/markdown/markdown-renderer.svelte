@@ -10,6 +10,9 @@
 	import texmath from "markdown-it-texmath";
 	import type Token from "markdown-it/lib/token.mjs";
 	import { onMount } from "svelte";
+	import BlockLoading from "./code-agent/block-loading.svelte";
+	import TodoListRenderer from "./code-agent/todo-list-renderer.svelte";
+	import WriteToolRenderer from "./code-agent/write-tool-renderer.svelte";
 	import CodeBlock from "./code-block.svelte";
 	import { DEFAULT_THEME, ensureHighlighter } from "./highlighter";
 
@@ -42,6 +45,10 @@
 		onInstance?: InstanceCallback;
 		transform?: TransformRenderedHtml;
 		codeTheme?: string;
+		messageId?: string;
+		messagePartIndex?: number;
+		/** Whether the message is currently streaming. When false, tool-loading blocks won't be rendered. */
+		isStreaming?: boolean;
 	}
 
 	type BlockDescriptor =
@@ -52,6 +59,29 @@
 				code: string;
 				language: string | null;
 				meta: string | null;
+		  }
+		| {
+				id: string;
+				kind: "todo";
+				todos: Array<{
+					content: string;
+					status: "pending" | "in_progress" | "completed";
+					activeForm: string;
+				}>;
+		  }
+		| {
+				id: string;
+				kind: "tool-loading";
+				toolType: "todo" | "write" | null;
+				code: string;
+				language: string | null;
+		  }
+		| {
+				id: string;
+				kind: "write";
+				filePath: string;
+				code: string;
+				language: string | null;
 		  };
 
 	const DEFAULT_OPTIONS: Readonly<MarkdownItOptions> = Object.freeze({
@@ -312,6 +342,137 @@
 		return instance;
 	};
 
+	const detectTodoWriteJson = (
+		code: string,
+		language: string | null,
+	): {
+		isTodoWrite: boolean;
+		todos: Array<{
+			content: string;
+			status: "pending" | "in_progress" | "completed";
+			activeForm: string;
+		}> | null;
+	} => {
+		// Only check JSON code blocks
+		if (language?.toLowerCase() !== "json") {
+			return { isTodoWrite: false, todos: null };
+		}
+
+		try {
+			const trimmed = code.trim();
+			const parsed = JSON.parse(trimmed);
+
+			// Check if it has the todos field with valid structure
+			if (
+				parsed &&
+				typeof parsed === "object" &&
+				"todos" in parsed &&
+				Array.isArray(parsed.todos)
+			) {
+				const todos = parsed.todos;
+
+				// Validate that all todos have the required fields
+				const isValid = todos.every(
+					(todo: unknown) =>
+						todo &&
+						typeof todo === "object" &&
+						"content" in todo &&
+						"status" in todo &&
+						"activeForm" in todo &&
+						typeof (todo as { content: unknown }).content === "string" &&
+						typeof (todo as { activeForm: unknown }).activeForm === "string" &&
+						["pending", "in_progress", "completed"].includes((todo as { status: string }).status),
+				);
+
+				if (isValid && todos.length > 0) {
+					return { isTodoWrite: true, todos };
+				}
+			}
+		} catch (_error) {
+			return { isTodoWrite: false, todos: null };
+		}
+
+		return { isTodoWrite: false, todos: null };
+	};
+
+	const detectToolWriteJson = (
+		code: string,
+		language: string | null,
+	): {
+		isToolWrite: boolean;
+		data: {
+			filePath: string;
+			code: string;
+			language: string | null;
+		} | null;
+	} => {
+		// Only check JSON code blocks
+		if (language?.toLowerCase() !== "json") {
+			return { isToolWrite: false, data: null };
+		}
+
+		try {
+			const trimmed = code.trim();
+			const parsed = JSON.parse(trimmed);
+
+			// Check if it has file_path field (Write tool)
+			if (parsed && typeof parsed === "object" && "file_path" in parsed) {
+				const filePath = parsed.file_path;
+
+				if (typeof filePath !== "string" || !filePath) {
+					return { isToolWrite: false, data: null };
+				}
+
+				const ext = filePath.split(".").pop()?.toLowerCase();
+				const languageMap: Record<string, string> = {
+					js: "javascript",
+					jsx: "javascript",
+					ts: "typescript",
+					tsx: "typescript",
+					py: "python",
+					html: "html",
+					htm: "html",
+					css: "css",
+					scss: "scss",
+					sass: "sass",
+					less: "less",
+					json: "json",
+					md: "markdown",
+					yaml: "yaml",
+					yml: "yaml",
+					sh: "bash",
+					bash: "bash",
+					svg: "svg",
+					vue: "vue",
+					svelte: "svelte",
+				};
+
+				const data: {
+					filePath: string;
+					code: string;
+					language: string | null;
+				} = {
+					filePath,
+					code:
+						(parsed.content as string) ||
+						(parsed.new_string as string) ||
+						(parsed.old_string as string) ||
+						"",
+					language: ext && languageMap[ext] ? languageMap[ext] : ext || "plaintext",
+				};
+
+				// At least one code field should exist
+				if (data.code) {
+					return { isToolWrite: true, data };
+				}
+			}
+		} catch (_error) {
+			// Not valid JSON or doesn't match Write tool structure
+		}
+
+		return { isToolWrite: false, data: null };
+	};
+
 	const collectBlocks = (markdown: string) => {
 		renderer = createRenderer();
 
@@ -336,6 +497,9 @@
 		let sliceStart = 0;
 		let htmlEnv = { ...envState };
 		let codeIndex = 0;
+		let todoIndex = 0;
+		let hasToolCallMarker = false;
+		let toolCallType: "todo" | "write" | null = null;
 
 		const pushHtml = (tokenSlice: Token[]) => {
 			if (!tokenSlice.length) return;
@@ -350,20 +514,101 @@
 			htmlEnv = { ...envState };
 		};
 
+		const checkForToolCallMarker = (
+			token: Token,
+		): { hasMarker: boolean; type: "todo" | "write" | null } => {
+			if (token.type === "paragraph_open") {
+				const nextToken = tokens[tokens.indexOf(token) + 1];
+				if (nextToken?.type === "inline" && nextToken.content) {
+					if (nextToken.content.includes("🔧 **Tool Call: TodoWrite**")) {
+						return { hasMarker: true, type: "todo" };
+					}
+					if (nextToken.content.includes("🔧 **Tool Call: Write**")) {
+						return { hasMarker: true, type: "write" };
+					}
+					if (nextToken.content.includes("🔧 **Tool Call: Edit**")) {
+						return { hasMarker: true, type: "write" };
+					}
+				}
+			}
+			return { hasMarker: false, type: null };
+		};
+
 		for (let index = 0; index < tokens.length; index += 1) {
 			const token = tokens[index];
+
+			// Check for tool call markers in paragraph tokens
+			if (!hasToolCallMarker) {
+				const markerCheck = checkForToolCallMarker(token);
+				if (markerCheck.hasMarker && markerCheck.type) {
+					hasToolCallMarker = true;
+					toolCallType = markerCheck.type;
+					continue;
+				}
+			}
+
 			if (token.type === "fence" && token.tag === "code") {
 				const slice = tokens.slice(sliceStart, index);
 				pushHtml(slice);
 
-				descriptors.push({
-					id: `code-${codeIndex}`,
-					kind: "code",
-					code: token.content ?? "",
-					language: (token.info || "").split(/\s+/)[0] || null,
-					meta: token.info?.replace(/^\s*\S+\s*/, "")?.trim() || null,
-				});
-				codeIndex += 1;
+				const rawInfo = (token.info || "").trim();
+				const languageParts = rawInfo.split(/\s+/);
+				const language = languageParts[0] || null;
+
+				// Check if this is a tool call JSON block
+				if (hasToolCallMarker && language?.toLowerCase() === "json") {
+					// Try to detect the JSON content immediately
+					let processedBlock: BlockDescriptor | null = null;
+
+					if (toolCallType === "todo") {
+						const todoResult = detectTodoWriteJson(token.content ?? "", language);
+						if (todoResult.isTodoWrite && todoResult.todos) {
+							processedBlock = {
+								id: `todo-${todoIndex}`,
+								kind: "todo",
+								todos: todoResult.todos,
+							};
+						}
+					} else if (toolCallType === "write") {
+						const toolResult = detectToolWriteJson(token.content ?? "", language);
+						if (toolResult.isToolWrite && toolResult.data) {
+							processedBlock = {
+								id: `write-${todoIndex}`,
+								kind: "write",
+								filePath: toolResult.data.filePath,
+								code: toolResult.data.code,
+								language: toolResult.data.language,
+							};
+						}
+					}
+
+					if (processedBlock) {
+						descriptors.push(processedBlock);
+					} else {
+						// Create loading state if parsing failed (e.g. incomplete stream)
+						descriptors.push({
+							id: `tool-loading-${todoIndex}`,
+							kind: "tool-loading",
+							toolType: toolCallType,
+							code: token.content ?? "",
+							language: language,
+						});
+					}
+
+					todoIndex += 1;
+					hasToolCallMarker = false;
+					toolCallType = null;
+				} else {
+					// Regular code block
+					descriptors.push({
+						id: `code-${codeIndex}`,
+						kind: "code",
+						code: token.content ?? "",
+						language: language,
+						meta: token.info?.replace(/^\s*\S+\s*/, "")?.trim() || null,
+					});
+					codeIndex += 1;
+				}
 				sliceStart = index + 1;
 			}
 		}
@@ -434,8 +679,24 @@
 				language={block.language}
 				meta={block.meta}
 				theme={props.codeTheme ?? DEFAULT_THEME}
+				messageId={props.messageId}
+				messagePartIndex={props.messagePartIndex}
 			/>
-		{:else}
+		{:else if block.kind === "todo"}
+			<TodoListRenderer todos={block.todos} />
+		{:else if block.kind === "tool-loading" && block.toolType && props.isStreaming}
+			<BlockLoading type={block.toolType} />
+		{:else if block.kind === "write"}
+			<WriteToolRenderer
+				blockId={block.id}
+				filePath={block.filePath}
+				code={block.code}
+				language={block.language}
+				theme={props.codeTheme ?? DEFAULT_THEME}
+				messageId={props.messageId}
+				messagePartIndex={props.messagePartIndex}
+			/>
+		{:else if block.kind === "html"}
 			<div use:handleExternalLinks>
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 				{@html block.html}

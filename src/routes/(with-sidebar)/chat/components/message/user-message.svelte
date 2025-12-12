@@ -26,7 +26,7 @@
 	let isEditDialogOpen = $state(false);
 	let editContent = $state("");
 	let isExpanded = $state(false);
-	let messageContentElement: HTMLDivElement | null = $state(null);
+	let _messageContentElement: HTMLDivElement | null = $state(null);
 	let needsCollapse = $state(false);
 
 	async function handleCopy(content: string) {
@@ -185,7 +185,7 @@
 	}
 
 	function checkLineCount(node: HTMLDivElement) {
-		messageContentElement = node;
+		_messageContentElement = node;
 
 		// Check if content exceeds 3 lines
 		const checkHeight = () => {
@@ -217,12 +217,12 @@
 
 {#snippet messageFooter()}
 	<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100">
-		<MessageActions {message} enabledActions={["edit"]} />
+		<MessageActions {message} enabledActions={["edit", "regenerate"]} />
 	</div>
 {/snippet}
 
 <MessageContextMenu onCopy={handleCopyMessage} onEdit={handleEditClick} onDelete={handleDelete}>
-	<div class="group flex flex-col items-end gap-2">
+	<div class="group flex flex-col items-end gap-2" data-message-id={message.id}>
 		{#if attachments.length > 0}
 			<div class="flex max-w-[80%] flex-wrap gap-2">
 				{#each attachments as attachment (attachment.id)}

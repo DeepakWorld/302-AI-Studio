@@ -1,6 +1,8 @@
 import type { ThreadData } from "@shared/types";
 import type { IpcMainInvokeEvent } from "electron";
+import { isNull } from "es-toolkit";
 import { broadcastService } from "../broadcast-service";
+import { tabStorage } from "../storage-service/tab-storage";
 import { threadStorage } from "../storage-service/thread-storage";
 
 export class ThreadService {
@@ -77,6 +79,109 @@ export class ThreadService {
 		} catch (error) {
 			console.error("ThreadService: Failed to remove favorite:", error);
 			return false;
+		}
+	}
+
+	/**
+	 * Delete all threads that match a specific apiKeyHash
+	 * Also closes any tabs that reference the deleted threads
+	 * Used when logging out to clean up associated sessions
+	 */
+	async deleteThreadsByApiKeyHash(_event: IpcMainInvokeEvent, apiKeyHash: string): Promise<number> {
+		try {
+			const { deletedCount, deletedThreadIds } =
+				await threadStorage.deleteThreadsByApiKeyHash(apiKeyHash);
+
+			if (deletedCount > 0) {
+				// Close tabs that reference deleted threads
+				await this.closeTabsForThreads(deletedThreadIds);
+
+				broadcastService.broadcastChannelToAll("broadcast-event", {
+					broadcastEvent: "thread-list-updated",
+					data: {},
+				});
+			}
+			return deletedCount;
+		} catch (error) {
+			console.error("ThreadService: Failed to delete threads by apiKeyHash:", error);
+			return 0;
+		}
+	}
+
+	/**
+	 * Clear selectedModel references from all threads for deleted models
+	 * Used when models are deleted to prevent stale references
+	 * @param deletedModelIds - Array of model IDs that were deleted
+	 * @returns Number of threads that had their selectedModel cleared
+	 */
+	async clearDeletedModelReferences(
+		_event: IpcMainInvokeEvent,
+		deletedModelIds: string[],
+	): Promise<number> {
+		try {
+			const deletedModelIdsSet = new Set(deletedModelIds);
+			const clearedCount = await threadStorage.clearDeletedModelReferences(deletedModelIdsSet);
+
+			if (clearedCount > 0) {
+				// Broadcast thread list update to refresh UI
+				broadcastService.broadcastChannelToAll("broadcast-event", {
+					broadcastEvent: "thread-list-updated",
+					data: {},
+				});
+			}
+
+			return clearedCount;
+		} catch (error) {
+			console.error("ThreadService: Failed to clear deleted model references:", error);
+			return 0;
+		}
+	}
+
+	/**
+	 * Close tabs that reference specific thread IDs from all windows
+	 */
+	private async closeTabsForThreads(threadIds: string[]): Promise<void> {
+		if (threadIds.length === 0) return;
+
+		const threadIdSet = new Set(threadIds);
+		const tabState = await tabStorage.getPersistedTabState();
+		if (isNull(tabState)) return;
+
+		let hasChanges = false;
+
+		// Remove tabs with matching threadIds from each window
+		for (const [windowId, windowData] of Object.entries(tabState)) {
+			const originalLength = windowData.tabs.length;
+			const remainingTabs = windowData.tabs.filter((tab) => !threadIdSet.has(tab.threadId));
+
+			if (remainingTabs.length !== originalLength) {
+				hasChanges = true;
+				console.log(
+					`[ThreadService] Closing ${originalLength - remainingTabs.length} tab(s) in window ${windowId}`,
+				);
+
+				// If all tabs were removed, we need to ensure there's at least one tab
+				// This will be handled by the frontend when it receives the broadcast
+				windowData.tabs = remainingTabs;
+
+				// If the active tab was removed, activate the first remaining tab
+				if (remainingTabs.length > 0) {
+					const hasActiveTab = remainingTabs.some((tab) => tab.active);
+					if (!hasActiveTab) {
+						remainingTabs[0].active = true;
+					}
+				}
+			}
+		}
+
+		if (hasChanges) {
+			await tabStorage.setItemInternal("tab-bar-state", tabState);
+
+			// Broadcast tab state update to all windows
+			broadcastService.broadcastChannelToAll("broadcast-event", {
+				broadcastEvent: "tab-state-updated",
+				data: {},
+			});
 		}
 	}
 }

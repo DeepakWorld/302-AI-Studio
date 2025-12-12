@@ -34,6 +34,9 @@ export interface Model {
 	custom: boolean;
 	enabled: boolean;
 	collected: boolean;
+	isFeatured: boolean;
+	isAddedByUser?: boolean;
+	is_custom_model?: boolean;
 }
 
 /* ============================================================================

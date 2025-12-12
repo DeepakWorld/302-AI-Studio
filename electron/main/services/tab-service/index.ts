@@ -1,4 +1,4 @@
-import type { Tab, TabType, ThreadParmas } from "@shared/types";
+import type { ChatMessage, Tab, TabType, ThreadParmas } from "@shared/types";
 import { BrowserWindow, WebContentsView, type IpcMainInvokeEvent } from "electron";
 import { isNull, isUndefined } from "es-toolkit";
 import { nanoid } from "nanoid";
@@ -11,9 +11,10 @@ import {
 	withLoadHandlers,
 } from "../../mixins/web-contents-mixins";
 import { TempStorage } from "../../utils/temp-storage";
-import { broadcastService } from "../broadcast-service";
+import { codeAgentService } from "../code-agent-service";
 import { shortcutService } from "../shortcut-service";
 import { storageService } from "../storage-service";
+import { providerStorage } from "../storage-service/provider-storage";
 import { sessionStorage } from "../storage-service/session-storage";
 import { tabStorage } from "../storage-service/tab-storage";
 
@@ -26,6 +27,8 @@ const TAB_CONFIGS: Record<TabType, TabConfig> = {
 	chat: { title: "New Chat", getHref: (id) => `/chat/${id}` },
 	settings: { title: "Settings", getHref: () => "/settings/general-settings" },
 	aiApplications: { title: "AI Applications", getHref: () => "/ai-applications" },
+	codeAgent: { title: "Code Agent", getHref: () => "/code-agent" },
+	htmlPreview: { title: "HTML Preview", getHref: (id) => `/html-preview/${id}` },
 } as const;
 
 const getTabConfig = (type: TabType) => TAB_CONFIGS[type] || TAB_CONFIGS.chat;
@@ -181,6 +184,26 @@ export class TabService {
 		}
 	}
 
+	private async afterTabClose(tab: Tab) {
+		const thread = (await storageService.getItemInternal(
+			"app-thread:" + tab.threadId,
+		)) as ThreadParmas | null;
+		const messages = (await storageService.getItemInternal("app-chat-messages:" + tab.threadId)) as
+			| ChatMessage[]
+			| null;
+
+		if (thread?.isPrivateChatActive) {
+			console.log(`[Privacy] Deleting private chat data for tab ${tab.id}, thread ${tab.threadId}`);
+			await storageService.removeItemInternal("app-thread:" + tab.threadId);
+			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
+			await codeAgentService.removeCodeAgentState(tab.threadId);
+		} else if (messages?.length === 0) {
+			await storageService.removeItemInternal("app-thread:" + tab.threadId);
+			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
+			await codeAgentService.removeCodeAgentState(tab.threadId);
+		}
+	}
+
 	// ******************************* Main Process Methods ******************************* //
 	getActiveTabView(windowId: number): WebContentsView | null {
 		const activeTabId = this.windowActiveTabId.get(windowId);
@@ -225,7 +248,7 @@ export class TabService {
 	}
 
 	async removeWindowTabs(windowId: number) {
-		const windowTabs = await tabStorage.getTabs(windowId.toString());
+		const windowTabs = await tabStorage.getTabsByWindowId(windowId.toString());
 		if (isNull(windowTabs)) return;
 		const window = BrowserWindow.fromId(windowId);
 		if (isNull(window)) return;
@@ -233,18 +256,7 @@ export class TabService {
 		// Check each tab and delete private chat data
 		for (const tab of windowTabs) {
 			if (tab.type === "chat" && tab.threadId) {
-				const thread = (await storageService.getItemInternal(
-					"app-thread:" + tab.threadId,
-				)) as ThreadParmas | null;
-
-				// If this is a private chat, delete all related data
-				if (thread?.isPrivateChatActive) {
-					console.log(
-						`[Privacy] Deleting private chat data for tab ${tab.id}, thread ${tab.threadId}`,
-					);
-					await storageService.removeItemInternal("app-thread:" + tab.threadId);
-					await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
-				}
+				this.afterTabClose(tab);
 			}
 
 			this.removeTab(window, tab.id);
@@ -265,7 +277,7 @@ export class TabService {
 	 * Used when closing the last window to ensure private data is deleted.
 	 */
 	async cleanupPrivateChatData(windowId: number) {
-		const windowTabs = await tabStorage.getTabs(windowId.toString());
+		const windowTabs = await tabStorage.getTabsByWindowId(windowId.toString());
 		if (isNull(windowTabs)) return;
 
 		console.log(`[Privacy] Cleaning up private chat data for window ${windowId}`);
@@ -507,24 +519,68 @@ export class TabService {
 		// ========== CHECK: Prevent duplicate tabs for the same thread ==========
 		const windowId = window.id.toString();
 		const tabState = await tabStorage.getItemInternal("tab-bar-state");
-		if (!isNull(tabState) && tabState[windowId]) {
-			// Check if this thread already has a tab in current window
-			const existingTab = tabState[windowId].tabs.find((t) => t.threadId === threadId);
-			if (existingTab) {
-				console.log(
-					`[TabService] Tab for thread ${threadId} already exists in window ${windowId}, activating it instead`,
-				);
-				// Activate the existing tab instead of creating a new one
-				const updatedTabs = tabState[windowId].tabs.map((t) => ({
-					...t,
-					active: t.id === existingTab.id,
-				}));
-				tabState[windowId] = { tabs: updatedTabs };
-				await tabStorage.setItemInternal("tab-bar-state", tabState);
-				this.focusTabInWindow(window, existingTab.id);
-				return stringify(existingTab);
+
+		console.log(`[TabService] handleNewTabWithThread: threadId=${threadId}, windowId=${windowId}`);
+		console.log(`[TabService] Current tabState windows:`, Object.keys(tabState || {}));
+		console.log(`[TabService] tabViewMap size:`, this.tabViewMap.size);
+
+		if (!isNull(tabState)) {
+			// Check in ALL windows, not just current window
+			for (const [wId, wData] of Object.entries(tabState)) {
+				const existingTab = wData.tabs.find((t) => t.threadId === threadId);
+				if (existingTab) {
+					console.log(
+						`[TabService] Found existing tab ${existingTab.id} for thread ${threadId} in window ${wId}`,
+					);
+
+					// Check if the tab's view still exists
+					const existingView = this.tabViewMap.get(existingTab.id);
+					console.log(`[TabService] View exists for tab ${existingTab.id}:`, !!existingView);
+
+					if (existingView) {
+						// View exists - activate it
+						if (wId === windowId) {
+							// Same window
+							console.log(
+								`[TabService] Tab for thread ${threadId} already exists in current window, activating it`,
+							);
+							const updatedTabs = tabState[wId].tabs.map((t) => ({
+								...t,
+								active: t.id === existingTab.id,
+							}));
+							tabState[wId] = { tabs: updatedTabs };
+							await tabStorage.setItemInternal("tab-bar-state", tabState);
+							this.focusTabInWindow(window, existingTab.id);
+							return stringify(existingTab);
+						} else {
+							// Different window - this shouldn't happen in normal flow
+							console.log(
+								`[TabService] Tab for thread ${threadId} exists in window ${wId}, but called from window ${windowId}. Allowing duplicate tab creation.`,
+							);
+							// Let it create a new tab in current window
+							// The old tab will remain in the other window
+							break;
+						}
+					} else {
+						// View doesn't exist (was destroyed) - cleanup storage and create new tab
+						console.log(
+							`[TabService] Tab ${existingTab.id} for thread ${threadId} exists in storage but view is destroyed, cleaning up`,
+						);
+						// Remove the orphaned tab from storage
+						const cleanedTabs = tabState[wId].tabs.filter((t) => t.id !== existingTab.id);
+						tabState[wId] = { tabs: cleanedTabs };
+						await tabStorage.setItemInternal("tab-bar-state", tabState);
+						console.log(
+							`[TabService] Cleaned orphaned tab from window ${wId}, will create new tab`,
+						);
+						// Continue to create new tab
+						break;
+					}
+				}
 			}
 		}
+
+		console.log(`[TabService] No duplicate found, creating new tab for thread ${threadId}`);
 		// ========================================================================
 
 		const { getHref } = getTabConfig(type);
@@ -575,6 +631,8 @@ export class TabService {
 		type: TabType = "chat",
 		active: boolean = true,
 		href?: string,
+		content?: string,
+		previewId?: string,
 	): Promise<string | null> {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return null;
@@ -589,12 +647,15 @@ export class TabService {
 			type,
 			active,
 			threadId: newThreadId,
+			...(content && { content }), // Add content if provided
+			...(previewId && { previewId }), // Add previewId if provided
 		};
 
 		if (type === "chat") {
-			const [newSessionModel, latestUsedModel] = await Promise.all([
+			const [newSessionModel, latestUsedModel, apiKeyHash] = await Promise.all([
 				storageService.getItemInternal("PreferencesSettingsStorage:state"),
 				sessionStorage.getLatestUsedModel(),
+				providerStorage.get302AIApiKeyHash(),
 			]);
 			const preferencesSettings = newSessionModel as unknown as {
 				newSessionModel?: ThreadParmas["selectedModel"];
@@ -639,6 +700,7 @@ export class TabService {
 				selectedModel: preferencesSettings?.newSessionModel ?? latestUsedModel,
 				isPrivateChatActive: inheritedPrivacyState,
 				updatedAt: new Date(),
+				apiKeyHash, // Track which API key was used when creating this thread
 			};
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const newMessages: any = [];
@@ -758,7 +820,7 @@ export class TabService {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return null;
 		const [tabs, activeTabId] = await Promise.all([
-			tabStorage.getTabs(window.id.toString()),
+			tabStorage.getTabsByWindowId(window.id.toString()),
 			tabStorage.getActiveTabId(window.id.toString()),
 		]);
 
@@ -768,6 +830,17 @@ export class TabService {
 		if (isUndefined(tab)) return null;
 
 		return tab;
+	}
+
+	async getAllTabsForCurrentWindow(event: IpcMainInvokeEvent): Promise<Tab[] | null> {
+		const window = BrowserWindow.fromWebContents(event.sender);
+		if (isNull(window)) return null;
+		const result = await tabStorage.getTabsByWindowId(window.id.toString());
+		return result;
+	}
+
+	async getAllTabs(_event: IpcMainInvokeEvent): Promise<Tab[] | null> {
+		return (await tabStorage.getAllTabs()) ?? [];
 	}
 
 	async handleTabClose(event: IpcMainInvokeEvent, tabId: string, newActiveTabId: string | null) {
@@ -784,22 +857,7 @@ export class TabService {
 		// Check if this tab is a private chat and delete its data
 		const tab = this.tabMap.get(tabId);
 		if (tab?.type === "chat" && tab.threadId) {
-			const thread = (await storageService.getItemInternal(
-				"app-thread:" + tab.threadId,
-			)) as ThreadParmas | null;
-
-			if (thread?.isPrivateChatActive) {
-				console.log(
-					`[Privacy] Deleting private chat data for tab ${tabId}, thread ${tab.threadId}`,
-				);
-				await storageService.removeItemInternal("app-thread:" + tab.threadId);
-				await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
-
-				broadcastService.broadcastChannelToAll("broadcast-event", {
-					broadcastEvent: "thread-list-updated",
-					data: {},
-				});
-			}
+			this.afterTabClose(tab);
 		}
 
 		this.removeTab(window, tabId);
@@ -815,17 +873,7 @@ export class TabService {
 		for (const tabIdToClose of tabIdsToClose) {
 			const tab = this.tabMap.get(tabIdToClose);
 			if (tab?.type === "chat" && tab.threadId) {
-				const thread = (await storageService.getItemInternal(
-					"app-thread:" + tab.threadId,
-				)) as ThreadParmas | null;
-
-				if (thread?.isPrivateChatActive) {
-					console.log(
-						`[Privacy] Deleting private chat data for tab ${tabIdToClose}, thread ${tab.threadId}`,
-					);
-					await storageService.removeItemInternal("app-thread:" + tab.threadId);
-					await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
-				}
+				this.afterTabClose(tab);
 			}
 
 			this.removeTab(window, tabIdToClose);
@@ -850,38 +898,28 @@ export class TabService {
 		for (const tabIdToClose of tabIdsToClose) {
 			const tab = this.tabMap.get(tabIdToClose);
 			if (tab?.type === "chat" && tab.threadId) {
-				const thread = (await storageService.getItemInternal(
-					"app-thread:" + tab.threadId,
-				)) as ThreadParmas | null;
-
-				if (thread?.isPrivateChatActive) {
-					console.log(
-						`[Privacy] Deleting private chat data for tab ${tabIdToClose}, thread ${tab.threadId}`,
-					);
-					await storageService.removeItemInternal("app-thread:" + tab.threadId);
-					await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
-				}
+				this.afterTabClose(tab);
 			}
 
 			this.removeTab(window, tabIdToClose);
 		}
 	}
 
-	async handleTabCloseAll(event: IpcMainInvokeEvent) {
-		const window = BrowserWindow.fromWebContents(event.sender);
-		if (isNull(window)) return;
+	// async handleTabCloseAll(event: IpcMainInvokeEvent) {
+	// 	const window = BrowserWindow.fromWebContents(event.sender);
+	// 	if (isNull(window)) return;
 
-		this.windowActiveTabId.delete(window.id);
+	// 	this.windowActiveTabId.delete(window.id);
 
-		const windowViews = this.windowTabView.get(window.id);
-		if (!isUndefined(windowViews)) {
-			windowViews.forEach((view) => {
-				window.contentView.removeChildView(view);
-				view.webContents.close();
-			});
-		}
-		this.windowTabView.delete(window.id);
-	}
+	// 	const windowViews = this.windowTabView.get(window.id);
+	// 	if (!isUndefined(windowViews)) {
+	// 		windowViews.forEach((view) => {
+	// 			window.contentView.removeChildView(view);
+	// 			view.webContents.close();
+	// 		});
+	// 	}
+	// 	this.windowTabView.delete(window.id);
+	// }
 
 	async handleShellViewLevel(event: IpcMainInvokeEvent, up: boolean) {
 		const window = BrowserWindow.fromWebContents(event.sender);
@@ -1071,6 +1109,34 @@ export class TabService {
 		} catch (error) {
 			console.error(`[handleGenerateTabTitle] Failed to generate title:`, error);
 			return false;
+		}
+	}
+
+	/**
+	 * Notify sandbox created event to the tab associated with the given threadId
+	 */
+	notifySandboxCreated(threadId: string, sandboxId: string): void {
+		console.log(
+			`[TabService] Notifying sandbox created: threadId=${threadId}, sandboxId=${sandboxId}`,
+		);
+
+		// Find the tab with matching threadId
+		let targetView: WebContentsView | undefined;
+		for (const [tabId, tab] of this.tabMap.entries()) {
+			if (tab.threadId === threadId) {
+				targetView = this.tabViewMap.get(tabId);
+				break;
+			}
+		}
+
+		if (targetView && !targetView.webContents.isDestroyed()) {
+			targetView.webContents.send("code-agent:sandbox-created", {
+				threadId,
+				sandboxId,
+			});
+			console.log(`[TabService] Sandbox created event sent to tab with threadId=${threadId}`);
+		} else {
+			console.warn(`[TabService] Could not find active tab for threadId=${threadId}`);
 		}
 	}
 }
