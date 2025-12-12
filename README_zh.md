@@ -13,22 +13,22 @@
 
 <p align="center"><a href="README_zh.md">中文</a> | <a href="README.md">English</a> | <a href="README_ja.md">日本語</a></p>
 
-![](docs/imgs/桌面客户端-cn.png) 
+![](docs/imgs/桌面客户端-cn.png)
 
 ## 🖼️ 界面截图
 
-主页聊天界面，提供消息输入框、工具栏、模型选择与常用AI工具快捷入口           
-<img src="./docs/imgs/302_AI_Studio_screenshot_01.png" >                   
- 
+主页聊天界面，提供消息输入框、工具栏、模型选择与常用AI工具快捷入口  
+<img src="./docs/imgs/302_AI_Studio_screenshot_01.png" >
+
 多标签聊天界面，左侧会话列表，右侧聊天界面
-<img src="./docs/imgs/302_AI_Studio_screenshot_02.png" >              
+<img src="./docs/imgs/302_AI_Studio_screenshot_02.png" >
 
 在客户端内可一键快速打开AI应用，无需跳转至官网
-<img src="./docs/imgs/302_AI_Studio_screenshot_03.png" >          
+<img src="./docs/imgs/302_AI_Studio_screenshot_03.png" >
 
 独立窗口形式的设置页面，包含通用、账户、偏好、MCP等常用配置
 <img src="./docs/imgs/302_AI_Studio_screenshot_04.png" >
-<img src="./docs/imgs/302_AI_Studio_screenshot_05.png" > 
+<img src="./docs/imgs/302_AI_Studio_screenshot_05.png" >
 
 Agent 管理页面，支持远程/本地平台切换，查看和管理 Agent 沙盒列表
 <img src="./docs/imgs/302_AI_Studio_screenshot_06.png" >
@@ -67,6 +67,7 @@ Agent 管理页面，支持远程/本地平台切换，查看和管理 Agent 沙
 - 🔄 热更新（HMR）支持，开发体验流畅
 
 ### Agent 模式
+
 - 🤖 通过远程沙盒环境调用 Claude Code，智能规划工作任务
 - 🎯 Agent 任务执行与实时监控，追踪任务进度和状态
 - 🔄 智能工作流管理，支持复杂任务分解与协作
@@ -83,6 +84,8 @@ Agent 管理页面，支持远程/本地平台切换，查看和管理 Agent 沙
 ## 📝 更新日志
 
 **[v25.50.8]** 新增 Agent 模式；新增快速登录与账户配置
+
+> 💡 查看完整的更新历史，请访问 [GitHub Releases](https://github.com/302ai/302-AI-Studio-sv/releases)
 
 ---
 
@@ -273,8 +276,6 @@ git push origin feature/amazing-feature
 
 # 5. 创建 Pull Request
 ```
-
-> 💡 查看完整的更新历史，请访问 [GitHub Releases](https://github.com/302ai/302-AI-Studio-sv/releases)
 
 ## 💬 联系我们
 
