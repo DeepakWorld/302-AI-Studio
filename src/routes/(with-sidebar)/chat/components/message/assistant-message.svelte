@@ -55,6 +55,75 @@
 
 	let { message }: Props = $props();
 
+	let isReasoningExpanded = $state(!preferencesSettings.autoCollapseThink);
+	let selectedToolPart = $state<DynamicToolUIPart | null>(null);
+	let isToolModalOpen = $state(false);
+	let isReading = $state(false);
+	let _currentUtterance: SpeechSynthesisUtterance | null = null;
+	let _isUserCancelled = $state(false);
+	let speechSynthesisAvailable = $state(false);
+
+	// Extract thinking content from <think>...</think> or incomplete think tags
+	function extractThinkingFromText(text: string) {
+		const endIdx = text.indexOf("</think>");
+		if (endIdx === -1) return null;
+
+		const startIdx = text.indexOf("<think>");
+		const reasoningStart = startIdx === -1 ? 0 : startIdx;
+		const reasoningEnd = endIdx + "</think>".length;
+		const reasoning = text
+			.substring(reasoningStart, reasoningEnd)
+			.replace(/<\/?think>/g, "")
+			.trim();
+
+		if (!reasoning) return null;
+
+		const before = startIdx === -1 ? "" : text.substring(0, startIdx);
+		const after = text.substring(reasoningEnd);
+
+		return { reasoning, before, after };
+	}
+
+	// Extract and inject reasoning parts from <think>...</think> or incomplete think tags
+	const messagePartsWithExtractedReasoning = $derived(() => {
+		// Check if any text part contains think tags that need extraction
+		const hasThinkTagsInText = message.parts.some(
+			(part) =>
+				part.type === "text" &&
+				"text" in part &&
+				(part.text.includes("<think>") || part.text.includes("</think>")),
+		);
+
+		// If no think tags in text parts, return original parts
+		if (!hasThinkTagsInText) {
+			return message.parts;
+		}
+
+		const newParts: typeof message.parts = [];
+
+		for (const part of message.parts) {
+			if (part.type === "text" && "text" in part) {
+				const extracted = extractThinkingFromText(part.text);
+				if (!extracted) {
+					newParts.push(part);
+					continue;
+				}
+
+				if (extracted.before.trim()) {
+					newParts.push({ type: "text", text: extracted.before });
+				}
+				newParts.push({ type: "reasoning", text: extracted.reasoning });
+				if (extracted.after.trim()) {
+					newParts.push({ type: "text", text: extracted.after });
+				}
+			} else {
+				newParts.push(part);
+			}
+		}
+
+		return newParts;
+	});
+
 	// Extract suggestions from message parts
 	const suggestions = $derived(() => {
 		const suggestionPart = message.parts.find((part) => part.type === "data-suggestions");
@@ -65,6 +134,11 @@
 		}
 		return [];
 	});
+
+	// Update getAssistantMessageContent to use extracted reasoning
+	const assistantMessageContent = $derived(
+		getAssistantMessageContent({ ...message, parts: messagePartsWithExtractedReasoning() }),
+	);
 
 	function getServerIcon(toolName: string): string | null {
 		// Extract server ID from toolName (format: serverId__toolName)
@@ -95,14 +169,6 @@
 		const parts = toolName.split("__");
 		return parts.length >= 2 ? parts.slice(1).join("__") : toolName;
 	}
-
-	let isReasoningExpanded = $state(!preferencesSettings.autoCollapseThink);
-	let selectedToolPart = $state<DynamicToolUIPart | null>(null);
-	let isToolModalOpen = $state(false);
-	let isReading = $state(false);
-	let _currentUtterance: SpeechSynthesisUtterance | null = null;
-	let _isUserCancelled = $state(false);
-	let speechSynthesisAvailable = $state(false);
 
 	// Check if speech synthesis is available
 	$effect(() => {
@@ -136,8 +202,12 @@
 
 	const isLastAssistantMessage = $derived(chatState.lastAssistantMessage?.id === message.id);
 
-	const hasReasoningContent = $derived(message.parts.some((part) => part.type === "reasoning"));
-	const hasTextContent = $derived(message.parts.some((part) => part.type === "text"));
+	const hasReasoningContent = $derived(
+		messagePartsWithExtractedReasoning().some((part) => part.type === "reasoning"),
+	);
+	const hasTextContent = $derived(
+		messagePartsWithExtractedReasoning().some((part) => part.type === "text"),
+	);
 	const isStreamingReasoning = $derived(
 		isCurrentMessageStreaming && hasReasoningContent && !hasTextContent,
 	);
@@ -147,7 +217,7 @@
 
 	async function handleCopyMessage() {
 		try {
-			await navigator.clipboard.writeText(getAssistantMessageContent(message));
+			await navigator.clipboard.writeText(assistantMessageContent);
 			toast.success(m.toast_copied_success());
 		} catch {
 			toast.error(m.toast_copied_failed());
@@ -199,7 +269,7 @@
 			}
 
 			// Start reading
-			const textContent = getAssistantMessageContent(message);
+			const textContent = assistantMessageContent;
 			if (!textContent.trim()) {
 				toast.error("没有可朗读的内容");
 				return;
@@ -383,7 +453,7 @@
 	<div class="group flex flex-col gap-1" data-message-id={message.id}>
 		{@render messageHeader(message.metadata?.model || "gpt-4o")}
 
-		{#each message.parts as part, partIndex (partIndex)}
+		{#each messagePartsWithExtractedReasoning() as part, partIndex (partIndex)}
 			{#if part.type === "text"}
 				{#if preferencesSettings.autoDisableMarkdown}
 					<div class="whitespace-pre-wrap text-sm leading-relaxed">
