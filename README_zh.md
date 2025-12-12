@@ -13,6 +13,26 @@
 
 <p align="center"><a href="README_zh.md">中文</a> | <a href="README.md">English</a> | <a href="README_ja.md">日本語</a></p>
 
+![](docs/imgs/桌面客户端-cn.png) 
+
+## 🖼️ 界面截图
+
+主页聊天界面，提供消息输入框、工具栏、模型选择与常用AI工具快捷入口           
+<img src="./docs/imgs/302_AI_Studio_screenshot_01.png" >                   
+ 
+多标签聊天界面，左侧会话列表，右侧聊天界面
+<img src="./docs/imgs/302_AI_Studio_screenshot_02.png" >              
+
+在客户端内可一键快速打开AI应用，无需跳转至官网
+<img src="./docs/imgs/302_AI_Studio_screenshot_03.png" >          
+
+独立窗口形式的设置页面，包含通用、账户、偏好、MCP等常用配置
+<img src="./docs/imgs/302_AI_Studio_screenshot_04.png" >
+<img src="./docs/imgs/302_AI_Studio_screenshot_05.png" > 
+
+Agent 管理页面，支持远程/本地平台切换，查看和管理 Agent 沙盒列表
+<img src="./docs/imgs/302_AI_Studio_screenshot_06.png" >
+
 ## 🌟 主要特点
 
 ### 多模型与多服务商支持
@@ -34,6 +54,7 @@
 
 - 🖥️ Windows、Mac、Linux 多平台支持
 - 🌙 可自定义的明暗主题系统，实时预览
+- 👤 支持账户登录，并可查询余额与使用情况
 - 📝 完整的 Markdown 渲染
 - 📱 响应式设计，完美适配各种屏幕尺寸
 - 🎨 基于 Shadcn-Svelte 的现代化组件库
@@ -45,11 +66,25 @@
 - ⌨️ 完整的快捷键系统
 - 🔄 热更新（HMR）支持，开发体验流畅
 
+### Agent 模式
+- 🤖 通过远程沙盒环境调用 Claude Code，智能规划工作任务
+- 🎯 Agent 任务执行与实时监控，追踪任务进度和状态
+- 🔄 智能工作流管理，支持复杂任务分解与协作
+- 📊 Agent 会话统计与分析，查看执行历史与性能数据
+- 🚀 一键部署全栈应用，Agent 自动完成代码编写、测试与部署
+- 📦 支持多种技术栈，快速构建 Web 应用、API 服务等
+
 ### 多语言支持
 
 - **中文**
 - **English**
-- **日本語**
+- **日本語**（后续支持）
+
+## 📝 更新日志
+
+**[v25.50.8]** 新增 Agent 模式；新增快速登录与账户配置
+
+---
 
 ## 🛠️ 技术架构
 
@@ -238,6 +273,8 @@ git push origin feature/amazing-feature
 
 # 5. 创建 Pull Request
 ```
+
+> 💡 查看完整的更新历史，请访问 [GitHub Releases](https://github.com/302ai/302-AI-Studio-sv/releases)
 
 ## 💬 联系我们
 

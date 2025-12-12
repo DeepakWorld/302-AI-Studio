@@ -13,6 +13,26 @@
 
 <p align="center"><a href="README_zh.md">中文</a> | <a href="README.md">English</a> | <a href="README_ja.md">日本語</a></p>
 
+![](docs/imgs/桌面客户端-en.png) 
+
+## 🖼️ Interface Screenshots
+
+Home chat interface, providing input box, toolbar, model selection, and quick access to commonly used AI tools           
+<img src="./docs/imgs/302_AI_Studio_en_screenshot_01.png" >                   
+ 
+Multi-tab chat interface with conversation list on the left and chat window on the right
+<img src="./docs/imgs/302_AI_Studio_en_screenshot_02.png" >              
+
+Quickly open AI applications within the client, no need to visit websites
+<img src="./docs/imgs/302_AI_Studio_en_screenshot_03.png" >          
+
+Settings page in standalone window, including General, Account, Preferences, MCP, and other common configurations
+<img src="./docs/imgs/302_AI_Studio_en_screenshot_04.png" >
+<img src="./docs/imgs/302_AI_Studio_en_screenshot_05.png" > 
+
+Agent management page, supports switching between remote/local platforms and viewing/managing the list of agent sandboxes
+<img src="./docs/imgs/302_AI_Studio_en_screenshot_06.png" >
+
 ## 🌟 Key Features
 
 ### Multi-Model & Multi-Provider Support
@@ -34,6 +54,7 @@
 
 - 🖥️ Multi-platform support for Windows, Mac, and Linux
 - 🌙 Customizable light/dark theme system with real-time preview
+- 👤 Support account login, and allows checking balance and usage
 - 📝 Complete Markdown rendering
 - 📱 Responsive design, perfectly adapts to various screen sizes
 - 🎨 Modern component library based on Shadcn-Svelte
@@ -45,11 +66,25 @@
 - ⌨️ Complete keyboard shortcut system
 - 🔄 Hot Module Replacement (HMR) support for smooth development experience
 
+### Agent Mode
+- 🤖 Invoke Claude Code via remote sandbox environments for intelligent task planning
+- 🎯 Agent task execution and real-time monitoring, track task progress and status
+- 🔄 Intelligent workflow management, supporting complex task decomposition and collaboration
+- 📊 Agent session statistics and analysis, view execution history and performance data
+- 🚀 One-click full-stack application deployment, Agent automatically writes, tests, and deploys code
+- 📦 Support for multiple tech stacks, quickly build web applications, API services, and more
+
 ### Multi-Language Support
 
 - **中文**
 - **English**
-- **日本語**
+- **日本語**(coming soon)
+
+## 📝 Changelog
+
+**[v25.50.8]** Added Agent mode; added quick login and account configuration
+
+---
 
 ## 🛠️ Technical Architecture
 
