@@ -121,12 +121,29 @@ function ensureCleanGit(allowDirty: boolean) {
 	}
 }
 
-function updateAppInfoVersion(source: string, nextVersion: string) {
-	const re = /(\bversion\s*:\s*")([^"]+)("\s*,)/;
-	if (!re.test(source)) {
-		throw new Error("Failed to locate appInfo.version in src/lib/app-info.ts");
+function maybeUpdateAppInfoVersion(
+	source: string,
+	nextVersion: string,
+): { contents: string; changed: boolean; reason?: "injected" } {
+	// If version is injected at build time, do not modify the file.
+	if (/\bversion\s*:\s*__APP_VERSION__\b/.test(source)) {
+		return { contents: source, changed: false, reason: "injected" };
 	}
-	return source.replace(re, `$1${nextVersion}$3`);
+
+	// Manual string version fallback (legacy)
+	const re = /^(\s*version\s*:\s*)(["'])([^"']+)(\2)(\s*,?)/m;
+	const m = source.match(re);
+	if (!m) {
+		throw new Error(
+			"Failed to locate appInfo.version in src/lib/app-info.ts (expected __APP_VERSION__ or a string literal)",
+		);
+	}
+
+	const current = m[3];
+	if (current === nextVersion) return { contents: source, changed: false };
+
+	const contents = source.replace(re, `$1$2${nextVersion}$2$5`);
+	return { contents, changed: true };
 }
 
 function updatePackageJsonVersion(source: string, nextVersion: string) {
@@ -135,7 +152,11 @@ function updatePackageJsonVersion(source: string, nextVersion: string) {
 	return JSON.stringify(parsed, null, "\t") + "\n";
 }
 
-async function promptInteractive(currentVersion: string, preset: CliOptions) {
+async function promptInteractive(
+	currentVersion: string,
+	preset: CliOptions,
+	appInfoMode: "manual" | "injected" | "unknown",
+) {
 	const action = await select<Exclude<ReleaseCommand, "interactive">>({
 		message: "Select release type",
 		choices: [
@@ -173,11 +194,16 @@ async function promptInteractive(currentVersion: string, preset: CliOptions) {
 		default: preset.notes ?? "",
 	});
 
-	const syncAppInfo = await confirm({
-		message: "Sync src/lib/app-info.ts ?",
-		default: !preset.skipAppInfo,
-	});
-	options.skipAppInfo = !syncAppInfo;
+	if (appInfoMode === "manual") {
+		const syncAppInfo = await confirm({
+			message: "Sync src/lib/app-info.ts ?",
+			default: !preset.skipAppInfo,
+		});
+		options.skipAppInfo = !syncAppInfo;
+	} else {
+		// injected/unknown: default skip to avoid breaking injected version
+		options.skipAppInfo = true;
+	}
 
 	const createCommit = await confirm({
 		message: "Create release commit?",
@@ -223,11 +249,20 @@ async function main() {
 		die(`Invalid current version in package.json: ${String(currentVersion)}`);
 	}
 
+	let appInfoMode: "manual" | "injected" | "unknown" = "unknown";
+	try {
+		const appInfoRaw = await readText(appInfoPath);
+		if (/\bversion\s*:\s*__APP_VERSION__\b/.test(appInfoRaw)) appInfoMode = "injected";
+		else if (/^\s*version\s*:\s*["']/m.test(appInfoRaw)) appInfoMode = "manual";
+	} catch {
+		// ignore
+	}
+
 	let finalCommand: Exclude<ReleaseCommand, "interactive">;
 	let finalOptions: CliOptions;
 
 	if (isInteractive) {
-		const resolved = await promptInteractive(currentVersion, options);
+		const resolved = await promptInteractive(currentVersion, options, appInfoMode);
 		finalCommand = resolved.command;
 		finalOptions = resolved.options;
 	} else {
@@ -264,9 +299,15 @@ async function main() {
 	const planned: string[] = [];
 
 	if (updateVersionFiles) {
-		planned.push(`- package.json: ${currentVersion} -> ${nextVersion}`);
-		if (!finalOptions.skipAppInfo)
-			planned.push(`- src/lib/app-info.ts: ${currentVersion} -> ${nextVersion}`);
+		if (nextVersion === currentVersion)
+			planned.push(`- package.json: (no change) ${currentVersion}`);
+		else planned.push(`- package.json: ${currentVersion} -> ${nextVersion}`);
+
+		if (!finalOptions.skipAppInfo) {
+			if (appInfoMode === "injected")
+				planned.push("- src/lib/app-info.ts: uses __APP_VERSION__ (no change)");
+			else planned.push(`- src/lib/app-info.ts: ${currentVersion} -> ${nextVersion}`);
+		}
 	} else {
 		planned.push(`- (beta) no version file changes`);
 	}
@@ -294,13 +335,18 @@ async function main() {
 	const filesToAdd: string[] = [];
 
 	if (updateVersionFiles) {
-		await writeText(pkgPath, updatePackageJsonVersion(pkgRaw, nextVersion), false);
-		filesToAdd.push(pkgPath);
+		if (nextVersion !== currentVersion) {
+			await writeText(pkgPath, updatePackageJsonVersion(pkgRaw, nextVersion), false);
+			filesToAdd.push(pkgPath);
+		}
 
 		if (!finalOptions.skipAppInfo) {
 			const appInfoRaw = await readText(appInfoPath);
-			await writeText(appInfoPath, updateAppInfoVersion(appInfoRaw, nextVersion), false);
-			filesToAdd.push(appInfoPath);
+			const updated = maybeUpdateAppInfoVersion(appInfoRaw, nextVersion);
+			if (updated.changed) {
+				await writeText(appInfoPath, updated.contents, false);
+				filesToAdd.push(appInfoPath);
+			}
 		}
 	}
 
