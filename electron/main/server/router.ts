@@ -214,10 +214,25 @@ app.post("/chat/302ai", async (c) => {
 		speedOptions,
 	);
 
+	const provider302Options: Record<string, boolean | string> = {};
+
+	if (autoParseUrl) {
+		provider302Options["file-parse"] = true;
+	}
+
+	if (isThinkingActive) {
+		provider302Options["fusion"] = true;
+	}
+
+	if (isOnlineSearchActive) {
+		provider302Options["web-search"] = true;
+		provider302Options["search-service"] = searchProvider;
+	}
+
 	const ai302 = createAI302({
 		baseURL: baseUrl || "https://api.openai.com/v1",
 		apiKey: apiKey || "[REDACTED:sk-secret]",
-		fetch: createCitationsFetch(),
+		fetch: createCitationsFetch(provider302Options),
 	});
 
 	const wrapModel = wrapLanguageModel({
@@ -228,21 +243,6 @@ app.post("/chat/302ai", async (c) => {
 		],
 		providerId: "302.AI",
 	});
-
-	const provider302Options: Record<string, boolean | string> = {};
-
-	if (autoParseUrl) {
-		provider302Options["file-parse"] = true;
-	}
-
-	if (isThinkingActive) {
-		provider302Options["r1-fusion"] = true;
-	}
-
-	if (isOnlineSearchActive) {
-		provider302Options["web-search"] = true;
-		provider302Options["search-service"] = searchProvider;
-	}
 
 	// Get MCP tools if MCP is active
 	let mcpTools = undefined;

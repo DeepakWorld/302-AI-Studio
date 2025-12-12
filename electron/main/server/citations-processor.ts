@@ -17,8 +17,37 @@ interface Choice {
 	finish_reason?: string;
 }
 
-export function createCitationsFetch(): typeof fetch {
+export function createCitationsFetch(
+	providerOptions?: Record<string, boolean | string>,
+): typeof fetch {
 	return async (url, options) => {
+		// Modify request body to add provider options if needed
+		if (options?.body && providerOptions && Object.keys(providerOptions).length > 0) {
+			try {
+				let bodyText: string;
+
+				if (typeof options.body === "string") {
+					bodyText = options.body;
+				} else {
+					// For other types (including ReadableStream), convert to text
+					// Note: This will consume the stream, so we need to recreate it
+					bodyText = await new Response(options.body as BodyInit).text();
+				}
+
+				const bodyJson = JSON.parse(bodyText);
+
+				// Add provider options directly to request body
+				Object.assign(bodyJson, providerOptions);
+
+				console.log("[302.AI] Adding provider options to request:", providerOptions);
+				console.log("[302.AI] Modified request body (full):", JSON.stringify(bodyJson, null, 2));
+
+				options.body = JSON.stringify(bodyJson);
+			} catch (error) {
+				console.error("[302.AI] Failed to modify request body:", error);
+			}
+		}
+
 		const response = await fetch(url, options);
 		const citationsProcessor = new CitationsProcessor();
 		return interceptSSEResponse(response, citationsProcessor);
