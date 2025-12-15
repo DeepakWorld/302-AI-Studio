@@ -26,6 +26,7 @@ import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
+import { convertAiSdkMessagesToOpenAiMessages } from "./utils";
 
 export type RouterRequestBody = {
 	baseUrl?: string;
@@ -214,10 +215,25 @@ app.post("/chat/302ai", async (c) => {
 		speedOptions,
 	);
 
+	const provider302Options: Record<string, boolean | string> = {};
+
+	if (autoParseUrl) {
+		provider302Options["file-parse"] = true;
+	}
+
+	if (isThinkingActive) {
+		provider302Options["fusion"] = true;
+	}
+
+	if (isOnlineSearchActive) {
+		provider302Options["web-search"] = true;
+		provider302Options["search-service"] = searchProvider;
+	}
+
 	const ai302 = createAI302({
 		baseURL: baseUrl || "https://api.openai.com/v1",
 		apiKey: apiKey || "[REDACTED:sk-secret]",
-		fetch: createCitationsFetch(),
+		fetch: createCitationsFetch(provider302Options),
 	});
 
 	const wrapModel = wrapLanguageModel({
@@ -228,21 +244,6 @@ app.post("/chat/302ai", async (c) => {
 		],
 		providerId: "302.AI",
 	});
-
-	const provider302Options: Record<string, boolean | string> = {};
-
-	if (autoParseUrl) {
-		provider302Options["file-parse"] = true;
-	}
-
-	if (isThinkingActive) {
-		provider302Options["r1-fusion"] = true;
-	}
-
-	if (isOnlineSearchActive) {
-		provider302Options["web-search"] = true;
-		provider302Options["search-service"] = searchProvider;
-	}
 
 	// Get MCP tools if MCP is active
 	let mcpTools = undefined;
@@ -830,9 +831,16 @@ app.post("/chat/302ai-code-agent", async (c) => {
 	const claudeCodeFetch = createClaudeCodeFetch(messageId);
 
 	// Build request body for 302.AI Claude Code API
+	const lastAiSdkModelMessage = convertToModelMessages(enhanceMessagesWithFeedback(messages)).at(
+		-1,
+	);
+	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(
+		lastAiSdkModelMessage ? [lastAiSdkModelMessage] : [],
+	);
+
 	const requestBody = {
 		model: sandboxId,
-		messages: [convertToModelMessages(enhanceMessagesWithFeedback(messages)).at(-1)!],
+		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
 	};

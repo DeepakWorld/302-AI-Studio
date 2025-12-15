@@ -1,10 +1,10 @@
 /**
  * Application metadata
- * Manually synced from package.json to avoid import issues in browser context
+ * Version is injected at build time from package.json (via Vite define) to keep it single-sourced.
  */
 export const appInfo = {
 	productName: "302 AI Studio",
-	version: "25.50.8",
+	version: __APP_VERSION__,
 	description: "302 AI Studio",
 	author: {
 		name: "302.AI",
