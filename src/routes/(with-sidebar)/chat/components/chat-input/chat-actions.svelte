@@ -11,7 +11,7 @@
 	import { Bot, Globe, Lightbulb, Settings2 } from "@lucide/svelte";
 	import { AttachmentUploader } from "../attachment";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
-	import ParametersPanel from "./parameters-panel.svelte";
+	import ParametersPanel from "./parameter/parameters-panel.svelte";
 
 	interface Props {
 		disabled?: boolean;
