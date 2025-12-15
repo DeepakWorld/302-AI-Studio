@@ -972,5 +972,13 @@
 	"prompt_variable_now": "Current Timestamp",
 	"prompt_variable_model_id": "Model ID",
 	"prompt_editor_clear": "Clear",
-	"prompt_editor_clear_confirm": "Are you sure you want to clear the editor content?"
+	"prompt_editor_clear_confirm": "Are you sure you want to clear the editor content?",
+	"text_system_prompt": "System Prompts",
+	"text_system_prompt_tips": "System Prompts",
+	"text_user_prompt_tempalte": "User Prompt Template",
+	"text_user_prompt_tempalte_tips": "User Prompt Template",
+	"text_custom_type": "Custom",
+	"text_universal_type": "Universal Type",
+	"text_terse_and_effective_type": "Terse and Effective Type",
+	"text_deep_thinking_type": "Deep Thinking Type"
 }

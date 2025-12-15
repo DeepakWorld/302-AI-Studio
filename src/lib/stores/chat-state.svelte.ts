@@ -17,7 +17,7 @@ import { ChatErrorHandler, type ChatError } from "$lib/utils/error-handler";
 import { replaceCodeBlockAt } from "$lib/utils/markdown-code-block";
 import { Chat } from "@ai-sdk/svelte";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { AttachmentFile, MCPServer, Model, ThreadParmas } from "@shared/types";
+import type { AttachmentFile, ChatVariable, MCPServer, Model, ThreadParmas } from "@shared/types";
 import { hashApiKey } from "@shared/utils/hash";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
@@ -88,6 +88,10 @@ const initialThread: ThreadParmas = hasValidThreadData
 			frequencyPenalty: null,
 			presencePenalty: null,
 			updatedAt: new Date(),
+
+			systemPromptVariables: [],
+			systemPromptMap: {} as Record<ChatVariable, string>,
+			systemPromptContent: "",
 		};
 
 export const persistedMessagesState = new PersistedState<ChatMessage[]>(
@@ -915,6 +919,9 @@ class ChatState {
 				presencePenalty: this.presencePenalty,
 				updatedAt: new Date(),
 				apiKeyHash: this.get302AIApiKeyHash(),
+				systemPromptVariables: [],
+				systemPromptMap: {} as Record<ChatVariable, string>,
+				systemPromptContent: "",
 			});
 
 			// 5. save thread data
@@ -1030,6 +1037,9 @@ class ChatState {
 				updatedAt: new Date(),
 				autoSendOnLoad: true, // Set flag to trigger AI reply on load
 				apiKeyHash: this.get302AIApiKeyHash(),
+				systemPromptVariables: [],
+				systemPromptMap: {} as Record<ChatVariable, string>,
+				systemPromptContent: "",
 			});
 
 			// 8. save thread data and messages

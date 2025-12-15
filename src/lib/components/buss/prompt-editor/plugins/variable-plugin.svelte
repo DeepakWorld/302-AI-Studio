@@ -2,15 +2,9 @@
 	import * as m from "$lib/paraglide/messages.js";
 	import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 	import {
-		COMMAND_PRIORITY_CRITICAL,
 		$getSelection as getSelection,
 		$insertNodes as insertNodes,
 		$isRangeSelection as isRangeSelection,
-		KEY_ARROW_DOWN_COMMAND,
-		KEY_ARROW_UP_COMMAND,
-		KEY_ENTER_COMMAND,
-		KEY_ESCAPE_COMMAND,
-		KEY_TAB_COMMAND,
 		TextNode,
 	} from "lexical";
 	import { onMount, tick } from "svelte";
@@ -201,65 +195,45 @@
 			checkForTrigger();
 		});
 
-		const unregisterDown = editor.registerCommand(
-			KEY_ARROW_DOWN_COMMAND,
-			() => {
-				if (!isOpen) return false;
-				selectedIndex = (selectedIndex + 1) % options.length;
-				return true;
-			},
-			COMMAND_PRIORITY_CRITICAL,
-		);
+		// Use DOM event listener to capture arrow keys before Lexical processes them
+		const rootElement = editor.getRootElement();
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!isOpen) return;
 
-		const unregisterUp = editor.registerCommand(
-			KEY_ARROW_UP_COMMAND,
-			() => {
-				if (!isOpen) return false;
-				selectedIndex = (selectedIndex - 1 + options.length) % options.length;
-				return true;
-			},
-			COMMAND_PRIORITY_CRITICAL,
-		);
+			switch (event.key) {
+				case "ArrowDown":
+					event.preventDefault();
+					event.stopPropagation();
+					selectedIndex = (selectedIndex + 1) % options.length;
+					break;
+				case "ArrowUp":
+					event.preventDefault();
+					event.stopPropagation();
+					selectedIndex = (selectedIndex - 1 + options.length) % options.length;
+					break;
+				case "Enter":
+					event.preventDefault();
+					event.stopPropagation();
+					selectOption(options[selectedIndex].key);
+					break;
+				case "Tab":
+					event.preventDefault();
+					event.stopPropagation();
+					selectOption(options[selectedIndex].key);
+					break;
+				case "Escape":
+					event.preventDefault();
+					event.stopPropagation();
+					closeMenu();
+					break;
+			}
+		};
 
-		const unregisterEnter = editor.registerCommand(
-			KEY_ENTER_COMMAND,
-			(event: KeyboardEvent | null) => {
-				if (!isOpen) return false;
-				event?.preventDefault();
-				selectOption(options[selectedIndex].key);
-				return true;
-			},
-			COMMAND_PRIORITY_CRITICAL,
-		);
-
-		const unregisterTab = editor.registerCommand(
-			KEY_TAB_COMMAND,
-			(event: KeyboardEvent | null) => {
-				if (!isOpen) return false;
-				event?.preventDefault();
-				selectOption(options[selectedIndex].key);
-				return true;
-			},
-			COMMAND_PRIORITY_CRITICAL,
-		);
-
-		const unregisterEscape = editor.registerCommand(
-			KEY_ESCAPE_COMMAND,
-			() => {
-				if (!isOpen) return false;
-				closeMenu();
-				return true;
-			},
-			COMMAND_PRIORITY_CRITICAL,
-		);
+		rootElement?.addEventListener("keydown", handleKeyDown, true);
 
 		return () => {
 			unregisterUpdate();
-			unregisterDown();
-			unregisterUp();
-			unregisterEnter();
-			unregisterTab();
-			unregisterEscape();
+			rootElement?.removeEventListener("keydown", handleKeyDown, true);
 		};
 	});
 </script>
@@ -273,7 +247,6 @@
 		{#each options as option, index (option.key)}
 			<PromptMenuItem
 				title={getVariableLabel(option.key)}
-				description={`{{#${option.key}#}}`}
 				isSelected={selectedIndex === index}
 				onclick={() => selectOption(option.key)}
 				onmouseenter={() => (selectedIndex = index)}

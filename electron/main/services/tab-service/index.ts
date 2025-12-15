@@ -1,4 +1,4 @@
-import type { ChatMessage, Tab, TabType, ThreadParmas } from "@shared/types";
+import type { ChatMessage, ChatVariable, Tab, TabType, ThreadParmas } from "@shared/types";
 import { BrowserWindow, WebContentsView, type IpcMainInvokeEvent } from "electron";
 import { isNull, isUndefined } from "es-toolkit";
 import { nanoid } from "nanoid";
@@ -701,6 +701,9 @@ export class TabService {
 				isPrivateChatActive: inheritedPrivacyState,
 				updatedAt: new Date(),
 				apiKeyHash, // Track which API key was used when creating this thread
+				systemPromptVariables: [],
+				systemPromptMap: {} as Record<ChatVariable, string>,
+				systemPromptContent: "",
 			};
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const newMessages: any = [];

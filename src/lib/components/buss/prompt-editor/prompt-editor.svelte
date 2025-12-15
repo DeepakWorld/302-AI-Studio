@@ -5,6 +5,7 @@
 	import { Composer, ContentEditable, HistoryPlugin, RichTextPlugin } from "svelte-lexical";
 
 	import LabelWithTips from "$lib/components/buss/label-with-tips/label-with-tips.svelte";
+	import { Label } from "$lib/components/ui/label";
 	import ClearEditorBtn from "./clear-editor-btn.svelte";
 	import { CustomTextNode } from "./nodes/custom-text-node";
 	import { VariableValueNode } from "./nodes/variable-value-node";
@@ -16,7 +17,7 @@
 
 	interface Props {
 		label: string;
-		tips: string;
+		tips?: string;
 		value?: string | null;
 		isSystemPrompt?: boolean;
 		wrapperClass?: string;
@@ -100,9 +101,13 @@
 </script>
 
 <Composer {initialConfig} bind:this={composer}>
-	<div class="flex flex-col gap-y-2">
+	<div class="flex flex-col">
 		<div class="flex items-center justify-between gap-2">
-			<LabelWithTips {label} {tips} tooltipPlacement="right" />
+			{#if tips}
+				<LabelWithTips {label} {tips} tooltipPlacement="right" />
+			{:else}
+				<Label class="text-label-fg">{label}</Label>
+			{/if}
 			<div class="flex flex-row gap-x-2">
 				{#if right}
 					{@render right()}
@@ -115,13 +120,13 @@
 
 		<div
 			class={cn(
-				"relative rounded-lg border bg-input transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
+				"relative rounded-lg border bg-input transition-colors focus-within:ring-2 focus-within:ring-primary",
 				wrapperClass,
 			)}
 		>
 			<ContentEditable
 				className={cn(
-					"min-h-[120px] w-full resize-none px-3 py-2 text-sm leading-relaxed focus:outline-none",
+					"h-[150px] w-full resize-none overflow-auto px-3 py-2 text-sm leading-relaxed focus:outline-none",
 					"[&_p]:m-0 [&_p]:min-h-[1.5em]",
 					className,
 				)}

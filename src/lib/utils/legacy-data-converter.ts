@@ -15,7 +15,7 @@ import type {
 import type { GeneralSettingsState } from "@shared/storage/general-settings";
 import type { McpServer } from "@shared/storage/mcp";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { Model, ThreadParmas } from "@shared/types";
+import type { ChatVariable, Model, ThreadParmas } from "@shared/types";
 
 export function convertProviders(legacyProviders: LegacyProvider[]): ModelProvider[] {
 	return legacyProviders.map((legacy) => {
@@ -136,6 +136,9 @@ export function convertThreads(
 			selectedModel: selectedModel,
 			isPrivateChatActive: legacy.isPrivate,
 			updatedAt: new Date(legacy.updatedAt),
+			systemPromptVariables: [],
+			systemPromptMap: {} as Record<ChatVariable, string>,
+			systemPromptContent: "",
 		};
 
 		threads.push({ id: legacy.id, data: threadData });
