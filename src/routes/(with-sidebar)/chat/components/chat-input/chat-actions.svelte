@@ -170,7 +170,6 @@
 
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
 	{#if !codeAgentState.enabled}
-		{@render actionUploadAttachment()}
 		{#if chatState.providerType === "302ai"}
 			{@render actionEnableThinking()}
 			{@render actionEnableOnlineSearch()}
