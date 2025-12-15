@@ -26,7 +26,11 @@ import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
-import { convertAiSdkMessagesToOpenAiMessages } from "./utils";
+import {
+	convertAiSdkMessagesToOpenAiMessages,
+	createUIMessageStreamFromGenerator,
+	isStreamingSupported,
+} from "./utils";
 
 export type RouterRequestBody = {
 	baseUrl?: string;
@@ -275,6 +279,31 @@ app.post("/chat/302ai", async (c) => {
 		frequencyPenalty,
 		presencePenalty,
 	});
+
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[302ai] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"ai302",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
+	}
 
 	const streamTextOptionsWithTransform = {
 		...streamTextOptions,
