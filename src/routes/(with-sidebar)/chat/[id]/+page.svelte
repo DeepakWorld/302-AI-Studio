@@ -25,7 +25,6 @@
 
 	let isInputAreaHovered = $state(false);
 	let fileUploadOverlayRef: FileUploadOverlay | null = $state(null);
-	let hasAutoOpened = false;
 
 	function handleFilesAdded(attachments: AttachmentFile[]) {
 		for (const attachment of attachments) {
@@ -190,16 +189,17 @@
 		};
 	});
 
-	$effect(() => {
-		const sandBoxId = agentPreviewState.sandBoxId;
-		console.log("sandBoxIdsandBoxId", sandBoxId);
-	});
+	// $effect(() => {
+	// 	const sandBoxId = agentPreviewState.sandBoxId;
+	// 	console.log("sandBoxIdsandBoxId", sandBoxId);
+	// });
 
 	$effect(() => {
-		if (codeAgentState.enabled && !hasAutoOpened) {
-			hasAutoOpened = true;
+		if (codeAgentState.enabled) {
 			// Open immediately, even if sandboxId is empty/loading
 			agentPreviewState.openPreview(codeAgentState.sandboxId || "");
+		} else {
+			agentPreviewState.closePreview();
 		}
 	});
 
