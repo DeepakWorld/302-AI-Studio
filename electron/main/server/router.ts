@@ -26,6 +26,7 @@ import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
+import { convertAiSdkMessagesToOpenAiMessages } from "./utils";
 
 export type RouterRequestBody = {
 	baseUrl?: string;
@@ -830,9 +831,16 @@ app.post("/chat/302ai-code-agent", async (c) => {
 	const claudeCodeFetch = createClaudeCodeFetch(messageId);
 
 	// Build request body for 302.AI Claude Code API
+	const lastAiSdkModelMessage = convertToModelMessages(enhanceMessagesWithFeedback(messages)).at(
+		-1,
+	);
+	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(
+		lastAiSdkModelMessage ? [lastAiSdkModelMessage] : [],
+	);
+
 	const requestBody = {
 		model: sandboxId,
-		messages: [convertToModelMessages(enhanceMessagesWithFeedback(messages)).at(-1)!],
+		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
 	};

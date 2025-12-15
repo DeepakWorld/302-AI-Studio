@@ -179,5 +179,6 @@
 		{@render actionSetParameters()}
 	{/if}
 
+	{@render actionUploadAttachment()}
 	{@render actionCodeAgent()}
 </div>
