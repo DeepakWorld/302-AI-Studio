@@ -74,6 +74,7 @@ export interface ModelProvider {
 	websites: ModelProviderWebsites;
 	icon?: string;
 	autoUpdateModels?: boolean;
+	lastAutoUpdateDate?: string;
 }
 
 /* ============================================================================

@@ -422,6 +422,81 @@ class ProviderState {
 		console.log("[Provider] API key mismatch, not clearing (user may have modified it)");
 		return false;
 	}
+
+	/**
+	 * 静默获取供应商模型（不显示 toast 提示）
+	 */
+	async fetchModelsForProviderSilent(provider: ModelProvider): Promise<boolean> {
+		try {
+			const latestProvider = this.getProvider(provider.id);
+			if (!latestProvider) return false;
+
+			const result = await getModelsByProvider(latestProvider);
+			if (result.success && result.data) {
+				await this.updateProvider(latestProvider.id, { status: "connected" });
+				persistedModelState.current = persistedModelState.current
+					.filter((models) => models.providerId !== latestProvider.id)
+					.concat(result.data.models);
+				return true;
+			} else {
+				await this.updateProvider(latestProvider.id, { status: "error" });
+				return false;
+			}
+		} catch (error) {
+			console.error(`[Provider] Silent fetch failed for ${provider.id}:`, error);
+			await this.updateProvider(provider.id, { status: "error" });
+			return false;
+		}
+	}
+
+	/**
+	 * 自动更新所有开启了 autoUpdateModels 的供应商
+	 * 每天只执行一次
+	 */
+	async autoUpdateModelsForEligibleProviders(): Promise<void> {
+		const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+		const providers = persistedProviderState.current;
+
+		// 找出需要更新的供应商
+		const providersToUpdate = providers.filter((p) => {
+			if (!p.autoUpdateModels || !p.apiKey) return false;
+			return p.lastAutoUpdateDate !== today;
+		});
+
+		if (providersToUpdate.length === 0) return;
+
+		console.log(`[Provider] Auto-updating models for ${providersToUpdate.length} provider(s)`);
+
+		// 并行更新所有供应商（静默模式，不显示 toast）
+		const results = await Promise.allSettled(
+			providersToUpdate.map((p) => this.fetchModelsForProviderSilent(p)),
+		);
+
+		// 更新成功的供应商记录日期
+		providersToUpdate.forEach((p, index) => {
+			const result = results[index];
+			if (result.status === "fulfilled" && result.value) {
+				this.updateProvider(p.id, { lastAutoUpdateDate: today });
+			}
+		});
+
+		const successCount = results.filter((r) => r.status === "fulfilled" && r.value).length;
+		console.log(
+			`[Provider] Auto-update completed: ${successCount}/${providersToUpdate.length} succeeded`,
+		);
+	}
 }
 
 export const providerState = new ProviderState();
+
+// 应用启动时自动更新模型
+if (typeof window !== "undefined") {
+	const checkAndAutoUpdate = () => {
+		if (persistedProviderState.isHydrated) {
+			providerState.autoUpdateModelsForEligibleProviders();
+		} else {
+			setTimeout(checkAndAutoUpdate, 100);
+		}
+	};
+	setTimeout(checkAndAutoUpdate, 500);
+}
