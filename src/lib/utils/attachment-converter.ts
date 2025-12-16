@@ -95,14 +95,37 @@ function isTextFile(attachment: AttachmentFile): boolean {
 	return textExtensions.some((ext) => name.toLowerCase().endsWith(ext));
 }
 
+/**
+ * Get ArrayBuffer from attachment file or preview
+ * Handles cases where File object may not have arrayBuffer method (e.g., after serialization)
+ */
+async function getArrayBufferFromAttachment(attachment: AttachmentFile): Promise<ArrayBuffer> {
+	// First try to read from file if it has arrayBuffer method
+	if (attachment.file && typeof attachment.file.arrayBuffer === "function") {
+		return await attachment.file.arrayBuffer();
+	}
+
+	// Then try to read from preview (data URL or URL)
+	if (attachment.preview && typeof attachment.preview === "string") {
+		// Use fetch to decode data URL, blob URL, or regular URL
+		// fetch() can handle all these URL types natively and correctly
+		if (
+			attachment.preview.startsWith("data:") ||
+			attachment.preview.startsWith("blob:") ||
+			attachment.preview.startsWith("http:") ||
+			attachment.preview.startsWith("https:")
+		) {
+			const response = await fetch(attachment.preview);
+			return await response.arrayBuffer();
+		}
+	}
+
+	throw new Error("No file or preview available for parsing");
+}
+
 async function readPdfFile(attachment: AttachmentFile): Promise<string> {
 	try {
-		if (!attachment.file) {
-			throw new Error("No file available for PDF parsing");
-		}
-
-		// Convert File to ArrayBuffer (browser-compatible)
-		const arrayBuffer = await attachment.file.arrayBuffer();
+		const arrayBuffer = await getArrayBufferFromAttachment(attachment);
 		const uint8Array = new Uint8Array(arrayBuffer);
 
 		// Parse PDF to Markdown using Uint8Array (browser-compatible)
@@ -120,14 +143,6 @@ async function readPdfFile(attachment: AttachmentFile): Promise<string> {
  * Decode base64 string to UTF-8 text
  * Uses TextDecoder to properly handle multi-byte UTF-8 characters (e.g., Chinese)
  */
-function decodeBase64ToUtf8(base64: string): string {
-	const binaryString = atob(base64);
-	const bytes = new Uint8Array(binaryString.length);
-	for (let i = 0; i < binaryString.length; i++) {
-		bytes[i] = binaryString.charCodeAt(i);
-	}
-	return new TextDecoder("utf-8").decode(bytes);
-}
 
 async function readTextFile(attachment: AttachmentFile): Promise<string> {
 	// First try to read from file if it's a valid File object
@@ -135,15 +150,25 @@ async function readTextFile(attachment: AttachmentFile): Promise<string> {
 		return await attachment.file.text();
 	}
 
-	// Then try to read from preview (data URL)
+	// Then try to read from preview using fetch (handles data URL, blob URL, etc.)
 	if (attachment.preview && typeof attachment.preview === "string") {
-		if (attachment.preview.startsWith("data:")) {
-			const base64Content = attachment.preview.split(",")[1];
-			return decodeBase64ToUtf8(base64Content);
-		} else {
+		if (
+			attachment.preview.startsWith("data:") ||
+			attachment.preview.startsWith("blob:") ||
+			attachment.preview.startsWith("http:") ||
+			attachment.preview.startsWith("https:")
+		) {
 			const response = await fetch(attachment.preview);
 			return await response.text();
 		}
+	}
+
+	// Last resort: try to get ArrayBuffer and decode as text
+	try {
+		const arrayBuffer = await getArrayBufferFromAttachment(attachment);
+		return new TextDecoder("utf-8").decode(arrayBuffer);
+	} catch {
+		// Ignore and throw the final error
 	}
 
 	throw new Error("No content available for text file");
@@ -151,12 +176,7 @@ async function readTextFile(attachment: AttachmentFile): Promise<string> {
 
 async function readExcelFile(attachment: AttachmentFile): Promise<string> {
 	try {
-		if (!attachment.file) {
-			throw new Error("No file available for Excel parsing");
-		}
-
-		// Read file as ArrayBuffer
-		const arrayBuffer = await attachment.file.arrayBuffer();
+		const arrayBuffer = await getArrayBufferFromAttachment(attachment);
 
 		// Parse Excel file
 		const workbook = XLSX.read(arrayBuffer, { type: "array" });
@@ -185,12 +205,7 @@ async function readExcelFile(attachment: AttachmentFile): Promise<string> {
 
 async function readWordFile(attachment: AttachmentFile): Promise<string> {
 	try {
-		if (!attachment.file) {
-			throw new Error("No file available for Word parsing");
-		}
-
-		// Read file as ArrayBuffer
-		const arrayBuffer = await attachment.file.arrayBuffer();
+		const arrayBuffer = await getArrayBufferFromAttachment(attachment);
 
 		// Extract text from Word document
 		const result = await mammoth.extractRawText({ arrayBuffer });
@@ -282,8 +297,8 @@ export async function convertAttachmentToMessagePart(
 				};
 			}
 
-			// Handle Word documents (.docx, .doc)
-			if (lowerName.endsWith(".docx") || lowerName.endsWith(".doc")) {
+			// Handle Word documents (.docx only - mammoth doesn't support .doc)
+			if (lowerName.endsWith(".docx")) {
 				const content = await readWordFile(attachment);
 				return {
 					part: {
@@ -291,6 +306,19 @@ export async function convertAttachmentToMessagePart(
 						text: `[File: ${attachment.name}]\n\`\`\`\n${content}\n\`\`\``,
 					},
 					textContent: content,
+				};
+			}
+
+			// Handle old Word format (.doc) - not supported
+			if (lowerName.endsWith(".doc")) {
+				const sizeInKB = (attachment.size / 1024).toFixed(2);
+				const description = `[${attachment.name}]\n${m.attachment_type()}: ${m.attachment_file_type_word()}\n${m.attachment_size()}: ${sizeInKB} KB\n\n${m.attachment_note()}: ${m.attachment_note_doc_not_supported()}`;
+
+				return {
+					part: {
+						type: "text",
+						text: description,
+					},
 				};
 			}
 

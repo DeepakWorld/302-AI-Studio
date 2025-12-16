@@ -209,6 +209,7 @@
 	"document_viewer_loading": "加载中...",
 	"attachment_note_api_limitation": "由于API限制，无法直接读取文件内容，但文件已上传并可供用户下载查看。",
 	"attachment_note_powerpoint_not_supported": "PowerPoint文件暂不支持内容提取，但文件已上传并可供下载查看。",
+	"attachment_note_doc_not_supported": "旧版Word格式(.doc)暂不支持内容提取，请转换为.docx格式。文件已上传并可供下载查看。",
 	"attachment_note_cannot_read_content": "无法读取文件内容，但文件已上传并可供下载查看。",
 	"attachment_type": "类型",
 	"attachment_size": "大小",

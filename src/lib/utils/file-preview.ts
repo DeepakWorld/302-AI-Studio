@@ -131,5 +131,65 @@ export async function generateFilePreview(file: File): Promise<string | undefine
 		});
 	}
 
+	// Handle text files (json, txt, code files, etc.)
+	const textExtensions = [
+		".txt",
+		".json",
+		".jsonc",
+		".xml",
+		".html",
+		".htm",
+		".css",
+		".scss",
+		".sass",
+		".less",
+		".js",
+		".ts",
+		".tsx",
+		".jsx",
+		".py",
+		".java",
+		".cpp",
+		".c",
+		".h",
+		".cs",
+		".php",
+		".rb",
+		".go",
+		".rs",
+		".swift",
+		".kt",
+		".scala",
+		".yml",
+		".yaml",
+		".toml",
+		".ini",
+		".cfg",
+		".conf",
+		".sh",
+		".bat",
+		".ps1",
+		".sql",
+		".log",
+		".csv",
+		".tsv",
+		".vue",
+		".svelte",
+	];
+
+	const isTextFile =
+		file.type.startsWith("text/") ||
+		file.type === "application/json" ||
+		textExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
+
+	if (isTextFile) {
+		return new Promise((resolve) => {
+			const reader = new FileReader();
+			reader.onload = (e) => resolve(e.target?.result as string);
+			reader.onerror = () => resolve(undefined);
+			reader.readAsDataURL(file);
+		});
+	}
+
 	return undefined;
 }

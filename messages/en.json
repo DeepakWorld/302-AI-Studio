@@ -213,6 +213,7 @@
 	"document_viewer_loading": "Loading...",
 	"attachment_note_api_limitation": "Due to API limitations, the file content cannot be read directly, but the file has been uploaded and is available for download.",
 	"attachment_note_powerpoint_not_supported": "PowerPoint files are not currently supported for content extraction, but the file has been uploaded and is available for download.",
+	"attachment_note_doc_not_supported": "Legacy Word format (.doc) is not supported for content extraction. Please convert to .docx format. The file has been uploaded and is available for download.",
 	"attachment_note_cannot_read_content": "Unable to read file content, but the file has been uploaded and is available for download.",
 	"attachment_type": "Type",
 	"attachment_size": "Size",
