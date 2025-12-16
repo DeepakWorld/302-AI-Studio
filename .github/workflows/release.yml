@@ -44,7 +44,7 @@ jobs:
 
           echo "Creating release ${VERSION} on channel ${CHANNEL}..."
 
-          curl -sf -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases" \
+          curl -sfk -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases" \
             -H "X-API-Key: ${{ secrets.UPDATE_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d "{\"version\": \"${VERSION}\", \"notes\": \"Release ${VERSION}\"}"
@@ -167,7 +167,7 @@ jobs:
           fi
           echo "Found ZIP: ${ZIP_FILE}"
 
-          curl -sf -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/upload" \
+          curl -sfk -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/upload" \
             -H "X-API-Key: ${{ secrets.UPDATE_API_KEY }}" \
             -F "file=@${ZIP_FILE}" \
             -F "platform=darwin" \
@@ -190,7 +190,7 @@ jobs:
           SETUP_FILE=$(find out/make/squirrel.windows -name "*Setup.exe" -type f | head -1)
           if [ -n "$SETUP_FILE" ]; then
             echo "Found Setup.exe: ${SETUP_FILE}"
-            curl -sf -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/upload" \
+            curl -sfk -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/upload" \
               -H "X-API-Key: ${{ secrets.UPDATE_API_KEY }}" \
               -F "file=@${SETUP_FILE}" \
               -F "platform=win32" \
@@ -202,7 +202,7 @@ jobs:
           NUPKG_FILE=$(find out/make/squirrel.windows -name "*-full.nupkg" -type f | head -1)
           if [ -n "$NUPKG_FILE" ]; then
             echo "Found nupkg: ${NUPKG_FILE}"
-            curl -sf -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/upload" \
+            curl -sfk -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/upload" \
               -H "X-API-Key: ${{ secrets.UPDATE_API_KEY }}" \
               -F "file=@${NUPKG_FILE}" \
               -F "platform=win32" \
@@ -252,7 +252,7 @@ jobs:
 
           echo "Publishing release ${VERSION} on channel ${CHANNEL}..."
 
-          curl -sf -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/publish" \
+          curl -sfk -X POST "${UPDATE_SERVER_URL}/api/channels/${CHANNEL}/releases/${VERSION}/publish" \
             -H "X-API-Key: ${{ secrets.UPDATE_API_KEY }}"
 
           echo "Release published successfully on update server!"
