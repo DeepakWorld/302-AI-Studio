@@ -30,17 +30,12 @@ export class UpdaterService {
 	}
 
 	private buildUpdateFeedUrl(channel: UpdateChannel): string {
-		const server = "https://update.electronjs.org";
-		const repo = "302ai/302-AI-Studio-sv";
-		let version = app.getVersion();
+		const server = "https://updater.302.ai";
+		const appId = "302-ai-studio";
+		const version = app.getVersion();
 		const platform = process.platform;
 
-		// For beta channel, append -beta suffix if not already present
-		if (channel === "beta" && !version.includes("-beta")) {
-			version = `${version}-beta`;
-		}
-
-		return `${server}/${repo}/${platform}-${process.arch}/${version}`;
+		return `${server}/update/${appId}/${channel}/${platform}/${process.arch}/${version}`;
 	}
 
 	private updateFeedUrlForChannel(channel: UpdateChannel) {
