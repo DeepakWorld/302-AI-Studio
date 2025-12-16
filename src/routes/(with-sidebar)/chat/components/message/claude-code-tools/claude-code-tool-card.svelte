@@ -140,7 +140,9 @@
 			<!-- Left: Input Parameters -->
 			<div class="min-h-0 min-w-0 overflow-y-auto {hasOutput ? 'flex-1 pr-2' : 'w-full'}">
 				{#if part.input}
-					<div class="h-full [&_.shiki]:overflow-auto [&_.shiki]:text-xs">
+					<div
+						class="h-full [&_.shiki]:overflow-y-auto [&_.shiki]:overflow-x-hidden [&_.shiki]:text-xs [&_.shiki_code]:whitespace-pre-wrap [&_.shiki_code]:break-all"
+					>
 						<StaticCodeBlock
 							code={formatJson(part.input)}
 							language="json"
@@ -156,7 +158,9 @@
 			{#if hasOutput}
 				<div class="flex-1 min-h-0 min-w-0 overflow-y-auto">
 					{#if part.state === "output-available" && part.output}
-						<div class="h-full [&_.shiki]:overflow-auto [&_.shiki]:text-xs">
+						<div
+							class="h-full [&_.shiki]:overflow-y-auto [&_.shiki]:overflow-x-hidden [&_.shiki]:text-xs [&_.shiki_code]:whitespace-pre-wrap [&_.shiki_code]:break-all"
+						>
 							<StaticCodeBlock
 								code={formatJson(part.output)}
 								language="json"
