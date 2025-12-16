@@ -222,6 +222,7 @@ async function readWordFile(attachment: AttachmentFile): Promise<string> {
 export function createAttachmentMetadata(
 	attachment: AttachmentFile,
 	textContent?: string,
+	preview?: string,
 ): AttachmentMetadata {
 	return {
 		id: attachment.id,
@@ -229,14 +230,14 @@ export function createAttachmentMetadata(
 		type: attachment.type,
 		size: attachment.size,
 		filePath: attachment.filePath,
-		preview: attachment.preview,
+		preview: preview ?? attachment.preview,
 		textContent,
 	};
 }
 
 export async function convertAttachmentToMessagePart(
 	attachment: AttachmentFile,
-): Promise<{ part: MessagePart; textContent?: string }> {
+): Promise<{ part: MessagePart; textContent?: string; preview?: string }> {
 	if (isMediaFile(attachment)) {
 		let url: string;
 
@@ -288,24 +289,34 @@ export async function convertAttachmentToMessagePart(
 			// Handle Excel files (.xlsx, .xls)
 			if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
 				const content = await readExcelFile(attachment);
+				// Generate preview for message history (only if not already present)
+				const preview =
+					attachment.preview ||
+					(attachment.file ? await fileToDataURL(attachment.file) : undefined);
 				return {
 					part: {
 						type: "text",
 						text: `[File: ${attachment.name}]\n\`\`\`csv\n${content}\n\`\`\``,
 					},
 					textContent: content,
+					preview,
 				};
 			}
 
 			// Handle Word documents (.docx only - mammoth doesn't support .doc)
 			if (lowerName.endsWith(".docx")) {
 				const content = await readWordFile(attachment);
+				// Generate preview for message history (only if not already present)
+				const preview =
+					attachment.preview ||
+					(attachment.file ? await fileToDataURL(attachment.file) : undefined);
 				return {
 					part: {
 						type: "text",
 						text: `[File: ${attachment.name}]\n\`\`\`\n${content}\n\`\`\``,
 					},
 					textContent: content,
+					preview,
 				};
 			}
 
@@ -370,9 +381,9 @@ export async function convertAttachmentsToMessageParts(
 
 	for (const attachment of attachments) {
 		try {
-			const { part, textContent } = await convertAttachmentToMessagePart(attachment);
+			const { part, textContent, preview } = await convertAttachmentToMessagePart(attachment);
 			parts.push(part);
-			metadataList.push(createAttachmentMetadata(attachment, textContent));
+			metadataList.push(createAttachmentMetadata(attachment, textContent, preview));
 		} catch (error) {
 			console.error(`Failed to convert attachment ${attachment.name}:`, error);
 		}

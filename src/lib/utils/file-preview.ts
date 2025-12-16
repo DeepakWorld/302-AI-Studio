@@ -101,18 +101,16 @@ export async function generateFilePreview(file: File): Promise<string | undefine
 		});
 	}
 
-	// Handle Office documents
+	// Handle Office documents - don't generate base64 preview to avoid performance issues
+	// Office documents show file icon in thumbnail (shouldShowPreviewAsThumbnail returns false)
+	// and display "cannot preview, download" in viewer. The file content will be read from
+	// attachment.file when sending message, so no preview is needed.
 	const isOfficeFile =
 		officeMimeTypes.includes(file.type) ||
 		officeExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
 
 	if (isOfficeFile) {
-		return new Promise((resolve) => {
-			const reader = new FileReader();
-			reader.onload = (e) => resolve(e.target?.result as string);
-			reader.onerror = () => resolve(undefined);
-			reader.readAsDataURL(file);
-		});
+		return undefined;
 	}
 
 	// Handle Markdown files
