@@ -27,7 +27,7 @@
 	} from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils";
 	import { getFilteredModels } from "$lib/utils/model-filters.js";
-	import { Check, ChevronRight, Star } from "@lucide/svelte";
+	import { ChevronRight, Star } from "@lucide/svelte";
 	// import { CLUADE_CODE_MODELS } from "@shared/constants/codeAgentModel";
 	import type { Model, ModelCapability, Model as ProviderModel } from "@shared/types";
 
@@ -583,11 +583,11 @@
 									</Button>
 								</div>
 
-								{#if isSelected}
+								<!-- {#if isSelected}
 									<div class="absolute top-1 right-1">
 										<Check class="h-3.5 w-3.5" />
 									</div>
-								{/if}
+								{/if} -->
 							</Command.Item>
 						{/each}
 					{/if}
