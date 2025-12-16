@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { getFileContent, uploadSandboxFile, type SandboxFileInfo } from "$lib/api/sandbox-file";
+	import {
+		downloadSandboxFile,
+		getFileContent,
+		uploadSandboxFile,
+		type SandboxFileInfo,
+	} from "$lib/api/sandbox-file";
 	import { deployHtmlTo302, validate302Provider } from "$lib/api/webserve-deploy";
 	import UnDeployedIcon from "$lib/assets/icons/code-agent/unDeployed.svg";
 	import CodeMirrorEditor from "$lib/components/buss/editor/codemirror-editor.svelte";
@@ -20,7 +25,7 @@
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
-	import { Loader2, Pencil, Save, X } from "@lucide/svelte";
+	import { FileWarning, Loader2, Pencil, Save, X } from "@lucide/svelte";
 	import type { ModelProvider } from "@shared/types";
 	import { onDestroy, untrack } from "svelte";
 	import { toast } from "svelte-sonner";
@@ -56,6 +61,90 @@
 		txt: "text",
 	};
 
+	// File type detection
+	type FilePreviewType = "text" | "image" | "pdf" | "video" | "audio" | "unsupported";
+
+	const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "svg"];
+	const VIDEO_EXTENSIONS = ["mp4", "webm", "ogg", "mov", "avi"];
+	const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "flac", "aac", "m4a"];
+	const PDF_EXTENSIONS = ["pdf"];
+	const TEXT_EXTENSIONS = [
+		"txt",
+		"md",
+		"markdown",
+		"json",
+		"jsonc",
+		"js",
+		"jsx",
+		"ts",
+		"tsx",
+		"css",
+		"scss",
+		"sass",
+		"less",
+		"html",
+		"htm",
+		"xml",
+		"svg",
+		"yml",
+		"yaml",
+		"toml",
+		"ini",
+		"cfg",
+		"conf",
+		"sh",
+		"bash",
+		"bat",
+		"ps1",
+		"py",
+		"rb",
+		"go",
+		"rs",
+		"java",
+		"c",
+		"cpp",
+		"h",
+		"hpp",
+		"cs",
+		"php",
+		"swift",
+		"kt",
+		"scala",
+		"sql",
+		"graphql",
+		"vue",
+		"svelte",
+		"astro",
+		"log",
+		"env",
+		"gitignore",
+		"dockerfile",
+		"makefile",
+		"license",
+		"readme",
+	];
+
+	function detectFilePreviewType(filename: string): FilePreviewType {
+		const ext = filename.split(".").pop()?.toLowerCase() || "";
+		const nameWithoutExt = filename.toLowerCase();
+
+		if (IMAGE_EXTENSIONS.includes(ext)) return "image";
+		if (VIDEO_EXTENSIONS.includes(ext)) return "video";
+		if (AUDIO_EXTENSIONS.includes(ext)) return "audio";
+		if (PDF_EXTENSIONS.includes(ext)) return "pdf";
+		if (TEXT_EXTENSIONS.includes(ext) || TEXT_EXTENSIONS.some((t) => nameWithoutExt.endsWith(t))) {
+			return "text";
+		}
+
+		// For files without extension or unknown extensions, try to treat as text
+		// Common files without extensions
+		if (["makefile", "dockerfile", "gemfile", "rakefile", "procfile"].includes(nameWithoutExt)) {
+			return "text";
+		}
+
+		return "unsupported";
+	}
+
 	function detectLanguage(filename: string): string {
 		const ext = filename.split(".").pop()?.toLowerCase();
 		return LANGUAGE_MAP[ext || ""] || "text";
@@ -78,6 +167,8 @@
 		content: "",
 		isLoading: false,
 		language: "text",
+		previewType: "text" as FilePreviewType,
+		previewUrl: null as string | null, // For image/video/audio/pdf blob URLs
 	});
 	let syncUnsubscribe: (() => void) | null = null;
 
@@ -267,6 +358,7 @@
 	// Cleanup on unmount
 	onDestroy(() => {
 		abortController?.abort();
+		cleanupPreviewUrl();
 		if (syncUnsubscribe) {
 			syncUnsubscribe();
 			syncUnsubscribe = null;
@@ -280,62 +372,180 @@
 		return provider?.apiKey || "";
 	};
 
+	// Clean up previous blob URL
+	function cleanupPreviewUrl() {
+		if (fileViewer.previewUrl) {
+			URL.revokeObjectURL(fileViewer.previewUrl);
+			fileViewer.previewUrl = null;
+		}
+	}
+
 	async function handleFileSelect(file: SandboxFileInfo) {
 		abortController?.abort();
 		abortController = new AbortController();
 		const signal = abortController.signal;
 
+		// Clean up previous preview URL
+		cleanupPreviewUrl();
+
+		// Detect file preview type
+		const previewType = detectFilePreviewType(file.name);
+
 		// 立即更新 UI 状态
 		fileViewer.selectedFile = file;
 		fileViewer.isLoading = true;
 		fileViewer.language = detectLanguage(file.name);
+		fileViewer.previewType = previewType;
+		fileViewer.content = "";
 		const currentFilePath = file.path;
 
 		try {
 			if (!currentSandboxId || !currentSessionId) throw new Error("No sandbox/session");
 
-			// 1. Try Cache
-			const cachedContent = await agentPreviewState.getFileContent(
-				currentSandboxId,
-				currentSessionId,
-				file.path,
-				file.modified_time,
-			);
-
-			if (signal.aborted) return;
-
-			if (cachedContent && isFileStillSelected(currentFilePath, fileViewer.selectedFile)) {
-				await agentPreviewState.setSelectedFilePath(currentSandboxId, currentSessionId, file.path);
-				fileViewer.content = cachedContent;
-				fileViewer.isLoading = false;
-				return;
-			}
-
-			// 2. Fetch from API
 			const apiKey = get302ApiKey();
 			if (!apiKey) throw new Error("302.AI API key not found");
 
-			const content = await withRetry(
-				() => getFileContent(currentSandboxId!, file.path, apiKey, undefined, signal),
-				3,
-				1000,
-			);
+			// Handle different file types
+			if (previewType === "text") {
+				// Text files: use existing logic with cache
+				const cachedContent = await agentPreviewState.getFileContent(
+					currentSandboxId,
+					currentSessionId,
+					file.path,
+					file.modified_time,
+				);
 
-			if (signal.aborted) return;
+				if (signal.aborted) return;
 
-			// 3. Update State & Cache
-			// 无论当前是否选中，都写入缓存
-			await agentPreviewState.setFileContent(
-				currentSandboxId,
-				currentSessionId,
-				file.path,
-				content,
-				file.modified_time,
-			);
+				if (cachedContent && isFileStillSelected(currentFilePath, fileViewer.selectedFile)) {
+					await agentPreviewState.setSelectedFilePath(
+						currentSandboxId,
+						currentSessionId,
+						file.path,
+					);
+					fileViewer.content = cachedContent;
+					fileViewer.isLoading = false;
+					return;
+				}
 
-			if (isFileStillSelected(currentFilePath, fileViewer.selectedFile)) {
+				// Fetch from API
+				const content = await withRetry(
+					() => getFileContent(currentSandboxId!, file.path, apiKey, undefined, signal),
+					3,
+					1000,
+				);
+
+				if (signal.aborted) return;
+
+				// Update State & Cache
+				await agentPreviewState.setFileContent(
+					currentSandboxId,
+					currentSessionId,
+					file.path,
+					content,
+					file.modified_time,
+				);
+
+				if (isFileStillSelected(currentFilePath, fileViewer.selectedFile)) {
+					await agentPreviewState.setSelectedFilePath(
+						currentSandboxId,
+						currentSessionId,
+						file.path,
+					);
+					fileViewer.content = content;
+				}
+			} else if (
+				previewType === "image" ||
+				previewType === "video" ||
+				previewType === "audio" ||
+				previewType === "pdf"
+			) {
+				// Binary files: download and create blob URL
+				const response = await downloadSandboxFile(currentSandboxId!, file.path, apiKey);
+
+				if (signal.aborted) return;
+
+				let blob: Blob | null = null;
+
+				// Determine the correct MIME type based on file extension
+				const ext = file.name.split(".").pop()?.toLowerCase() || "";
+				const mimeTypeMap: Record<string, string> = {
+					// Images
+					jpg: "image/jpeg",
+					jpeg: "image/jpeg",
+					png: "image/png",
+					gif: "image/gif",
+					webp: "image/webp",
+					bmp: "image/bmp",
+					ico: "image/x-icon",
+					svg: "image/svg+xml",
+					// Videos
+					mp4: "video/mp4",
+					webm: "video/webm",
+					ogg: "video/ogg",
+					mov: "video/quicktime",
+					avi: "video/x-msvideo",
+					// Audio
+					mp3: "audio/mpeg",
+					wav: "audio/wav",
+					flac: "audio/flac",
+					aac: "audio/aac",
+					m4a: "audio/mp4",
+					// Documents
+					pdf: "application/pdf",
+				};
+				const mimeType = mimeTypeMap[ext] || "application/octet-stream";
+
+				if (response._blobContent) {
+					// Re-create blob with correct MIME type if needed
+					if (response._blobContent.type !== mimeType) {
+						const arrayBuffer = await response._blobContent.arrayBuffer();
+						blob = new Blob([arrayBuffer], { type: mimeType });
+					} else {
+						blob = response._blobContent;
+					}
+				} else if (response._directContent) {
+					// If we got text content, convert to blob
+					blob = new Blob([response._directContent], { type: mimeType });
+				} else {
+					// Check for download_url in the response (API may return this format)
+					const jsonResponse = response as unknown as { download_url?: string };
+					let downloadUrl: string | null = null;
+
+					if (jsonResponse.download_url) {
+						downloadUrl = jsonResponse.download_url;
+					} else if (
+						response.result?.[0]?.file_list?.[0]?.upload_url &&
+						response.result[0].file_list[0].upload_url !== ""
+					) {
+						downloadUrl = response.result[0].file_list[0].upload_url;
+					}
+
+					if (downloadUrl) {
+						const fileResponse = await fetch(downloadUrl, { signal });
+						if (!fileResponse.ok) {
+							throw new Error(`Failed to download file: ${fileResponse.statusText}`);
+						}
+						const arrayBuffer = await fileResponse.arrayBuffer();
+						blob = new Blob([arrayBuffer], { type: mimeType });
+					}
+				}
+
+				if (signal.aborted) return;
+
+				if (blob && isFileStillSelected(currentFilePath, fileViewer.selectedFile)) {
+					const blobUrl = URL.createObjectURL(blob);
+					fileViewer.previewUrl = blobUrl;
+					await agentPreviewState.setSelectedFilePath(
+						currentSandboxId,
+						currentSessionId,
+						file.path,
+					);
+				}
+			}
+			// For unsupported types, just update the selection without loading content
+			else if (isFileStillSelected(currentFilePath, fileViewer.selectedFile)) {
 				await agentPreviewState.setSelectedFilePath(currentSandboxId, currentSessionId, file.path);
-				fileViewer.content = content;
 			}
 		} catch (e) {
 			if (!signal.aborted && isFileStillSelected(currentFilePath, fileViewer.selectedFile)) {
@@ -355,8 +565,10 @@
 			file.type === "dir" && fileViewer.selectedFile.path.startsWith(file.path + "/");
 
 		if (isExactMatch || isParentDir) {
+			cleanupPreviewUrl();
 			fileViewer.selectedFile = null;
 			fileViewer.content = "";
+			fileViewer.previewType = "text";
 		}
 	}
 
@@ -673,7 +885,8 @@
 						{:else if activeTab === TAB_CODE}
 							{#if fileViewer.selectedFile}
 								<div class="flex-1 flex flex-col min-h-0">
-									{#if !fileViewer.isLoading}
+									<!-- Only show edit toolbar for text files -->
+									{#if !fileViewer.isLoading && fileViewer.previewType === "text"}
 										<div
 											class="flex items-center justify-end gap-2 border-b border-border bg-background px-3 py-2"
 										>
@@ -686,7 +899,6 @@
 														title={m.text_button_cancel()}
 													>
 														<X class="h-4 w-4 flex-shrink-0" />
-														<!-- <span class="whitespace-nowrap">{m.text_button_cancel()}</span> -->
 													</button>
 													<button
 														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
@@ -707,7 +919,6 @@
 													onclick={handleStartEdit}
 												>
 													<Pencil class="h-4 w-4" strokeWidth={1.25} />
-													<!-- {m.text_button_edit()} -->
 												</button>
 											{/if}
 										</div>
@@ -718,7 +929,7 @@
 											<div class="flex h-full items-center justify-center">
 												<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
 											</div>
-										{:else}
+										{:else if fileViewer.previewType === "text"}
 											<CodeMirrorEditor
 												value={isEditing ? editContent : fileViewer.content}
 												language={fileViewer.language}
@@ -727,6 +938,63 @@
 													if (isEditing) editContent = val;
 												}}
 											/>
+										{:else if fileViewer.previewType === "image" && fileViewer.previewUrl}
+											<div
+												class="flex h-full w-full items-center justify-center overflow-auto bg-muted/30 p-4"
+											>
+												<img
+													src={fileViewer.previewUrl}
+													alt={fileViewer.selectedFile?.name || "Preview"}
+													class="max-h-full max-w-full object-contain"
+												/>
+											</div>
+										{:else if fileViewer.previewType === "video" && fileViewer.previewUrl}
+											<div
+												class="flex h-full w-full items-center justify-center overflow-auto bg-muted/30 p-4"
+											>
+												<video src={fileViewer.previewUrl} controls class="max-h-full max-w-full">
+													<track kind="captions" />
+												</video>
+											</div>
+										{:else if fileViewer.previewType === "audio" && fileViewer.previewUrl}
+											<div class="flex h-full w-full items-center justify-center bg-muted/30 p-4">
+												<audio src={fileViewer.previewUrl} controls class="w-full max-w-md">
+													Your browser does not support the audio element.
+												</audio>
+											</div>
+										{:else if fileViewer.previewType === "pdf" && fileViewer.previewUrl}
+											<div class="h-full w-full bg-white">
+												<object
+													data={fileViewer.previewUrl}
+													type="application/pdf"
+													class="h-full w-full"
+													title={fileViewer.selectedFile?.name || "PDF Preview"}
+												>
+													<div
+														class="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"
+													>
+														<FileWarning class="h-12 w-12" strokeWidth={1.25} />
+														<p class="text-sm">{m.document_viewer_cannot_preview()}</p>
+														<a
+															href={fileViewer.previewUrl}
+															download={fileViewer.selectedFile?.name}
+															class="text-primary hover:underline text-sm"
+														>
+															{m.document_viewer_download_button()}
+														</a>
+													</div>
+												</object>
+											</div>
+										{:else}
+											<div
+												class="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground"
+											>
+												<FileWarning class="h-12 w-12" strokeWidth={1.25} />
+												<p class="text-sm">{m.document_viewer_cannot_preview()}</p>
+												<p class="text-xs text-muted-foreground/70">
+													{fileViewer.selectedFile?.name}
+												</p>
+											</div>
 										{/if}
 									</div>
 								</div>
