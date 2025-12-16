@@ -8,14 +8,13 @@ import { serve } from "@hono/node-server";
 import type { ModelProvider } from "@shared/storage/provider";
 import type { McpServer } from "@shared/types";
 import {
-	Experimental_Agent as Agent,
+	ToolLoopAgent as Agent,
 	convertToModelMessages,
 	createUIMessageStreamResponse,
 	extractReasoningMiddleware,
 	generateText,
 	smoothStream,
 	stepCountIs,
-	streamText,
 	wrapLanguageModel,
 	type UIMessage,
 } from "ai";
@@ -309,21 +308,34 @@ app.post("/chat/302ai", async (c) => {
 		});
 	}
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	// Stream the main text response using Agent without waiting for suggestions
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
+		model: wrapModel,
+		...(systemPrompt && { instructions: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
+		providerOptions: {
+			"302": provider302Options,
+		},
+	};
+	addDefinedParams(agentConfig, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	const result = await new Agent(agentConfig).stream({
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response using Agent without waiting for suggestions
-	const result = await new Agent({
-		...streamTextOptionsWithTransform,
-		stopWhen: stepCountIs(20),
-	}).stream(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
@@ -410,14 +422,15 @@ app.post("/chat/openai", async (c) => {
 		}
 	}
 
-	const streamTextOptions = {
+	// Stream the main text response using Agent
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
-		...(systemPrompt && { system: systemPrompt }),
+		...(systemPrompt && { instructions: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
 	};
-
-	addDefinedParams(streamTextOptions, {
+	addDefinedParams(agentConfig, {
 		temperature,
 		topP,
 		maxTokens,
@@ -425,18 +438,15 @@ app.post("/chat/openai", async (c) => {
 		presencePenalty,
 	});
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	const result = await new Agent(agentConfig).stream({
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response without waiting for suggestions
-	const result = streamText(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
@@ -512,14 +522,15 @@ app.post("/chat/anthropic", async (c) => {
 		}
 	}
 
-	const streamTextOptions = {
+	// Stream the main text response using Agent
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
-		...(systemPrompt && { system: systemPrompt }),
+		...(systemPrompt && { instructions: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
 	};
-
-	addDefinedParams(streamTextOptions, {
+	addDefinedParams(agentConfig, {
 		temperature,
 		topP,
 		maxTokens,
@@ -527,18 +538,15 @@ app.post("/chat/anthropic", async (c) => {
 		presencePenalty,
 	});
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	const result = await new Agent(agentConfig).stream({
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response without waiting for suggestions
-	const result = streamText(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
@@ -614,14 +622,15 @@ app.post("/chat/gemini", async (c) => {
 		}
 	}
 
-	const streamTextOptions = {
+	// Stream the main text response using Agent
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
-		...(systemPrompt && { system: systemPrompt }),
+		...(systemPrompt && { instructions: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
 	};
-
-	addDefinedParams(streamTextOptions, {
+	addDefinedParams(agentConfig, {
 		temperature,
 		topP,
 		maxTokens,
@@ -629,18 +638,15 @@ app.post("/chat/gemini", async (c) => {
 		presencePenalty,
 	});
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	const result = await new Agent(agentConfig).stream({
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response without waiting for suggestions
-	const result = streamText(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
