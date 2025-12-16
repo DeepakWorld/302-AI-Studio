@@ -78,6 +78,12 @@
 
 	const ToolIcon = $derived(getClaudeCodeToolIcon(part.toolName));
 	const toolLabel = $derived(getClaudeCodeToolLabel(part.toolName));
+
+	// 判断是否有输出内容
+	const hasOutput = $derived(
+		(part.state === "output-available" && part.output) ||
+			(part.state === "output-error" && part.errorText),
+	);
 </script>
 
 <!-- Card Button -->
@@ -118,7 +124,10 @@
 
 <!-- Modal Dialog -->
 <Dialog bind:open={isModalOpen}>
-	<DialogContent class="!flex !flex-col !grid-cols-none !gap-0 h-[80vh] w-[60vw]">
+	<DialogContent
+		data-tool-card-dialog
+		class="!flex !flex-col !grid-cols-none !gap-0 h-[80vh] w-[60vw]"
+	>
 		<DialogHeader class="shrink-0 mb-4">
 			<DialogTitle class="flex items-center gap-2">
 				<ToolIcon class="h-5 w-5" />
@@ -129,7 +138,7 @@
 		<!-- Input & Output Layout -->
 		<div class="flex-1 min-h-0 flex gap-2">
 			<!-- Left: Input Parameters -->
-			<div class="flex-1 min-h-0 min-w-0 overflow-y-auto pr-2">
+			<div class="min-h-0 min-w-0 overflow-y-auto {hasOutput ? 'flex-1 pr-2' : 'w-full'}">
 				{#if part.input}
 					<div class="h-full [&_.shiki]:overflow-auto [&_.shiki]:text-xs">
 						<StaticCodeBlock
@@ -144,28 +153,30 @@
 			</div>
 
 			<!-- Right: Output / Error -->
-			<div class="flex-1 min-h-0 min-w-0 overflow-y-auto">
-				{#if part.state === "output-available" && part.output}
-					<div class="h-full [&_.shiki]:overflow-auto [&_.shiki]:text-xs">
-						<StaticCodeBlock
-							code={formatJson(part.output)}
-							language="json"
-							canCollapse={false}
-							title={m.tool_call_result()}
-							showCollapseButton={false}
-						/>
-					</div>
-				{:else if part.state === "output-error" && part.errorText}
-					<div
-						class="h-full rounded-lg border border-red-200 bg-red-50 p-4 overflow-y-auto dark:border-red-900 dark:bg-red-950"
-					>
-						<p class="text-sm font-medium text-[#D82525] mb-2">{m.tool_call_error_message()}</p>
-						<p class="text-xs text-red-900 dark:text-red-100 whitespace-pre-wrap">
-							{part.errorText}
-						</p>
-					</div>
-				{/if}
-			</div>
+			{#if hasOutput}
+				<div class="flex-1 min-h-0 min-w-0 overflow-y-auto">
+					{#if part.state === "output-available" && part.output}
+						<div class="h-full [&_.shiki]:overflow-auto [&_.shiki]:text-xs">
+							<StaticCodeBlock
+								code={formatJson(part.output)}
+								language="json"
+								canCollapse={false}
+								title={m.tool_call_result()}
+								showCollapseButton={false}
+							/>
+						</div>
+					{:else if part.state === "output-error" && part.errorText}
+						<div
+							class="h-full rounded-lg border border-red-200 bg-red-50 p-4 overflow-y-auto dark:border-red-900 dark:bg-red-950"
+						>
+							<p class="text-sm font-medium text-[#D82525] mb-2">{m.tool_call_error_message()}</p>
+							<p class="text-xs text-red-900 dark:text-red-100 whitespace-pre-wrap">
+								{part.errorText}
+							</p>
+						</div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</DialogContent>
 </Dialog>
