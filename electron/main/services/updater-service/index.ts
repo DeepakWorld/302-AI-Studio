@@ -32,9 +32,16 @@ export class UpdaterService {
 	private buildUpdateFeedUrl(channel: UpdateChannel): string {
 		const server = "https://updater.302.ai";
 		const appId = "302-ai-studio";
-		const version = app.getVersion();
 		const platform = process.platform;
 
+		if (platform === "win32") {
+			// Windows Squirrel expects base URL without version
+			// It will automatically request /RELEASES file
+			return `${server}/update/${appId}/${channel}/${platform}/${process.arch}`;
+		}
+
+		// macOS Squirrel needs version in URL for update check
+		const version = app.getVersion();
 		return `${server}/update/${appId}/${channel}/${platform}/${process.arch}/${version}`;
 	}
 
