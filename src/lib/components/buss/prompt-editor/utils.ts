@@ -7,10 +7,28 @@ const VARIABLE_PATTERN = /\{\{#([^#}]+)#\}\}/g;
 type SerializedCustomTextNode = SerializedTextNode & { type: "custom-text" };
 
 /**
+ * Check if the input is already a valid Lexical editor state JSON
+ */
+export function isLexicalEditorState(text: string): boolean {
+	try {
+		const parsed = JSON.parse(text);
+		return parsed && typeof parsed === "object" && "root" in parsed && parsed.root?.type === "root";
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Convert a text string with variable placeholders to Lexical editor state JSON
+ * If the input is already a valid Lexical editor state JSON, return it as-is
  */
 export function textJsonToEditorState(text: string | null): string | null {
 	if (!text) return null;
+
+	// If already a valid Lexical editor state, return as-is
+	if (isLexicalEditorState(text)) {
+		return text;
+	}
 
 	const paragraphs: SerializedParagraphNode[] = [];
 	const lines = text.split("\n");

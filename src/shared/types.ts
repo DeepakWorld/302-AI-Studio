@@ -123,7 +123,7 @@ export interface AttachmentFile {
 	textContent?: string;
 }
 
-export type ChatVariable = "input" | "date" | "time" | "datetime" | "now" | "model_id";
+export type { ChatVariable } from "./storage/chat-parameters";
 
 export interface ThreadParmas {
 	id: string;
@@ -146,10 +146,6 @@ export interface ThreadParmas {
 	autoSendOnLoad?: boolean; // Flag to auto-send message when thread loads (for branch and send)
 	/** Hash of the API key used when creating this thread, used to track account association */
 	apiKeyHash?: string;
-
-	systemPromptVariables: ChatVariable[];
-	systemPromptMap: Record<ChatVariable, string>;
-	systemPromptContent: string;
 }
 
 export interface ThreadData {

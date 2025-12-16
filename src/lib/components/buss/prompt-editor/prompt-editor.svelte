@@ -13,7 +13,7 @@
 	import OnBlurOrFocusPlugin from "./plugins/on-blur-or-focus-plugin.svelte";
 	import OnChangePlugin from "./plugins/on-change-plugin.svelte";
 	import VariablePlugin from "./plugins/variable-plugin.svelte";
-	import { textJsonToEditorState } from "./utils";
+	import { isLexicalEditorState, textJsonToEditorState } from "./utils";
 
 	interface Props {
 		label: string;
@@ -23,7 +23,7 @@
 		wrapperClass?: string;
 		class?: string;
 		canReset?: boolean;
-		onchange?: (value: string) => void;
+		onchange?: (content: string, rawJson: string) => void;
 		onEditorReady?: (editor: LexicalEditor) => void;
 		onFocus?: () => void;
 		onBlur?: () => void;
@@ -47,6 +47,7 @@
 
 	let composer: Composer | undefined = $state();
 	let editorReady = $state(false);
+	let initialValueSet = $state(false);
 
 	const initialConfig = {
 		namespace: "prompt-editor",
@@ -58,7 +59,8 @@
 				with: (node: TextNode) => new CustomTextNode(node.__text),
 			},
 		],
-		editorState: textJsonToEditorState(value),
+		// Don't set editorState here, we'll set it after editor is ready
+		// This ensures node types are fully registered before parsing JSON
 		onError: (error: Error) => {
 			console.error("Lexical error:", error);
 		},
@@ -69,15 +71,17 @@
 		const editor = composer.getEditor();
 		if (!editor) return;
 
-		const text = editor.getEditorState().read(() => {
+		const editorState = editor.getEditorState();
+		const text = editorState.read(() => {
 			return getRoot()
 				.getChildren()
 				.map((p) => p.getTextContent())
 				.join("\n");
 		});
+		const rawJson = JSON.stringify(editorState.toJSON());
 
-		value = text;
-		onchange?.(text);
+		value = rawJson;
+		onchange?.(text, rawJson);
 	}
 
 	onMount(() => {
@@ -87,6 +91,24 @@
 				const editor = composer.getEditor();
 				if (editor) {
 					clearInterval(checkReady);
+
+					// Set initial value after editor is ready (node types are registered)
+					if (value && !initialValueSet) {
+						initialValueSet = true;
+						// If value is already Lexical JSON, parse and set directly
+						if (isLexicalEditorState(value)) {
+							const parsed = editor.parseEditorState(value);
+							editor.setEditorState(parsed);
+						} else {
+							// Convert plain text to editor state
+							const jsonState = textJsonToEditorState(value);
+							if (jsonState) {
+								const parsed = editor.parseEditorState(jsonState);
+								editor.setEditorState(parsed);
+							}
+						}
+					}
+
 					editorReady = true;
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					onEditorReady?.(editor as any);

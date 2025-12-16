@@ -17,12 +17,14 @@ import { ChatErrorHandler, type ChatError } from "$lib/utils/error-handler";
 import { replaceCodeBlockAt } from "$lib/utils/markdown-code-block";
 import { Chat } from "@ai-sdk/svelte";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { AttachmentFile, ChatVariable, MCPServer, Model, ThreadParmas } from "@shared/types";
+import type { AttachmentFile, MCPServer, Model, ThreadParmas } from "@shared/types";
 import { hashApiKey } from "@shared/utils/hash";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 
 import { updateSessionNote } from "$lib/api/sandbox-session";
+import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
+import { resolvePrompt } from "$lib/stores/chat-paramters/utils";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { agentPreviewState } from "./agent-preview-state.svelte";
 import { codeAgentState } from "./code-agent";
@@ -88,10 +90,6 @@ const initialThread: ThreadParmas = hasValidThreadData
 			frequencyPenalty: null,
 			presencePenalty: null,
 			updatedAt: new Date(),
-
-			systemPromptVariables: [],
-			systemPromptMap: {} as Record<ChatVariable, string>,
-			systemPromptContent: "",
 		};
 
 export const persistedMessagesState = new PersistedState<ChatMessage[]>(
@@ -919,9 +917,6 @@ class ChatState {
 				presencePenalty: this.presencePenalty,
 				updatedAt: new Date(),
 				apiKeyHash: this.get302AIApiKeyHash(),
-				systemPromptVariables: [],
-				systemPromptMap: {} as Record<ChatVariable, string>,
-				systemPromptContent: "",
 			});
 
 			// 5. save thread data
@@ -1037,9 +1032,6 @@ class ChatState {
 				updatedAt: new Date(),
 				autoSendOnLoad: true, // Set flag to trigger AI reply on load
 				apiKeyHash: this.get302AIApiKeyHash(),
-				systemPromptVariables: [],
-				systemPromptMap: {} as Record<ChatVariable, string>,
-				systemPromptContent: "",
 			});
 
 			// 8. save thread data and messages
@@ -1221,6 +1213,26 @@ export const chat = new Chat({
 				threadId,
 				sessionId,
 				sandboxName: claudeCodeAgentState.sandboxRemark,
+
+				// Resolved system prompt with variables substituted
+				// Note: input variable is not supported for system prompts
+				systemPrompt: (() => {
+					if (!chatParameters.systemPromptContent) return undefined;
+
+					const result = resolvePrompt(chatParameters.systemPromptContent, {
+						modelId: chatState.selectedModel?.id ?? "",
+						language: generalSettings.language,
+						cachedMap: chatParameters.systemPromptMap,
+						variables: chatParameters.systemPromptVariables,
+					});
+
+					// Update cache with newly computed values
+					if (Object.keys(result.updatedMap).length > 0) {
+						chatParameters.updateSystemPromptMap(result.updatedMap);
+					}
+
+					return result.content;
+				})(),
 			};
 		},
 	}),

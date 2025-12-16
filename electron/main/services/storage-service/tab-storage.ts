@@ -1,10 +1,4 @@
-import {
-	prefixStorage,
-	TabState,
-	type ChatVariable,
-	type Tab,
-	type ThreadParmas,
-} from "@shared/types";
+import { prefixStorage, TabState, type Tab, type ThreadParmas } from "@shared/types";
 import { isNull } from "es-toolkit";
 import { isEmpty } from "es-toolkit/compat";
 import { nanoid } from "nanoid";
@@ -117,9 +111,6 @@ export class TabStorage extends StorageService<TabState> {
 				isPrivateChatActive: false,
 				updatedAt: new Date(),
 				apiKeyHash,
-				systemPromptVariables: [],
-				systemPromptMap: {} as Record<ChatVariable, string>,
-				systemPromptContent: "",
 			};
 			allWindowsTabs.push([initTab]);
 

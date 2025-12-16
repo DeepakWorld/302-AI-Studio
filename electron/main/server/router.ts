@@ -179,6 +179,7 @@ app.post("/chat/302ai", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -203,6 +204,7 @@ app.post("/chat/302ai", async (c) => {
 
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
 	}>();
 	console.log(
 		baseUrl,
@@ -217,6 +219,7 @@ app.post("/chat/302ai", async (c) => {
 		isOnlineSearchActive,
 		messages,
 		speedOptions,
+		systemPrompt,
 	);
 
 	const provider302Options: Record<string, boolean | string> = {};
@@ -269,6 +272,7 @@ app.post("/chat/302ai", async (c) => {
 		providerOptions: {
 			"302": provider302Options,
 		},
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -358,6 +362,7 @@ app.post("/chat/openai", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -375,6 +380,7 @@ app.post("/chat/openai", async (c) => {
 		};
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
 	}>();
 
 	const openai = createOpenAI({
@@ -407,6 +413,7 @@ app.post("/chat/openai", async (c) => {
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -457,6 +464,7 @@ app.post("/chat/anthropic", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -474,6 +482,7 @@ app.post("/chat/anthropic", async (c) => {
 		};
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
 	}>();
 
 	const anthropic = createAnthropic({
@@ -506,6 +515,7 @@ app.post("/chat/anthropic", async (c) => {
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -556,6 +566,7 @@ app.post("/chat/gemini", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -573,6 +584,7 @@ app.post("/chat/gemini", async (c) => {
 		};
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
 	}>();
 
 	const google = createGoogleGenerativeAI({
@@ -605,6 +617,7 @@ app.post("/chat/gemini", async (c) => {
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 

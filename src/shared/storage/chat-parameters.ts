@@ -1,0 +1,18 @@
+import { type } from "arktype";
+
+export const ChatVariable = type("'input' | 'date' | 'time' | 'datetime' | 'now' | 'model_id'");
+export type ChatVariable = typeof ChatVariable.infer;
+
+export const SystemPromptPresetType = type(
+	"'custom-type' | 'universal-type' | 'terse-and-effective-type' | 'deep-thinking-type'",
+);
+export type SystemPromptPresetType = typeof SystemPromptPresetType.infer;
+
+export const ChatParameters = type({
+	systemPromptVariables: ChatVariable.array(),
+	systemPromptMap: type({ "[string]": "string" }),
+	systemPromptContent: "string",
+	systemPromptPresetType: "string",
+	systemPromptRawJson: "string.json",
+});
+export type ChatParameters = typeof ChatParameters.infer;
