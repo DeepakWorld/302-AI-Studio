@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export * from "@302ai/unstorage";
+// Export necessary types and functions from @302ai/unstorage
+export type { StorageValue, StorageMeta } from "@302ai/unstorage";
+export { prefixStorage } from "@302ai/unstorage";
 export * from "./storage/ai-applications";
 export * from "./storage/code-agent";
 export * from "./storage/general-settings";

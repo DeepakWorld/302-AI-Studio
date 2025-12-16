@@ -17,11 +17,10 @@
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
-	import {
-		claudeCodeAgentState,
-		claudeCodeSandboxState,
-		codeAgentState,
-	} from "$lib/stores/code-agent";
+	// Import directly from source files to avoid circular dependency
+	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
+	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { cn } from "$lib/utils";
 	import { ChevronsUpDownIcon, RefreshCcw } from "@lucide/svelte";
 
