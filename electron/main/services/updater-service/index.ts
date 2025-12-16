@@ -101,7 +101,22 @@ export class UpdaterService {
 
 		autoUpdater.on("error", (error) => {
 			console.error("Update error:", error);
-			broadcastService.broadcastChannelToAll("updater:update-error", { message: error.message });
+
+			// Check if this is a "no releases available" error (common on Windows)
+			// These errors should be treated as "no update available" rather than errors
+			const errorMessage = error.message || "";
+			const isNoReleasesError =
+				errorMessage.includes("empty or corrupted") ||
+				errorMessage.includes("RELEASES") ||
+				errorMessage.includes("404") ||
+				errorMessage.includes("Not Found");
+
+			if (isNoReleasesError) {
+				console.log("No releases available on server, treating as no update available");
+				broadcastService.broadcastChannelToAll("updater:update-not-available");
+			} else {
+				broadcastService.broadcastChannelToAll("updater:update-error", { message: error.message });
+			}
 		});
 	}
 
