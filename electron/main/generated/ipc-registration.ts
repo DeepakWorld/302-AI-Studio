@@ -225,8 +225,18 @@ export function registerIpcHandlers() {
 	ipcMain.handle("shortcutService:getSyncInfo", (event) => shortcutService.getSyncInfo(event));
 
 	// tabService service registration
-	ipcMain.handle("tabService:handleNewTabWithThread", (event, threadId, title, type, active) =>
-		tabService.handleNewTabWithThread(event, threadId, title, type, active),
+	ipcMain.handle(
+		"tabService:handleNewTabWithThread",
+		(event, threadId, title, type, active, initialSearchQuery, initialSearchResultIds) =>
+			tabService.handleNewTabWithThread(
+				event,
+				threadId,
+				title,
+				type,
+				active,
+				initialSearchQuery,
+				initialSearchResultIds,
+			),
 	);
 	ipcMain.handle(
 		"tabService:handleNewTab",

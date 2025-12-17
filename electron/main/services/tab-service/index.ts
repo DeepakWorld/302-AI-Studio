@@ -518,6 +518,8 @@ export class TabService {
 		title: string = "Chat",
 		type: TabType = "chat",
 		active: boolean = true,
+		initialSearchQuery?: string,
+		initialSearchResultIds?: string[],
 	): Promise<string | null> {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return null;
@@ -598,6 +600,8 @@ export class TabService {
 			type,
 			active,
 			threadId,
+			...(initialSearchQuery ? { initialSearchQuery } : {}),
+			...(initialSearchResultIds?.length ? { initialSearchResultIds } : {}),
 		};
 
 		const view = await this.newWebContentsView(window.id, newTab);

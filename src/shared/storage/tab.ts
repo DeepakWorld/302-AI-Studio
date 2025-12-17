@@ -13,6 +13,8 @@ export const Tab = type({
 	threadId: "string",
 	"content?": "string", // Optional content for special tab types like htmlPreview
 	"previewId?": "string", // Optional preview identifier for htmlPreview tabs
+	"initialSearchQuery?": "string", // Optional search query to inherit when tab is created
+	"initialSearchResultIds?": "string[]", // Optional pre-computed search result thread IDs
 });
 export type Tab = typeof Tab.infer;
 
