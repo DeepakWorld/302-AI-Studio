@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import Button from "$lib/components/ui/button/button.svelte";
-	import SettingSearchInput from "$lib/components/buss/settings/setting-search-input.svelte";
 	import { McpImportModal, type ImportData } from "$lib/components/buss/mcp-import-modal/index.js";
-	import { mcpState } from "$lib/stores/mcp-state.svelte";
-	import { Plus, Upload, Server } from "@lucide/svelte";
+	import SettingSearchInput from "$lib/components/buss/settings/setting-search-input.svelte";
+	import Button from "$lib/components/ui/button/button.svelte";
 	import * as m from "$lib/paraglide/messages.js";
+	import { mcpState } from "$lib/stores/mcp-state.svelte";
+	import { Plus, Server, Upload } from "@lucide/svelte";
 	import { nanoid } from "nanoid";
 
 	let searchTerm = $state("");
@@ -103,9 +103,6 @@
 									</p>
 								{/if}
 							</div>
-						</div>
-						<div class="shrink-0 text-setting-fg text-sm">
-							{server.enabled ? m.mcp_enabled() : m.mcp_disabled()}
 						</div>
 					</div>
 				</button>

@@ -27,10 +27,6 @@
 		isParametersOpen = false;
 	}
 
-	function handleMCPSelectorClose() {
-		isMCPSelectorOpen = false;
-	}
-
 	function handleMCPClick() {
 		isMCPSelectorOpen = true;
 	}
@@ -106,7 +102,6 @@
 	<McpServerSelector
 		bind:open={isMCPSelectorOpen}
 		selectedServerIds={chatState.mcpServerIds}
-		onClose={handleMCPSelectorClose}
 		onConfirm={handleMCPServerConfirm}
 	/>
 {/snippet}

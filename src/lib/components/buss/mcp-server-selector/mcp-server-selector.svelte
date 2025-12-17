@@ -1,6 +1,5 @@
 <script lang="ts">
 	import SettingSearchInput from "$lib/components/buss/settings/setting-search-input.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
 	import Checkbox from "$lib/components/ui/checkbox/checkbox.svelte";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as m from "$lib/paraglide/messages.js";
@@ -10,11 +9,10 @@
 	interface Props {
 		open: boolean;
 		selectedServerIds: string[];
-		onClose: () => void;
 		onConfirm: (selectedIds: string[]) => void;
 	}
 
-	let { open = $bindable(), selectedServerIds = [], onClose, onConfirm }: Props = $props();
+	let { open = $bindable(), selectedServerIds = [], onConfirm }: Props = $props();
 
 	let searchTerm = $state("");
 	let localSelectedIds = $state<string[]>([]);
@@ -36,29 +34,19 @@
 	});
 
 	function handleToggleServer(serverId: string) {
+		let newSelectedIds: string[];
 		if (localSelectedIds.includes(serverId)) {
-			localSelectedIds = localSelectedIds.filter((id) => id !== serverId);
+			newSelectedIds = localSelectedIds.filter((id) => id !== serverId);
 		} else {
-			localSelectedIds = [...localSelectedIds, serverId];
+			newSelectedIds = [...localSelectedIds, serverId];
 		}
-	}
-
-	function handleConfirm() {
-		onConfirm(localSelectedIds);
-		onClose();
-	}
-
-	function handleCancel() {
-		onClose();
+		localSelectedIds = newSelectedIds;
+		onConfirm(newSelectedIds);
 	}
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="w-[600px] max-h-[700px] flex flex-col p-6 gap-4">
-		<Dialog.Header>
-			<Dialog.Title>{m.mcp_select_servers()}</Dialog.Title>
-		</Dialog.Header>
-
+	<Dialog.Content class="w-[600px] max-h-[700px] flex flex-col p-6 gap-4" showCloseButton={false}>
 		<div class="flex flex-col gap-4 flex-1 min-h-0">
 			<SettingSearchInput bind:value={searchTerm} placeholder={m.mcp_search_placeholder()} />
 
@@ -95,14 +83,7 @@
 											{/if}
 										</div>
 									</div>
-									<div class="flex items-center gap-2 flex-shrink-0">
-										<span
-											class="text-setting-fg text-xs {server.enabled
-												? 'text-green-600'
-												: 'text-gray-400'}"
-										>
-											{server.enabled ? m.mcp_enabled() : m.mcp_disabled()}
-										</span>
+									<div class="flex items-center flex-shrink-0">
 										<Checkbox checked={localSelectedIds.includes(server.id)} />
 									</div>
 								</div>
@@ -112,10 +93,5 @@
 				{/if}
 			</div>
 		</div>
-
-		<Dialog.Footer>
-			<Button variant="outline" onclick={handleCancel}>{m.mcp_cancel()}</Button>
-			<Button onclick={handleConfirm}>{m.mcp_confirm()}</Button>
-		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
