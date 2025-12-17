@@ -12,7 +12,15 @@
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as m from "$lib/paraglide/messages.js";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
-	import { ChevronLeft, RefreshCw, Trash2 } from "@lucide/svelte";
+	import {
+		ChevronDown,
+		ChevronLeft,
+		Hammer,
+		LayoutGrid,
+		NotepadText,
+		RefreshCw,
+		Trash2,
+	} from "@lucide/svelte";
 	import type { McpServerType } from "@shared/storage/mcp";
 	import { nanoid } from "nanoid";
 	import { toast } from "svelte-sonner";
@@ -63,9 +71,9 @@
 	let showToolDialog = $state(false);
 
 	const resourceTabOptions = [
-		{ key: "tools", label: m.mcp_tools() },
-		{ key: "prompts", label: m.mcp_prompts() },
-		{ key: "resources", label: m.mcp_resources() },
+		{ key: "tools", label: m.mcp_tools(), icon: Hammer, iconSize: 14 },
+		{ key: "prompts", label: m.mcp_prompts(), icon: NotepadText, iconSize: 14 },
+		{ key: "resources", label: m.mcp_resources(), icon: LayoutGrid, iconSize: 14 },
 	];
 
 	$effect(() => {
@@ -368,13 +376,14 @@
 			{/if}
 
 			<!-- 高级设置 -->
-			<Collapsible.Root bind:open={isAdvancedOpen}>
-				<Collapsible.Trigger
-					class="bg-settings-item-bg flex w-full items-center justify-between rounded-lg px-3 py-2"
-				>
+			<Collapsible.Root bind:open={isAdvancedOpen} class="bg-settings-item-bg rounded-lg">
+				<Collapsible.Trigger class="flex w-full items-center justify-between px-3 py-2">
 					<span class="font-medium">{m.mcp_advanced_settings()}</span>
+					<ChevronDown
+						class="h-4 w-4 transition-transform duration-200 {isAdvancedOpen ? 'rotate-180' : ''}"
+					/>
 				</Collapsible.Trigger>
-				<Collapsible.Content class="bg-settings-item-bg mt-2 rounded-lg p-4">
+				<Collapsible.Content class="px-3 pb-4 pt-2">
 					<div class="space-y-4">
 						<!-- 超时 -->
 						<SettingInputField
@@ -429,12 +438,11 @@
 
 						<Button
 							variant="outline"
-							size="sm"
+							size="icon"
 							onclick={handleRefreshTools}
 							disabled={isLoadingTools}
 						>
 							<RefreshCw class="h-4 w-4 {isLoadingTools ? 'animate-spin' : ''}" />
-							{isLoadingTools ? m.mcp_refreshing() : m.mcp_refresh()}
 						</Button>
 					</div>
 
