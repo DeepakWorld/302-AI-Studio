@@ -801,15 +801,10 @@ export class FileTreeState {
 
 				// Refresh the target directory to show the new file
 				// If targetPath is the root or a loaded directory, we need to refresh it
-				if (targetPath === DEFAULT_WORKSPACE_PATH || this.loadedDirs.has(targetPath)) {
+				if (targetPath === this.rootPath || this.loadedDirs.has(targetPath)) {
 					// Add a small delay to ensure the server has processed the upload
 					await new Promise((resolve) => setTimeout(resolve, 500));
 					await this.loadFiles(targetPath, true, true); // Merge mode + Force update
-				} else {
-					// If we uploaded to a subdirectory that isn't loaded, we might want to load it
-					// or just let the user expand it later.
-					// For now, let's try to refresh the parent of the uploaded file location if possible
-					// But since we upload to a 'path' which is a directory, we just refresh that directory.
 				}
 
 				return true;
@@ -883,7 +878,7 @@ export class FileTreeState {
 				toast.success(m.toast_file_upload_folder_success(), { id: uploadToastId });
 
 				// Refresh the target directory
-				if (targetPath === DEFAULT_WORKSPACE_PATH || this.loadedDirs.has(targetPath)) {
+				if (targetPath === this.rootPath || this.loadedDirs.has(targetPath)) {
 					await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for unzip
 					await this.loadFiles(targetPath, true, true);
 				}
@@ -932,7 +927,7 @@ export class FileTreeState {
 				toast.success(m.toast_file_create_folder_success(), { id: toastId });
 
 				// Refresh the parent directory
-				if (parentPath === DEFAULT_WORKSPACE_PATH || this.loadedDirs.has(parentPath)) {
+				if (parentPath === this.rootPath || this.loadedDirs.has(parentPath)) {
 					await new Promise((resolve) => setTimeout(resolve, 500));
 					await this.loadFiles(parentPath, true, true);
 
