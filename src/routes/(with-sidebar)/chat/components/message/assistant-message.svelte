@@ -634,7 +634,7 @@
 						onclick={() => {
 							chatState.inputValue = suggestion;
 						}}
-						class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+						class="cursor-pointer rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
 					>
 						{suggestion}
 					</button>

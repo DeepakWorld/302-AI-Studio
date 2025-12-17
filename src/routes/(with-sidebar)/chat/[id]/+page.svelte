@@ -223,7 +223,7 @@
 				<button
 					type="button"
 					onclick={handleNewExploration}
-					class="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6]"
+					class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6]"
 				>
 					<MessageSquarePlus class="h-4 w-4" />
 					<span>{m.text_new_exploration()}</span>
