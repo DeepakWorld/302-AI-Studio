@@ -472,6 +472,9 @@ export class TabService {
 				console.error(`Failed to update window ID for tab ${tabId}:`, error);
 			});
 
+		// Reattach shortcut engine with new windowId to fix shortcut context
+		shortcutService.getEngine().attachToView(view, toWindow.id, tabId);
+
 		// Add to target window
 		this.attachViewToWindow(toWindow, view);
 

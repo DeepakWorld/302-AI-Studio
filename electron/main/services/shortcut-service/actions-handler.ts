@@ -8,6 +8,30 @@ export class ShortcutActionsHandler {
 	async handle(action: string, ctx: ShortcutContext): Promise<void> {
 		const { windowId } = ctx;
 
+		// Tab-related actions require more than one tab
+		const tabRelatedActions = [
+			"closeCurrentTab",
+			"closeOtherTabs",
+			"nextTab",
+			"previousTab",
+			"switchToTab1",
+			"switchToTab2",
+			"switchToTab3",
+			"switchToTab4",
+			"switchToTab5",
+			"switchToTab6",
+			"switchToTab7",
+			"switchToTab8",
+			"switchToTab9",
+		];
+
+		if (tabRelatedActions.includes(action)) {
+			const windowTabs = tabService.getWindowTabs(windowId);
+			if (windowTabs.size <= 1) {
+				return;
+			}
+		}
+
 		try {
 			switch (action) {
 				case "newTab":
