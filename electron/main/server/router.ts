@@ -422,6 +422,46 @@ app.post("/chat/openai", async (c) => {
 		}
 	}
 
+	const streamTextOptions = {
+		model: wrapModel,
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		...(systemPrompt && { system: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+	};
+
+	addDefinedParams(streamTextOptions, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[openai] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"openai",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
+	}
+
 	// Stream the main text response using Agent
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
@@ -522,6 +562,46 @@ app.post("/chat/anthropic", async (c) => {
 		}
 	}
 
+	const streamTextOptions = {
+		model: wrapModel,
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		...(systemPrompt && { system: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+	};
+
+	addDefinedParams(streamTextOptions, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[anthropic] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"anthropic",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
+	}
+
 	// Stream the main text response using Agent
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
@@ -620,6 +700,46 @@ app.post("/chat/gemini", async (c) => {
 		} catch (error) {
 			console.error("Failed to load MCP tools:", error);
 		}
+	}
+
+	const streamTextOptions = {
+		model: wrapModel,
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		...(systemPrompt && { system: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+	};
+
+	addDefinedParams(streamTextOptions, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[gemini] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"gemini",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
 	}
 
 	// Stream the main text response using Agent
