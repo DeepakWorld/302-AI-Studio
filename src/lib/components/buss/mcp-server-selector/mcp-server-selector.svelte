@@ -4,15 +4,18 @@
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as m from "$lib/paraglide/messages.js";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
+
 	import { Server } from "@lucide/svelte";
+	import type { McpServerType } from "@shared/types";
 
 	interface Props {
 		open: boolean;
 		selectedServerIds: string[];
 		onConfirm: (selectedIds: string[]) => void;
+		filterType?: McpServerType;
 	}
 
-	let { open = $bindable(), selectedServerIds = [], onConfirm }: Props = $props();
+	let { open = $bindable(), selectedServerIds = [], onConfirm, filterType }: Props = $props();
 
 	let searchTerm = $state("");
 	let localSelectedIds = $state<string[]>([]);
@@ -20,8 +23,9 @@
 	const filteredServers = $derived(
 		mcpState.servers.filter(
 			(server) =>
-				server.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				server.description?.toLowerCase().includes(searchTerm.toLowerCase()),
+				(filterType ? server.type === filterType : true) &&
+				(server.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+					server.description?.toLowerCase().includes(searchTerm.toLowerCase())),
 		),
 	);
 

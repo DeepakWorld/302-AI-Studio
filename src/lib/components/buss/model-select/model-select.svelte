@@ -54,11 +54,6 @@
 		// 使用统一的过滤方法：只显示已启用且（isFeatured === true 或 isAddedByUser === true）的模型
 		const filteredModels = getFilteredModels(models, true);
 
-		// if (codeAgentState.enabled) {
-		// 	// When code agent is enabled, only show Claude Code models
-		// 	filteredModels = filteredModels.filter((model) => CLUADE_CODE_MODELS.includes(model.id));
-		// }
-
 		return filteredModels
 			.map((model): Model | null => {
 				const provider = providers.find((p) => p.id === model.providerId);
@@ -373,24 +368,6 @@
 				return "";
 		}
 	}
-
-	// $effect(() => {
-	// 	if (codeAgentState.enabled) {
-	// 		// Find the claude-sonnet-4-5-20250929 model
-	// 		const targetModel = transformedModels.find(
-	// 			(model) => model.id === "claude-sonnet-4-5-20250929",
-	// 		);
-
-	// 		// If target model exists and is different from current selection, switch to it
-	// 		if (
-	// 			targetModel &&
-	// 			(selectedModel?.id !== targetModel.id ||
-	// 				selectedModel?.providerId !== targetModel.providerId)
-	// 		) {
-	// 			onModelSelect(targetModel);
-	// 		}
-	// 	}
-	// });
 
 	// 自动滚动到选中项
 	$effect(() => {

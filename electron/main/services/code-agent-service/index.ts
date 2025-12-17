@@ -1,4 +1,5 @@
 import {
+	addClaudeCodeSandboxMCP,
 	createClaudeCodeSandbox,
 	deleteClaudeCodeSandbox,
 	listClaudeCodeSandboxes,
@@ -389,6 +390,20 @@ export class CodeAgentService {
 		}
 
 		return { isOK: false };
+	}
+
+	async addClaudeCodeSandboxMCP(
+		_event: IpcMainInvokeEvent,
+		sandboxId: string,
+		mcpServerUrls: string[],
+	): Promise<{ isOK: boolean }> {
+		try {
+			const result = await addClaudeCodeSandboxMCP(sandboxId, mcpServerUrls);
+			return { isOK: result.success };
+		} catch (error) {
+			console.error("Error adding Claude code sandbox MCP:", error);
+			return { isOK: false };
+		}
 	}
 }
 

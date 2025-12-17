@@ -5,13 +5,17 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 
+	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
 	import { Bot, Globe, Lightbulb, Settings2 } from "@lucide/svelte";
 	import { AttachmentUploader } from "../attachment";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
+
+	const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
 
 	interface Props {
 		disabled?: boolean;
@@ -22,6 +26,7 @@
 
 	let isParametersOpen = $state(false);
 	let isMCPSelectorOpen = $state(false);
+	let addingMCP = $state(false);
 
 	function handleParametersClose() {
 		isParametersOpen = false;
@@ -31,9 +36,15 @@
 		isMCPSelectorOpen = true;
 	}
 
-	function handleMCPServerConfirm(selectedIds: string[]) {
-		chatState.handleMCPServerIdsChange(selectedIds);
-		chatState.handleMCPActiveChange(selectedIds.length > 0);
+	async function handleMCPServerConfirm(selectedIds: string[]) {
+		if (selectedIds.length > 0 && codeAgentState.enabled) {
+			addingMCP = true;
+			const serverUrls = mcpState.getServerUrlsByIds(selectedIds);
+			await addClaudeCodeSandboxMCP(codeAgentState.sandboxId, serverUrls);
+			addingMCP = false;
+		}
+
+		chatState.handleMCPServerChange(selectedIds);
 	}
 
 	function handleCodeAgentClick() {
@@ -86,23 +97,28 @@
 		)}
 		tooltip={m.title_mcpServers()}
 		onclick={handleMCPClick}
-		{disabled}
+		disabled={disabled || addingMCP}
 	>
-		<img
-			src={mcpIcon}
-			alt="MCP"
-			class={cn(
-				"size-chat-icon group-hover:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:invert",
-				chatState.isMCPActive &&
-					"[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)]",
-			)}
-		/>
+		{#if addingMCP}
+			<LdrsLoader type="line-spinner" size={16} />
+		{:else}
+			<img
+				src={mcpIcon}
+				alt="MCP"
+				class={cn(
+					"size-chat-icon group-hover:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:invert",
+					chatState.isMCPActive &&
+						"[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)]",
+				)}
+			/>
+		{/if}
 	</ButtonWithTooltip>
 
 	<McpServerSelector
 		bind:open={isMCPSelectorOpen}
 		selectedServerIds={chatState.mcpServerIds}
 		onConfirm={handleMCPServerConfirm}
+		filterType={codeAgentState.enabled ? "streamableHTTP" : undefined}
 	/>
 {/snippet}
 
@@ -169,10 +185,10 @@
 			{@render actionEnableThinking()}
 			{@render actionEnableOnlineSearch()}
 		{/if}
-		{@render actionEnableMCP()}
 		{@render actionSetParameters()}
 	{/if}
 
 	{@render actionUploadAttachment()}
+	{@render actionEnableMCP()}
 	{@render actionCodeAgent()}
 </div>

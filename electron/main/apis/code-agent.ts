@@ -213,3 +213,42 @@ export async function listClaudeCodeSessions(
 		throw error;
 	}
 }
+
+export const addMcpSchemaResponse = type({
+	success: "boolean",
+	message: "string",
+	sandbox_id: "string",
+});
+export type AddMcpSchema = typeof addMcpSchemaResponse.infer;
+
+/**
+ * Add MCP servers to a claude code sandbox
+ * @param sandboxId - The sandbox id to add MCP servers to
+ * @param mcpServerUrls - The MCP server URLs to add
+ * @returns The result of adding the MCP servers
+ */
+export async function addClaudeCodeSandboxMCP(
+	sandboxId: string,
+	mcpServerUrls: string[],
+): Promise<AddMcpSchema> {
+	const commands = mcpServerUrls.map(
+		(url) => `claude mcp add --transport http basic-mcp-server ${url}`,
+	);
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/mcp/add", {
+				json: { sandbox_id: sandboxId, mcp_servers: commands, auto_purging: false },
+			})
+			.json();
+
+		const validated = addMcpSchemaResponse(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate add claude code MCP response:", validated.summary);
+			throw new Error("Invalid response format from add claude code MCP API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to add claude code MCP:", error);
+		throw error;
+	}
+}

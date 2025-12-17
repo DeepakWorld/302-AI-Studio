@@ -1099,6 +1099,17 @@ class ChatState {
 		this.mcpServerIds = serverIds;
 	}
 
+	/**
+	 * Update MCP server IDs and active state in a single operation to avoid race conditions
+	 */
+	handleMCPServerChange(serverIds: string[]) {
+		persistedChatParamsState.current = {
+			...persistedChatParamsState.current,
+			mcpServerIds: serverIds,
+			isMCPActive: serverIds.length > 0,
+		};
+	}
+
 	handleSelectedModelChange(model: Model | null) {
 		this.selectedModel = model;
 	}

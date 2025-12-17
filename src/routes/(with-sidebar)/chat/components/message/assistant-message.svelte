@@ -41,11 +41,14 @@
 	import { toast } from "svelte-sonner";
 	import {
 		ClaudeCodeToolCard,
+		McpToolCard,
 		TodoWriteCard,
 		WriteCard,
 		extractToolNameFromType,
 		isClaudeCodeTool,
 		isClaudeCodeToolType,
+		isMcpToolType,
+		extractMcpToolInfo,
 	} from "./claude-code-tools";
 	import AgentTaskResult from "./code-agent/agent-task-result.svelte";
 	import MessageActions from "./message-actions.svelte";
@@ -588,6 +591,17 @@
 					<WriteCard part={toolPart} messageId={message.id} messagePartIndex={partIndex} />
 				{:else}
 					<ClaudeCodeToolCard part={toolPart} messageId={message.id} />
+				{/if}
+			{:else if isMcpToolType(part.type)}
+				<!-- 302.AI Claude Code MCP tool format: tool-mcp__serverId__toolName -->
+				{@const mcpToolInfo = extractMcpToolInfo(part.type)}
+				{#if mcpToolInfo}
+					{@const toolPart = {
+						...part,
+						toolName: `${mcpToolInfo.serverId}__${mcpToolInfo.toolName}`,
+						type: "dynamic-tool",
+					} as unknown as DynamicToolUIPart}
+					<McpToolCard part={toolPart} messageId={message.id} {mcpToolInfo} />
 				{/if}
 			{/if}
 		{/each}

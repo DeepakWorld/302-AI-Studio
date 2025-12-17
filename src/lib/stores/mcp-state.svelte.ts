@@ -128,6 +128,13 @@ class McpState {
 		}
 		return removed;
 	}
+
+	getServerUrlsByIds(ids: string[]): string[] {
+		return this.servers
+			.filter((server) => ids.includes(server.id))
+			.map((server) => server.url)
+			.filter((url) => url !== null);
+	}
 }
 
 export const mcpState = new McpState();
