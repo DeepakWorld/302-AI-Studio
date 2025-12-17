@@ -237,7 +237,7 @@ export async function addClaudeCodeSandboxMCP(
 	try {
 		const response = await _302AIKy
 			.post("302/claude-code/sandbox/mcp/add", {
-				json: { sandbox_id: sandboxId, mcp_servers: commands, auto_purging: false },
+				json: { sandbox_id: sandboxId, mcp_servers: commands },
 			})
 			.json();
 
