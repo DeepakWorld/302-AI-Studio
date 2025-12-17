@@ -5,7 +5,64 @@ import path from "node:path";
 import process from "node:process";
 import semver from "semver";
 
-type ReleaseCommand = "patch" | "minor" | "major" | "to" | "beta" | "interactive";
+type ReleaseCommand = "patch" | "minor" | "major" | "to" | "beta" | "stable" | "interactive";
+
+/**
+ * Check if a version is a beta prerelease
+ */
+function isBetaVersion(version: string): boolean {
+	const prerelease = semver.prerelease(version);
+	return Array.isArray(prerelease) && prerelease[0] === "beta";
+}
+
+/**
+ * Get the base version without prerelease suffix
+ * e.g., "25.50.18-beta.2" -> "25.50.18"
+ */
+function getBaseVersion(version: string): string {
+	const parsed = semver.parse(version);
+	if (!parsed) return version;
+	return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
+}
+
+/**
+ * Calculate the next beta version
+ * - If current is stable (e.g., 25.50.18): bump patch + add -beta.1 -> 25.50.19-beta.1
+ * - If current is beta (e.g., 25.50.18-beta.1): increment beta number -> 25.50.18-beta.2
+ */
+function getNextBetaVersion(currentVersion: string): string {
+	if (isBetaVersion(currentVersion)) {
+		// Already a beta, increment the beta number
+		const next = semver.inc(currentVersion, "prerelease", "beta");
+		if (!next) throw new Error(`Failed to increment beta version from ${currentVersion}`);
+		return next;
+	} else {
+		// Stable version, bump patch and add -beta.1
+		const patchBumped = semver.inc(currentVersion, "patch");
+		if (!patchBumped) throw new Error(`Failed to bump patch version from ${currentVersion}`);
+		return `${patchBumped}-beta.1`;
+	}
+}
+
+/**
+ * Calculate the next stable version
+ * - If current is beta (e.g., 25.50.18-beta.2): drop beta suffix -> 25.50.18
+ * - If current is stable: use standard semver bump
+ */
+function getNextStableVersion(
+	currentVersion: string,
+	releaseType: "patch" | "minor" | "major",
+): string {
+	if (isBetaVersion(currentVersion)) {
+		// From beta to stable: just drop the beta suffix
+		return getBaseVersion(currentVersion);
+	} else {
+		// Standard semver bump
+		const next = semver.inc(currentVersion, releaseType);
+		if (!next) throw new Error(`Failed to bump ${releaseType} version from ${currentVersion}`);
+		return next;
+	}
+}
 
 type CliOptions = {
 	to?: string;
@@ -51,14 +108,28 @@ function parseArgs(argv: string[]): { command: ReleaseCommand; options: CliOptio
 	const command = (hasCommand ? first : "interactive") as ReleaseCommand;
 	const rest = hasCommand ? argv.slice(1) : argv;
 
-	if (!["patch", "minor", "major", "to", "beta", "interactive"].includes(command)) {
+	if (!["patch", "minor", "major", "to", "beta", "stable", "interactive"].includes(command)) {
 		die(
 			[
 				"Usage:",
 				'  pnpm tsx scripts/release.ts patch|minor|major [--notes "..."] [--push]',
 				'  pnpm tsx scripts/release.ts to --to <version> [--notes "..."] [--push]',
 				'  pnpm tsx scripts/release.ts beta [--notes "..."] [--push]',
+				'  pnpm tsx scripts/release.ts stable [--notes "..."] [--push]',
 				"  pnpm tsx scripts/release.ts  (interactive)",
+				"",
+				"Commands:",
+				"  patch                  Bump patch version (25.50.18 -> 25.50.19)",
+				"                         From beta: release stable (25.50.18-beta.2 -> 25.50.18)",
+				"  minor                  Bump minor version (25.50.18 -> 25.51.0)",
+				"                         From beta: release stable (25.50.18-beta.2 -> 25.50.18)",
+				"  major                  Bump major version (25.50.18 -> 26.0.0)",
+				"                         From beta: release stable (25.50.18-beta.2 -> 25.50.18)",
+				"  beta                   Create beta version:",
+				"                         From stable: 25.50.18 -> 25.50.19-beta.1",
+				"                         From beta: 25.50.18-beta.1 -> 25.50.18-beta.2",
+				"  stable                 Release stable from beta (25.50.18-beta.2 -> 25.50.18)",
+				"  to                     Set exact version",
 				"",
 				"Options:",
 				"  --to <version>         Target version when using 'to'",
@@ -157,24 +228,47 @@ async function promptInteractive(
 	preset: CliOptions,
 	appInfoMode: "manual" | "injected" | "unknown",
 ) {
+	const isBeta = isBetaVersion(currentVersion);
+	const nextBeta = getNextBetaVersion(currentVersion);
+	const nextStable = isBeta ? getNextStableVersion(currentVersion, "patch") : null;
+
+	const choices: Array<{ name: string; value: Exclude<ReleaseCommand, "interactive"> }> = [];
+
+	if (isBeta) {
+		// Current version is beta, show stable release option first
+		choices.push({
+			name: `Stable (${currentVersion} -> ${nextStable})`,
+			value: "stable",
+		});
+		choices.push({
+			name: `Beta (${currentVersion} -> ${nextBeta})`,
+			value: "beta",
+		});
+	} else {
+		// Current version is stable
+		choices.push({
+			name: `Patch (${currentVersion} -> ${getNextStableVersion(currentVersion, "patch")})`,
+			value: "patch",
+		});
+		choices.push({
+			name: `Minor (${currentVersion} -> ${getNextStableVersion(currentVersion, "minor")})`,
+			value: "minor",
+		});
+		choices.push({
+			name: `Major (${currentVersion} -> ${getNextStableVersion(currentVersion, "major")})`,
+			value: "major",
+		});
+		choices.push({
+			name: `Beta (${currentVersion} -> ${nextBeta})`,
+			value: "beta",
+		});
+	}
+
+	choices.push({ name: `Set exact version (to)`, value: "to" });
+
 	const action = await select<Exclude<ReleaseCommand, "interactive">>({
 		message: "Select release type",
-		choices: [
-			{
-				name: `Patch (${currentVersion} -> ${semver.inc(currentVersion, "patch")})`,
-				value: "patch",
-			},
-			{
-				name: `Minor (${currentVersion} -> ${semver.inc(currentVersion, "minor")})`,
-				value: "minor",
-			},
-			{
-				name: `Major (${currentVersion} -> ${semver.inc(currentVersion, "major")})`,
-				value: "major",
-			},
-			{ name: `Set exact version (to)`, value: "to" },
-			{ name: `Beta tag (v${currentVersion}-beta, no version file changes)`, value: "beta" },
-		],
+		choices,
 	});
 
 	const options: CliOptions = {
@@ -273,47 +367,44 @@ async function main() {
 	ensureCleanGit(finalOptions.allowDirty);
 
 	let nextVersion = currentVersion;
-	let tagName: string;
-	let updateVersionFiles = true;
 
-	if (finalCommand === "beta") {
-		// Beta releases are represented by git tags only (e.g. v25.50.8-beta)
-		updateVersionFiles = false;
-		tagName = `v${currentVersion}-beta`;
-	} else {
-		if (finalCommand === "to") {
-			if (!finalOptions.to) die("Missing --to <version>");
-			if (!semver.valid(finalOptions.to)) die(`Invalid --to version: ${finalOptions.to}`);
-			nextVersion = finalOptions.to;
-		} else {
-			const inc = semver.inc(currentVersion, finalCommand);
-			if (!inc) die(`Failed to bump version from ${currentVersion} using ${finalCommand}`);
-			nextVersion = inc;
+	if (finalCommand === "to") {
+		if (!finalOptions.to) die("Missing --to <version>");
+		if (!semver.valid(finalOptions.to)) die(`Invalid --to version: ${finalOptions.to}`);
+		nextVersion = finalOptions.to;
+	} else if (finalCommand === "beta") {
+		// Beta version: 25.50.18 -> 25.50.19-beta.1, or 25.50.18-beta.1 -> 25.50.18-beta.2
+		nextVersion = getNextBetaVersion(currentVersion);
+	} else if (finalCommand === "stable") {
+		// Stable from beta: 25.50.18-beta.2 -> 25.50.18
+		if (!isBetaVersion(currentVersion)) {
+			die(
+				`Cannot release stable: current version ${currentVersion} is not a beta. Use patch/minor/major instead.`,
+			);
 		}
-
-		tagName = `v${nextVersion}`;
+		nextVersion = getNextStableVersion(currentVersion, "patch");
+	} else {
+		// patch, minor, major
+		nextVersion = getNextStableVersion(currentVersion, finalCommand);
 	}
+
+	const tagName = `v${nextVersion}`;
 
 	const tagMessage = finalOptions.notes?.trim() ? finalOptions.notes.trim() : tagName;
 
 	const planned: string[] = [];
 
-	if (updateVersionFiles) {
-		if (nextVersion === currentVersion)
-			planned.push(`- package.json: (no change) ${currentVersion}`);
-		else planned.push(`- package.json: ${currentVersion} -> ${nextVersion}`);
+	if (nextVersion === currentVersion) planned.push(`- package.json: (no change) ${currentVersion}`);
+	else planned.push(`- package.json: ${currentVersion} -> ${nextVersion}`);
 
-		if (!finalOptions.skipAppInfo) {
-			if (appInfoMode === "injected")
-				planned.push("- src/lib/app-info.ts: uses __APP_VERSION__ (no change)");
-			else planned.push(`- src/lib/app-info.ts: ${currentVersion} -> ${nextVersion}`);
-		}
-	} else {
-		planned.push(`- (beta) no version file changes`);
+	if (!finalOptions.skipAppInfo) {
+		if (appInfoMode === "injected")
+			planned.push("- src/lib/app-info.ts: uses __APP_VERSION__ (no change)");
+		else planned.push(`- src/lib/app-info.ts: ${currentVersion} -> ${nextVersion}`);
 	}
 
 	const gitOps: string[] = [];
-	if (!finalOptions.noCommit && updateVersionFiles) gitOps.push("- git commit: chore(release)");
+	if (!finalOptions.noCommit) gitOps.push("- git commit: chore(release)");
 	if (!finalOptions.noTag) gitOps.push(`- git tag: ${tagName}`);
 	if (finalOptions.push) gitOps.push("- git push (commits + tags)");
 
@@ -334,19 +425,17 @@ async function main() {
 
 	const filesToAdd: string[] = [];
 
-	if (updateVersionFiles) {
-		if (nextVersion !== currentVersion) {
-			await writeText(pkgPath, updatePackageJsonVersion(pkgRaw, nextVersion), false);
-			filesToAdd.push(pkgPath);
-		}
+	if (nextVersion !== currentVersion) {
+		await writeText(pkgPath, updatePackageJsonVersion(pkgRaw, nextVersion), false);
+		filesToAdd.push(pkgPath);
+	}
 
-		if (!finalOptions.skipAppInfo) {
-			const appInfoRaw = await readText(appInfoPath);
-			const updated = maybeUpdateAppInfoVersion(appInfoRaw, nextVersion);
-			if (updated.changed) {
-				await writeText(appInfoPath, updated.contents, false);
-				filesToAdd.push(appInfoPath);
-			}
+	if (!finalOptions.skipAppInfo) {
+		const appInfoRaw = await readText(appInfoPath);
+		const updated = maybeUpdateAppInfoVersion(appInfoRaw, nextVersion);
+		if (updated.changed) {
+			await writeText(appInfoPath, updated.contents, false);
+			filesToAdd.push(appInfoPath);
 		}
 	}
 
