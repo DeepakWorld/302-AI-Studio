@@ -14,6 +14,7 @@ export class UpdaterService {
 	private updateDownloaded = false;
 	private static isInstallingUpdate = false;
 	private currentChannel: UpdateChannel = "stable";
+	private isChecking = false;
 
 	constructor() {
 		const platform = process.platform;
@@ -79,11 +80,13 @@ export class UpdaterService {
 
 		autoUpdater.on("update-available", () => {
 			console.log("Update available");
+			this.isChecking = false;
 			broadcastService.broadcastChannelToAll("updater:update-available");
 		});
 
 		autoUpdater.on("update-not-available", () => {
 			console.log("Update not available");
+			this.isChecking = false;
 			broadcastService.broadcastChannelToAll("updater:update-not-available");
 		});
 
@@ -101,6 +104,7 @@ export class UpdaterService {
 
 		autoUpdater.on("error", (error) => {
 			console.error("Update error:", error);
+			this.isChecking = false;
 
 			// Check if this is a "no releases available" error (common on Windows)
 			// These errors should be treated as "no update available" rather than errors
@@ -141,9 +145,16 @@ export class UpdaterService {
 	}
 
 	private checkForUpdates() {
+		if (this.isChecking) {
+			console.log("Update check already in progress, skipping...");
+			return;
+		}
+
 		try {
+			this.isChecking = true;
 			autoUpdater.checkForUpdates();
 		} catch (error) {
+			this.isChecking = false;
 			console.error("Failed to check for updates:", error);
 		}
 	}
