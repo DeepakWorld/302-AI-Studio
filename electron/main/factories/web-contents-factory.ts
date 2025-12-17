@@ -1,9 +1,16 @@
 import type { Tab } from "@shared/types";
-import { nativeTheme, WebContentsView } from "electron";
+import { Menu, nativeTheme, WebContentsView } from "electron";
 import path from "node:path";
 import { UNSUPPORTED_INJECTING_THEME } from "../constants";
 import { withExternalLinkHandler } from "../mixins/web-contents-mixins";
+import { generalSettingsStorage } from "../services/storage-service/general-settings-storage";
 import { TempStorage } from "../utils/temp-storage";
+
+// Context menu labels for i18n
+const contextMenuLabels = {
+	zh: { cut: "剪切", copy: "复制", paste: "粘贴", delete: "删除", selectAll: "全选" },
+	en: { cut: "Cut", copy: "Copy", paste: "Paste", delete: "Delete", selectAll: "Select All" },
+};
 
 export interface WebContentsConfig {
 	windowId: number;
@@ -57,6 +64,42 @@ export class WebContentsFactory {
 
 		// Add external link handler to all views
 		withExternalLinkHandler(view);
+
+		// Add input context menu (cut, copy, paste) for editable elements
+		view.webContents.on("context-menu", async (_event, params) => {
+			if (!params.isEditable) return;
+
+			const language = await generalSettingsStorage.getLanguage();
+			const labels = contextMenuLabels[language] || contextMenuLabels.en;
+
+			const menuItems: Electron.MenuItemConstructorOptions[] = [];
+
+			if (params.selectionText) {
+				menuItems.push(
+					{ label: labels.cut, role: "cut", enabled: params.editFlags.canCut },
+					{ label: labels.copy, role: "copy", enabled: params.editFlags.canCopy },
+				);
+			}
+
+			menuItems.push({ label: labels.paste, role: "paste", enabled: params.editFlags.canPaste });
+
+			if (params.selectionText) {
+				menuItems.push({
+					label: labels.delete,
+					role: "delete",
+					enabled: params.editFlags.canDelete,
+				});
+			}
+
+			menuItems.push({ type: "separator" });
+			menuItems.push({
+				label: labels.selectAll,
+				role: "selectAll",
+				enabled: params.editFlags.canSelectAll,
+			});
+
+			Menu.buildFromTemplate(menuItems).popup();
+		});
 
 		if (config.type === "aiApplication") {
 			view.webContents.on("dom-ready", () => {
