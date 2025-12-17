@@ -14,7 +14,6 @@
 	import { getFilteredModels } from "$lib/utils/model-filters.js";
 	import { Eye, EyeOff } from "@lucide/svelte";
 	import type { Model, ModelCreateInput, ModelProvider } from "@shared/types";
-	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
 
 	const apiTypes = [
@@ -275,15 +274,15 @@
 	);
 
 	// 页面加载时自动更新模型（异步执行，不阻塞页面渲染）
-	onMount(() => {
-		if (currentProvider?.autoUpdateModels && currentProvider.apiKey) {
-			// 使用 setTimeout 将更新操作推迟到下一个事件循环
-			// 让页面先完成渲染，避免切换标签页时卡顿
-			setTimeout(() => {
-				handleGetModels();
-			}, 0);
-		}
-	});
+	// onMount(() => {
+	// 	if (currentProvider?.autoUpdateModels && currentProvider.apiKey) {
+	// 		// 使用 setTimeout 将更新操作推迟到下一个事件循环
+	// 		// 让页面先完成渲染，避免切换标签页时卡顿
+	// 		setTimeout(() => {
+	// 			handleGetModels();
+	// 		}, 0);
+	// 	}
+	// });
 </script>
 
 <div class="flex h-full min-w-0 flex-1 flex-col overflow-hidden p-6">
