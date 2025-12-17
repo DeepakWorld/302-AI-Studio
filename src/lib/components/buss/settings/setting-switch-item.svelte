@@ -28,7 +28,7 @@
 	<Label for={id} class="text-sm font-normal">{label}</Label>
 	<Switch
 		{id}
-		class="data-[state=unchecked]:border-settings-switch-border"
+		class="data-[state=unchecked]:border-settings-switch-border cursor-pointer"
 		{checked}
 		onCheckedChange={handleCheckedChange}
 	/>

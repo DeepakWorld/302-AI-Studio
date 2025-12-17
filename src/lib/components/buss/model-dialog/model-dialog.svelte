@@ -328,7 +328,7 @@
 					{#each availableCapabilities as capability (capability.value)}
 						<div class="hover:bg-accent/10 flex items-center gap-2 rounded-md px-2 py-1">
 							<Checkbox
-								class="border-muted-foreground/40 hover:border-muted-foreground/70 bg-transparent dark:border-white/30"
+								class="border-muted-foreground/40 cursor-pointer hover:border-muted-foreground/70 bg-transparent dark:border-white/30"
 								id={capability.value}
 								checked={formData.capabilities.has(capability.value)}
 								onCheckedChange={(checked) => toggleCapability(capability.value, !!checked)}
