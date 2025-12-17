@@ -115,7 +115,12 @@
 </script>
 
 {#snippet openDirectoryButton()}
-	<Button size="sm" variant="outline" onclick={handleOpenBackupDirectory}>
+	<Button
+		size="sm"
+		variant="outline"
+		onclick={handleOpenBackupDirectory}
+		class="border-border text-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring dark:border-border dark:text-foreground dark:hover:bg-muted dark:hover:text-foreground border bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+	>
 		<FolderOpen className="size-4" />
 		{m.settings_backupOpenDirectory()}
 	</Button>
