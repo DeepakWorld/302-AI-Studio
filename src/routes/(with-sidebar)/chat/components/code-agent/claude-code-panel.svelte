@@ -169,7 +169,7 @@
 					{m.click_here_manage_sandbox()}
 					<button
 						type="button"
-						class="text-primary hover:underline hover:underline-offset-2"
+						class="text-primary hover:underline hover:underline-offset-2 cursor-pointer"
 						onclick={() => {
 							windowService.handleOpenSettingsWindow("/settings/agent-settings");
 						}}

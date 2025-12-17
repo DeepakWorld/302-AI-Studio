@@ -18,8 +18,8 @@
 		type AgentPreviewSyncEnvelope,
 	} from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
-	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
@@ -893,7 +893,7 @@
 											{#if isEditing}
 												<div class="flex items-center gap-2">
 													<button
-														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 														onclick={handleCancelEdit}
 														disabled={isSaving}
 														title={m.text_button_cancel()}
@@ -901,7 +901,7 @@
 														<X class="h-4 w-4 flex-shrink-0" />
 													</button>
 													<button
-														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 														onclick={handleSaveEdit}
 														disabled={isSaving}
 														title={isSaving ? m.text_button_saving() : m.text_button_save()}
@@ -915,7 +915,7 @@
 												</div>
 											{:else}
 												<button
-													class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+													class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 													onclick={handleStartEdit}
 												>
 													<Pencil class="h-4 w-4" strokeWidth={1.25} />

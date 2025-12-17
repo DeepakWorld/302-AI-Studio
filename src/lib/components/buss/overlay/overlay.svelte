@@ -109,7 +109,7 @@
 			tabindex="0"
 		>
 			<button
-				class="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100"
+				class="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 cursor-pointer"
 				onclick={onClose}
 			>
 				<X class="h-4 w-4" />

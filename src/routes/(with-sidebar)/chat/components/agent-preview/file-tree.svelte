@@ -580,7 +580,7 @@
 			<button
 				type="button"
 				onclick={() => handleCreateFile()}
-				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 				disabled={fileTreeState.loading || fileTreeState.isStreaming}
 				title={m.title_button_create_file()}
 			>
@@ -591,7 +591,7 @@
 			<button
 				type="button"
 				onclick={() => handleCreateFolder()}
-				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 				disabled={fileTreeState.loading || fileTreeState.isStreaming}
 				title={m.title_button_new_folder()}
 			>
@@ -602,7 +602,7 @@
 			<button
 				type="button"
 				onclick={() => triggerFileUpload()}
-				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 				disabled={fileTreeState.loading || fileTreeState.isStreaming}
 				title={m.label_file_tree_upload_file()}
 			>
@@ -613,7 +613,7 @@
 			<button
 				type="button"
 				onclick={() => handleFolderUpload()}
-				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 				disabled={fileTreeState.loading || fileTreeState.isStreaming}
 				title={m.label_file_tree_upload_folder()}
 			>
@@ -629,7 +629,7 @@
 						type: "dir",
 					});
 				}}
-				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 				disabled={fileTreeState.loading || fileTreeState.isStreaming}
 				title={m.label_file_tree_download_all()}
 			>
@@ -643,7 +643,7 @@
 				<DropdownMenu.Trigger>
 					<button
 						type="button"
-						class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1"
+						class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1 cursor-pointer"
 						disabled={fileTreeState.loading || fileTreeState.isStreaming}
 						title={m.common_actions()}
 						aria-label={m.common_actions()}
@@ -729,7 +729,7 @@
 		<button
 			type="button"
 			onclick={() => fileTreeState.refreshFileTree()}
-			class="rounded p-1 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:bg-accent hover:text-accent-foreground"
+			class="rounded p-1 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
 			disabled={fileTreeState.loading || fileTreeState.isStreaming}
 			title={m.label_file_tree_refresh()}
 		>

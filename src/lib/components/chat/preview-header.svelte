@@ -81,7 +81,7 @@
 				<button
 					type="button"
 					class={cn(
-						"text-xs font-medium transition-colors rounded whitespace-nowrap px-2.5 py-0.5 [@container(max-width:349px)]:px-1.5",
+						"text-xs font-medium transition-colors rounded whitespace-nowrap px-2.5 py-0.5 [@container(max-width:349px)]:px-1.5 cursor-pointer",
 						activeTab === tab.id
 							? "bg-primary text-primary-foreground shadow-sm"
 							: "text-muted-foreground hover:text-foreground",
@@ -137,7 +137,7 @@
 				{#if (!deployedUrl && !compactDeployButton && !isDeleted) || (isAgentMode && !isDeleted)}
 					<button
 						type="button"
-						class="flex items-center gap-1.5 px-2.5 py-1 rounded border border-border/40 bg-background text-foreground text-xs font-medium shadow-none transition-colors hover:bg-muted/70 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+						class="flex items-center gap-1.5 px-2.5 py-1 rounded border border-border/40 bg-background text-foreground text-xs font-medium shadow-none transition-colors hover:bg-muted/70 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer"
 						title={isDeploying ? m.tooltip_deploying() : m.tooltip_deploy_to_302()}
 						disabled={isDeploying || isStreaming}
 						onclick={onDeploy}
@@ -168,7 +168,7 @@
 				{#if deployedUrl}
 					<button
 						type="button"
-						class="flex flex-1 items-center gap-1 overflow-hidden rounded border border-border/40 bg-background px-2 py-1 text-xs text-primary shadow-none transition-colors hover:bg-muted/70 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 min-w-[28px] max-w-[200px]"
+						class="flex flex-1 items-center gap-1 overflow-hidden rounded border border-border/40 bg-background px-2 py-1 text-xs text-primary shadow-none transition-colors hover:bg-muted/70 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 min-w-[28px] max-w-[200px] cursor-pointer"
 						title={deployedUrl ?? undefined}
 						onclick={onOpenDeployedUrl}
 					>
@@ -207,7 +207,7 @@
 				<button
 					type="button"
 					class={cn(
-						"flex items-center justify-center transition-all rounded-[100px]",
+						"flex items-center justify-center transition-all rounded-[100px] cursor-pointer",
 						deviceMode === "desktop"
 							? "w-[32px] h-[20px] bg-[#FFFFFF] text-[#8E47F0] shadow-sm"
 							: "w-[32px] h-[20px] text-white/70 hover:text-white",
@@ -220,7 +220,7 @@
 				<button
 					type="button"
 					class={cn(
-						"flex items-center justify-center transition-all rounded-[100px]",
+						"flex items-center justify-center transition-all rounded-[100px] cursor-pointer",
 						deviceMode === "mobile"
 							? "w-[32px] h-[20px] bg-[#FFFFFF] text-[#8E47F0] shadow-sm"
 							: "w-[32px] h-[20px] text-white/70 hover:text-white",
