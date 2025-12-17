@@ -14,7 +14,7 @@
 
 {#if !userState.isLoggedIn}
 	<div class="gap-settings-gap flex flex-col">
-		<Label class="text-label-fg">{m.login_account_management()}</Label>
+		<Label class="text-label-fg font-normal">{m.login_account_management()}</Label>
 
 		<!-- SSO Quick Login Card -->
 		<button

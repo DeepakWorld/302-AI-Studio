@@ -2,9 +2,9 @@
 	import { SegButton } from "$lib/components/buss/settings";
 	import Label from "$lib/components/ui/label/label.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { persistedThemeState, setTheme } from "$lib/stores/theme.state.svelte";
 	import { Laptop, Moon, Sun } from "@lucide/svelte";
 	import type { Theme } from "@shared/types";
-	import { setTheme, persistedThemeState } from "$lib/stores/theme.state.svelte";
 
 	let selectedKey = $derived(persistedThemeState.current.theme);
 
@@ -35,6 +35,6 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_theme()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_theme()}</Label>
 	<SegButton options={themeOptions} {selectedKey} onSelect={handleSelect} />
 </div>

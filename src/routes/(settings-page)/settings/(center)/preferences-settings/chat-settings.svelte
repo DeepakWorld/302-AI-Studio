@@ -6,7 +6,7 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_chatSetting()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_chatSetting()}</Label>
 	<SettingSwitchItem
 		label={m.settings_hideCode()}
 		checked={preferencesSettings.autoHideCode}

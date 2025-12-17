@@ -77,7 +77,7 @@
 {#if userState.isLoggedIn && userState.userInfo}
 	<!-- User Info Section -->
 	<div class="gap-settings-gap flex flex-col">
-		<Label class="text-label-fg">{m.settings_user_info_label()}</Label>
+		<Label class="text-label-fg font-normal">{m.settings_user_info_label()}</Label>
 		<div
 			class="rounded-settings-item bg-settings-item-bg px-settings-item-x py-settings-item-y flex w-full items-center gap-4"
 		>
@@ -128,7 +128,7 @@
 
 	<!-- Account Details Section -->
 	<div class="gap-settings-gap flex flex-col">
-		<Label class="text-label-fg">{m.settings_account_details()}</Label>
+		<Label class="text-label-fg font-normal">{m.settings_account_details()}</Label>
 
 		{#snippet apiKeyAction()}
 			{@const displayApiKey = userState.ssoApiKey || userState.userInfo?.api_key}
@@ -193,7 +193,7 @@
 	<!-- Balance Section -->
 	<div class="gap-settings-gap flex flex-col">
 		<div class="flex items-center justify-between">
-			<Label class="text-label-fg">{m.settings_balance_usage()}</Label>
+			<Label class="text-label-fg font-normal">{m.settings_balance_usage()}</Label>
 			<Button variant="outline" size="sm" onclick={openWallet} class="dark:hover:bg-muted gap-1.5">
 				{m.settings_recharge()}
 				<ExternalLink class="size-3.5" />

@@ -21,7 +21,7 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_suggestions()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_suggestions()}</Label>
 	<SettingSwitchItem
 		label={m.settings_suggestionsEnable()}
 		checked={preferencesSettings.suggestionsEnabled}

@@ -15,7 +15,7 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_titleGenerationTiming()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_titleGenerationTiming()}</Label>
 	<SettingSelect
 		name="titleGenerationTiming"
 		value={preferencesSettings.titleGenerationTiming}

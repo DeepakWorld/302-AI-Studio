@@ -2,9 +2,9 @@
 	import { ModelSelect } from "$lib/components/buss/model-select";
 	import { Label } from "$lib/components/ui/label/index.js";
 	import { m } from "$lib/paraglide/messages.js";
+	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { cn } from "$lib/utils";
 	import type { Model } from "@shared/types";
-	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 
 	function handleModelSelect(model: Model) {
 		preferencesSettings.setTitleGenerationModel(model);
@@ -24,7 +24,7 @@
 {/snippet}
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_titleGenerationModel()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_titleGenerationModel()}</Label>
 
 	<ModelSelect
 		selectedModel={preferencesSettings.titleGenerationModel}

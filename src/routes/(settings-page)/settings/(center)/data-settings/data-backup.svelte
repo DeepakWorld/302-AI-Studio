@@ -4,8 +4,8 @@
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Label from "$lib/components/ui/label/label.svelte";
 	import { m } from "$lib/paraglide/messages.js";
-	import type { BackupInfo } from "@shared/types";
 	import { Archive, FolderOpen, RotateCcw, Trash2 } from "@lucide/svelte";
+	import type { BackupInfo } from "@shared/types";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
 
@@ -127,7 +127,7 @@
 {/snippet}
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_backupManagement()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_backupManagement()}</Label>
 	<SettingInfoItem label={m.settings_backupInfo()} action={openDirectoryButton} />
 
 	{#if isLoading}

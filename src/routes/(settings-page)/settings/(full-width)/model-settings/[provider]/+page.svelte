@@ -304,7 +304,7 @@
 				<!-- 图标和名称（自定义供应商） -->
 				<div class="flex items-end gap-4">
 					<div class="flex flex-col gap-2">
-						<Label class="text-sm font-medium">{m.text_label_provider_icon()}</Label>
+						<Label class="text-sm font-normal">{m.text_label_provider_icon()}</Label>
 						<IconPicker value={formData.icon || formData.apiType} onChange={handleIconChange} />
 					</div>
 					<div class="flex flex-1 flex-col gap-2">
@@ -399,7 +399,7 @@
 
 			<!-- 自动更新模型 -->
 			<div class="space-y-2">
-				<Label class="text-sm font-medium">{m.text_label_provider_auto_update_models()}</Label>
+				<Label class="text-sm font-normal">{m.text_label_provider_auto_update_models()}</Label>
 				<SettingSwitchItem
 					label={m.text_label_provider_auto_update_models_desc()}
 					checked={formData.autoUpdateModels}

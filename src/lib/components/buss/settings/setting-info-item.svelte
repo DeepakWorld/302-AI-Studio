@@ -23,9 +23,9 @@
 	)}
 >
 	<div class="flex items-center gap-2">
-		<Label class="text-sm">{label}</Label>
+		<Label class="text-sm font-normal">{label}</Label>
 		{#if value}
-			<Label class="text-muted-foreground text-sm">{value}</Label>
+			<Label class="text-muted-foreground text-sm font-normal">{value}</Label>
 		{/if}
 	</div>
 	{#if action}
