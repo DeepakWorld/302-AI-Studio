@@ -242,8 +242,12 @@ app.post("/chat/302ai", async (c) => {
 		fetch: createCitationsFetch(provider302Options),
 	});
 
+	// Only enable thinking for DeepSeek models
+	const isDeepSeekModel = model.toLowerCase().includes("deepseek");
+	const modelOptions = isDeepSeekModel ? { thinking: { type: "enabled" as const } } : {};
+
 	const wrapModel = wrapLanguageModel({
-		model: ai302.chatModel(model, { thinking: { type: "enabled" } }),
+		model: ai302.chatModel(model, modelOptions),
 		middleware: [
 			extractReasoningMiddleware({ tagName: "think" }),
 			extractReasoningMiddleware({ tagName: "thinking" }),
