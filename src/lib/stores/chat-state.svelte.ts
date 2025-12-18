@@ -29,6 +29,7 @@ import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.s
 import { agentPreviewState } from "./agent-preview-state.svelte";
 import { codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
+import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
 import { preferencesSettings } from "./preferences-settings.state.svelte";
 import {
@@ -119,6 +120,37 @@ $effect.root(() => {
 				`[ChatState] Clearing selectedModel ${selected.providerId}:${selected.id} (model not found)`,
 			);
 			persistedChatParamsState.current.selectedModel = null;
+		}
+	});
+
+	// Clean up mcpServerIds when MCP servers are deleted
+	$effect(() => {
+		// Avoid running too early
+		if (!persistedChatParamsState.isHydrated || !mcpState.isHydrated) {
+			return;
+		}
+
+		const currentServerIds = persistedChatParamsState.current.mcpServerIds;
+		if (!currentServerIds || currentServerIds.length === 0) {
+			return;
+		}
+
+		// Get IDs of all existing servers
+		const existingServerIds = new Set(mcpState.servers.map((s) => s.id));
+
+		// Filter out IDs that no longer exist
+		const validServerIds = currentServerIds.filter((id) => existingServerIds.has(id));
+
+		// If some IDs were removed, update the state
+		if (validServerIds.length !== currentServerIds.length) {
+			console.log(
+				`[ChatState] Cleaning up deleted MCP server IDs: ${currentServerIds.length - validServerIds.length} removed`,
+			);
+			persistedChatParamsState.current = {
+				...persistedChatParamsState.current,
+				mcpServerIds: validServerIds,
+				isMCPActive: validServerIds.length > 0,
+			};
 		}
 	});
 });
