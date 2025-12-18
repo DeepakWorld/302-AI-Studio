@@ -75,7 +75,11 @@
 	>
 		<!-- Icon -->
 		<div class="size-provider-icon flex shrink-0 items-center justify-center">
-			<ModelIcon modelName={provider.icon || provider.apiType} className="h-6 w-6" />
+			<ModelIcon
+				modelName={provider.icon || provider.apiType}
+				className="h-6 w-6"
+				forceApplyClassName
+			/>
 		</div>
 
 		<!-- Content -->
