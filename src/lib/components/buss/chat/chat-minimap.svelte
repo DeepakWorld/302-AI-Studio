@@ -500,7 +500,8 @@
 	bind:this={minimapRef}
 	class={cn(
 		"absolute right-0 z-10 transition-all duration-300 select-none pointer-events-auto",
-		isHovered || isDragging ? "opacity-100 w-[60px]" : "opacity-70 w-[28px]",
+		isHovered || isDragging ? "opacity-100" : "opacity-70",
+		"w-[28px]",
 		className,
 	)}
 	style="top: 60px; bottom: 180px;"
