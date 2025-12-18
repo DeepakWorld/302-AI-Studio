@@ -81,7 +81,7 @@
 			{#each filteredServers as server (server.id)}
 				<button
 					type="button"
-					class="block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 hover:bg-[#F9F9F9] dark:bg-background dark:hover:bg-[#2D2D2D]"
+					class="block w-full cursor-pointer rounded-[10px] border-0 bg-white py-3 hover:bg-[#F9F9F9] dark:bg-background dark:hover:bg-[#2D2D2D]"
 					onclick={() => handleServerClick(server.id)}
 				>
 					<div class="flex w-full items-center justify-between gap-x-10">
