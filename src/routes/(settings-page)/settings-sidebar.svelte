@@ -123,8 +123,7 @@
 					draggable="false"
 					class={cn(
 						"px-settings-item-x py-settings-item-y flex w-full items-center rounded-lg text-sm font-medium whitespace-nowrap outline-hidden transition-colors",
-						"hover:bg-hover-primary",
-						isSelected ? "text-accent-fg bg-accent" : "text-foreground",
+						isSelected ? "text-accent-fg bg-accent" : "text-foreground bg-tab-inactive hover:bg-tab-hover",
 					)}
 					role="tab"
 					aria-selected={isSelected}
