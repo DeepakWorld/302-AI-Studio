@@ -180,15 +180,20 @@
 {/snippet}
 
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
+	{@render actionUploadAttachment()}
+
 	{#if !codeAgentState.enabled}
 		{#if chatState.providerType === "302ai"}
-			{@render actionEnableThinking()}
 			{@render actionEnableOnlineSearch()}
+			{@render actionEnableThinking()}
 		{/if}
+	{/if}
+
+	{@render actionEnableMCP()}
+
+	{#if !codeAgentState.enabled}
 		{@render actionSetParameters()}
 	{/if}
 
-	{@render actionUploadAttachment()}
-	{@render actionEnableMCP()}
 	{@render actionCodeAgent()}
 </div>
