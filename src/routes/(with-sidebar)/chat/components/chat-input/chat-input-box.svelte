@@ -33,6 +33,14 @@
 		if (textareaRef) {
 			// 使用 requestAnimationFrame 确保 DOM 已更新
 			requestAnimationFrame(() => {
+				// 如果当前焦点在其他输入框/文本区域中，不要抢夺焦点
+				const activeEl = document.activeElement;
+				const isInOtherInput =
+					activeEl &&
+					(activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA") &&
+					activeEl !== textareaRef;
+				if (isInOtherInput) return;
+
 				textareaRef?.focus();
 			});
 		}
