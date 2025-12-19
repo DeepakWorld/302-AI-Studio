@@ -38,10 +38,13 @@
 
 	async function handleMCPServerConfirm(selectedIds: string[]) {
 		if (selectedIds.length > 0 && codeAgentState.enabled) {
-			addingMCP = true;
-			const serverUrls = mcpState.getServerUrlsByIds(selectedIds);
-			await addClaudeCodeSandboxMCP(codeAgentState.sandboxId, serverUrls);
-			addingMCP = false;
+			const sandboxId = codeAgentState.sandboxId;
+			if (sandboxId) {
+				addingMCP = true;
+				const serverUrls = mcpState.getServerUrlsByIds(selectedIds);
+				await addClaudeCodeSandboxMCP(sandboxId, serverUrls);
+				addingMCP = false;
+			}
 		}
 
 		chatState.handleMCPServerChange(selectedIds);

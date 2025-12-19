@@ -1,5 +1,8 @@
 import { chatState } from "../chat-state.svelte";
+import { mcpState } from "../mcp-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
+
+const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
 
 class CodeAgentSendMessageButtonState {
 	executionIterator: AsyncGenerator<string, void, boolean> | null = null;
@@ -19,6 +22,18 @@ class CodeAgentSendMessageButtonState {
 		if (sandboxInfo) {
 			if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {
 				await codeAgentState.handleCodeAgentModelChange(chatState.selectedModel);
+			}
+
+			// 在 sandbox 确定后，添加用户选择的 MCP 服务器
+			if (chatState.mcpServerIds.length > 0) {
+				const serverUrls = mcpState.getServerUrlsByIds(chatState.mcpServerIds);
+				if (serverUrls.length > 0) {
+					try {
+						await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, serverUrls);
+					} catch (error) {
+						console.error("Failed to add MCP servers:", error);
+					}
+				}
 			}
 
 			if (sandboxInfo.diskUsage === "insufficient") {
