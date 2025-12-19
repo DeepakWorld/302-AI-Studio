@@ -464,6 +464,8 @@
 	"mcp_search_placeholder": "Search MCP servers...",
 	"mcp_loading": "Loading...",
 	"mcp_no_servers": "No servers yet",
+	"mcp_no_servers_empty_state": "No MCP servers, ",
+	"mcp_click_to_settings": "go to settings",
 	"mcp_no_match": "No matching servers found",
 	"mcp_enabled": "Enabled",
 	"mcp_disabled": "Disabled",
