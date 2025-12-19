@@ -57,7 +57,7 @@
 		)}
 	>
 		{#if selectedIcon}
-			<ModelIcon modelName={selectedIcon.key} className="h-6 w-6" />
+			<ModelIcon modelName={selectedIcon.key} className="h-6 w-6" forceApplyClassName />
 		{:else}
 			<FileImage class="text-muted-foreground h-4 w-4" />
 		{/if}
@@ -76,7 +76,7 @@
 						)}
 						title={iconItem.name}
 					>
-						<ModelIcon modelName={iconItem.key} className="mb-1 h-8 w-8" />
+						<ModelIcon modelName={iconItem.key} className="mb-1 h-8 w-8" forceApplyClassName />
 						<span class="w-full truncate text-center text-xs">
 							{iconItem.name}
 						</span>
