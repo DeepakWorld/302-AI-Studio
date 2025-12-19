@@ -120,10 +120,8 @@ class ProviderState {
 
 		const existingModel = persistedModelState.current.find((m) => m.id === input.id);
 		if (existingModel) {
-			// 检查 isAddedByUser 字段
-			const isAddedByUser = (existingModel as Model & { isAddedByUser?: boolean }).isAddedByUser;
 			// 如果 isAddedByUser 为 true，说明已经被用户添加过，不允许重复添加
-			if (isAddedByUser === true) {
+			if (existingModel.isAddedByUser === true) {
 				throw new Error(`Model with ID "${input.id}" already exists`);
 			}
 			// 如果 isAddedByUser 为 false 或 undefined，则更新该模型，将 isAddedByUser 设置为 true
@@ -149,7 +147,7 @@ class ProviderState {
 			return existingModel;
 		}
 
-		const model: Model & { isAddedByUser?: boolean } = {
+		const model: Model = {
 			id: input.id,
 			name: input.name,
 			remark: input.remark || "",
@@ -305,11 +303,26 @@ class ProviderState {
 			const result = await getModelsByProvider(latestProvider);
 			if (result.success && result.data) {
 				await this.updateProvider(latestProvider.id, { status: "connected" });
+
+				// 保留用户手动添加的模型
+				const userAddedModels = persistedModelState.current.filter((model) => {
+					return model.providerId === latestProvider.id && model.isAddedByUser === true;
+				});
+
+				// 获取用户添加的模型ID集合，用于去重
+				const userAddedModelIds = new Set(userAddedModels.map((m) => m.id));
+
+				// 过滤掉与用户添加模型ID重复的新模型
+				const newModelsWithoutDuplicates = result.data.models.filter(
+					(m) => !userAddedModelIds.has(m.id),
+				);
+
 				persistedModelState.current = persistedModelState.current
 					.filter((models) => {
 						return models.providerId !== latestProvider.id;
 					})
-					.concat(result.data.models);
+					.concat(userAddedModels)
+					.concat(newModelsWithoutDuplicates);
 
 				// 对于 302AI provider，只统计 isFeatured === true 或 isAddedByUser === true 的模型数量
 				const displayCount =
@@ -344,7 +357,20 @@ class ProviderState {
 		try {
 			const result = await getAllModels(persistedProviderState.current);
 			if (result.success && result.data) {
-				persistedModelState.current = result.data.models;
+				// 保留所有用户手动添加的模型
+				const userAddedModels = persistedModelState.current.filter((model) => {
+					return model.isAddedByUser === true;
+				});
+
+				// 获取用户添加的模型ID集合，用于去重
+				const userAddedModelIds = new Set(userAddedModels.map((m) => m.id));
+
+				// 过滤掉与用户添加模型ID重复的新模型
+				const newModelsWithoutDuplicates = result.data.models.filter(
+					(m) => !userAddedModelIds.has(m.id),
+				);
+
+				persistedModelState.current = [...userAddedModels, ...newModelsWithoutDuplicates];
 
 				return true;
 			}
@@ -434,9 +460,24 @@ class ProviderState {
 			const result = await getModelsByProvider(latestProvider);
 			if (result.success && result.data) {
 				await this.updateProvider(latestProvider.id, { status: "connected" });
+
+				// 保留用户手动添加的模型
+				const userAddedModels = persistedModelState.current.filter((model) => {
+					return model.providerId === latestProvider.id && model.isAddedByUser === true;
+				});
+
+				// 获取用户添加的模型ID集合，用于去重
+				const userAddedModelIds = new Set(userAddedModels.map((m) => m.id));
+
+				// 过滤掉与用户添加模型ID重复的新模型
+				const newModelsWithoutDuplicates = result.data.models.filter(
+					(m) => !userAddedModelIds.has(m.id),
+				);
+
 				persistedModelState.current = persistedModelState.current
 					.filter((models) => models.providerId !== latestProvider.id)
-					.concat(result.data.models);
+					.concat(userAddedModels)
+					.concat(newModelsWithoutDuplicates);
 				return true;
 			} else {
 				await this.updateProvider(latestProvider.id, { status: "error" });

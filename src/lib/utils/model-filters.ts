@@ -4,8 +4,7 @@ import type { Model } from "@shared/types";
  * 检查模型是否被用户添加
  */
 function isModelAddedByUser(model: Model): boolean {
-	const isAddedByUser = (model as Model & { isAddedByUser?: boolean }).isAddedByUser;
-	return isAddedByUser === true;
+	return model.isAddedByUser === true;
 }
 
 /**
@@ -45,8 +44,7 @@ export function getAvailableModelIdsForDropdown(models: Model[], providerId: str
 	const allModels = models.filter((m) => {
 		if (m.providerId !== providerId) return false;
 		if (isModelFeatured(m)) return false;
-		const isAddedByUser = (m as Model & { isAddedByUser?: boolean }).isAddedByUser;
-		return isAddedByUser === false || isAddedByUser === undefined;
+		return m.isAddedByUser === false || m.isAddedByUser === undefined;
 	});
 	// 去重并按名称排序
 	return Array.from(new Set(allModels.map((m) => m.id))).sort();
