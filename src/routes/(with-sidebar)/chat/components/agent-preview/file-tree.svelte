@@ -9,8 +9,6 @@
 	import { claudeCodeAgentState } from "$lib/stores/code-agent";
 	import {
 		ArrowDownToLine,
-		ChevronDown,
-		ChevronRight,
 		File,
 		FilePlus,
 		FileUp,
@@ -75,7 +73,7 @@
 
 	// Handle create file start
 	function handleCreateFile(parentPath?: string) {
-		createFilePath = parentPath ?? fileTreeState.rootPath;
+		createFilePath = parentPath ?? fileTreeState.currentDirectory;
 		createFileInputValue = "";
 		createFileDialogOpen = true;
 	}
@@ -321,7 +319,7 @@
 	let pendingUploadPath = $state<string | null>(null);
 
 	function triggerFileUpload(path?: string) {
-		pendingUploadPath = path ?? fileTreeState.rootPath;
+		pendingUploadPath = path ?? fileTreeState.currentDirectory;
 		fileInput.click();
 	}
 
@@ -330,7 +328,7 @@
 		if (target.files && target.files.length > 0) {
 			const file = target.files[0];
 			// Upload to pendingUploadPath
-			await fileTreeState.uploadFile(file, pendingUploadPath ?? fileTreeState.rootPath);
+			await fileTreeState.uploadFile(file, pendingUploadPath ?? fileTreeState.currentDirectory);
 
 			// Reset input and path
 			target.value = "";
@@ -340,12 +338,12 @@
 
 	// Folder upload - uses Electron dialog
 	async function handleFolderUpload(targetPath?: string) {
-		await fileTreeState.uploadFolder(targetPath ?? fileTreeState.rootPath);
+		await fileTreeState.uploadFolder(targetPath ?? fileTreeState.currentDirectory);
 	}
 
 	// Handle create folder
 	function handleCreateFolder(parentPath?: string) {
-		createFolderParentPath = parentPath ?? fileTreeState.rootPath;
+		createFolderParentPath = parentPath ?? fileTreeState.currentDirectory;
 		createFolderInputValue = "";
 		createFolderDialogOpen = true;
 	}
@@ -379,16 +377,19 @@
 </script>
 
 {#snippet contextMenuContent(node: TreeNode)}
-	{@const isFile = node.type === "file"}
-	{@const isDir = node.type === "dir"}
-	{@const isOperating = fileTreeState.operatingPaths.has(node.path)}
-	{@const isDownloading = fileTreeState.downloadingPaths.has(node.path)}
-	{@const isPasteOperating = fileTreeState.copiedFilePath
-		? fileTreeState.operatingPaths.has(fileTreeState.copiedFilePath)
-		: false}
+	{#if node.isParentEntry}
+		<!-- No context menu for parent entry ("..") per Requirements 6.3 -->
+	{:else}
+		{@const isFile = node.type === "file"}
+		{@const isDir = node.type === "dir"}
+		{@const isOperating = fileTreeState.operatingPaths.has(node.path)}
+		{@const isDownloading = fileTreeState.downloadingPaths.has(node.path)}
+		{@const isPasteOperating = fileTreeState.copiedFilePath
+			? fileTreeState.operatingPaths.has(fileTreeState.copiedFilePath)
+			: false}
 
-	<ContextMenu.Content>
-		<!-- {#if isDir}
+		<ContextMenu.Content>
+			<!-- {#if isDir}
 			<ContextMenu.Item
 				onSelect={() => handleCreateFile(isDir ? node.path : undefined)}
 				disabled={isOperating || fileTreeState.isStreaming}
@@ -399,122 +400,137 @@
 				<span>{m.label_file_tree_create_file()}</span>
 			</ContextMenu.Item>
 		{/if} -->
-		{#if isFile}
-			<!-- Create File -->
+			{#if isFile}
+				<!-- Create File -->
 
-			<!-- Rename -->
+				<!-- Rename -->
+				<ContextMenu.Item
+					onSelect={() => handleRename(node)}
+					disabled={isOperating || fileTreeState.isStreaming}
+				>
+					{#if isOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.title_button_rename()}</span>
+				</ContextMenu.Item>
+			{/if}
+
+			<!-- Copy -->
 			<ContextMenu.Item
-				onSelect={() => handleRename(node)}
+				onSelect={() => handleCopy(node)}
 				disabled={isOperating || fileTreeState.isStreaming}
 			>
-				{#if isOperating}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}{/if}
-				<span>{m.title_button_rename()}</span>
+				<span>{m.common_copy()}</span>
 			</ContextMenu.Item>
-		{/if}
 
-		<!-- Copy -->
-		<ContextMenu.Item
-			onSelect={() => handleCopy(node)}
-			disabled={isOperating || fileTreeState.isStreaming}
-		>
-			<span>{m.common_copy()}</span>
-		</ContextMenu.Item>
+			{#if isDir}
+				<!-- Paste -->
+				<ContextMenu.Item
+					onSelect={() => handlePaste(node)}
+					disabled={!fileTreeState.copiedFilePath || isPasteOperating || fileTreeState.isStreaming}
+				>
+					{#if isPasteOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.label_file_tree_paste()}</span>
+				</ContextMenu.Item>
+				<ContextMenu.Separator />
 
-		{#if isDir}
-			<!-- Paste -->
-			<ContextMenu.Item
-				onSelect={() => handlePaste(node)}
-				disabled={!fileTreeState.copiedFilePath || isPasteOperating || fileTreeState.isStreaming}
-			>
-				{#if isPasteOperating}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}{/if}
-				<span>{m.label_file_tree_paste()}</span>
-			</ContextMenu.Item>
+				<!-- New Folder -->
+				<ContextMenu.Item
+					onSelect={() => handleCreateFolder(node.path)}
+					disabled={isOperating || fileTreeState.isStreaming}
+				>
+					{#if isOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.label_file_tree_new_folder()}</span>
+				</ContextMenu.Item>
+
+				<!-- Create File -->
+				<ContextMenu.Item
+					onSelect={() => handleCreateFile(node.path)}
+					disabled={isOperating || fileTreeState.isStreaming}
+				>
+					{#if isOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.label_file_tree_create_file()}</span>
+				</ContextMenu.Item>
+				<ContextMenu.Separator />
+
+				<!-- Upload File -->
+				<ContextMenu.Item
+					onSelect={() => triggerFileUpload(node.path)}
+					disabled={isOperating || fileTreeState.isStreaming}
+				>
+					{#if isOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.label_file_tree_upload_file()}</span>
+				</ContextMenu.Item>
+
+				<!-- Upload Folder -->
+				<ContextMenu.Item
+					onSelect={() => handleFolderUpload(node.path)}
+					disabled={isOperating || fileTreeState.isStreaming}
+				>
+					{#if isOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.label_file_tree_upload_folder()}</span>
+				</ContextMenu.Item>
+			{/if}
+
 			<ContextMenu.Separator />
 
-			<!-- New Folder -->
-			<ContextMenu.Item
-				onSelect={() => handleCreateFolder(node.path)}
-				disabled={isOperating || fileTreeState.isStreaming}
-			>
-				{#if isOperating}
+			<!-- Download -->
+			<ContextMenu.Item onSelect={() => handleDownload(node)} disabled={isDownloading}>
+				{#if isDownloading}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 				{:else}{/if}
-				<span>{m.label_file_tree_new_folder()}</span>
+				<span>{m.label_file_tree_download()}</span>
 			</ContextMenu.Item>
 
-			<!-- Create File -->
-			<ContextMenu.Item
-				onSelect={() => handleCreateFile(node.path)}
-				disabled={isOperating || fileTreeState.isStreaming}
-			>
-				{#if isOperating}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}{/if}
-				<span>{m.label_file_tree_create_file()}</span>
-			</ContextMenu.Item>
-			<ContextMenu.Separator />
-
-			<!-- Upload File -->
-			<ContextMenu.Item
-				onSelect={() => triggerFileUpload(node.path)}
-				disabled={isOperating || fileTreeState.isStreaming}
-			>
-				{#if isOperating}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}{/if}
-				<span>{m.label_file_tree_upload_file()}</span>
-			</ContextMenu.Item>
-
-			<!-- Upload Folder -->
-			<ContextMenu.Item
-				onSelect={() => handleFolderUpload(node.path)}
-				disabled={isOperating || fileTreeState.isStreaming}
-			>
-				{#if isOperating}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}{/if}
-				<span>{m.label_file_tree_upload_folder()}</span>
-			</ContextMenu.Item>
-		{/if}
-
-		<ContextMenu.Separator />
-
-		<!-- Download -->
-		<ContextMenu.Item onSelect={() => handleDownload(node)} disabled={isDownloading}>
-			{#if isDownloading}
-				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-			{:else}{/if}
-			<span>{m.label_file_tree_download()}</span>
-		</ContextMenu.Item>
-
-		<!-- Delete -->
-		{#if !isDir}
-			<ContextMenu.Separator />
-			<ContextMenu.Item
-				onSelect={() => handleDelete(node)}
-				disabled={isOperating || fileTreeState.isStreaming}
-				class="text-destructive focus:text-destructive"
-			>
-				{#if isOperating}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}{/if}
-				<span>{m.text_button_delete()}</span>
-			</ContextMenu.Item>
-		{/if}
-	</ContextMenu.Content>
+			<!-- Delete -->
+			{#if !isDir}
+				<ContextMenu.Separator />
+				<ContextMenu.Item
+					onSelect={() => handleDelete(node)}
+					disabled={isOperating || fileTreeState.isStreaming}
+					class="text-destructive focus:text-destructive"
+				>
+					{#if isOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.text_button_delete()}</span>
+				</ContextMenu.Item>
+			{/if}
+		</ContextMenu.Content>
+	{/if}
 {/snippet}
 
 {#snippet treeNodeItem(node: TreeNode)}
-	{#if node.type === "dir"}
+	{#if node.isParentEntry}
+		<!-- Parent directory entry ("..") -->
+		<button
+			type="button"
+			ondblclick={() => fileTreeState.navigateToParent()}
+			class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-muted transition-colors"
+			style="padding-left: 12px"
+		>
+			<div class="flex items-center gap-1.5 flex-1 min-w-0">
+				<span class="h-3 w-3 flex-shrink-0"></span>
+				<FolderUp class="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
+				<span class="truncate text-xs font-medium text-muted-foreground">..</span>
+			</div>
+		</button>
+	{:else if node.type === "dir"}
 		<ContextMenu.Root>
 			<ContextMenu.Trigger>
 				<button
 					type="button"
-					onclick={() => fileTreeState.toggleDir(node.path)}
+					ondblclick={() => fileTreeState.navigateToFolder(node.path)}
 					class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-muted transition-colors"
 					style="padding-left: {node.depth * 20 + 12}px"
 				>
@@ -522,15 +538,11 @@
 						{#if fileTreeState.loadingDirs.has(node.path)}
 							<Loader2 class="h-3 w-3 flex-shrink-0 animate-spin text-muted-foreground" />
 							<Folder class="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
-						{:else if fileTreeState.expandedDirs.has(node.path)}
-							<ChevronDown
-								class="h-3 w-3 flex-shrink-0 text-muted-foreground transition-transform"
-							/>
+						{:else if fileTreeState.selectedFile === node.path}
+							<span class="h-3 w-3 flex-shrink-0"></span>
 							<FolderOpen class="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
 						{:else}
-							<ChevronRight
-								class="h-3 w-3 flex-shrink-0 text-muted-foreground transition-transform"
-							/>
+							<span class="h-3 w-3 flex-shrink-0"></span>
 							<Folder class="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
 						{/if}
 						<span class="truncate text-xs font-medium">{node.name}</span>
@@ -539,11 +551,6 @@
 			</ContextMenu.Trigger>
 			{@render contextMenuContent(node)}
 		</ContextMenu.Root>
-		{#if fileTreeState.expandedDirs.has(node.path) && node.children.length > 0}
-			{#each node.children as childNode (childNode.path)}
-				{@render treeNodeItem(childNode)}
-			{/each}
-		{/if}
 	{:else}
 		<ContextMenu.Root>
 			<ContextMenu.Trigger>

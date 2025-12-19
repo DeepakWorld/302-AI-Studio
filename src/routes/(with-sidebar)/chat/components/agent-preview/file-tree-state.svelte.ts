@@ -25,12 +25,12 @@ export interface TreeNode extends SandboxFileInfo {
 	children: TreeNode[];
 	depth: number;
 	isExpanded?: boolean;
+	isParentEntry?: boolean;
 }
 
 interface TreeCache {
 	files: SandboxFileInfo[];
 	nodes: TreeNode[];
-	expandedDirs: SvelteSet<string>;
 }
 
 /**
@@ -42,6 +42,33 @@ const pathUtils = {
 	join: (...parts: string[]): string => parts.filter(Boolean).join("/"),
 	normalize: (path: string): string => (path.startsWith("/") ? path : `/${path}`),
 };
+
+/**
+ * Check if the given path is at the root level
+ * @param path - The current directory path
+ * @param rootPath - The root/workspace path
+ * @returns true if path equals rootPath or is "/"
+ */
+export function isAtRoot(path: string, rootPath: string): boolean {
+	const normalizedPath = path.endsWith("/") ? path.slice(0, -1) : path;
+	const normalizedRoot = rootPath.endsWith("/") ? rootPath.slice(0, -1) : rootPath;
+	return normalizedPath === normalizedRoot || normalizedPath === "" || normalizedPath === "/";
+}
+
+/**
+ * Create a parent directory entry node ("..")
+ * @returns TreeNode representing the parent directory entry
+ */
+export function createParentEntry(): TreeNode {
+	return {
+		name: "..",
+		path: "..",
+		type: "dir",
+		children: [],
+		depth: 0,
+		isParentEntry: true,
+	};
+}
 
 /**
  * Set utility functions for SvelteSet
@@ -62,11 +89,11 @@ export class FileTreeState {
 	// State properties
 	sandboxId = $state<string>("");
 	workspacePath = $state<string>(DEFAULT_WORKSPACE_PATH);
+	currentDirectory = $state<string>(DEFAULT_WORKSPACE_PATH);
 	files = $state<SandboxFileInfo[]>([]);
 	treeNodes = $state<TreeNode[]>([]);
 	loading = $state(false);
 	error = $state<string | null>(null);
-	expandedDirs = $state(new SvelteSet([DEFAULT_WORKSPACE_PATH]));
 	selectedFile = $state<string | null>(null);
 	loadedDirs = $state(new SvelteSet<string>());
 	loadingDirs = $state(new SvelteSet<string>());
@@ -88,7 +115,7 @@ export class FileTreeState {
 		this.sandboxId = sandboxId;
 		if (workspacePath) {
 			this.workspacePath = workspacePath;
-			this.expandedDirs = new SvelteSet([workspacePath]);
+			this.currentDirectory = workspacePath;
 		}
 	}
 
@@ -99,8 +126,7 @@ export class FileTreeState {
 	updateWorkspacePath(workspacePath: string) {
 		if (workspacePath && workspacePath !== this.workspacePath) {
 			this.workspacePath = workspacePath;
-			// Update expanded dirs to include the new workspace path
-			this.expandedDirs = new SvelteSet([workspacePath]);
+			this.currentDirectory = workspacePath;
 		}
 	}
 
@@ -149,76 +175,50 @@ export class FileTreeState {
 	}
 
 	/**
-	 * Build tree structure with memoization
+	 * Build tree structure with flat directory view
+	 * Shows only direct children of currentDirectory with depth 0 and empty children arrays
+	 * Prepends ".." parent entry when not at root
 	 */
 	buildTreeStructure(fileList: SandboxFileInfo[]): TreeNode[] {
-		if (!fileList || fileList.length === 0) {
-			return [];
-		}
+		// Filter files to only include direct children of currentDirectory
+		const normalizedCurrentDir = this.currentDirectory.endsWith("/")
+			? this.currentDirectory.slice(0, -1)
+			: this.currentDirectory;
 
-		// Check cache
-		if (
-			this.treeNodesCache &&
-			this.treeNodesCache.files.length === fileList.length &&
-			this.treeNodesCache.expandedDirs.size === this.expandedDirs.size &&
-			JSON.stringify(this.treeNodesCache.files.map((f) => f.path).sort()) ===
-				JSON.stringify(fileList.map((f) => f.path).sort()) &&
-			JSON.stringify([...this.treeNodesCache.expandedDirs].sort()) ===
-				JSON.stringify([...this.expandedDirs].sort())
-		) {
-			console.log("[FileTree] Using cached tree structure");
-			return this.treeNodesCache.nodes;
-		}
-
-		// Create path to node mapping
-		const nodeMap = new SvelteMap<string, TreeNode>();
-		const rootNodes: TreeNode[] = [];
-
-		// Sort by path depth to ensure parent nodes are processed before children
-		const sortedFiles = [...fileList].sort((a, b) => {
-			const aDepth = a.path.split("/").filter(Boolean).length;
-			const bDepth = b.path.split("/").filter(Boolean).length;
-			if (aDepth !== bDepth) return aDepth - bDepth;
-			return a.path.localeCompare(b.path);
+		const directChildren = fileList.filter((file) => {
+			const parentDir = pathUtils.getParentDir(file.path);
+			return parentDir === normalizedCurrentDir;
 		});
 
-		// Find minimum depth for relative depth calculation
-		const minDepth = Math.min(...sortedFiles.map((f) => f.path.split("/").filter(Boolean).length));
+		// Sort alphabetically, folders first
+		const sortedChildren = [...directChildren].sort((a, b) => {
+			// Folders come before files
+			if (a.type === "dir" && b.type !== "dir") return -1;
+			if (a.type !== "dir" && b.type === "dir") return 1;
+			// Then sort alphabetically by name
+			return a.name.localeCompare(b.name);
+		});
 
-		for (const file of sortedFiles) {
-			const pathParts = file.path.split("/").filter(Boolean);
-			const absoluteDepth = pathParts.length;
-			const depth = absoluteDepth - minDepth; // Relative depth
+		// Create flat tree nodes with depth 0 and empty children
+		const flatNodes: TreeNode[] = sortedChildren.map((file) => ({
+			...file,
+			children: [], // Always empty in flat view
+			depth: 0, // Always 0 in flat view
+			isExpanded: false, // Not used in flat view
+		}));
 
-			const node: TreeNode = {
-				...file,
-				children: [],
-				depth,
-				isExpanded: this.expandedDirs.has(file.path),
-			};
-
-			nodeMap.set(file.path, node);
-
-			// Find parent node
-			const parentPath = pathParts.slice(0, -1).join("/");
-			const fullParentPath = parentPath ? `/${parentPath}` : "";
-
-			if (fullParentPath && nodeMap.has(fullParentPath)) {
-				const parentNode = nodeMap.get(fullParentPath)!;
-				parentNode.children.push(node);
-			} else {
-				rootNodes.push(node);
-			}
+		// Prepend parent entry (".." ) when not at root
+		if (!isAtRoot(this.currentDirectory, this.rootPath)) {
+			flatNodes.unshift(createParentEntry());
 		}
 
 		// Update cache
 		this.treeNodesCache = {
 			files: [...fileList],
-			nodes: rootNodes,
-			expandedDirs: new SvelteSet(this.expandedDirs),
+			nodes: flatNodes,
 		};
 
-		return rootNodes;
+		return flatNodes;
 	}
 
 	/**
@@ -279,6 +279,7 @@ export class FileTreeState {
 			deployedAt: existingStorage?.deployedAt,
 			selectedFilePath:
 				updates?.selectedFilePath ?? this.selectedFile ?? existingStorage?.selectedFilePath,
+			fileTreeCurrentDirectory: this.currentDirectory,
 			currentWorkingDirectory: existingStorage?.currentWorkingDirectory,
 			terminalHistory: existingStorage?.terminalHistory,
 			type: existingStorage?.type,
@@ -312,6 +313,10 @@ export class FileTreeState {
 			const storage = await agentPreviewState.loadFromStorage(this.sandboxId, sessionId);
 			if (storage && storage.fileList.length > 0) {
 				this.files = storage.fileList;
+				// Restore currentDirectory from storage, fallback to workspacePath
+				if (storage.fileTreeCurrentDirectory) {
+					this.currentDirectory = storage.fileTreeCurrentDirectory;
+				}
 				this.treeNodes = this.buildTreeStructure(this.files);
 				this.loadedDirs = this.inferLoadedDirsFromFiles(this.files);
 			} else if (clearIfNotFound) {
@@ -450,33 +455,53 @@ export class FileTreeState {
 	async refreshFileTree(): Promise<void> {
 		this.loadedDirs = new SvelteSet();
 		this.treeNodesCache = null;
-		this.expandedDirs = new SvelteSet([this.rootPath]);
 		await this.loadFiles(this.rootPath, false, true);
 	}
 
 	/**
-	 * Toggle directory expansion
+	 * Navigate to a folder (folder navigation model)
+	 * Sets currentDirectory to the target folder and loads its contents
 	 */
-	async toggleDir(path: string): Promise<void> {
-		const isExpanding = !this.expandedDirs.has(path);
-
-		if (isExpanding) {
-			// Expanding: fetch folder contents if not already loaded and no direct children exist
-			if (!this.loadedDirs.has(path) && !this.hasDirectChildren(path)) {
-				await this.loadFiles(path, true); // Merge mode
-			} else if (!this.loadedDirs.has(path) && this.hasDirectChildren(path)) {
-				// We have children from storage, mark as loaded without fetching
-				this.loadedDirs = addToSet(this.loadedDirs, path);
-			}
-
-			this.expandedDirs = addToSet(this.expandedDirs, path);
-		} else {
-			// Collapsing: just remove from expanded set
-			this.expandedDirs = removeFromSet(this.expandedDirs, path);
+	async navigateToFolder(folderPath: string): Promise<void> {
+		if (!folderPath) {
+			return;
 		}
 
-		// Rebuild tree to update expanded state
+		// Set the current directory to the target folder
+		this.currentDirectory = folderPath;
+
+		// Load folder contents if not already cached
+		if (!this.loadedDirs.has(folderPath)) {
+			await this.loadFiles(folderPath, true);
+		}
+
+		// Rebuild tree to show the new directory contents
 		this.rebuildTree();
+
+		// Persist currentDirectory to storage for session continuity
+		await this.saveToStorage();
+	}
+
+	/**
+	 * Navigate to parent directory
+	 * Computes parent path and navigates to it, guarding against root boundary
+	 */
+	async navigateToParent(): Promise<void> {
+		// Guard against navigating above root
+		if (this.currentDirectory === this.rootPath || this.currentDirectory === "/") {
+			return;
+		}
+
+		// Compute parent path
+		const parentPath = pathUtils.getParentDir(this.currentDirectory);
+
+		// Guard against empty parent path (shouldn't happen, but safety check)
+		if (!parentPath) {
+			return;
+		}
+
+		// Navigate to parent folder
+		await this.navigateToFolder(parentPath);
 	}
 
 	/**
@@ -748,12 +773,9 @@ export class FileTreeState {
 					this.loadedDirs = addToSet(this.loadedDirs, parentPath);
 				}
 
-				// Expand parent directory
-				if (!this.expandedDirs.has(parentPath)) {
-					this.expandedDirs = addToSet(this.expandedDirs, parentPath);
-				}
-
-				await this.updateFilesAndRebuild(this.files);
+				// Update files and set the new file as selected
+				// This ensures the selectedFilePath in storage is updated before broadcasting
+				await this.updateFilesAndRebuild(this.files, newFile.path);
 				return newFile;
 			} else {
 				const errorMsg = response.error || m.toast_file_create_failed();
@@ -930,12 +952,6 @@ export class FileTreeState {
 				if (parentPath === this.rootPath || this.loadedDirs.has(parentPath)) {
 					await new Promise((resolve) => setTimeout(resolve, 500));
 					await this.loadFiles(parentPath, true, true);
-
-					// Also expand the parent directory if not already expanded
-					if (!this.expandedDirs.has(parentPath)) {
-						this.expandedDirs = addToSet(this.expandedDirs, parentPath);
-						this.rebuildTree();
-					}
 				}
 
 				return true;

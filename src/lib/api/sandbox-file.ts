@@ -55,7 +55,7 @@ export async function listSandboxFiles(
 	});
 
 	if (!response.ok) {
-		throw new Error(`Failed to list files}`);
+		throw new Error(`Failed to list files`);
 	}
 
 	return response.json();
