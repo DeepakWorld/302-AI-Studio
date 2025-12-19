@@ -499,6 +499,7 @@
 	"mcp_confirm_delete_title": "Confirm Delete",
 	"mcp_confirm_delete_message": "Are you sure you want to delete server \"{name}\"? This action cannot be undone.",
 	"mcp_cancel": "Cancel",
+	"mcp_filtered_warning": "The following MCP servers are not compatible with Agent mode and have been removed: {names}",
 	"mcp_import_title": "Import MCP Server Configuration",
 	"mcp_import_json_label": "JSON Configuration",
 	"mcp_import_json_placeholder": "Paste your Cline MCP configuration file content here...",

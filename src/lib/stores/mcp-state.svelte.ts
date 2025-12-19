@@ -135,6 +135,29 @@ class McpState {
 			.map((server) => server.url)
 			.filter((url) => url !== null);
 	}
+
+	/**
+	 * Filter server IDs to only include streamableHTTP type servers
+	 * @param ids - Array of server IDs to filter
+	 * @returns Object with compatible IDs and filtered out server names
+	 */
+	filterStreamableHTTPServers(ids: string[]): { compatibleIds: string[]; filteredNames: string[] } {
+		const compatibleIds: string[] = [];
+		const filteredNames: string[] = [];
+
+		for (const id of ids) {
+			const server = this.getServer(id);
+			if (server) {
+				if (server.type === "streamableHTTP") {
+					compatibleIds.push(id);
+				} else {
+					filteredNames.push(server.name);
+				}
+			}
+		}
+
+		return { compatibleIds, filteredNames };
+	}
 }
 
 export const mcpState = new McpState();

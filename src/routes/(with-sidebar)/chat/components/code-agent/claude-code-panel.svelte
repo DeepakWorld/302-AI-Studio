@@ -22,8 +22,10 @@
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import { ChevronsUpDownIcon, RefreshCcw } from "@lucide/svelte";
+	import { toast } from "svelte-sonner";
 
 	const { windowService } = window.electronAPI;
 
@@ -61,8 +63,19 @@
 	}
 
 	function handleCodeAgentEnabled() {
+		// 过滤不兼容的 MCP 服务器（只保留 streamableHTTP 类型）
+		if (chatState.mcpServerIds.length > 0) {
+			const { compatibleIds, filteredNames } = mcpState.filterStreamableHTTPServers(
+				chatState.mcpServerIds,
+			);
+
+			if (filteredNames.length > 0) {
+				toast.warning(m.mcp_filtered_warning({ names: filteredNames.join(", ") }));
+				chatState.handleMCPServerChange(compatibleIds);
+			}
+		}
+
 		handleOverlayAction("enabled");
-		chatState.handleMCPActiveChange(false);
 	}
 </script>
 

@@ -495,6 +495,7 @@
 	"mcp_confirm_delete_title": "确认删除",
 	"mcp_confirm_delete_message": "确定要删除服务器 \"{name}\" 吗？此操作无法撤销。",
 	"mcp_cancel": "取消",
+	"mcp_filtered_warning": "以下 MCP 服务器不兼容 Agent 模式，已被移除：{names}",
 	"mcp_import_title": "导入 MCP 服务器配置",
 	"mcp_import_json_label": "JSON 配置",
 	"mcp_import_json_placeholder": "粘贴您的 Cline MCP 配置文件内容到这里...",
