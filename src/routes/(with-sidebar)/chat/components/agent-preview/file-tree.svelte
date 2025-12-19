@@ -510,6 +510,55 @@
 	{/if}
 {/snippet}
 
+{#snippet emptyAreaContextMenu()}
+	{@const isPasteOperating = fileTreeState.copiedFilePath
+		? fileTreeState.operatingPaths.has(fileTreeState.copiedFilePath)
+		: false}
+
+	<ContextMenu.Content>
+		<!-- Paste -->
+		<ContextMenu.Item
+			onSelect={() => {
+				// Create a virtual directory node for the current directory
+				const currentDirNode = {
+					path: fileTreeState.currentDirectory,
+					name: fileTreeState.currentDirectory.split("/").pop() || "",
+					type: "dir" as const,
+				};
+				handlePaste(currentDirNode);
+			}}
+			disabled={!fileTreeState.copiedFilePath || isPasteOperating || fileTreeState.isStreaming}
+		>
+			{#if isPasteOperating}
+				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+			{/if}
+			<span>{m.label_file_tree_paste()}</span>
+		</ContextMenu.Item>
+		<ContextMenu.Separator />
+
+		<!-- New Folder -->
+		<ContextMenu.Item onSelect={() => handleCreateFolder()} disabled={fileTreeState.isStreaming}>
+			<span>{m.label_file_tree_new_folder()}</span>
+		</ContextMenu.Item>
+
+		<!-- Create File -->
+		<ContextMenu.Item onSelect={() => handleCreateFile()} disabled={fileTreeState.isStreaming}>
+			<span>{m.label_file_tree_create_file()}</span>
+		</ContextMenu.Item>
+		<ContextMenu.Separator />
+
+		<!-- Upload File -->
+		<ContextMenu.Item onSelect={() => triggerFileUpload()} disabled={fileTreeState.isStreaming}>
+			<span>{m.label_file_tree_upload_file()}</span>
+		</ContextMenu.Item>
+
+		<!-- Upload Folder -->
+		<ContextMenu.Item onSelect={() => handleFolderUpload()} disabled={fileTreeState.isStreaming}>
+			<span>{m.label_file_tree_upload_folder()}</span>
+		</ContextMenu.Item>
+	</ContextMenu.Content>
+{/snippet}
+
 {#snippet treeNodeItem(node: TreeNode)}
 	{#if node.isParentEntry}
 		<!-- Parent directory entry ("..") -->
@@ -748,27 +797,32 @@
 	</div>
 
 	<!-- File List -->
-	<div class="flex-1 overflow-y-auto">
-		{#if fileTreeState.error}
-			<div class="m-2 rounded bg-destructive/10 p-2 text-xs text-destructive">
-				{fileTreeState.error}
-			</div>
-		{/if}
+	<ContextMenu.Root>
+		<ContextMenu.Trigger class="flex-1 overflow-y-auto block">
+			{#if fileTreeState.error}
+				<div class="m-2 rounded bg-destructive/10 p-2 text-xs text-destructive">
+					{fileTreeState.error}
+				</div>
+			{/if}
 
-		{#if fileTreeState.loading && fileTreeState.treeNodes.length === 0}
-			<div class="flex items-center justify-center py-8">
-				<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
-			</div>
-		{:else if fileTreeState.treeNodes.length === 0}
-			<div class="py-8 text-center text-xs text-muted-foreground">{m.label_file_tree_empty()}</div>
-		{:else}
-			<div class="p-1">
-				{#each fileTreeState.treeNodes as node (node.path)}
-					{@render treeNodeItem(node)}
-				{/each}
-			</div>
-		{/if}
-	</div>
+			{#if fileTreeState.loading && fileTreeState.treeNodes.length === 0}
+				<div class="flex items-center justify-center py-8">
+					<Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
+				</div>
+			{:else if fileTreeState.treeNodes.length === 0}
+				<div class="py-8 text-center text-xs text-muted-foreground">
+					{m.label_file_tree_empty()}
+				</div>
+			{:else}
+				<div class="p-1">
+					{#each fileTreeState.treeNodes as node (node.path)}
+						{@render treeNodeItem(node)}
+					{/each}
+				</div>
+			{/if}
+		</ContextMenu.Trigger>
+		{@render emptyAreaContextMenu()}
+	</ContextMenu.Root>
 
 	<!-- Rename Dialog -->
 	<Dialog.Root

@@ -296,9 +296,14 @@
 			deployment.deploymentId = info?.deploymentId ?? null;
 
 			if (savedPath) {
-				const storage = await agentPreviewState.loadFromStorage(sandboxId, sessionId);
-				const file = storage?.fileList?.find((f) => f.path === savedPath);
-				if (file) await handleFileSelect(file);
+				// Skip if the file is already selected and loaded (avoid unnecessary re-fetch)
+				if (fileViewer.selectedFile?.path === savedPath && !fileViewer.isLoading) {
+					// File is already selected, no need to reload
+				} else {
+					const storage = await agentPreviewState.loadFromStorage(sandboxId, sessionId);
+					const file = storage?.fileList?.find((f) => f.path === savedPath);
+					if (file) await handleFileSelect(file);
+				}
 			}
 
 			// Mark as restored only after successful completion
