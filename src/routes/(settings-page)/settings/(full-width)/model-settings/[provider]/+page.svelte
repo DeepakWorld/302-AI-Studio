@@ -139,7 +139,14 @@
 		clearTimeout(saveTimeout);
 		await saveFormData();
 
-		await providerState.fetchModelsForProvider(currentProvider);
+		const success = await providerState.fetchModelsForProvider(currentProvider);
+
+		// After successfully fetching models, apply default model if needed
+		// This ensures users don't have to manually select a model
+		if (success) {
+			await providerState.applyDefaultModelIfNeeded(currentProvider);
+		}
+
 		isLoadingModels = false;
 	}
 

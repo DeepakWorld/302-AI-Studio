@@ -15,7 +15,7 @@ export const persistedProviderState = new PersistedState<ModelProvider[]>(
 	true,
 	300,
 );
-export const persistedModelState = new PersistedState<Model[]>("app-models", [], true, 500);
+export const persistedModelState = new PersistedState<Model[]>("app-models", [], true);
 
 const { providerService } = window.electronAPI;
 
@@ -385,6 +385,75 @@ class ProviderState {
 		if (!provider) return false;
 
 		return await this.fetchModelsForProvider(provider);
+	}
+
+	/**
+	 * Apply a default model for the provider if user hasn't already set a preference
+	 * This is called both after SSO login and after manually adding API key
+	 * Ensures users don't have to manually select a model to start chatting
+	 *
+	 * @param provider - The provider to apply default model for
+	 */
+	async applyDefaultModelIfNeeded(provider: ModelProvider): Promise<void> {
+		// Check if user already has a model preference set
+		const hasExistingModelPreference =
+			preferencesSettings.newSessionModel !== null || sessionState.latestUsedModel !== null;
+
+		if (hasExistingModelPreference) {
+			console.log(
+				`[Provider] User already has model preference, skipping default model setup for ${provider.name}`,
+			);
+			return;
+		}
+
+		// Find the default model from the fetched models
+		const models = persistedModelState.current;
+		if (models.length === 0) {
+			console.log(
+				`[Provider] No models available for ${provider.name}, skipping default model setup`,
+			);
+			return;
+		}
+
+		// For 302.AI, try to find gemini-3-pro-preview as the preferred default model
+		const DEFAULT_MODEL_ID_302AI = "gemini-3-pro-preview";
+		let defaultModel =
+			provider.id === "302AI" ? models.find((m) => m.id === DEFAULT_MODEL_ID_302AI) : null;
+
+		// If preferred model not found, fall back to any featured model from this provider
+		if (!defaultModel) {
+			defaultModel = models.find((m) => m.providerId === provider.id && m.isFeatured);
+		}
+
+		// If still no model found, use the first available model from this provider
+		if (!defaultModel) {
+			defaultModel = models.find((m) => m.providerId === provider.id);
+		}
+
+		if (defaultModel) {
+			// Set as the default model for future new sessions
+			// Flush model state to storage and wait for completion before broadcasting
+			// This ensures other windows can read the latest models when they receive the event
+			await persistedModelState.flush();
+			preferencesSettings.setNewSessionModel(defaultModel);
+
+			// Broadcast to all chat tabs to apply the default model
+			// This handles the case where chat tabs are already open but don't have a model selected
+			try {
+				// Clone the model object to ensure it can be serialized for IPC
+				// The original object may be a Proxy from Svelte's reactivity system
+				const modelForBroadcast = JSON.parse(JSON.stringify(defaultModel));
+				await window.electronAPI.broadcastService.broadcastToAll("apply-default-model", {
+					model: modelForBroadcast,
+				});
+				console.log(`[Provider] Applied default model "${defaultModel.name}" for ${provider.name}`);
+			} catch (error) {
+				console.error(
+					`[Provider] Failed to broadcast apply-default-model event for ${provider.name}:`,
+					error,
+				);
+			}
+		}
 	}
 
 	/**

@@ -7,16 +7,8 @@ import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
-import { preferencesSettings } from "./preferences-settings.state.svelte";
-import { persistedModelState, providerState } from "./provider-state.svelte";
-import { sessionState } from "./session-state.svelte";
+import { providerState } from "./provider-state.svelte";
 import { userState } from "./user-state.svelte";
-
-/**
- * Default model ID to use for new users after initial login
- * This should be a popular, featured model that provides a good first experience
- */
-const DEFAULT_MODEL_ID = "gemini-3-pro-preview";
 
 class SsoStateManager {
 	isLoading = $state(false);
@@ -155,8 +147,12 @@ class SsoStateManager {
 				this.isSuccess = true;
 				toast.success(m.login_success());
 
-				// Set default model for first-time users (after models are fetched)
-				await this.setDefaultModelIfNeeded();
+				// Set default model for 302AI provider if needed
+				// This uses the shared logic with manual API key addition
+				const provider302AI = providerState.getProvider("302AI");
+				if (provider302AI) {
+					await providerState.applyDefaultModelIfNeeded(provider302AI);
+				}
 
 				// Fetch and import MCP servers from 302.AI (silently, don't block login)
 				this.fetchAndImportMcpServers();
@@ -171,60 +167,6 @@ class SsoStateManager {
 			}
 		} finally {
 			this.isLoading = false;
-		}
-	}
-
-	/**
-	 * Set a default model for first-time users after initial login
-	 * This ensures users don't have to manually select a model to start chatting
-	 */
-	private async setDefaultModelIfNeeded() {
-		// Check if user already has a model preference set
-		const hasExistingModelPreference =
-			preferencesSettings.newSessionModel !== null || sessionState.latestUsedModel !== null;
-
-		if (hasExistingModelPreference) {
-			console.log("[SSO] User already has model preference, skipping default model setup");
-			return;
-		}
-
-		// Find the default model from the fetched models
-		const models = persistedModelState.current;
-		if (models.length === 0) {
-			console.log("[SSO] No models available, skipping default model setup");
-
-			return;
-		}
-
-		// Try to find the preferred default model
-		let defaultModel = models.find((m) => m.id === DEFAULT_MODEL_ID);
-
-		// If preferred model not found, fall back to any featured model
-		if (!defaultModel) {
-			defaultModel = models.find((m) => m.isFeatured);
-		}
-
-		// If still no model found, use the first available model
-		if (!defaultModel) {
-			defaultModel = models[0];
-		}
-
-		if (defaultModel) {
-			// Set as the default model for future new sessions
-			preferencesSettings.setNewSessionModel(defaultModel);
-
-			// Broadcast to all chat tabs to apply the default model
-			// This handles the case where chat tabs are already open but don't have a model selected
-			try {
-				// Clone the model object to ensure it can be serialized for IPC
-				// The original object may be a Proxy from Svelte's reactivity system
-				const modelForBroadcast = JSON.parse(JSON.stringify(defaultModel));
-				await window.electronAPI.broadcastService.broadcastToAll("apply-default-model", {
-					model: modelForBroadcast,
-				});
-			} catch (error) {
-				console.error("[SSO] Failed to broadcast apply-default-model event:", error);
-			}
 		}
 	}
 
