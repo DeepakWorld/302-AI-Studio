@@ -15,7 +15,6 @@
 	import { ChevronDown } from "@lucide/svelte";
 	import type { CodeAgentConfigMetadata, CodeAgentMetadata } from "@shared/storage/code-agent";
 	import { onMount } from "svelte";
-	import { SvelteMap } from "svelte/reactivity";
 	import RenameDialog from "./rename-dialog.svelte";
 	import ThreadDeleteDialog from "./thread-delete-dialog.svelte";
 	import ThreadItem from "./thread-item.svelte";
@@ -184,7 +183,7 @@
 	});
 
 	// Helper function to check if a thread has code agent enabled
-	const codeAgentInfoPromiseCache = new SvelteMap<
+	const codeAgentInfoPromiseCache = new Map<
 		string,
 		Promise<{
 			isCodeAgent: boolean;
