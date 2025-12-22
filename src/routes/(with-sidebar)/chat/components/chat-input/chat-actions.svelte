@@ -41,8 +41,8 @@
 			const sandboxId = codeAgentState.sandboxId;
 			if (sandboxId) {
 				addingMCP = true;
-				const serverUrls = mcpState.getServerUrlsByIds(selectedIds);
-				await addClaudeCodeSandboxMCP(sandboxId, serverUrls);
+				const infos = mcpState.getMCPInfosByIds(selectedIds);
+				await addClaudeCodeSandboxMCP(sandboxId, infos);
 				addingMCP = false;
 			}
 		}

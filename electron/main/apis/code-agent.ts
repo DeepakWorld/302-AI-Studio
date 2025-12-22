@@ -229,10 +229,10 @@ export type AddMcpSchema = typeof addMcpSchemaResponse.infer;
  */
 export async function addClaudeCodeSandboxMCP(
 	sandboxId: string,
-	mcpServerUrls: string[],
+	MCPInfos: { url: string; name: string }[],
 ): Promise<AddMcpSchema> {
-	const commands = mcpServerUrls.map(
-		(url) => `claude mcp add --transport http basic-mcp-server ${url}`,
+	const commands = MCPInfos.map(
+		(info) => `claude mcp add --transport http ${info.name} ${info.url}`,
 	);
 	try {
 		const response = await _302AIKy

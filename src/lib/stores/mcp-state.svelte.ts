@@ -136,6 +136,12 @@ class McpState {
 			.filter((url) => url !== null);
 	}
 
+	getMCPInfosByIds(ids: string[]): { url: string; name: string }[] {
+		return this.servers
+			.filter((server) => server.id && ids.includes(server.id))
+			.map((server) => ({ url: server.url, name: server.name }))
+			.filter((info): info is { url: string; name: string } => info.url !== null);
+	}
 	/**
 	 * Filter server IDs to only include streamableHTTP type servers
 	 * @param ids - Array of server IDs to filter

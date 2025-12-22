@@ -395,10 +395,10 @@ export class CodeAgentService {
 	async addClaudeCodeSandboxMCP(
 		_event: IpcMainInvokeEvent,
 		sandboxId: string,
-		mcpServerUrls: string[],
+		MCPInfos: { url: string; name: string }[],
 	): Promise<{ isOK: boolean }> {
 		try {
-			const result = await addClaudeCodeSandboxMCP(sandboxId, mcpServerUrls);
+			const result = await addClaudeCodeSandboxMCP(sandboxId, MCPInfos);
 			return { isOK: result.success };
 		} catch (error) {
 			console.error("Error adding Claude code sandbox MCP:", error);

@@ -26,10 +26,10 @@ class CodeAgentSendMessageButtonState {
 
 			// 在 sandbox 确定后，添加用户选择的 MCP 服务器
 			if (chatState.mcpServerIds.length > 0) {
-				const serverUrls = mcpState.getServerUrlsByIds(chatState.mcpServerIds);
-				if (serverUrls.length > 0) {
+				const infos = mcpState.getMCPInfosByIds(chatState.mcpServerIds);
+				if (infos.length > 0) {
 					try {
-						await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, serverUrls);
+						await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, infos);
 					} catch (error) {
 						console.error("Failed to add MCP servers:", error);
 					}

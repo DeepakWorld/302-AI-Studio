@@ -183,8 +183,8 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:findClaudeCodeSandboxWithValidDisk", (event, threadId) =>
 		codeAgentService.findClaudeCodeSandboxWithValidDisk(event, threadId),
 	);
-	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, mcpServerUrls) =>
-		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, mcpServerUrls),
+	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos) =>
+		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos),
 	);
 
 	// ghostWindowService service registration
