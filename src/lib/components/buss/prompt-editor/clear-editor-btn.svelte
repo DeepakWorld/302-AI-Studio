@@ -1,3 +1,9 @@
+<script lang="ts" module>
+	export interface Props {
+		reset?: () => void;
+	}
+</script>
+
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button";
 	import * as m from "$lib/paraglide/messages.js";
@@ -7,7 +13,14 @@
 
 	const editor = getEditor();
 
+	let { reset }: Props = $props();
+
 	function handleClear() {
+		if (reset) {
+			reset();
+			return;
+		}
+
 		editor.update(() => {
 			const root = getRoot();
 			root.clear();

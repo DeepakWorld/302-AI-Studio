@@ -52,7 +52,7 @@
 		/>
 	</div>
 
-	<div class="flex flex-1 flex-col gap-y-4 rounded-[10px] bg-background p-4 min-h-0">
+	<div class="flex flex-1 flex-col gap-y-2 rounded-[10px] bg-background p-4 min-h-0">
 		<SystemPromptEditor />
 		<!-- <UserPromptTemplateEditor /> -->
 	</div>

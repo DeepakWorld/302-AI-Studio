@@ -9,10 +9,16 @@ export const SystemPromptPresetType = type(
 export type SystemPromptPresetType = typeof SystemPromptPresetType.infer;
 
 export const ChatParameters = type({
+	// System Prompt
 	systemPromptVariables: ChatVariable.array(),
 	systemPromptMap: type({ "[string]": "string" }),
 	systemPromptContent: "string",
 	systemPromptPresetType: "string",
 	systemPromptRawJson: "string.json",
+	// User Prompt Template
+	userPromptTemplateVariables: ChatVariable.array(),
+	userPromptTemplateMap: type({ "[string]": "string" }),
+	userPromptTemplateContent: "string",
+	userPromptTemplateRawJson: "string.json",
 });
 export type ChatParameters = typeof ChatParameters.infer;

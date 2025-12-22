@@ -15,6 +15,7 @@
 	import { ChevronDown } from "@lucide/svelte";
 	import type { CodeAgentConfigMetadata, CodeAgentMetadata } from "@shared/storage/code-agent";
 	import { onMount } from "svelte";
+	import { SvelteMap } from "svelte/reactivity";
 	import RenameDialog from "./rename-dialog.svelte";
 	import ThreadDeleteDialog from "./thread-delete-dialog.svelte";
 	import ThreadItem from "./thread-item.svelte";
@@ -183,7 +184,7 @@
 	});
 
 	// Helper function to check if a thread has code agent enabled
-	const codeAgentInfoPromiseCache = new Map<
+	const codeAgentInfoPromiseCache = new SvelteMap<
 		string,
 		Promise<{
 			isCodeAgent: boolean;
@@ -253,7 +254,10 @@
 		const cached = codeAgentInfoPromiseCache.get(threadId);
 		if (cached) return cached;
 		const promise = isCodeAgentThread(threadId);
-		codeAgentInfoPromiseCache.set(threadId, promise);
+		// Cache the promise without triggering reactive updates in template context
+		Promise.resolve().then(() => {
+			codeAgentInfoPromiseCache.set(threadId, promise);
+		});
 		return promise;
 	}
 

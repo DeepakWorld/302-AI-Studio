@@ -76,11 +76,11 @@
 
 <PromptEditor
 	bind:value={chatParameters.systemPromptRawJson}
-	class="min-h-[300px]"
+	class="min-h-[250px]"
 	label={m.text_system_prompt()}
 	{right}
 	isSystemPrompt
 	onEditorReady={handleEditorReady}
 	canReset
-	onchange={(content, rawJson) => chatParameters.handleEditorChange(content, rawJson)}
+	onchange={(content, rawJson) => chatParameters.handleEditorChange(content, rawJson, true)}
 />

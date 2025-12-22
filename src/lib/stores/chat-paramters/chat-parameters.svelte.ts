@@ -22,6 +22,11 @@ const initialChatParameters: ChatParametersType = {
 	systemPromptContent: "",
 	systemPromptPresetType: "custom-type",
 	systemPromptRawJson: "",
+	userPromptTemplateVariables: ["input"],
+	userPromptTemplateMap: {},
+	userPromptTemplateContent: "{{#input#}}",
+	userPromptTemplateRawJson:
+		'{"root":{"children":[{"children":[{"type":"variable-value","version":1,"variable":"input"}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""}],"direction":null,"format":"","indent":0,"type":"root","version":1}}',
 };
 
 export const persistedChatParametersState = new PersistedState<ChatParametersType>(
@@ -30,11 +35,10 @@ export const persistedChatParametersState = new PersistedState<ChatParametersTyp
 );
 
 class ChatParameters {
-	// Editor reference for external updates (in-memory only)
-	systemPromptEditorRef = $state<LexicalEditor | null>(null);
-
-	// Temporary flag to distinguish preset selection from manual editing (in-memory only)
 	#isPresetUpdate = $state(false);
+
+	systemPromptEditorRef = $state<LexicalEditor | null>(null);
+	userPromptTemplateEditorRef = $state<LexicalEditor | null>(null);
 
 	systemPromptVariables = $derived.by(
 		() => persistedChatParametersState.current.systemPromptVariables,
@@ -42,89 +46,59 @@ class ChatParameters {
 	systemPromptMap = $derived.by(() => persistedChatParametersState.current.systemPromptMap);
 	systemPromptContent = $derived.by(() => persistedChatParametersState.current.systemPromptContent);
 	systemPromptPresetType = $derived.by(
-		() => persistedChatParametersState.current.systemPromptPresetType || "custom-type",
+		() => persistedChatParametersState.current.systemPromptPresetType,
 	);
 	systemPromptRawJson = $derived.by(() => persistedChatParametersState.current.systemPromptRawJson);
 
-	/**
-	 * Update the persistent state
-	 */
-	private updateState(partial: Partial<ChatParametersType>): void {
+	userPromptTemplateVariables = $derived.by(
+		() => persistedChatParametersState.current.userPromptTemplateVariables,
+	);
+	userPromptTemplateMap = $derived.by(
+		() => persistedChatParametersState.current.userPromptTemplateMap,
+	);
+	userPromptTemplateContent = $derived.by(
+		() => persistedChatParametersState.current.userPromptTemplateContent,
+	);
+	userPromptTemplateRawJson = $derived.by(
+		() => persistedChatParametersState.current.userPromptTemplateRawJson,
+	);
+
+	#updateState(partial: Partial<ChatParametersType>): void {
 		persistedChatParametersState.current = {
 			...persistedChatParametersState.current,
 			...partial,
 		};
 	}
 
-	/**
-	 * Set the editor reference
-	 */
 	setSystemPromptEditorRef(editor: LexicalEditor | null) {
 		this.systemPromptEditorRef = editor;
 	}
 
-	/**
-	 * Update system prompt raw JSON (editor state)
-	 */
-	updateSystemPromptRawJson(rawJson: string) {
-		this.updateState({ systemPromptRawJson: rawJson });
+	setUserPromptTemplateEditorRef(editor: LexicalEditor | null) {
+		this.userPromptTemplateEditorRef = editor;
 	}
 
-	/**
-	 * Update system prompt content and raw JSON together
-	 */
-	updateSystemPromptContent(content: string, rawJson?: string) {
-		const updates: Partial<ChatParametersType> = { systemPromptContent: content };
-		if (rawJson !== undefined) {
-			updates.systemPromptRawJson = rawJson;
-		}
-		this.updateState(updates);
-	}
-
-	/**
-	 * Update system prompt preset type
-	 */
-	updateSystemPromptPresetType(type: string) {
-		this.updateState({ systemPromptPresetType: type });
-	}
-
-	/**
-	 * Update system prompt map with new cached values
-	 * Merges new values with existing map
-	 */
 	updateSystemPromptMap(newValues: Record<string, string>) {
 		const currentMap = persistedChatParametersState.current.systemPromptMap;
-		this.updateState({
+		this.#updateState({
 			systemPromptMap: { ...currentMap, ...newValues },
 		});
 	}
 
-	/**
-	 * Clear system prompt map (reset cache)
-	 */
 	clearSystemPromptMap() {
-		this.updateState({ systemPromptMap: {} });
+		this.#updateState({ systemPromptMap: {} });
 	}
 
-	/**
-	 * Start a preset change - updates preset type and marks as preset update
-	 */
 	startPresetChange(type: string) {
-		// Set in-memory flag first (before editor triggers onchange)
 		this.#isPresetUpdate = true;
-		// Then persist the preset type
-		this.updateState({ systemPromptPresetType: type });
+		this.#updateState({ systemPromptPresetType: type });
 	}
 
-	/**
-	 * Extract variables from rawJson (Lexical editor state)
-	 */
 	private extractVariablesFromRawJson(rawJson: string): ChatVariable[] {
 		try {
 			const parsed = JSON.parse(rawJson);
 			const variables: ChatVariable[] = [];
 
-			// Recursively find all variable-value nodes
 			const findVariables = (node: unknown) => {
 				if (!node || typeof node !== "object") return;
 
@@ -151,41 +125,35 @@ class ChatParameters {
 		}
 	}
 
-	/**
-	 * Handle editor content change
-	 * If the change is from a preset selection, consume the flag
-	 * Otherwise, switch to "custom-type" if not already
-	 * Also resets systemPromptMap to clear frozen variable values
-	 */
-	handleEditorChange(content: string, rawJson: string) {
-		const updates: Partial<ChatParametersType> = {
-			systemPromptContent: content,
-			systemPromptRawJson: rawJson,
-			systemPromptVariables: this.extractVariablesFromRawJson(rawJson),
-			// Reset cached variable map when content changes
-			systemPromptMap: {},
-		};
+	handleEditorChange(content: string, rawJson: string, isSystemPrompt: boolean) {
+		let updates: Partial<ChatParametersType> = {};
 
-		if (this.#isPresetUpdate) {
-			// Consume the in-memory flag
-			this.#isPresetUpdate = false;
-		} else {
-			// User manually edited, switch to custom
-			if (this.systemPromptPresetType !== "custom-type") {
-				updates.systemPromptPresetType = "custom-type";
+		if (isSystemPrompt) {
+			updates = {
+				systemPromptContent: content,
+				systemPromptRawJson: rawJson,
+				systemPromptVariables: this.extractVariablesFromRawJson(rawJson),
+				// Reset cached variable map when content changes
+				systemPromptMap: {},
+			};
+
+			if (this.#isPresetUpdate) {
+				this.#isPresetUpdate = false;
+			} else {
+				if (this.systemPromptPresetType !== "custom-type") {
+					updates.systemPromptPresetType = "custom-type";
+				}
 			}
+		} else {
+			updates = {
+				userPromptTemplateContent: content,
+				userPromptTemplateRawJson: rawJson,
+				userPromptTemplateVariables: this.extractVariablesFromRawJson(rawJson),
+				userPromptTemplateMap: {},
+			};
 		}
 
-		// Single unified write to avoid concurrent writes corrupting the file
-		this.updateState(updates);
-	}
-
-	/**
-	 * Reset system prompt state to defaults
-	 */
-	resetSystemPrompt() {
-		this.#isPresetUpdate = false;
-		this.updateState({ systemPromptPresetType: "custom-type" });
+		this.#updateState(updates);
 	}
 }
 

@@ -1,6 +1,8 @@
 import {
 	$applyNodeReplacement,
 	DecoratorNode,
+	type DOMConversionMap,
+	type DOMConversionOutput,
 	type DOMExportOutput,
 	type LexicalEditor,
 	type LexicalNode,
@@ -63,6 +65,27 @@ export class VariableValueNode extends DecoratorNode<DecoratorResult> {
 		const element = document.createElement("span");
 		element.textContent = `{{#${this.__variable}#}}`;
 		return { element };
+	}
+
+	static importDOM(): DOMConversionMap | null {
+		return {
+			span: (domNode: Node) => {
+				if (!(domNode instanceof HTMLSpanElement)) return null;
+				const text = domNode.textContent ?? "";
+				const match = /^\{\{#([^#}]+)#\}\}$/.exec(text.trim());
+				if (!match) return null;
+
+				return {
+					conversion: () => {
+						const output: DOMConversionOutput = {
+							node: $createVariableValueNode(match[1]),
+						};
+						return output;
+					},
+					priority: 2,
+				};
+			},
+		};
 	}
 
 	exportJSON(): SerializedVariableValueNode {

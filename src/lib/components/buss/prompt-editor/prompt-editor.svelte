@@ -23,6 +23,7 @@
 		wrapperClass?: string;
 		class?: string;
 		canReset?: boolean;
+		onReset?: () => void;
 		onchange?: (content: string, rawJson: string) => void;
 		onEditorReady?: (editor: LexicalEditor) => void;
 		onFocus?: () => void;
@@ -38,6 +39,7 @@
 		wrapperClass = "",
 		class: className = "",
 		canReset = false,
+		onReset,
 		onchange,
 		onEditorReady,
 		onFocus,
@@ -56,6 +58,7 @@
 			CustomTextNode,
 			{
 				replace: TextNode,
+				withKlass: CustomTextNode,
 				with: (node: TextNode) => new CustomTextNode(node.__text),
 			},
 		],
@@ -123,19 +126,19 @@
 </script>
 
 <Composer {initialConfig} bind:this={composer}>
-	<div class="flex flex-col">
-		<div class="flex items-center justify-between gap-2">
+	<div class="flex flex-col justify-center">
+		<div class="flex items-center justify-between h-9">
 			{#if tips}
 				<LabelWithTips {label} {tips} tooltipPlacement="right" />
 			{:else}
 				<Label class="text-label-fg">{label}</Label>
 			{/if}
-			<div class="flex flex-row gap-x-2">
+			<div class="flex flex-row gap-x-2 items-center justify-between">
 				{#if right}
 					{@render right()}
 				{/if}
 				{#if canReset}
-					<ClearEditorBtn />
+					<ClearEditorBtn reset={onReset} />
 				{/if}
 			</div>
 		</div>
