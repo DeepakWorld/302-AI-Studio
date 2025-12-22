@@ -15,6 +15,7 @@
 	import { ChevronDown } from "@lucide/svelte";
 	import type { CodeAgentConfigMetadata, CodeAgentMetadata } from "@shared/storage/code-agent";
 	import { onMount } from "svelte";
+	import { SvelteMap } from "svelte/reactivity";
 	import RenameDialog from "./rename-dialog.svelte";
 	import ThreadDeleteDialog from "./thread-delete-dialog.svelte";
 	import ThreadItem from "./thread-item.svelte";
@@ -177,10 +178,21 @@
 			);
 		});
 
+		console.log("Grouped threads:", groups);
+
 		return groups;
 	});
 
 	// Helper function to check if a thread has code agent enabled
+	const codeAgentInfoPromiseCache = new SvelteMap<
+		string,
+		Promise<{
+			isCodeAgent: boolean;
+			sandboxId?: string;
+			sessionId?: string;
+		}>
+	>();
+
 	async function isCodeAgentThread(threadId: string): Promise<{
 		isCodeAgent: boolean;
 		sandboxId?: string;
@@ -236,6 +248,14 @@
 		}
 
 		return { isCodeAgent: false };
+	}
+
+	function getCodeAgentInfo(threadId: string) {
+		const cached = codeAgentInfoPromiseCache.get(threadId);
+		if (cached) return cached;
+		const promise = isCodeAgentThread(threadId);
+		codeAgentInfoPromiseCache.set(threadId, promise);
+		return promise;
 	}
 
 	async function handleThreadClick(threadId: string) {
@@ -390,7 +410,7 @@
 					{#await filteredThreadList then threads}
 						{#each threads as threadData (threadData.threadId)}
 							{@const { threadId, thread, isFavorite } = threadData}
-							{#await isCodeAgentThread(threadId) then agentInfo}
+							{#await getCodeAgentInfo(threadId) then agentInfo}
 								<ThreadItem
 									{threadId}
 									{thread}
@@ -429,7 +449,7 @@
 								<Collapsible.Content class="flex flex-col gap-y-1">
 									{#each group as threadData (threadData.threadId)}
 										{@const { threadId, thread, isFavorite } = threadData}
-										{#await isCodeAgentThread(threadId) then agentInfo}
+										{#await getCodeAgentInfo(threadId) then agentInfo}
 											<ThreadItem
 												{threadId}
 												{thread}
