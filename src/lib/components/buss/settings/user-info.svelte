@@ -126,38 +126,11 @@
 		</div>
 	</div>
 
-	<!-- Account Details Section -->
-	<div class="gap-settings-gap flex flex-col">
-		<Label class="text-label-fg font-normal">{m.settings_account_details()}</Label>
+	<!-- Account Details Section - only show if there's content -->
+	{#if userState.userInfo.invite_code}
+		<div class="gap-settings-gap flex flex-col">
+			<Label class="text-label-fg font-normal">{m.settings_account_details()}</Label>
 
-		{#snippet apiKeyAction()}
-			{@const displayApiKey = userState.ssoApiKey || userState.userInfo?.api_key}
-			{#if displayApiKey}
-				<div class="flex items-center gap-2">
-					<code class="bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-semibold text-sm">
-						{displayApiKey.slice(0, 8)}...
-					</code>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						onclick={() => copyToClipboard(displayApiKey, "api_key")}
-						class="relative"
-					>
-						{#each [{ Icon: Check, visible: copiedField === "api_key", id: "check" }, { Icon: Copy, visible: copiedField !== "api_key", id: "copy" }] as { Icon, visible, id } (id)}
-							<Icon
-								class={cn(
-									"absolute inset-0 m-auto size-4 transition-all duration-200 ease-in-out",
-									visible ? "scale-100 opacity-100" : "scale-0 opacity-0",
-								)}
-							/>
-						{/each}
-					</Button>
-				</div>
-			{/if}
-		{/snippet}
-		<SettingInfoItem label={m.settings_api_key()} action={apiKeyAction} />
-
-		{#if userState.userInfo.invite_code}
 			{#snippet inviteCodeAction()}
 				{#if userState.userInfo}
 					<div class="flex items-center gap-2">
@@ -185,8 +158,8 @@
 				{/if}
 			{/snippet}
 			<SettingInfoItem label={m.settings_invite_code()} action={inviteCodeAction} />
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	<!-- Balance Section -->
 	<div class="gap-settings-gap flex flex-col">

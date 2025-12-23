@@ -493,19 +493,19 @@
 			</ContextMenu.Item>
 
 			<!-- Delete -->
-			{#if !isDir}
-				<ContextMenu.Separator />
-				<ContextMenu.Item
-					onSelect={() => handleDelete(node)}
-					disabled={isOperating || fileTreeState.isStreaming}
-					class="text-destructive focus:text-destructive"
-				>
-					{#if isOperating}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-					{:else}{/if}
-					<span>{m.text_button_delete()}</span>
-				</ContextMenu.Item>
-			{/if}
+			<!-- {#if !isDir} -->
+			<ContextMenu.Separator />
+			<ContextMenu.Item
+				onSelect={() => handleDelete(node)}
+				disabled={isOperating || fileTreeState.isStreaming}
+				class="text-destructive focus:text-destructive"
+			>
+				{#if isOperating}
+					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+				{:else}{/if}
+				<span>{m.text_button_delete()}</span>
+			</ContextMenu.Item>
+			<!-- {/if} -->
 		</ContextMenu.Content>
 	{/if}
 {/snippet}
