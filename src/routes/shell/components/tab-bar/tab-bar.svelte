@@ -397,7 +397,7 @@
 			"gap-tab-gap px-tabbar-x flex min-w-0 items-center overflow-x-hidden w-[calc(env(titlebar-area-width,100%)-10px)] relative",
 			isMac &&
 				"transition-[padding-left] duration-200 ease-in-out" &&
-				(isMaximized ? "pl-[10px]" : "pl-[75px]"),
+				(isMaximized ? "pl-[10px]" : "pl-[85px]"),
 			!isMac && "pr-[130px]",
 		)}
 		bind:this={groupEl}
