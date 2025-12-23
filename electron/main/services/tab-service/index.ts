@@ -11,7 +11,7 @@ import {
 	withLoadHandlers,
 } from "../../mixins/web-contents-mixins";
 import { TempStorage } from "../../utils/temp-storage";
-import { chatParametersStorage } from "../chat-parameters-service";
+import { chatParametersService } from "../chat-parameters-service";
 import { codeAgentService } from "../code-agent-service";
 import { shortcutService } from "../shortcut-service";
 import { storageService } from "../storage-service";
@@ -198,12 +198,12 @@ export class TabService {
 			await storageService.removeItemInternal("app-thread:" + tab.threadId);
 			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
 			await codeAgentService.removeCodeAgentState(tab.threadId);
-			await chatParametersStorage.removeChatParameters(tab.threadId);
+			await chatParametersService.removeChatParameters(tab.threadId);
 		} else if (messages?.length === 0) {
 			await storageService.removeItemInternal("app-thread:" + tab.threadId);
 			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
 			await codeAgentService.removeCodeAgentState(tab.threadId);
-			await chatParametersStorage.removeChatParameters(tab.threadId);
+			await chatParametersService.removeChatParameters(tab.threadId);
 		}
 	}
 

@@ -4,6 +4,7 @@
 	import ParametersInput from "./parameters-input.svelte";
 	import ParametersSlider from "./parameters-slider.svelte";
 	import SystemPromptEditor from "./system-prompt-editor.svelte";
+	import UserPromptTemplateEditor from "./user-prompt-template-editor.svelte";
 </script>
 
 <div class="flex w-4xl gap-4">
@@ -54,6 +55,6 @@
 
 	<div class="flex flex-1 flex-col gap-y-2 rounded-[10px] bg-background p-4 min-h-0">
 		<SystemPromptEditor />
-		<!-- <UserPromptTemplateEditor /> -->
+		<UserPromptTemplateEditor />
 	</div>
 </div>

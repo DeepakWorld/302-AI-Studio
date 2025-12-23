@@ -76,7 +76,7 @@
 
 <PromptEditor
 	bind:value={chatParameters.systemPromptRawJson}
-	class="min-h-[250px]"
+	class="min-h-[150px]"
 	label={m.text_system_prompt()}
 	{right}
 	isSystemPrompt

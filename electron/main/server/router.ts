@@ -6,7 +6,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { serve } from "@hono/node-server";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { McpServer } from "@shared/types";
+import type { ChatMessage, McpServer } from "@shared/types";
 import {
 	ToolLoopAgent as Agent,
 	convertToModelMessages,
@@ -21,6 +21,7 @@ import {
 import getPort from "get-port";
 import { Hono, type Context } from "hono";
 import { codeAgentService, ssoService } from "../services";
+import { chatParametersService } from "../services/chat-parameters-service";
 import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
@@ -179,6 +180,7 @@ app.post("/chat/302ai", async (c) => {
 		speedOptions,
 		language: _language,
 		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -204,6 +206,7 @@ app.post("/chat/302ai", async (c) => {
 		messages: UIMessage[];
 		language?: string;
 		systemPrompt?: string;
+		threadId: string;
 	}>();
 	console.log(
 		baseUrl,
@@ -219,6 +222,7 @@ app.post("/chat/302ai", async (c) => {
 		messages,
 		speedOptions,
 		systemPrompt,
+		threadId,
 	);
 
 	const provider302Options: Record<string, boolean | string> = {};
@@ -269,9 +273,38 @@ app.post("/chat/302ai", async (c) => {
 		}
 	}
 
+	let resolvedMessages = messages;
+	console.log(
+		"Resolving user prompt template variables for thread - before:",
+		JSON.stringify(resolvedMessages, null, 2),
+	);
+
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+			);
+
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
+	console.log(
+		"Resolving user prompt template variables for thread - after:",
+		JSON.stringify(resolvedMessages, null, 2),
+	);
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		providerOptions: {
 			"302": provider302Options,
 		},
@@ -332,7 +365,7 @@ app.post("/chat/302ai", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
@@ -379,6 +412,7 @@ app.post("/chat/openai", async (c) => {
 		speedOptions,
 		language: _language,
 		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -397,6 +431,7 @@ app.post("/chat/openai", async (c) => {
 		messages: UIMessage[];
 		language?: string;
 		systemPrompt?: string;
+		threadId: string;
 	}>();
 
 	const openai = createOpenAI({
@@ -426,9 +461,30 @@ app.post("/chat/openai", async (c) => {
 		}
 	}
 
+	// Resolve user prompt template variables
+	let resolvedMessages = messages;
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			// Resolve previous user messages (using metadata)
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+			);
+			// Resolve last user message (using storage)
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
@@ -483,7 +539,7 @@ app.post("/chat/openai", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
@@ -519,6 +575,7 @@ app.post("/chat/anthropic", async (c) => {
 		speedOptions,
 		language: _language,
 		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -537,6 +594,7 @@ app.post("/chat/anthropic", async (c) => {
 		messages: UIMessage[];
 		language?: string;
 		systemPrompt?: string;
+		threadId: string;
 	}>();
 
 	const anthropic = createAnthropic({
@@ -566,9 +624,30 @@ app.post("/chat/anthropic", async (c) => {
 		}
 	}
 
+	// Resolve user prompt template variables
+	let resolvedMessages = messages;
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			// Resolve previous user messages (using metadata)
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+			);
+			// Resolve last user message (using storage)
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
@@ -623,7 +702,7 @@ app.post("/chat/anthropic", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
@@ -659,6 +738,7 @@ app.post("/chat/gemini", async (c) => {
 		speedOptions,
 		language: _language,
 		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -677,6 +757,7 @@ app.post("/chat/gemini", async (c) => {
 		messages: UIMessage[];
 		language?: string;
 		systemPrompt?: string;
+		threadId: string;
 	}>();
 
 	const google = createGoogleGenerativeAI({
@@ -706,9 +787,30 @@ app.post("/chat/gemini", async (c) => {
 		}
 	}
 
+	// Resolve user prompt template variables
+	let resolvedMessages = messages;
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			// Resolve previous user messages (using metadata)
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+			);
+			// Resolve last user message (using storage)
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
@@ -763,7 +865,7 @@ app.post("/chat/gemini", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertToModelMessages(enhanceMessagesWithFeedback(resolvedMessages)),
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,

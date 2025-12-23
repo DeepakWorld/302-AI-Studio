@@ -4,6 +4,7 @@ import type {
 	ChatVariable,
 } from "@shared/storage/chat-parameters";
 import type { LexicalEditor } from "lexical";
+import { SvelteSet } from "svelte/reactivity";
 
 // Get threadId from window.tab (same logic as chat-state.svelte.ts)
 const tab = window?.tab ?? null;
@@ -85,8 +86,19 @@ class ChatParameters {
 		});
 	}
 
+	updateUserPromptTemplateMap(newValues: Record<string, string>) {
+		const currentMap = persistedChatParametersState.current.userPromptTemplateMap;
+		this.#updateState({
+			userPromptTemplateMap: { ...currentMap, ...newValues },
+		});
+	}
+
 	clearSystemPromptMap() {
 		this.#updateState({ systemPromptMap: {} });
+	}
+
+	clearUserPromptTemplateMap() {
+		this.#updateState({ userPromptTemplateMap: {} });
 	}
 
 	startPresetChange(type: string) {
@@ -97,7 +109,7 @@ class ChatParameters {
 	private extractVariablesFromRawJson(rawJson: string): ChatVariable[] {
 		try {
 			const parsed = JSON.parse(rawJson);
-			const variables: ChatVariable[] = [];
+			const variableSet = new SvelteSet<ChatVariable>();
 
 			const findVariables = (node: unknown) => {
 				if (!node || typeof node !== "object") return;
@@ -108,7 +120,7 @@ class ChatParameters {
 					"variable" in node &&
 					typeof node.variable === "string"
 				) {
-					variables.push(node.variable as ChatVariable);
+					variableSet.add(node.variable as ChatVariable);
 				}
 
 				if ("children" in node && Array.isArray(node.children)) {
@@ -119,7 +131,7 @@ class ChatParameters {
 			};
 
 			findVariables(parsed.root);
-			return variables;
+			return Array.from(variableSet);
 		} catch {
 			return [];
 		}

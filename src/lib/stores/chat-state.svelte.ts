@@ -24,8 +24,9 @@ import { toast } from "svelte-sonner";
 
 import { updateSessionNote } from "$lib/api/sandbox-session";
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
-import { resolvePrompt } from "$lib/stores/chat-paramters/utils";
+
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
+import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { agentPreviewState } from "./agent-preview-state.svelte";
 import { codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
@@ -636,9 +637,6 @@ class ChatState {
 				await threadService.addThread(threadId);
 
 				await broadcastService.broadcastToAll("thread-list-updated", { threadId });
-
-				// this.inputValue = "";
-				// this.attachments = [];
 
 				this.resetChat();
 			} catch (error) {
@@ -1284,7 +1282,30 @@ export const chat = new Chat({
 	},
 	onFinish: async ({ messages, isAbort, isDisconnect, isError }) => {
 		console.log("更新完成", $state.snapshot(messages));
+		console.debug("[onFinish] messages", JSON.stringify($state.snapshot(messages), null, 2));
 		console.log("[onFinish] isAbort:", isAbort, "isDisconnect:", isDisconnect, "isError:", isError);
+
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			const updatedMessages = messages.map((msg) => {
+				if (msg.id === lastUserMessage.id) {
+					return {
+						...msg,
+						metadata: {
+							...msg.metadata,
+							userPromptTemplateContent: chatParameters.userPromptTemplateContent,
+							userPromptTemplateVariables: chatParameters.userPromptTemplateVariables,
+							userPromptTemplateMap: chatParameters.userPromptTemplateMap,
+						},
+					};
+				}
+				return msg;
+			});
+
+			// Update both messages array and persisted state
+			chat.messages = updatedMessages;
+			messages = updatedMessages;
+		}
 
 		const codeAgentEnabled = codeAgentState.enabled;
 		console.log("onFinish: async ({ messages }) pendingResultMetadata", pendingResultMetadata);

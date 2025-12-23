@@ -82,6 +82,22 @@ export interface ModelProvider {
  * ========================================================================= */
 
 /**
+ * Result metadata from 302.AI Claude Code
+ */
+export interface ResultMetadata {
+	type?: string;
+	subtype?: string;
+	is_error?: boolean;
+	duration_ms?: number;
+	duration_api_ms?: number;
+	num_turns?: number;
+	content?: string;
+	session_id?: string;
+	total_cost_usd?: number;
+	uuid?: string;
+}
+
+/**
  * Message metadata
  */
 export interface MessageMetadata {
@@ -97,6 +113,13 @@ export interface MessageMetadata {
 		textContent?: string;
 	}>;
 	fileContentPartIndex?: number;
+	feedback?: "like" | "dislike";
+	/** Result metadata from 302.AI Claude Code */
+	result?: ResultMetadata;
+	/** User Prompt Template related fields */
+	userPromptTemplateContent?: string;
+	userPromptTemplateVariables?: string[];
+	userPromptTemplateMap?: Record<string, string>;
 }
 
 /**
