@@ -269,9 +269,11 @@ app.post("/chat/302ai", async (c) => {
 		}
 	}
 
+	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		providerOptions: {
 			"302": provider302Options,
 		},
@@ -332,7 +334,7 @@ app.post("/chat/302ai", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
@@ -426,9 +428,11 @@ app.post("/chat/openai", async (c) => {
 		}
 	}
 
+	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
@@ -483,7 +487,7 @@ app.post("/chat/openai", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
@@ -566,9 +570,11 @@ app.post("/chat/anthropic", async (c) => {
 		}
 	}
 
+	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
@@ -623,7 +629,7 @@ app.post("/chat/anthropic", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
@@ -706,9 +712,11 @@ app.post("/chat/gemini", async (c) => {
 		}
 	}
 
+	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
@@ -763,7 +771,7 @@ app.post("/chat/gemini", async (c) => {
 	});
 
 	const result = await new Agent(agentConfig).stream({
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
@@ -921,10 +929,11 @@ app.post("/generate-suggestions", async (c) => {
 
 	try {
 		console.log("[Suggestions] Starting to generate suggestions...");
+		const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
 		const { text } = await generateText({
 			model: languageModel,
 			messages: [
-				...convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+				...convertedMessages,
 				{
 					role: "user",
 					content: getSuggestionsPrompt(language, count),
@@ -1003,9 +1012,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 	const claudeCodeFetch = createClaudeCodeFetch(messageId);
 
 	// Build request body for 302.AI Claude Code API
-	const lastAiSdkModelMessage = convertToModelMessages(enhanceMessagesWithFeedback(messages)).at(
-		-1,
-	);
+	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
+	const lastAiSdkModelMessage = convertedMessages.at(-1);
 	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(
 		lastAiSdkModelMessage ? [lastAiSdkModelMessage] : [],
 	);
