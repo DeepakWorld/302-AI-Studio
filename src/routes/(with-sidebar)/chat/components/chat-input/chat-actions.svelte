@@ -153,7 +153,8 @@
 		class={cn(
 			"h-9 px-2.5",
 			"hover:!bg-chat-action-hover group/code-agent",
-			codeAgentState.enabled && "!bg-chat-action-active hover:!bg-chat-action-active",
+			codeAgentState.enabled &&
+				"!bg-chat-action-active hover:!bg-chat-action-active border border-[#8E47F0] rounded-[10px]",
 		)}
 		tooltip={m.title_code_agent()}
 		onclick={() => handleCodeAgentClick()}
@@ -162,9 +163,15 @@
 	>
 		<div class="flex items-center">
 			<Bot class={cn("size-4", codeAgentState.enabled && "!text-chat-action-active-fg")} />
+			<div
+				class={cn(
+					"h-3.5 border-l border-[#D9D9D9] mx-1.5",
+					codeAgentState.enabled && "border-[rgba(142,71,240,0.4)]",
+				)}
+			></div>
 			<span
 				class={cn(
-					"transition-all duration-300 ease-in-out opacity-0 group-hover/code-agent:ml-2 group-hover/code-agent:opacity-100 max-w-0 group-hover/code-agent:max-w-[200px]",
+					"transition-all duration-300 ease-in-out opacity-100 max-w-[200px]",
 					codeAgentState.enabled && "!text-chat-action-active-fg",
 				)}
 			>
