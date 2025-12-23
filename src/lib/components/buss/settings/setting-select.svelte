@@ -6,10 +6,22 @@
 		extra?: string;
 	}
 
+	export interface GroupedSelectOption {
+		groupKey: string;
+		groupLabel: string;
+		items: SelectOption[];
+	}
+
+	export interface GroupedSelectData {
+		standalone?: SelectOption[];
+		groups: GroupedSelectOption[];
+	}
+
 	interface Props {
 		name: string;
 		value: string;
-		options: SelectOption[];
+		options?: SelectOption[];
+		groupedOptions?: GroupedSelectData;
 		placeholder?: string;
 		class?: string;
 		contentClass?: string;
@@ -30,6 +42,7 @@
 		name,
 		value = $bindable(),
 		options,
+		groupedOptions,
 		placeholder,
 		class: className,
 		contentClass,
@@ -37,8 +50,28 @@
 		onValueChange,
 	}: Props = $props();
 
+	// Compute all options for label lookup
+	const allOptions = $derived.by(() => {
+		if (groupedOptions) {
+			const standalone = groupedOptions.standalone || [];
+			const grouped = groupedOptions.groups.flatMap((g) => g.items);
+			return [...standalone, ...grouped];
+		}
+		return options || [];
+	});
+
+	// Check if we have any options
+	const hasOptions = $derived.by(() => {
+		if (groupedOptions) {
+			const standaloneCount = groupedOptions.standalone?.length || 0;
+			const groupedCount = groupedOptions.groups.reduce((acc, g) => acc + g.items.length, 0);
+			return standaloneCount + groupedCount > 0;
+		}
+		return (options?.length || 0) > 0;
+	});
+
 	function getLabel(val: string) {
-		return options.find((option) => option.value === val)?.label || val;
+		return allOptions.find((option) => option.value === val)?.label || val;
 	}
 
 	function formatExtra(extra?: string): string {
@@ -61,7 +94,7 @@
 		</span>
 	</Select.Trigger>
 	<Select.Content class={contentClass}>
-		{#if options.length === 0}
+		{#if !hasOptions}
 			<Empty.Root>
 				<Empty.Content>
 					<Empty.Description>
@@ -69,23 +102,43 @@
 					</Empty.Description>
 				</Empty.Content>
 			</Empty.Root>
-		{:else}
-			{#each options as option (option.key || option.value)}
-				{#if option.extra}
-					<Select.Item value={option.value} label={option.label} title={option.label}>
-						<span class="flex w-full items-center justify-between min-w-0">
-							<span class="truncate" title={option.label}>{option.label}</span>
-							<span class="ml-2 text-xs text-muted-foreground shrink-0"
-								>{formatExtra(option.extra)}</span
-							>
-						</span>
-					</Select.Item>
-				{:else}
-					<Select.Item value={option.value} label={option.label} title={option.label}>
-						<span class="truncate" title={option.label}>{option.label}</span>
-					</Select.Item>
+		{:else if groupedOptions}
+			<!-- Standalone items (e.g., "New Session") -->
+			{#if groupedOptions.standalone}
+				{#each groupedOptions.standalone as option (option.key || option.value)}
+					{@render selectItem(option)}
+				{/each}
+			{/if}
+			<!-- Grouped items -->
+			{#each groupedOptions.groups as group (group.groupKey)}
+				{#if group.items.length > 0}
+					<Select.Group>
+						<Select.GroupHeading>{group.groupLabel}</Select.GroupHeading>
+						{#each group.items as option (option.key || option.value)}
+							{@render selectItem(option)}
+						{/each}
+					</Select.Group>
 				{/if}
+			{/each}
+		{:else if options}
+			{#each options as option (option.key || option.value)}
+				{@render selectItem(option)}
 			{/each}
 		{/if}
 	</Select.Content>
 </Select.Root>
+
+{#snippet selectItem(option: SelectOption)}
+	{#if option.extra}
+		<Select.Item value={option.value} label={option.label} title={option.label}>
+			<span class="flex w-full items-center justify-between min-w-0">
+				<span class="truncate" title={option.label}>{option.label}</span>
+				<span class="ml-2 text-xs text-muted-foreground shrink-0">{formatExtra(option.extra)}</span>
+			</span>
+		</Select.Item>
+	{:else}
+		<Select.Item value={option.value} label={option.label} title={option.label}>
+			<span class="truncate" title={option.label}>{option.label}</span>
+		</Select.Item>
+	{/if}
+{/snippet}

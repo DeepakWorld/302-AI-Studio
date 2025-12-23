@@ -95,7 +95,7 @@
 		<SettingSelect
 			name="session"
 			value={claudeCodeAgentState.selectedSessionId}
-			options={claudeCodeSandboxState.sessions}
+			groupedOptions={claudeCodeSandboxState.groupedSessions}
 			placeholder={m.select_session_placeholder()}
 			{disabled}
 			contentClass="max-w-[600px]"
