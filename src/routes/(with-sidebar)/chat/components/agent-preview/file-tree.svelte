@@ -565,11 +565,16 @@
 		<button
 			type="button"
 			ondblclick={() => fileTreeState.navigateToParent()}
-			class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-muted transition-colors"
+			class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 			style="padding-left: 12px"
+			disabled={fileTreeState.isParentLoading}
 		>
 			<div class="flex items-center gap-1.5 flex-1 min-w-0">
-				<span class="h-3 w-3 flex-shrink-0"></span>
+				{#if fileTreeState.isParentLoading}
+					<Loader2 class="h-3 w-3 flex-shrink-0 animate-spin text-muted-foreground" />
+				{:else}
+					<span class="h-3 w-3 flex-shrink-0"></span>
+				{/if}
 				<FolderUp class="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
 				<span class="truncate text-xs font-medium text-muted-foreground">..</span>
 			</div>
@@ -580,8 +585,9 @@
 				<button
 					type="button"
 					ondblclick={() => fileTreeState.navigateToFolder(node.path)}
-					class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-muted transition-colors"
+					class="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					style="padding-left: {node.depth * 20 + 12}px"
+					disabled={fileTreeState.loadingDirs.has(node.path)}
 				>
 					<div class="flex items-center gap-1.5 flex-1 min-w-0">
 						{#if fileTreeState.loadingDirs.has(node.path)}

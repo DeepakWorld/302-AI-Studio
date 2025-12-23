@@ -37,22 +37,27 @@ interface TreeCache {
  * Path utility functions
  */
 const pathUtils = {
-	getParentDir: (path: string): string => path.substring(0, path.lastIndexOf("/")),
+	getParentDir: (path: string): string => {
+		const lastSlashIndex = path.lastIndexOf("/");
+		// If path is "/something" (only one slash at start), parent is "/"
+		if (lastSlashIndex <= 0) {
+			return "/";
+		}
+		return path.substring(0, lastSlashIndex);
+	},
 	getFileName: (path: string): string => path.split("/").pop() || "file",
 	join: (...parts: string[]): string => parts.filter(Boolean).join("/"),
 	normalize: (path: string): string => (path.startsWith("/") ? path : `/${path}`),
 };
 
 /**
- * Check if the given path is at the root level
+ * Check if the given path is at the system root level
  * @param path - The current directory path
- * @param rootPath - The root/workspace path
- * @returns true if path equals rootPath or is "/"
+ * @returns true if path is "/" or empty (system root)
  */
-export function isAtRoot(path: string, rootPath: string): boolean {
+export function isAtSystemRoot(path: string): boolean {
 	const normalizedPath = path.endsWith("/") ? path.slice(0, -1) : path;
-	const normalizedRoot = rootPath.endsWith("/") ? rootPath.slice(0, -1) : rootPath;
-	return normalizedPath === normalizedRoot || normalizedPath === "" || normalizedPath === "/";
+	return normalizedPath === "" || normalizedPath === "/";
 }
 
 /**
@@ -109,6 +114,12 @@ export class FileTreeState {
 	// Computed root path - uses workspacePath if set, otherwise falls back to DEFAULT_WORKSPACE_PATH
 	get rootPath(): string {
 		return this.workspacePath || DEFAULT_WORKSPACE_PATH;
+	}
+
+	// Check if parent directory is currently loading (for ".." loading indicator)
+	get isParentLoading(): boolean {
+		const parentPath = pathUtils.getParentDir(this.currentDirectory);
+		return this.loadingDirs.has(parentPath);
 	}
 
 	constructor(sandboxId: string, workspacePath?: string) {
@@ -181,9 +192,13 @@ export class FileTreeState {
 	 */
 	buildTreeStructure(fileList: SandboxFileInfo[]): TreeNode[] {
 		// Filter files to only include direct children of currentDirectory
-		const normalizedCurrentDir = this.currentDirectory.endsWith("/")
+		// Special case: "/" should stay as "/" not become ""
+		let normalizedCurrentDir = this.currentDirectory.endsWith("/")
 			? this.currentDirectory.slice(0, -1)
 			: this.currentDirectory;
+		if (normalizedCurrentDir === "") {
+			normalizedCurrentDir = "/";
+		}
 
 		const directChildren = fileList.filter((file) => {
 			const parentDir = pathUtils.getParentDir(file.path);
@@ -207,8 +222,8 @@ export class FileTreeState {
 			isExpanded: false, // Not used in flat view
 		}));
 
-		// Prepend parent entry (".." ) when not at root
-		if (!isAtRoot(this.currentDirectory, this.rootPath)) {
+		// Prepend parent entry (".." ) when not at system root
+		if (!isAtSystemRoot(this.currentDirectory)) {
 			flatNodes.unshift(createParentEntry());
 		}
 
@@ -450,12 +465,12 @@ export class FileTreeState {
 	}
 
 	/**
-	 * Refresh file tree (reset and reload from root)
+	 * Refresh file tree (reload current directory)
 	 */
 	async refreshFileTree(): Promise<void> {
 		this.loadedDirs = new SvelteSet();
 		this.treeNodesCache = null;
-		await this.loadFiles(this.rootPath, false, true);
+		await this.loadFiles(this.currentDirectory, false, true);
 	}
 
 	/**
@@ -467,13 +482,13 @@ export class FileTreeState {
 			return;
 		}
 
-		// Set the current directory to the target folder
-		this.currentDirectory = folderPath;
-
-		// Load folder contents if not already cached
+		// Load folder contents first if not already cached (show loading on folder item)
 		if (!this.loadedDirs.has(folderPath)) {
 			await this.loadFiles(folderPath, true);
 		}
+
+		// After loading completes, set the current directory to the target folder
+		this.currentDirectory = folderPath;
 
 		// Rebuild tree to show the new directory contents
 		this.rebuildTree();
@@ -484,11 +499,11 @@ export class FileTreeState {
 
 	/**
 	 * Navigate to parent directory
-	 * Computes parent path and navigates to it, guarding against root boundary
+	 * Computes parent path and navigates to it, guarding against system root boundary
 	 */
 	async navigateToParent(): Promise<void> {
-		// Guard against navigating above root
-		if (this.currentDirectory === this.rootPath || this.currentDirectory === "/") {
+		// Guard against navigating above system root
+		if (this.currentDirectory === "/" || this.currentDirectory === "") {
 			return;
 		}
 
