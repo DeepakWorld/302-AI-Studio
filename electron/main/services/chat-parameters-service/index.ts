@@ -21,9 +21,16 @@ class ChatParametersService {
 	async resolvePrevUserMsgsByUserPromptTemp(
 		threadId: string,
 		modelId: string,
+		excludeLastUserMessageId?: string,
 	): Promise<ChatMessage[]> {
 		const previousMessages = await chatMessagesService.getMessagesByThreadId(threadId);
-		const resolvedMessages = previousMessages.map((message) => {
+
+		// Filter out the message to exclude (for regenerate case) before processing
+		const messagesToProcess = excludeLastUserMessageId
+			? previousMessages.filter((msg) => msg.id !== excludeLastUserMessageId)
+			: previousMessages;
+
+		const resolvedMessages = messagesToProcess.map((message) => {
 			if (message.role !== "user") return message;
 			if (!message.metadata) return message;
 			const { userPromptTemplateVariables, userPromptTemplateContent, userPromptTemplateMap } =
@@ -70,7 +77,7 @@ class ChatParametersService {
 		modelId: string,
 	): Promise<ChatMessage> {
 		// Get user prompt template from storage
-		const { variables, content, map } = await chatParametersStorage.getUserPromptTemplate(threadId);
+		const { variables, content } = await chatParametersStorage.getUserPromptTemplate(threadId);
 
 		// Check if template contains input variable
 		if (!variables.includes(DETECTOR_VARIABLE)) {
@@ -86,7 +93,7 @@ class ChatParametersService {
 		const inputValue = candidateTextPart.text;
 
 		// Override cached map input with current input to avoid using stale value
-		const currentMap = { ...map, input: inputValue };
+		const currentMap = { input: inputValue };
 
 		// Resolve variables in template
 		const { content: resolvedText, updatedMap } = resolvePrompt(content, {
@@ -96,13 +103,10 @@ class ChatParametersService {
 			variables: variables as ChatVariable[],
 		});
 
-		// Update storage with newly computed variable values (including input)
-		if (Object.keys(updatedMap).length > 0) {
-			await chatParametersStorage.updateUserPromptTemplateMap(threadId, {
-				...updatedMap,
-				input: inputValue, // Always update input to current value
-			});
-		}
+		await chatParametersStorage.updateUserPromptTemplateMap(threadId, {
+			...updatedMap,
+			input: inputValue, // Always update input to current value
+		});
 
 		// Create new message with resolved text
 		const resolvedParts = [

@@ -286,6 +286,7 @@ app.post("/chat/302ai", async (c) => {
 			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
 				threadId,
 				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
 			);
 
 			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
@@ -471,6 +472,7 @@ app.post("/chat/openai", async (c) => {
 			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
 				threadId,
 				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
 			);
 			// Resolve last user message (using storage)
 			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
@@ -634,6 +636,7 @@ app.post("/chat/anthropic", async (c) => {
 			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
 				threadId,
 				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
 			);
 			// Resolve last user message (using storage)
 			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
@@ -797,6 +800,7 @@ app.post("/chat/gemini", async (c) => {
 			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
 				threadId,
 				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
 			);
 			// Resolve last user message (using storage)
 			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
