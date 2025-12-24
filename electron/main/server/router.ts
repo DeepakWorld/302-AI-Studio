@@ -1092,30 +1092,11 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		messages,
 		threadId,
 		sessionId,
-		systemPrompt,
-		mcpServers,
-		sandboxName,
 	} = await c.req.json<RouterRequestBody>();
 
-	const cfg = {
-		llm_model: model,
-		system_prompt: systemPrompt,
-		mcp_servers: mcpServers,
-		sandbox_name: sandboxName,
-	};
-	const { sandboxId, createdResult } = await codeAgentService.createClaudeCodeSandbox(
-		threadId,
-		cfg,
-	);
+	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
 
-	console.log(
-		"[302ai-code-agent] Received request",
-		baseUrl,
-		sandboxId,
-		threadId,
-		sessionId,
-		createdResult,
-	);
+	console.log("[302ai-code-agent] Received request", baseUrl, sandboxId, threadId, sessionId);
 
 	// Generate messageId upfront for immediate start event
 	const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
