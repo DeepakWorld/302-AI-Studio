@@ -33,7 +33,7 @@
 		{
 			name: "agent-settings",
 			path: "/settings/agent-settings",
-			labelKey: "Agent",
+			labelKey: m.title_code_agent(),
 		},
 		{
 			name: "mcp-settings",
