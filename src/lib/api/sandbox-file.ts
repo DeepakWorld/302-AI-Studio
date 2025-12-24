@@ -17,6 +17,13 @@ export interface SandboxFileListResponse {
 }
 
 export interface SandboxFileDownloadResponse {
+	success?: boolean;
+	error?: {
+		message?: string;
+		type?: string;
+		param?: string | null;
+		code?: string;
+	};
 	result: Array<{
 		path: string;
 		path_type: string;
@@ -62,6 +69,42 @@ export async function listSandboxFiles(
 }
 
 /**
+ * 构建直接内容响应
+ */
+function buildDirectContentResponse(
+	path: string | string[],
+	content: string | Blob,
+	contentType: string | null,
+): SandboxFileDownloadResponse {
+	const filePath = typeof path === "string" ? path : path[0];
+	const isBlob = content instanceof Blob;
+	return {
+		result: [
+			{
+				path: filePath,
+				path_type: "file",
+				file_list: [{ upload_url: "", sandbox_path: filePath }],
+			},
+		],
+		...(isBlob
+			? { _blobContent: content, _contentType: contentType || "application/octet-stream" }
+			: { _directContent: content as string, _contentType: contentType ?? undefined }),
+	};
+}
+
+/**
+ * 解析错误信息
+ */
+function parseErrorMessage(text: string, fallback: string): string {
+	try {
+		const json = JSON.parse(text);
+		return json.error?.message || fallback;
+	} catch {
+		return fallback;
+	}
+}
+
+/**
  * 下载沙盒文件内容
  */
 export async function downloadSandboxFile(
@@ -76,99 +119,48 @@ export async function downloadSandboxFile(
 			"Content-Type": "application/json",
 			Authorization: `Bearer ${apiKey}`,
 		},
-		body: JSON.stringify({
-			sandbox_id: sandboxId,
-			path,
-		}),
+		body: JSON.stringify({ sandbox_id: sandboxId, path }),
 	});
 
+	// 处理 HTTP 错误
 	if (!response.ok) {
 		const errorText = await response.text();
-		console.error("[downloadSandboxFile] Error response:", errorText);
-		throw new Error(`Failed to download file: ${response.statusText}`);
+		throw new Error(
+			parseErrorMessage(errorText, `Failed to download file: ${response.statusText}`),
+		);
 	}
 
 	const contentType = response.headers.get("content-type");
-	console.log("[downloadSandboxFile] Content-Type:", contentType);
 
-	// 如果是 JSON，尝试解析
-	if (contentType && contentType.includes("application/json")) {
-		// 克隆 response 以防需要回退到 blob（虽然 text() 也会消耗流，但这里逻辑是互斥的）
-		const text = await response.text();
-		try {
-			const jsonData = JSON.parse(text);
-			console.log("[downloadSandboxFile] Parsed JSON response:", jsonData);
+	// 非 JSON 内容，直接返回 Blob
+	if (!contentType?.includes("application/json")) {
+		return buildDirectContentResponse(path, await response.blob(), contentType);
+	}
 
-			// 验证返回的数据结构（标准的 API 响应格式）
-			if (jsonData.result && Array.isArray(jsonData.result)) {
-				return jsonData;
-			} else {
-				// 如果结构不对，可能是 API 直接返回了文件内容（JSON 格式的文件，如 package.json）
-				console.log("[downloadSandboxFile] API returned file content directly (JSON format)");
-				return {
-					result: [
-						{
-							path: typeof path === "string" ? path : path[0],
-							path_type: "file",
-							file_list: [
-								{
-									upload_url: "",
-									sandbox_path: typeof path === "string" ? path : path[0],
-								},
-							],
-						},
-					],
-					_directContent: text,
-					_contentType: contentType,
-				};
-			}
-		} catch (e) {
-			console.warn(
-				"[downloadSandboxFile] Failed to parse JSON response, treating as file content:",
-				e,
-			);
-			// 如果 JSON 解析失败，我们已经读取了 text，所以只能用 text 返回
-			// 注意：如果二进制数据被 text() 读取，可能会损坏。
-			// 但前提是 Content-Type 是 application/json，所以理论上不应该是二进制。
-			return {
-				result: [
-					{
-						path: typeof path === "string" ? path : path[0],
-						path_type: "file",
-						file_list: [
-							{
-								upload_url: "",
-								sandbox_path: typeof path === "string" ? path : path[0],
-							},
-						],
-					},
-				],
-				_directContent: text,
-				_contentType: contentType,
-			};
+	// JSON 内容处理
+	const text = await response.text();
+	let jsonData: unknown;
+	try {
+		jsonData = JSON.parse(text);
+	} catch {
+		return buildDirectContentResponse(path, text, contentType);
+	}
+
+	// 检查错误响应
+	if (typeof jsonData === "object" && jsonData !== null) {
+		const data = jsonData as Record<string, unknown>;
+		if (data.success === false || data.error) {
+			const error = data.error as { message?: string } | undefined;
+			throw new Error(error?.message || "Download failed");
+		}
+		// 标准 API 响应
+		if (Array.isArray(data.result)) {
+			return jsonData as SandboxFileDownloadResponse;
 		}
 	}
 
-	// 对于非 JSON 内容，作为 Blob 读取
-	const blob = await response.blob();
-	console.log("[downloadSandboxFile] Received blob content, size:", blob.size);
-
-	return {
-		result: [
-			{
-				path: typeof path === "string" ? path : path[0],
-				path_type: "file",
-				file_list: [
-					{
-						upload_url: "",
-						sandbox_path: typeof path === "string" ? path : path[0],
-					},
-				],
-			},
-		],
-		_blobContent: blob,
-		_contentType: contentType || "application/octet-stream",
-	};
+	// JSON 文件内容（如 package.json）
+	return buildDirectContentResponse(path, text, contentType);
 }
 
 /**
