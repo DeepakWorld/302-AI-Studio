@@ -659,7 +659,7 @@
 		// In agent mode, if we have a deployment URL, create a new tab with iframe
 		if (isAgentMode && deployment.url && currentSandboxId && currentSessionId) {
 			// Create HTML content with iframe pointing to deployment URL
-			const htmlContent = `<iframe src="${deployment.url}" style="width: 100%; height: 100%; border: 0;" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals" referrerpolicy="no-referrer"></iframe>`;
+			const htmlContent = `<iframe src="${deployment.url}" style="width: 100%; height: 100%; border: 0;" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads" referrerpolicy="no-referrer"></iframe>`;
 
 			// Generate unique previewId based on sandboxId and sessionId
 			const previewId = `agent-preview-${currentSandboxId}-${currentSessionId}`;
@@ -848,7 +848,7 @@
 													class="w-full h-full border-0 {deviceMode === DEVICE_MODE_MOBILE
 														? 'shadow-lg border-x border-border'
 														: ''}"
-													sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+													sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads"
 													referrerpolicy="no-referrer"
 													title="Sandbox Preview"
 													src={deployment.url}
