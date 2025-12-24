@@ -69,6 +69,23 @@
 	--sidebar-accent-foreground: oklch(0.208 0.042 265.755);
 	--sidebar-border: oklch(0.929 0.013 255.508);
 	--sidebar-ring: oklch(0.704 0.04 256.788);
+
+	/* Code Agent */
+	--code-agent-primary: #8e47f0;
+	--code-agent-border: #d9d9d9;
+	--code-agent-border-active: rgba(142, 71, 240, 0.4);
+}
+
+.code-agent-divider {
+	border-color: var(--code-agent-border);
+}
+
+.code-agent-divider-active {
+	border-color: var(--code-agent-border-active);
+}
+
+.group\/code-agent:hover .code-agent-divider {
+	border-color: var(--code-agent-border-active);
 }
 
 .dark {

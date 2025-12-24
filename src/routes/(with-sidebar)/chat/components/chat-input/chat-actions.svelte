@@ -154,7 +154,7 @@
 			"h-9 px-2.5",
 			"hover:!bg-chat-action-hover group/code-agent",
 			codeAgentState.enabled &&
-				"!bg-chat-action-active hover:!bg-chat-action-active border border-[#8E47F0] rounded-[10px]",
+				"!bg-chat-action-active hover:!bg-chat-action-active border border-[color:var(--code-agent-primary)] rounded-[10px]",
 		)}
 		tooltip={m.title_code_agent()}
 		onclick={() => handleCodeAgentClick()}
@@ -165,8 +165,8 @@
 			<Bot class={cn("size-4", codeAgentState.enabled && "!text-chat-action-active-fg")} />
 			<div
 				class={cn(
-					"h-3.5 border-l border-[#D9D9D9] mx-1.5",
-					codeAgentState.enabled && "border-[rgba(142,71,240,0.4)]",
+					"h-3.5 border-l mx-1.5",
+					codeAgentState.enabled ? "code-agent-divider-active" : "code-agent-divider",
 				)}
 			></div>
 			<span
