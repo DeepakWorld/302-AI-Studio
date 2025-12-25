@@ -841,6 +841,7 @@
 				link.click();
 				document.body.removeChild(link);
 			}
+			toast.success(m.toast_download_file_success({ fileName: fileViewer.selectedFile.name }));
 		} catch (e) {
 			console.error("Download failed:", e);
 			toast.error(m.toast_download_failed());
