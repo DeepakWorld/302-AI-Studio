@@ -148,8 +148,6 @@ export interface ThreadParmas {
 	autoSendOnLoad?: boolean; // Flag to auto-send message when thread loads (for branch and send)
 	/** Hash of the API key used when creating this thread, used to track account association */
 	apiKeyHash?: string;
-	/** Incremental summary for title generation to avoid token explosion */
-	titleSummary?: string;
 }
 
 export interface ThreadData {

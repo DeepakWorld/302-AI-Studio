@@ -43,16 +43,6 @@ import { tabBarState } from "./tab-bar-state.svelte";
 
 const { broadcastService, threadService, storageService, pluginService } = window.electronAPI;
 
-/**
- * Extract text content from a chat message
- */
-function extractMessageText(message: ChatMessage | undefined): string | undefined {
-	if (!message) return undefined;
-	const textParts = message.parts.filter((part) => part.type === "text");
-	const text = textParts.map((part) => ("text" in part ? part.text : "")).join(" ");
-	return text.trim() || undefined;
-}
-
 export interface Thread {
 	id: string;
 }
@@ -892,34 +882,11 @@ class ChatState {
 			const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 			const serverPort = window.app?.serverPort ?? 8089;
 
-			// Extract last user message and last assistant message
-			const lastUserMessage = [...this.messages].reverse().find((msg) => msg.role === "user");
-			const lastAssistantMessage = [...this.messages]
-				.reverse()
-				.find((msg) => msg.role === "assistant");
+			const generatedTitle = await generateTitle(this.messages, titleModel, provider, serverPort);
 
-			const lastUserText = extractMessageText(lastUserMessage);
-			const lastAssistantText = extractMessageText(lastAssistantMessage);
-			const previousSummary = persistedChatParamsState.current.titleSummary;
-
-			if (!lastUserText) {
-				toast.error(m.toast_title_generation_failed());
-				return;
-			}
-
-			const result = await generateTitle(
-				lastUserText,
-				lastAssistantText,
-				previousSummary,
-				titleModel,
-				provider,
-				serverPort,
-			);
-
-			if (result.title) {
-				persistedChatParamsState.current.title = result.title;
-				persistedChatParamsState.current.titleSummary = result.summary;
-				await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
+			if (generatedTitle) {
+				persistedChatParamsState.current.title = generatedTitle;
+				await tabBarState.updateTabTitle(persistedChatParamsState.current.id, generatedTitle);
 
 				// Force flush to ensure all changes are persisted before broadcasting
 				persistedChatParamsState.flush();
@@ -1488,39 +1455,18 @@ export const chat = new Chat({
 				const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 				const serverPort = window.app?.serverPort ?? 8089;
 
-				// Extract last user message and last assistant message for incremental summary
-				const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
-				const lastAssistantMessage = [...messages]
-					.reverse()
-					.find((msg) => msg.role === "assistant");
-
-				const lastUserText = extractMessageText(lastUserMessage);
-				const lastAssistantText = extractMessageText(lastAssistantMessage);
-				const previousSummary = persistedChatParamsState.current.titleSummary;
-
-				if (lastUserText) {
-					const result = await generateTitle(
-						lastUserText,
-						lastAssistantText,
-						previousSummary,
-						titleModel,
-						provider,
-						serverPort,
-					);
-
-					if (result.title) {
-						persistedChatParamsState.current.title = result.title;
-						persistedChatParamsState.current.titleSummary = result.summary;
-						if (codeAgentEnabled && provider) {
-							updateSessionNote(provider, {
-								note: result.title,
-								sandbox_id: claudeCodeAgentState.sandboxId,
-								session_id: claudeCodeAgentState.currentSessionId,
-							});
-						}
-
-						await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
+				const generatedTitle = await generateTitle(messages, titleModel, provider, serverPort);
+				if (generatedTitle) {
+					persistedChatParamsState.current.title = generatedTitle;
+					if (codeAgentEnabled && provider) {
+						updateSessionNote(provider, {
+							note: generatedTitle,
+							sandbox_id: claudeCodeAgentState.sandboxId,
+							session_id: claudeCodeAgentState.currentSessionId,
+						});
 					}
+
+					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, generatedTitle);
 				}
 			} catch (error) {
 				console.error("Failed to generate title:", error);
