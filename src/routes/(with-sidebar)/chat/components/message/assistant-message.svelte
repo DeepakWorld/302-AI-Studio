@@ -50,6 +50,7 @@
 		isMcpToolType,
 		extractMcpToolInfo,
 	} from "./claude-code-tools";
+	import { downloadImage } from "$lib/components/buss/markdown/download-utils";
 	import AgentTaskResult from "./code-agent/agent-task-result.svelte";
 	import MessageActions from "./message-actions.svelte";
 	import MessageContextMenu from "./message-context-menu.svelte";
@@ -257,6 +258,16 @@
 		chatState.updateMessageFeedback(message.id, newFeedback);
 	}
 
+	async function handleDownloadImage(src: string) {
+		try {
+			await downloadImage(src);
+			toast.success(m.toast_download_file_success({ fileName: "image" }));
+		} catch (error) {
+			console.error("Failed to download image:", error);
+			toast.error(m.toast_download_failed());
+		}
+	}
+
 	async function handleReadAloud() {
 		if (isReading) {
 			// Stop current reading
@@ -452,6 +463,7 @@
 	onRegenerate={handleRegenerate}
 	onCreateBranch={handleCreateBranch}
 	onDelete={handleDelete}
+	onDownloadImage={handleDownloadImage}
 >
 	<div class="group flex flex-col gap-1" data-message-id={message.id}>
 		{@render messageHeader(message.metadata?.model || "gpt-4o")}
