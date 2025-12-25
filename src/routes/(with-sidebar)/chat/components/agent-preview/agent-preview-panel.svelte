@@ -25,7 +25,7 @@
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
-	import { FileWarning, Loader2, Pencil, Save, X } from "@lucide/svelte";
+	import { Check, Copy, Download, FileWarning, Loader2, Pencil, Save, X } from "@lucide/svelte";
 	import type { ModelProvider } from "@shared/types";
 	import { onDestroy, untrack } from "svelte";
 	import { toast } from "svelte-sonner";
@@ -180,6 +180,10 @@
 	let isSaving = $state(false);
 	let editContent = $state("");
 
+	// Copy State
+	let isCopied = $state(false);
+	let copyTimeoutId: NodeJS.Timeout | null = null;
+
 	// Internal logic variables (non-reactive)
 	let abortController: AbortController | null = null;
 	let isRestoringState = $state(false); // Track loading state for UI
@@ -296,13 +300,23 @@
 			deployment.deploymentId = info?.deploymentId ?? null;
 
 			if (savedPath) {
-				// Skip if the file is already selected and loaded (avoid unnecessary re-fetch)
-				if (fileViewer.selectedFile?.path === savedPath && !fileViewer.isLoading) {
-					// File is already selected, no need to reload
-				} else {
-					const storage = await agentPreviewState.loadFromStorage(sandboxId, sessionId);
-					const file = storage?.fileList?.find((f) => f.path === savedPath);
-					if (file) await handleFileSelect(file);
+				// Load storage first to get file info with updated modified_time
+				const storage = await agentPreviewState.loadFromStorage(sandboxId, sessionId);
+				const file = storage?.fileList?.find((f) => f.path === savedPath);
+
+				if (file) {
+					const currentlySelectedPath = fileViewer.selectedFile?.path;
+					const isAlreadySelected = currentlySelectedPath === savedPath;
+					const isModified =
+						isAlreadySelected && fileViewer.selectedFile?.modified_time !== file.modified_time;
+
+					// Only reload if:
+					// 1. File was modified (modified_time changed) - reload to show new content
+					// 2. No file is currently selected - restore saved selection on panel open
+					// Do NOT reload if user just selected a different file (would abort their selection)
+					if (isModified || !currentlySelectedPath) {
+						await handleFileSelect(file);
+					}
 				}
 			}
 
@@ -367,6 +381,9 @@
 		if (syncUnsubscribe) {
 			syncUnsubscribe();
 			syncUnsubscribe = null;
+		}
+		if (copyTimeoutId) {
+			clearTimeout(copyTimeoutId);
 		}
 	});
 
@@ -465,8 +482,12 @@
 				previewType === "audio" ||
 				previewType === "pdf"
 			) {
-				// Binary files: download and create blob URL
-				const response = await downloadSandboxFile(currentSandboxId!, file.path, apiKey);
+				// Binary files: download and create blob URL with retry
+				const response = await withRetry(
+					() => downloadSandboxFile(currentSandboxId!, file.path, apiKey),
+					3,
+					1000,
+				);
 
 				if (signal.aborted) return;
 
@@ -776,6 +797,55 @@
 			isSaving = false;
 		}
 	};
+
+	const handleCopyContent = async () => {
+		if (!fileViewer.content || fileViewer.previewType !== "text") return;
+
+		try {
+			await navigator.clipboard.writeText(fileViewer.content);
+			toast.success(m.toast_copied_success());
+
+			isCopied = true;
+			if (copyTimeoutId) {
+				clearTimeout(copyTimeoutId);
+			}
+			copyTimeoutId = setTimeout(() => {
+				isCopied = false;
+			}, 2000);
+		} catch (_e) {
+			toast.error(m.toast_copied_failed());
+		}
+	};
+
+	const handleDownloadFile = () => {
+		if (!fileViewer.selectedFile) return;
+
+		try {
+			if (fileViewer.previewType === "text") {
+				// Text files: create blob and download
+				const blob = new Blob([fileViewer.content], { type: "text/plain" });
+				const url = URL.createObjectURL(blob);
+				const link = document.createElement("a");
+				link.href = url;
+				link.download = fileViewer.selectedFile.name;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+				URL.revokeObjectURL(url);
+			} else if (fileViewer.previewUrl) {
+				// Binary files: use existing blob URL
+				const link = document.createElement("a");
+				link.href = fileViewer.previewUrl;
+				link.download = fileViewer.selectedFile.name;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+			}
+		} catch (e) {
+			console.error("Download failed:", e);
+			toast.error(m.toast_download_failed());
+		}
+	};
 </script>
 
 <div class="h-full">
@@ -890,8 +960,8 @@
 						{:else if activeTab === TAB_CODE}
 							{#if fileViewer.selectedFile}
 								<div class="flex-1 flex flex-col min-h-0">
-									<!-- Only show edit toolbar for text files -->
-									{#if !fileViewer.isLoading && fileViewer.previewType === "text"}
+									<!-- Toolbar for file operations -->
+									{#if !fileViewer.isLoading}
 										<div
 											class="flex items-center justify-end gap-2 border-b border-border bg-background px-3 py-2"
 										>
@@ -919,12 +989,44 @@
 													</button>
 												</div>
 											{:else}
+												<!-- Copy button - only for text files -->
+												{#if fileViewer.previewType === "text"}
+													<button
+														class="relative rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer h-6 w-6"
+														onclick={handleCopyContent}
+														title={m.title_copy()}
+													>
+														<Check
+															class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
+																? 'scale-100 opacity-100'
+																: 'scale-0 opacity-0'}"
+															strokeWidth={1.25}
+														/>
+														<Copy
+															class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
+																? 'scale-0 opacity-0'
+																: 'scale-100 opacity-100'}"
+															strokeWidth={1.25}
+														/>
+													</button>
+												{/if}
+												<!-- Download button - for all file types -->
 												<button
-													class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-													onclick={handleStartEdit}
+													class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+													onclick={handleDownloadFile}
+													title={m.label_file_tree_download()}
 												>
-													<Pencil class="h-4 w-4" strokeWidth={1.25} />
+													<Download class="h-4 w-4" strokeWidth={1.25} />
 												</button>
+												<!-- Edit button - only for text files -->
+												{#if fileViewer.previewType === "text"}
+													<button
+														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+														onclick={handleStartEdit}
+													>
+														<Pencil class="h-4 w-4" strokeWidth={1.25} />
+													</button>
+												{/if}
 											{/if}
 										</div>
 									{/if}
