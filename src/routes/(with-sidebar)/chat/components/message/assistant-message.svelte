@@ -50,7 +50,10 @@
 		isMcpToolType,
 		extractMcpToolInfo,
 	} from "./claude-code-tools";
-	import { downloadImage } from "$lib/components/buss/markdown/download-utils";
+	import {
+		downloadImage,
+		copyImageToClipboard,
+	} from "$lib/components/buss/markdown/download-utils";
 	import AgentTaskResult from "./code-agent/agent-task-result.svelte";
 	import MessageActions from "./message-actions.svelte";
 	import MessageContextMenu from "./message-context-menu.svelte";
@@ -268,6 +271,16 @@
 		}
 	}
 
+	async function handleCopyImage(src: string) {
+		try {
+			await copyImageToClipboard(src);
+			toast.success(m.toast_copied_success());
+		} catch (error) {
+			console.error("Failed to copy image:", error);
+			toast.error(m.toast_copied_failed());
+		}
+	}
+
 	async function handleReadAloud() {
 		if (isReading) {
 			// Stop current reading
@@ -460,6 +473,7 @@
 
 <MessageContextMenu
 	onCopy={handleCopyMessage}
+	onCopyImage={handleCopyImage}
 	onRegenerate={handleRegenerate}
 	onCreateBranch={handleCreateBranch}
 	onDelete={handleDelete}

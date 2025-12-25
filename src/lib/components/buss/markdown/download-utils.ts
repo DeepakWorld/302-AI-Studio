@@ -47,8 +47,9 @@ export const LANGUAGE_EXTENSION_MAP: Record<string, string> = {
 
 /**
  * Download code as a file with appropriate extension based on language
+ * @returns The filename that was downloaded
  */
-export function downloadCode(code: string, language: string): void {
+export function downloadCode(code: string, language: string): string {
 	const lang = language.toLowerCase();
 	const extension = LANGUAGE_EXTENSION_MAP[lang] || "md";
 	const fileName = `${Date.now()}.${extension}`;
@@ -62,6 +63,8 @@ export function downloadCode(code: string, language: string): void {
 	link.click();
 	document.body.removeChild(link);
 	URL.revokeObjectURL(url);
+
+	return fileName;
 }
 
 /**
@@ -84,6 +87,52 @@ function extractFilenameFromUrl(url: string): string | null {
 		}
 	}
 	return null;
+}
+
+/**
+ * Convert a blob to PNG format using canvas
+ */
+async function convertToPng(blob: Blob): Promise<Blob> {
+	return new Promise((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => {
+			const canvas = document.createElement("canvas");
+			canvas.width = img.naturalWidth;
+			canvas.height = img.naturalHeight;
+			const ctx = canvas.getContext("2d");
+			if (!ctx) {
+				reject(new Error("Failed to get canvas context"));
+				return;
+			}
+			ctx.drawImage(img, 0, 0);
+			canvas.toBlob(
+				(pngBlob) => {
+					if (pngBlob) {
+						resolve(pngBlob);
+					} else {
+						reject(new Error("Failed to convert to PNG"));
+					}
+				},
+				"image/png",
+				1,
+			);
+		};
+		img.onerror = () => reject(new Error("Failed to load image"));
+		img.src = URL.createObjectURL(blob);
+	});
+}
+
+/**
+ * Copy an image to clipboard from a URL or data URL
+ */
+export async function copyImageToClipboard(src: string): Promise<void> {
+	const response = await fetch(src);
+	const blob = await response.blob();
+
+	// Convert to PNG if needed (clipboard API works best with PNG)
+	const pngBlob = blob.type === "image/png" ? blob : await convertToPng(blob);
+
+	await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
 }
 
 /**

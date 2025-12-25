@@ -984,5 +984,6 @@
 	"text_universal_type": "Universal Type",
 	"text_terse_and_effective_type": "Terse and Effective Type",
 	"text_deep_thinking_type": "Deep Thinking Type",
-	"context_menu_download_image": "Download Image"
+	"context_menu_download_image": "Download Image",
+	"context_menu_copy_image": "Copy Image"
 }

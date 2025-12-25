@@ -88,6 +88,10 @@
 	border-color: var(--code-agent-border-active);
 }
 
+.dark .group\/code-agent:hover .code-agent-divider {
+	border-color: var(--code-agent-border);
+}
+
 .dark {
 	--background: #121212;
 	--foreground: #e6e6e6;

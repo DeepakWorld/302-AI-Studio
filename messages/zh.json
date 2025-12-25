@@ -980,5 +980,6 @@
 	"text_universal_type": "广泛通用型",
 	"text_terse_and_effective_type": "简洁高效型",
 	"text_deep_thinking_type": "深度思考型",
-	"context_menu_download_image": "下载图片"
+	"context_menu_download_image": "下载图片",
+	"context_menu_copy_image": "复制图片"
 }

@@ -18,7 +18,7 @@
 	interface Props {
 		label: string;
 		tips?: string;
-		value?: string | null;
+		value?: string | null | undefined;
 		isSystemPrompt?: boolean;
 		wrapperClass?: string;
 		class?: string;
@@ -34,7 +34,7 @@
 	let {
 		label,
 		tips,
-		value = $bindable(null),
+		value = $bindable(),
 		isSystemPrompt = false,
 		wrapperClass = "",
 		class: className = "",

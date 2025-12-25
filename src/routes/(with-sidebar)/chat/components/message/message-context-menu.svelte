@@ -4,6 +4,7 @@
 
 	interface Props {
 		onCopy?: () => void | Promise<void>;
+		onCopyImage?: (src: string) => void | Promise<void>;
 		onEdit?: () => void | Promise<void>;
 		onRegenerate?: () => void | Promise<void>;
 		onCreateBranch?: () => void | Promise<void>;
@@ -12,8 +13,16 @@
 		children: import("svelte").Snippet;
 	}
 
-	let { onCopy, onEdit, onRegenerate, onCreateBranch, onDelete, onDownloadImage, children }: Props =
-		$props();
+	let {
+		onCopy,
+		onCopyImage,
+		onEdit,
+		onRegenerate,
+		onCreateBranch,
+		onDelete,
+		onDownloadImage,
+		children,
+	}: Props = $props();
 
 	let clickedImageSrc = $state<string | null>(null);
 
@@ -32,6 +41,14 @@
 	function handleDownloadImage() {
 		if (clickedImageSrc && onDownloadImage) {
 			onDownloadImage(clickedImageSrc);
+		}
+	}
+
+	function handleCopy() {
+		if (clickedImageSrc && onCopyImage) {
+			onCopyImage(clickedImageSrc);
+		} else if (onCopy) {
+			onCopy();
 		}
 	}
 </script>
@@ -53,7 +70,7 @@
 		{/if}
 
 		{#if onCopy}
-			<ContextMenu.Item onSelect={onCopy}>
+			<ContextMenu.Item onSelect={handleCopy}>
 				{m.common_copy()}
 			</ContextMenu.Item>
 		{/if}

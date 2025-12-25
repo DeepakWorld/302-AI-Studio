@@ -2,6 +2,7 @@
 	/* eslint-disable svelte/no-at-html-tags */
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { CopyButton } from "$lib/components/buss/copy-button";
+	import * as m from "$lib/paraglide/messages.js";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { persistedThemeState } from "$lib/stores/theme.state.svelte";
@@ -9,6 +10,7 @@
 	import type { GrammarState, ThemedToken } from "@shikijs/types";
 	import { onMount } from "svelte";
 	import { SvelteMap } from "svelte/reactivity";
+	import { toast } from "svelte-sonner";
 	import type { ShikiHighlighter } from "./highlighter";
 	import { ensureHighlighter, ensureLanguageLoaded, LANGUAGE_ALIASES } from "./highlighter";
 	import { downloadCode } from "./download-utils";
@@ -182,7 +184,8 @@
 	};
 
 	const handleDownload = () => {
-		downloadCode(props.code, resolvedLanguage);
+		const fileName = downloadCode(props.code, resolvedLanguage);
+		toast.success(m.toast_download_file_success({ fileName }));
 	};
 
 	const buildTokenStyle = (token: ThemedToken): string | undefined => {
