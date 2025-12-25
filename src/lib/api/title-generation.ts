@@ -1,9 +1,10 @@
-import type { ChatMessage } from "$lib/types/chat";
 import type { ModelProvider } from "@shared/storage/provider";
 import type { Model } from "@shared/types";
 
 export interface GenerateTitleRequest {
-	messages: ChatMessage[];
+	lastAssistantMessage?: string;
+	lastUserMessage: string;
+	previousSummary?: string;
 	model: string;
 	apiKey?: string;
 	baseUrl?: string;
@@ -12,14 +13,17 @@ export interface GenerateTitleRequest {
 
 export interface GenerateTitleResponse {
 	title: string;
+	summary: string;
 }
 
 export async function generateTitle(
-	messages: ChatMessage[],
+	lastUserMessage: string,
+	lastAssistantMessage: string | undefined,
+	previousSummary: string | undefined,
 	model: Model,
 	provider: ModelProvider | undefined,
 	serverPort?: number,
-): Promise<string> {
+): Promise<GenerateTitleResponse> {
 	const port = serverPort ?? 8089;
 
 	try {
@@ -29,7 +33,9 @@ export async function generateTitle(
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
-				messages,
+				lastUserMessage,
+				lastAssistantMessage,
+				previousSummary,
 				model: model.id,
 				apiKey: provider?.apiKey,
 				baseUrl: provider?.baseUrl,
@@ -42,10 +48,13 @@ export async function generateTitle(
 		}
 
 		const data: GenerateTitleResponse = await response.json();
-		return sanitizeGeneratedTitle(data.title);
+		return {
+			title: sanitizeGeneratedTitle(data.title),
+			summary: data.summary || "",
+		};
 	} catch (error) {
 		console.error("Title generation failed, using fallback:", error);
-		return "";
+		return { title: "", summary: previousSummary || "" };
 	}
 }
 

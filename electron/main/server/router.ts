@@ -904,20 +904,23 @@ app.post("/chat/gemini", async (c) => {
 });
 
 app.post("/generate-title", async (c) => {
-	const { messages, model, apiKey, baseUrl, providerType } = await c.req.json<{
-		messages: UIMessage[];
+	const {
+		lastAssistantMessage,
+		lastUserMessage,
+		previousSummary,
+		model,
+		apiKey,
+		baseUrl,
+		providerType,
+	} = await c.req.json<{
+		lastAssistantMessage?: string;
+		lastUserMessage: string;
+		previousSummary?: string;
 		model: string;
 		apiKey?: string;
 		baseUrl?: string;
 		providerType: ModelProvider["apiType"];
 	}>();
-
-	const conversationText = messages
-		.map((msg) => {
-			const textParts = msg.parts.filter((part) => part.type === "text");
-			return textParts.map((part) => ("text" in part ? part.text : "")).join(" ");
-		})
-		.join("\n");
 
 	let languageModel;
 	switch (providerType) {
@@ -959,22 +962,67 @@ app.post("/generate-title", async (c) => {
 	}
 
 	try {
-		const { text } = await generateText({
-			model: languageModel,
-			prompt: `Based on the following conversation, generate a concise title (Please limit your response to a very short length: approximately 10-20 words if in English, or 10-20 characters if in Chinese., no punctuation):
+		let prompt: string;
 
-${conversationText}
+		if (!previousSummary) {
+			// First time: only user's first message -> generate summary1 + title1
+			prompt = `Based on the following user message, generate a JSON response with a concise title and a brief summary.
+
+User message:
+${lastUserMessage}
 
 Requirements:
-- Accurately summarize the main topic
-- Be concise and clear
-- Do not use punctuation
-- Return only the title text`,
+- title: A concise title (10-20 words in English, or 10-20 characters in Chinese, no punctuation)
+- summary: A brief summary of the conversation so far (1-2 sentences, max 100 words)
+- Return ONLY valid JSON in this format: {"title": "...", "summary": "..."}`;
+		} else {
+			// Subsequent times: previous summary + last AI reply + new user message -> generate new summary + title
+			const contextParts: string[] = [];
+			contextParts.push(`Previous summary: ${previousSummary}`);
+			if (lastAssistantMessage) {
+				contextParts.push(`Last AI reply: ${lastAssistantMessage}`);
+			}
+			contextParts.push(`New user message: ${lastUserMessage}`);
+
+			prompt = `Based on the following context, generate an updated JSON response with a concise title and an updated summary.
+
+${contextParts.join("\n\n")}
+
+Requirements:
+- title: A concise title reflecting the current topic (10-20 words in English, or 10-20 characters in Chinese, no punctuation)
+- summary: An updated brief summary incorporating the new exchange (1-2 sentences, max 100 words)
+- Return ONLY valid JSON in this format: {"title": "...", "summary": "..."}`;
+		}
+
+		const { text } = await generateText({
+			model: languageModel,
+			prompt,
 		});
 
-		const title = text.trim();
+		// Parse JSON response
+		let cleanText = text.trim();
+		// Remove markdown code blocks if present
+		if (cleanText.startsWith("```")) {
+			cleanText = cleanText
+				.replace(/```json?\n?/g, "")
+				.replace(/```/g, "")
+				.trim();
+		}
 
-		return c.json({ title });
+		try {
+			const result = JSON.parse(cleanText);
+			return c.json({
+				title: result.title?.trim() || "",
+				summary: result.summary?.trim() || "",
+			});
+		} catch (parseError) {
+			console.error("Failed to parse title generation JSON:", parseError, "Raw text:", text);
+			// Fallback: use the raw text as title, no summary
+			return c.json({
+				title: cleanText.substring(0, 50),
+				summary: previousSummary || "",
+			});
+		}
 	} catch (error) {
 		console.error("Title generation error:", error);
 		return c.json({ error: "Failed to generate title" }, 500);

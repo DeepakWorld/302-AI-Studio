@@ -670,6 +670,44 @@ export class FileTreeState {
 	}
 
 	/**
+	 * Generate a unique file/folder name to avoid duplicates
+	 * @param targetDirPath - The target directory path
+	 * @param originalName - The original file/folder name
+	 * @returns A unique name (possibly with suffix like "_1", "_2")
+	 */
+	private generateUniqueName(targetDirPath: string, originalName: string): string {
+		// Normalize target directory path
+		const normalizedDir = targetDirPath.endsWith("/") ? targetDirPath.slice(0, -1) : targetDirPath;
+
+		// Get all existing names in target directory
+		const existingNames = new SvelteSet(
+			this.files.filter((f) => pathUtils.getParentDir(f.path) === normalizedDir).map((f) => f.name),
+		);
+
+		// If no conflict, return original name
+		if (!existingNames.has(originalName)) {
+			return originalName;
+		}
+
+		// Split name and extension for files
+		const lastDotIndex = originalName.lastIndexOf(".");
+		const hasExtension = lastDotIndex > 0; // Ensure dot is not at start (hidden files)
+		const baseName = hasExtension ? originalName.slice(0, lastDotIndex) : originalName;
+		const extension = hasExtension ? originalName.slice(lastDotIndex) : "";
+
+		// Find a unique name with suffix (use underscore to avoid shell escaping issues)
+		let counter = 1;
+		let newName = `${baseName}_${counter}${extension}`;
+
+		while (existingNames.has(newName)) {
+			counter++;
+			newName = `${baseName}_${counter}${extension}`;
+		}
+
+		return newName;
+	}
+
+	/**
 	 * Paste file or folder
 	 */
 	async pasteFile(sourcePath: string, targetDir: SandboxFileInfo): Promise<boolean> {
@@ -697,9 +735,10 @@ export class FileTreeState {
 			return false;
 		}
 
-		// Build destination path
+		// Build destination path with unique name to avoid duplicates
 		const sourceName = pathUtils.getFileName(sourcePath);
-		const destPath = `${targetDir.path}/${sourceName}`;
+		const uniqueName = this.generateUniqueName(targetDir.path, sourceName);
+		const destPath = `${targetDir.path}/${uniqueName}`;
 
 		const toastId = toast.loading(m.toast_file_pasting());
 
