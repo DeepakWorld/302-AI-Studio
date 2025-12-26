@@ -97,7 +97,7 @@ export class TrayService {
 		// In production, use the packaged icon
 		if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
 			// Development mode
-			return path.join(import.meta.dirname, "../../../static/icon.png");
+			return path.join(import.meta.dirname, "../../../static/tray-icon.png");
 		} else {
 			// Production mode - icon is in the renderer folder
 			return path.join(import.meta.dirname, "../../renderer/main_window/icon.png");
