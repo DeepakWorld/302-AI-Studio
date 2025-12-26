@@ -1,55 +1,39 @@
 <script lang="ts">
-	import { SettingSwitchItem } from "$lib/components/buss/settings";
-	import { Input } from "$lib/components/ui/input";
+	import { SettingSelectItem, SettingSwitchItem } from "$lib/components/buss/settings";
 	import { Label } from "$lib/components/ui/label/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 
-	let suggestionsCount = $state(preferencesSettings.suggestionsCount);
+	const suggestionsCountOptions = [
+		{ value: "1", label: "1" },
+		{ value: "2", label: "2" },
+		{ value: "3", label: "3" },
+		{ value: "4", label: "4" },
+		{ value: "5", label: "5" },
+	];
 
-	function handleCountChange(event: Event) {
-		const target = event.target as HTMLInputElement;
-		const value = parseInt(target.value);
-		if (!isNaN(value) && value >= 1 && value <= 5) {
-			suggestionsCount = value;
-			preferencesSettings.setSuggestionsCount(value);
-		}
-	}
-
-	function handleCountBlur() {
-		// Ensure the value is within bounds on blur
-		if (suggestionsCount < 1) {
-			suggestionsCount = 1;
-			preferencesSettings.setSuggestionsCount(1);
-		} else if (suggestionsCount > 5) {
-			suggestionsCount = 5;
-			preferencesSettings.setSuggestionsCount(5);
+	function handleCountChange(value: string) {
+		const count = parseInt(value);
+		if (!isNaN(count)) {
+			preferencesSettings.setSuggestionsCount(count);
 		}
 	}
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_suggestions()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_suggestions()}</Label>
 	<SettingSwitchItem
 		label={m.settings_suggestionsEnable()}
 		checked={preferencesSettings.suggestionsEnabled}
 		onCheckedChange={(v) => preferencesSettings.setSuggestionsEnabled(v)}
 	/>
 	{#if preferencesSettings.suggestionsEnabled}
-		<div
-			class="h-settings-item rounded-settings-item bg-settings-item-bg px-settings-item-x py-settings-item-y flex w-full items-center justify-between"
-		>
-			<span class="text-sm">{m.settings_suggestionsCount()}</span>
-			<Input
-				type="number"
-				min="1"
-				max="5"
-				value={suggestionsCount}
-				oninput={handleCountChange}
-				onblur={handleCountBlur}
-				class="!bg-settings-bg dark:!bg-settings-bg h-9 w-20 text-center"
-			/>
-		</div>
+		<SettingSelectItem
+			label={m.settings_suggestionsCount()}
+			options={suggestionsCountOptions}
+			value={String(preferencesSettings.suggestionsCount)}
+			onValueChange={handleCountChange}
+		/>
 		<SettingSwitchItem
 			label={m.settings_showOnlyLastSuggestion()}
 			checked={preferencesSettings.showOnlyLastSuggestion}

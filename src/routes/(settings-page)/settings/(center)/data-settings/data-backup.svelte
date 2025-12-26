@@ -4,8 +4,8 @@
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Label from "$lib/components/ui/label/label.svelte";
 	import { m } from "$lib/paraglide/messages.js";
-	import type { BackupInfo } from "@shared/types";
 	import { Archive, FolderOpen, RotateCcw, Trash2 } from "@lucide/svelte";
+	import type { BackupInfo } from "@shared/types";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
 
@@ -115,14 +115,19 @@
 </script>
 
 {#snippet openDirectoryButton()}
-	<Button size="sm" variant="outline" onclick={handleOpenBackupDirectory}>
+	<Button
+		size="sm"
+		variant="outline"
+		onclick={handleOpenBackupDirectory}
+		class="border-border text-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring dark:border-border dark:text-foreground dark:hover:bg-muted dark:hover:text-foreground border bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+	>
 		<FolderOpen className="size-4" />
 		{m.settings_backupOpenDirectory()}
 	</Button>
 {/snippet}
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_backupManagement()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_backupManagement()}</Label>
 	<SettingInfoItem label={m.settings_backupInfo()} action={openDirectoryButton} />
 
 	{#if isLoading}

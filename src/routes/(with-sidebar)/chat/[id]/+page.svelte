@@ -25,7 +25,6 @@
 
 	let isInputAreaHovered = $state(false);
 	let fileUploadOverlayRef: FileUploadOverlay | null = $state(null);
-	let hasAutoOpened = false;
 
 	function handleFilesAdded(attachments: AttachmentFile[]) {
 		for (const attachment of attachments) {
@@ -190,16 +189,17 @@
 		};
 	});
 
-	$effect(() => {
-		const sandBoxId = agentPreviewState.sandBoxId;
-		console.log("sandBoxIdsandBoxId", sandBoxId);
-	});
+	// $effect(() => {
+	// 	const sandBoxId = agentPreviewState.sandBoxId;
+	// 	console.log("sandBoxIdsandBoxId", sandBoxId);
+	// });
 
 	$effect(() => {
-		if (codeAgentState.enabled && !hasAutoOpened) {
-			hasAutoOpened = true;
+		if (codeAgentState.enabled) {
 			// Open immediately, even if sandboxId is empty/loading
 			agentPreviewState.openPreview(codeAgentState.sandboxId || "");
+		} else {
+			agentPreviewState.closePreview();
 		}
 	});
 
@@ -223,7 +223,7 @@
 				<button
 					type="button"
 					onclick={handleNewExploration}
-					class="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6]"
+					class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6]"
 				>
 					<MessageSquarePlus class="h-4 w-4" />
 					<span>{m.text_new_exploration()}</span>

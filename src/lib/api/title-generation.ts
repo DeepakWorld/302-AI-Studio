@@ -8,10 +8,18 @@ export interface GenerateTitleRequest {
 	apiKey?: string;
 	baseUrl?: string;
 	providerType: "302ai" | "openai" | "anthropic" | "gemini";
+	previousSummary?: string;
+	isFirstGeneration?: boolean;
 }
 
 export interface GenerateTitleResponse {
 	title: string;
+	summary: string;
+}
+
+export interface GenerateTitleResult {
+	title: string;
+	summary: string;
 }
 
 export async function generateTitle(
@@ -19,7 +27,9 @@ export async function generateTitle(
 	model: Model,
 	provider: ModelProvider | undefined,
 	serverPort?: number,
-): Promise<string> {
+	previousSummary?: string,
+	isFirstGeneration?: boolean,
+): Promise<GenerateTitleResult | null> {
 	const port = serverPort ?? 8089;
 
 	try {
@@ -34,6 +44,8 @@ export async function generateTitle(
 				apiKey: provider?.apiKey,
 				baseUrl: provider?.baseUrl,
 				providerType: provider?.apiType || "openai",
+				previousSummary,
+				isFirstGeneration,
 			} satisfies GenerateTitleRequest),
 		});
 
@@ -42,10 +54,13 @@ export async function generateTitle(
 		}
 
 		const data: GenerateTitleResponse = await response.json();
-		return sanitizeGeneratedTitle(data.title);
+		return {
+			title: sanitizeGeneratedTitle(data.title),
+			summary: data.summary || "",
+		};
 	} catch (error) {
 		console.error("Title generation failed, using fallback:", error);
-		return "";
+		return null;
 	}
 }
 

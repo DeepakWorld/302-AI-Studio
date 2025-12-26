@@ -34,3 +34,4 @@ storage
 dist
 
 plugins/external
+.aider*

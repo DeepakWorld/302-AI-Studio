@@ -50,7 +50,7 @@
 <div class="mx-auto flex h-full flex-col items-center">
 	<div class="flex flex-1 items-center justify-center">
 		<div class="flex items-center gap-y-[22px] flex-col">
-			<ModelIcon modelName="ai302" className="size-[62px]" />
+			<ModelIcon modelName="ai302" className="size-[62px]" forceApplyClassName />
 			<div class="flex items-center gap-y-2 flex-col">
 				<h1 class="text-xl">{appInfo.productName}</h1>
 				<p class="text-muted-foreground text-sm">{m.title_version()} {appInfo.version}</p>

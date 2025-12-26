@@ -27,10 +27,13 @@ export class ShortcutEngine {
 	private windowIndex = new Map<number, Map<string, ShortcutBinding>>();
 	private webviewIndex = new Map<string, Map<string, ShortcutBinding>>();
 
+	// Track view listeners for detachment/reattachment
+	private viewListeners = new Map<number, (event: Electron.Event, input: Electron.Input) => void>();
+
 	// Deduplication: track last handled shortcut to prevent duplicate triggers
 	private lastHandledKey: string | null = null;
 	private lastHandledTime: number = 0;
-	private readonly DEBOUNCE_MS = 200; // 200ms debounce window
+	private readonly DEBOUNCE_MS = 50;
 
 	constructor() {}
 
@@ -49,9 +52,28 @@ export class ShortcutEngine {
 	}
 
 	attachToView(view: WebContentsView, windowId: number, viewId: string): void {
-		view.webContents.on("before-input-event", (electronEvent, input) => {
+		const webContentsId = view.webContents.id;
+
+		// Remove existing listener if any
+		this.detachFromView(view);
+
+		// Create and store the listener
+		const listener = (electronEvent: Electron.Event, input: Electron.Input) => {
 			this.handleBeforeInput(electronEvent, input, windowId, viewId);
-		});
+		};
+
+		this.viewListeners.set(webContentsId, listener);
+		view.webContents.on("before-input-event", listener);
+	}
+
+	detachFromView(view: WebContentsView): void {
+		const webContentsId = view.webContents.id;
+		const existingListener = this.viewListeners.get(webContentsId);
+
+		if (existingListener) {
+			view.webContents.off("before-input-event", existingListener);
+			this.viewListeners.delete(webContentsId);
+		}
 	}
 
 	getConflicts(): ShortcutConflict[] {
@@ -69,6 +91,7 @@ export class ShortcutEngine {
 	handleKeyPressed(keyEvent: ShortcutKeyPressEvent): void {
 		const key = keysToString(keyEvent.keys);
 		const windowId = keyEvent.windowId;
+		console.log("keyEvent", windowId);
 		const viewId = keyEvent.viewId || "";
 
 		// Check if this is editable and the shortcut requires non-editable

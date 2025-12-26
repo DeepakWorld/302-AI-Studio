@@ -76,7 +76,7 @@
 			class="w-full h-full border-0 {deviceMode === 'mobile'
 				? 'shadow-lg border-x border-border'
 				: ''}"
-			sandbox="allow-same-origin allow-scripts"
+			sandbox="allow-same-origin allow-scripts allow-downloads"
 			referrerpolicy="no-referrer"
 			title="HTML Preview"
 		></iframe>

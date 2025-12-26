@@ -52,12 +52,12 @@
 <Popover.Root bind:open={isOpen}>
 	<Popover.Trigger
 		class={cn(
-			"bg-muted hover:bg-muted/80 focus-visible:ring-ring flex size-11 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+			"bg-muted hover:bg-muted/80 focus-visible:ring-ring flex size-11 cursor-pointer items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
 			className,
 		)}
 	>
 		{#if selectedIcon}
-			<ModelIcon modelName={selectedIcon.key} className="h-6 w-6" />
+			<ModelIcon modelName={selectedIcon.key} className="h-6 w-6" forceApplyClassName />
 		{:else}
 			<FileImage class="text-muted-foreground h-4 w-4" />
 		{/if}
@@ -71,12 +71,12 @@
 						type="button"
 						onclick={() => handleIconSelect(iconItem.key)}
 						class={cn(
-							"text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring flex flex-col items-center rounded p-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+							"text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring flex cursor-pointer flex-col items-center rounded p-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
 							value === iconItem.key && "bg-primary/10 text-primary ring-primary/20 ring-2",
 						)}
 						title={iconItem.name}
 					>
-						<ModelIcon modelName={iconItem.key} className="mb-1 h-8 w-8" />
+						<ModelIcon modelName={iconItem.key} className="mb-1 h-8 w-8" forceApplyClassName />
 						<span class="w-full truncate text-center text-xs">
 							{iconItem.name}
 						</span>

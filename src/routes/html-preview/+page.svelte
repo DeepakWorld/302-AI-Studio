@@ -15,37 +15,29 @@
 		activeTab?.type === "htmlPreview" && activeTab?.content ? activeTab.content : "",
 	);
 
-	// Cache content to prevent flickering during window migration
+	// Cache content to prevent flickering during tab switching and window migration
+	// Always keep the last valid content to display during transitions
 	let cachedHtmlContent = $state("");
-	let isMigrating = $state(false);
 
 	$effect(() => {
+		// Only update cache when we have valid content
 		if (rawHtmlContent) {
 			cachedHtmlContent = rawHtmlContent;
-			isMigrating = false;
 		}
 	});
 
-	const htmlContent = $derived(rawHtmlContent || (isMigrating ? cachedHtmlContent : ""));
+	// Always prefer raw content, fallback to cached content to prevent flickering
+	const htmlContent = $derived(rawHtmlContent || cachedHtmlContent);
 
 	$effect(() => {
 		const handleWindowIdChanged = (event: Event) => {
 			const customEvent = event as CustomEvent<{ newWindowId: string }>;
 			console.log("[HTML Preview] windowIdChanged event received:", customEvent.detail.newWindowId);
 
-			isMigrating = true;
 			windowId = customEvent.detail.newWindowId;
 
 			// Force refresh state to ensure we have the latest data for the new window
 			persistedTabState.refresh();
-
-			// Safety timeout in case data never syncs
-			setTimeout(() => {
-				if (isMigrating) {
-					console.warn("[HTML Preview] Migration timeout");
-					isMigrating = false;
-				}
-			}, 2000);
 		};
 
 		window.addEventListener("windowIdChanged", handleWindowIdChanged);

@@ -1,9 +1,10 @@
 import type { ThreadData } from "@shared/types";
-import type { IpcMainInvokeEvent } from "electron";
+import { BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { isNull } from "es-toolkit";
 import { broadcastService } from "../broadcast-service";
 import { tabStorage } from "../storage-service/tab-storage";
 import { threadStorage } from "../storage-service/thread-storage";
+import { tabService } from "../tab-service";
 
 export class ThreadService {
 	async addThread(_event: IpcMainInvokeEvent, threadId: string): Promise<boolean> {
@@ -152,6 +153,7 @@ export class ThreadService {
 		// Remove tabs with matching threadIds from each window
 		for (const [windowId, windowData] of Object.entries(tabState)) {
 			const originalLength = windowData.tabs.length;
+			const tabsToClose = windowData.tabs.filter((tab) => threadIdSet.has(tab.threadId));
 			const remainingTabs = windowData.tabs.filter((tab) => !threadIdSet.has(tab.threadId));
 
 			if (remainingTabs.length !== originalLength) {
@@ -159,6 +161,18 @@ export class ThreadService {
 				console.log(
 					`[ThreadService] Closing ${originalLength - remainingTabs.length} tab(s) in window ${windowId}`,
 				);
+
+				// Actually close the WebContentsViews for the tabs being removed
+				const numericWindowId = Number.parseInt(windowId, 10);
+				if (!Number.isNaN(numericWindowId)) {
+					const browserWindow = BrowserWindow.fromId(numericWindowId);
+					if (browserWindow && !browserWindow.isDestroyed()) {
+						for (const tab of tabsToClose) {
+							console.log(`[ThreadService] Removing tab view ${tab.id} from window ${windowId}`);
+							tabService.removeTab(browserWindow, tab.id);
+						}
+					}
+				}
 
 				// If all tabs were removed, we need to ensure there's at least one tab
 				// This will be handled by the frontend when it receives the broadcast
@@ -169,6 +183,14 @@ export class ThreadService {
 					const hasActiveTab = remainingTabs.some((tab) => tab.active);
 					if (!hasActiveTab) {
 						remainingTabs[0].active = true;
+						// Also activate the first remaining tab in the tabService
+						const numericWindowId = Number.parseInt(windowId, 10);
+						if (!Number.isNaN(numericWindowId)) {
+							const browserWindow = BrowserWindow.fromId(numericWindowId);
+							if (browserWindow && !browserWindow.isDestroyed()) {
+								tabService.focusTabInWindow(browserWindow, remainingTabs[0].id);
+							}
+						}
 					}
 				}
 			}

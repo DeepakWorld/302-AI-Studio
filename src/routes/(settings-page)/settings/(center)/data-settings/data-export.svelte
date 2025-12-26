@@ -37,6 +37,6 @@
 {/snippet}
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_exportData()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_exportData()}</Label>
 	<SettingInfoItem label={m.settings_exportAsJson()} action={exportButton} />
 </div>

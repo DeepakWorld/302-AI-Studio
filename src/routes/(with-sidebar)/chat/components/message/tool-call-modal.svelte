@@ -20,7 +20,6 @@
 	} from "$lib/components/ui/dialog/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
-	import { RotateCw } from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 
 	let { part, messageId, open = $bindable(), onOpenChange }: ToolCallModalProps = $props();
@@ -196,7 +195,7 @@
 					onclick={handleRerun}
 					disabled={isRerunning}
 				>
-					<RotateCw class="h-4 w-4 {isRerunning ? 'animate-spin' : ''}" />
+					<!-- <RotateCw class="h-4 w-4 {isRerunning ? 'animate-spin' : ''}" /> -->
 					{m.tool_call_rerun()}
 				</Button>
 			{/if}

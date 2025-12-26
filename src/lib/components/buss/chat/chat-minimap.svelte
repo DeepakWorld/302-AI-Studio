@@ -500,7 +500,8 @@
 	bind:this={minimapRef}
 	class={cn(
 		"absolute right-0 z-10 transition-all duration-300 select-none pointer-events-auto",
-		isHovered || isDragging ? "opacity-100 w-[60px]" : "opacity-70 w-[50px]",
+		isHovered || isDragging ? "opacity-100" : "opacity-70",
+		"w-[28px]",
 		className,
 	)}
 	style="top: 60px; bottom: 180px;"
@@ -553,7 +554,7 @@
 	<div
 		bind:this={visibleIndicator}
 		class={cn(
-			"absolute left-0 right-0 cursor-grab rounded-r-md pointer-events-auto",
+			"absolute left-0 right-0 cursor-grab pointer-events-auto",
 			isDragging
 				? "cursor-grabbing border-2 border-primary bg-primary/25 shadow-lg"
 				: "border border-primary/70 bg-primary/15 shadow-md hover:bg-primary/20 hover:border-primary",
@@ -570,11 +571,7 @@
 	>
 		<!-- Drag handle indicator -->
 		<div class="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center">
-			<div class="flex flex-col gap-[2px] opacity-50">
-				<div class="w-3 h-[1px] bg-current rounded-full"></div>
-				<div class="w-3 h-[1px] bg-current rounded-full"></div>
-				<div class="w-3 h-[1px] bg-current rounded-full"></div>
-			</div>
+			<div class="flex flex-col gap-[2px] opacity-50"></div>
 		</div>
 	</div>
 </div>

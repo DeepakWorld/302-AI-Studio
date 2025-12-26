@@ -48,13 +48,12 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content class="min-w-[569px] rounded-2xl bg-[#F7F8FA] p-6 dark:bg-neutral-900">
-		<!-- Header -->
-		<span class="text-base font-semibold text-foreground">
-			{m.title_rename()}
-		</span>
+		<Dialog.Header>
+			<Dialog.Title class="text-base">{m.title_rename()}</Dialog.Title>
+		</Dialog.Header>
 
 		<!-- Content -->
-		<div class="mt-6 rounded-xl bg-white p-5 dark:bg-neutral-800">
+		<div class="mt-2 rounded-xl bg-white p-5 dark:bg-neutral-800">
 			<!-- 沙盒ID -->
 			<div class="mb-4">
 				<div class="mb-2 text-sm font-medium text-foreground">

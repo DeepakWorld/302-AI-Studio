@@ -11,6 +11,7 @@ import {
 	withLoadHandlers,
 } from "../../mixins/web-contents-mixins";
 import { TempStorage } from "../../utils/temp-storage";
+import { chatParametersService } from "../chat-parameters-service";
 import { codeAgentService } from "../code-agent-service";
 import { shortcutService } from "../shortcut-service";
 import { storageService } from "../storage-service";
@@ -197,10 +198,12 @@ export class TabService {
 			await storageService.removeItemInternal("app-thread:" + tab.threadId);
 			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
 			await codeAgentService.removeCodeAgentState(tab.threadId);
+			await chatParametersService.removeChatParameters(tab.threadId);
 		} else if (messages?.length === 0) {
 			await storageService.removeItemInternal("app-thread:" + tab.threadId);
 			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
 			await codeAgentService.removeCodeAgentState(tab.threadId);
+			await chatParametersService.removeChatParameters(tab.threadId);
 		}
 	}
 
@@ -469,6 +472,9 @@ export class TabService {
 				console.error(`Failed to update window ID for tab ${tabId}:`, error);
 			});
 
+		// Reattach shortcut engine with new windowId to fix shortcut context
+		shortcutService.getEngine().attachToView(view, toWindow.id, tabId);
+
 		// Add to target window
 		this.attachViewToWindow(toWindow, view);
 
@@ -512,6 +518,8 @@ export class TabService {
 		title: string = "Chat",
 		type: TabType = "chat",
 		active: boolean = true,
+		initialSearchQuery?: string,
+		initialSearchResultIds?: string[],
 	): Promise<string | null> {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return null;
@@ -592,6 +600,8 @@ export class TabService {
 			type,
 			active,
 			threadId,
+			...(initialSearchQuery ? { initialSearchQuery } : {}),
+			...(initialSearchResultIds?.length ? { initialSearchResultIds } : {}),
 		};
 
 		const view = await this.newWebContentsView(window.id, newTab);

@@ -3,6 +3,7 @@
 		modelName: string;
 		className?: string;
 		forceDark?: boolean;
+		forceApplyClassName?: boolean;
 	}
 </script>
 
@@ -53,7 +54,7 @@
 	import yiIcon from "@lobehub/icons-static-svg/icons/yi-color.svg";
 	import zhipuIcon from "@lobehub/icons-static-svg/icons/zhipu-color.svg";
 
-	const { modelName, className, forceDark = false }: Props = $props();
+	const { modelName, className, forceDark = false, forceApplyClassName = false }: Props = $props();
 	const coloredIcons = new Set([
 		ai302Icon,
 		azureIcon,
@@ -217,7 +218,7 @@
 	class={cn(
 		"h-4 w-4 rounded-full",
 		!forceDark && !isColorIcon && "dark:brightness-0 dark:invert dark:filter",
-		iconUrl !== ai302Icon && className,
+		(forceApplyClassName || iconUrl !== ai302Icon) && className,
 	)}
 	alt={modelName || "Model Icon"}
 	onerror={handleError}

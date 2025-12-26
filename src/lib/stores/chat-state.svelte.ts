@@ -23,10 +23,14 @@ import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 
 import { updateSessionNote } from "$lib/api/sandbox-session";
+import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
+
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
+import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { agentPreviewState } from "./agent-preview-state.svelte";
 import { codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
+import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
 import { preferencesSettings } from "./preferences-settings.state.svelte";
 import {
@@ -117,6 +121,37 @@ $effect.root(() => {
 				`[ChatState] Clearing selectedModel ${selected.providerId}:${selected.id} (model not found)`,
 			);
 			persistedChatParamsState.current.selectedModel = null;
+		}
+	});
+
+	// Clean up mcpServerIds when MCP servers are deleted
+	$effect(() => {
+		// Avoid running too early
+		if (!persistedChatParamsState.isHydrated || !mcpState.isHydrated) {
+			return;
+		}
+
+		const currentServerIds = persistedChatParamsState.current.mcpServerIds;
+		if (!currentServerIds || currentServerIds.length === 0) {
+			return;
+		}
+
+		// Get IDs of all existing servers
+		const existingServerIds = new Set(mcpState.servers.map((s) => s.id));
+
+		// Filter out IDs that no longer exist
+		const validServerIds = currentServerIds.filter((id) => existingServerIds.has(id));
+
+		// If some IDs were removed, update the state
+		if (validServerIds.length !== currentServerIds.length) {
+			console.log(
+				`[ChatState] Cleaning up deleted MCP server IDs: ${currentServerIds.length - validServerIds.length} removed`,
+			);
+			persistedChatParamsState.current = {
+				...persistedChatParamsState.current,
+				mcpServerIds: validServerIds,
+				isMCPActive: validServerIds.length > 0,
+			};
 		}
 	});
 });
@@ -603,9 +638,6 @@ class ChatState {
 
 				await broadcastService.broadcastToAll("thread-list-updated", { threadId });
 
-				// this.inputValue = "";
-				// this.attachments = [];
-
 				this.resetChat();
 			} catch (error) {
 				this.handleChatError(error);
@@ -850,11 +882,37 @@ class ChatState {
 			const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 			const serverPort = window.app?.serverPort ?? 8089;
 
-			const generatedTitle = await generateTitle(this.messages, titleModel, provider, serverPort);
+			// Get previous summary and determine if first generation
+			const previousSummary = persistedChatParamsState.current.incrementalSummary;
+			const isFirstGeneration = this.messages.length === 2;
 
-			if (generatedTitle) {
-				persistedChatParamsState.current.title = generatedTitle;
-				await tabBarState.updateTabTitle(persistedChatParamsState.current.id, generatedTitle);
+			// Prepare messages for incremental generation
+			let messagesToSend: ChatMessage[];
+			if (isFirstGeneration) {
+				// First generation: only send the first user message
+				messagesToSend = this.messages.filter((m) => m.role === "user").slice(0, 1);
+			} else {
+				// Incremental: send previous assistant message + latest user message
+				const userMessages = this.messages.filter((m) => m.role === "user");
+				const assistantMessages = this.messages.filter((m) => m.role === "assistant");
+				const lastUserMsg = userMessages.at(-1);
+				const prevAssistantMsg = assistantMessages.at(-1);
+				messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
+			}
+
+			const result = await generateTitle(
+				messagesToSend,
+				titleModel,
+				provider,
+				serverPort,
+				previousSummary,
+				isFirstGeneration,
+			);
+
+			if (result) {
+				persistedChatParamsState.current.title = result.title;
+				persistedChatParamsState.current.incrementalSummary = result.summary;
+				await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
 
 				// Force flush to ensure all changes are persisted before broadcasting
 				persistedChatParamsState.flush();
@@ -1097,6 +1155,17 @@ class ChatState {
 		this.mcpServerIds = serverIds;
 	}
 
+	/**
+	 * Update MCP server IDs and active state in a single operation to avoid race conditions
+	 */
+	handleMCPServerChange(serverIds: string[]) {
+		persistedChatParamsState.current = {
+			...persistedChatParamsState.current,
+			mcpServerIds: serverIds,
+			isMCPActive: serverIds.length > 0,
+		};
+	}
+
 	handleSelectedModelChange(model: Model | null) {
 		this.selectedModel = model;
 	}
@@ -1211,6 +1280,26 @@ export const chat = new Chat({
 				threadId,
 				sessionId,
 				sandboxName: claudeCodeAgentState.sandboxRemark,
+
+				// Resolved system prompt with variables substituted
+				// Note: input variable is not supported for system prompts
+				systemPrompt: (() => {
+					if (!chatParameters.systemPromptContent) return undefined;
+
+					const result = resolvePrompt(chatParameters.systemPromptContent, {
+						modelId: chatState.selectedModel?.id ?? "",
+						language: generalSettings.language,
+						cachedMap: chatParameters.systemPromptMap,
+						variables: chatParameters.systemPromptVariables,
+					});
+
+					// Update cache with newly computed values
+					if (Object.keys(result.updatedMap).length > 0) {
+						chatParameters.updateSystemPromptMap(result.updatedMap);
+					}
+
+					return result.content;
+				})(),
 			};
 		},
 	}),
@@ -1219,7 +1308,30 @@ export const chat = new Chat({
 	},
 	onFinish: async ({ messages, isAbort, isDisconnect, isError }) => {
 		console.log("更新完成", $state.snapshot(messages));
+		console.debug("[onFinish] messages", JSON.stringify($state.snapshot(messages), null, 2));
 		console.log("[onFinish] isAbort:", isAbort, "isDisconnect:", isDisconnect, "isError:", isError);
+
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			const updatedMessages = messages.map((msg) => {
+				if (msg.id === lastUserMessage.id) {
+					return {
+						...msg,
+						metadata: {
+							...msg.metadata,
+							userPromptTemplateContent: chatParameters.userPromptTemplateContent,
+							userPromptTemplateVariables: chatParameters.userPromptTemplateVariables,
+							userPromptTemplateMap: chatParameters.userPromptTemplateMap,
+						},
+					};
+				}
+				return msg;
+			});
+
+			// Update both messages array and persisted state
+			chat.messages = updatedMessages;
+			messages = updatedMessages;
+		}
 
 		const codeAgentEnabled = codeAgentState.enabled;
 		console.log("onFinish: async ({ messages }) pendingResultMetadata", pendingResultMetadata);
@@ -1369,18 +1481,44 @@ export const chat = new Chat({
 				const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 				const serverPort = window.app?.serverPort ?? 8089;
 
-				const generatedTitle = await generateTitle(messages, titleModel, provider, serverPort);
-				if (generatedTitle) {
-					persistedChatParamsState.current.title = generatedTitle;
+				// Get previous summary for incremental generation
+				const previousSummary = persistedChatParamsState.current.incrementalSummary;
+
+				// Prepare messages for incremental generation
+				let messagesToSend: ChatMessage[];
+				if (isFirstMessage) {
+					// First generation: only send the first user message
+					messagesToSend = messages.filter((m) => m.role === "user").slice(0, 1);
+				} else {
+					// Incremental: send previous assistant message + latest user message
+					const userMessages = messages.filter((m) => m.role === "user");
+					const assistantMessages = messages.filter((m) => m.role === "assistant");
+					const lastUserMsg = userMessages.at(-1);
+					const prevAssistantMsg = assistantMessages.at(-1);
+					messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
+				}
+
+				const result = await generateTitle(
+					messagesToSend,
+					titleModel,
+					provider,
+					serverPort,
+					previousSummary,
+					isFirstMessage,
+				);
+
+				if (result) {
+					persistedChatParamsState.current.title = result.title;
+					persistedChatParamsState.current.incrementalSummary = result.summary;
 					if (codeAgentEnabled && provider) {
 						updateSessionNote(provider, {
-							note: generatedTitle,
+							note: result.title,
 							sandbox_id: claudeCodeAgentState.sandboxId,
 							session_id: claudeCodeAgentState.currentSessionId,
 						});
 					}
 
-					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, generatedTitle);
+					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
 				}
 			} catch (error) {
 				console.error("Failed to generate title:", error);

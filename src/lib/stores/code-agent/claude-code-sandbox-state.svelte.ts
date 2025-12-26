@@ -71,6 +71,25 @@ class ClaudeCodeSandboxState {
 		];
 	});
 
+	groupedSessions = $derived.by(() => {
+		const sandboxes = persistedClaudeCodeSandboxState.current;
+		return {
+			standalone: [newSessionItem],
+			groups: sandboxes.map((sandbox) => ({
+				groupKey: sandbox.sandboxId,
+				groupLabel: sandbox.sandboxRemark || sandbox.sandboxId,
+				items: [...sandbox.sessionInfos]
+					.sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime())
+					.map((session) => ({
+						key: session.workspacePath,
+						label: session.note || session.sessionId,
+						value: session.sessionId,
+						extra: session.usedAt,
+					})),
+			})),
+		};
+	});
+
 	/**
 	 * Get the workspace path for the current session
 	 * Returns the session's workspacePath if available, empty string otherwise

@@ -192,17 +192,19 @@ export class PersistedState<T extends StorageValue> {
 	}
 
 	// Force immediate storage without debounce
-	flush(): void {
+	async flush(): Promise<void> {
 		if (this.#storeTimeoutId !== null) {
 			clearTimeout(this.#storeTimeoutId);
 			this.#storeTimeoutId = null;
 		}
-		this.#storage?.setItemAsync(this.#key, this.#current ?? null).catch((error) => {
+		try {
+			await this.#storage?.setItemAsync(this.#key, this.#current ?? null);
+		} catch (error) {
 			console.error(
 				`Error when flushing persisted store "${this.#key}" to Electron storage`,
 				error,
 			);
-		});
+		}
 	}
 
 	// Force refresh from storage (useful after main process updates)

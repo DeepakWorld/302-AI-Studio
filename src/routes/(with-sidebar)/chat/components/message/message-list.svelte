@@ -256,7 +256,7 @@
 				type="button"
 				onclick={scrollToTopSmooth}
 				title={m.scroll_to_top()}
-				class="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl dark:bg-gray-800 dark:hover:bg-gray-700"
+				class="pointer-events-auto flex cursor-pointer h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl dark:bg-gray-800 dark:hover:bg-gray-700"
 			>
 				<ArrowUp class="h-5 w-5 text-gray-700 dark:text-gray-200" />
 			</button>
@@ -266,7 +266,7 @@
 				type="button"
 				onclick={scrollToBottomSmooth}
 				title={m.scroll_to_bottom()}
-				class="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl dark:bg-gray-800 dark:hover:bg-gray-700"
+				class="pointer-events-auto flex cursor-pointer h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg transition-all hover:bg-gray-50 hover:shadow-xl dark:bg-gray-800 dark:hover:bg-gray-700"
 			>
 				<ArrowDown class="h-5 w-5 text-gray-700 dark:text-gray-200" />
 			</button>

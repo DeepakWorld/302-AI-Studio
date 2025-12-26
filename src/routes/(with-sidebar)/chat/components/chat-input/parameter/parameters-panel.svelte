@@ -3,10 +3,12 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import ParametersInput from "./parameters-input.svelte";
 	import ParametersSlider from "./parameters-slider.svelte";
+	import SystemPromptEditor from "./system-prompt-editor.svelte";
+	import UserPromptTemplateEditor from "./user-prompt-template-editor.svelte";
 </script>
 
-<div class="w-[500px]">
-	<div class="flex flex-col gap-y-4 rounded-[10px] bg-background p-4">
+<div class="flex w-4xl gap-4">
+	<div class="flex flex-1 flex-col justify-between rounded-[10px] bg-background p-4">
 		<ParametersSlider
 			label={m.text_label_temperature()}
 			tips={m.title_temperature_tips()}
@@ -49,5 +51,10 @@
 			value={chatState.presencePenalty}
 			onChange={chatState.handlePresencePenaltyChange.bind(chatState)}
 		/>
+	</div>
+
+	<div class="flex flex-1 flex-col gap-y-2 rounded-[10px] bg-background p-4 min-h-0">
+		<SystemPromptEditor />
+		<UserPromptTemplateEditor />
 	</div>
 </div>

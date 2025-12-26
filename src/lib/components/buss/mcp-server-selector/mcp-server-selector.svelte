@@ -1,20 +1,26 @@
 <script lang="ts">
+	import EmptyMcpListIcon from "$lib/assets/icons/mcp/empty-mcp-list.svg";
 	import SettingSearchInput from "$lib/components/buss/settings/setting-search-input.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
 	import Checkbox from "$lib/components/ui/checkbox/checkbox.svelte";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as m from "$lib/paraglide/messages.js";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
+
 	import { Server } from "@lucide/svelte";
+	import type { McpServerType } from "@shared/types";
+
+	async function handleGoToMcpSettings() {
+		await window.electronAPI.windowService.handleOpenSettingsWindow("/settings/mcp-settings");
+	}
 
 	interface Props {
 		open: boolean;
 		selectedServerIds: string[];
-		onClose: () => void;
 		onConfirm: (selectedIds: string[]) => void;
+		filterType?: McpServerType;
 	}
 
-	let { open = $bindable(), selectedServerIds = [], onClose, onConfirm }: Props = $props();
+	let { open = $bindable(), selectedServerIds = [], onConfirm, filterType }: Props = $props();
 
 	let searchTerm = $state("");
 	let localSelectedIds = $state<string[]>([]);
@@ -22,8 +28,9 @@
 	const filteredServers = $derived(
 		mcpState.servers.filter(
 			(server) =>
-				server.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				server.description?.toLowerCase().includes(searchTerm.toLowerCase()),
+				(filterType ? server.type === filterType : true) &&
+				(server.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+					server.description?.toLowerCase().includes(searchTerm.toLowerCase())),
 		),
 	);
 
@@ -36,37 +43,40 @@
 	});
 
 	function handleToggleServer(serverId: string) {
+		let newSelectedIds: string[];
 		if (localSelectedIds.includes(serverId)) {
-			localSelectedIds = localSelectedIds.filter((id) => id !== serverId);
+			newSelectedIds = localSelectedIds.filter((id) => id !== serverId);
 		} else {
-			localSelectedIds = [...localSelectedIds, serverId];
+			newSelectedIds = [...localSelectedIds, serverId];
 		}
-	}
-
-	function handleConfirm() {
-		onConfirm(localSelectedIds);
-		onClose();
-	}
-
-	function handleCancel() {
-		onClose();
+		localSelectedIds = newSelectedIds;
+		onConfirm(newSelectedIds);
 	}
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="w-[600px] max-h-[700px] flex flex-col p-6 gap-4">
-		<Dialog.Header>
-			<Dialog.Title>{m.mcp_select_servers()}</Dialog.Title>
-		</Dialog.Header>
-
-		<div class="flex flex-col gap-4 flex-1 min-h-0">
+	<Dialog.Content class="w-[600px] max-h-[700px] flex flex-col p-6 gap-4" showCloseButton={false}>
+		<div class="flex flex-col gap-4 flex-1 min-h-0 min-w-[552px]">
 			<SettingSearchInput bind:value={searchTerm} placeholder={m.mcp_search_placeholder()} />
 
 			<div class="flex-1 overflow-y-auto min-h-0">
 				{#if filteredServers.length === 0}
-					<div class="text-muted-foreground py-8 text-center">
-						{searchTerm ? m.mcp_no_match() : m.mcp_no_servers()}
-					</div>
+					{#if searchTerm}
+						<div class="w-full text-muted-foreground py-8 text-center">
+							{m.mcp_no_match()}
+						</div>
+					{:else}
+						<div class="flex w-full flex-col items-center justify-center py-8">
+							<img src={EmptyMcpListIcon} alt="" class="mb-4 h-24 w-24" />
+							<p class="text-muted-foreground text-sm">
+								{m.mcp_no_servers_empty_state()}<button
+									type="button"
+									class="text-primary hover:text-primary/80 cursor-pointer font-medium"
+									onclick={handleGoToMcpSettings}>{m.mcp_click_to_settings()}</button
+								>
+							</p>
+						</div>
+					{/if}
 				{:else}
 					<div class="flex flex-col gap-2">
 						{#each filteredServers as server (server.id)}
@@ -95,14 +105,7 @@
 											{/if}
 										</div>
 									</div>
-									<div class="flex items-center gap-2 flex-shrink-0">
-										<span
-											class="text-setting-fg text-xs {server.enabled
-												? 'text-green-600'
-												: 'text-gray-400'}"
-										>
-											{server.enabled ? m.mcp_enabled() : m.mcp_disabled()}
-										</span>
+									<div class="flex items-center flex-shrink-0">
 										<Checkbox checked={localSelectedIds.includes(server.id)} />
 									</div>
 								</div>
@@ -112,10 +115,5 @@
 				{/if}
 			</div>
 		</div>
-
-		<Dialog.Footer>
-			<Button variant="outline" onclick={handleCancel}>{m.mcp_cancel()}</Button>
-			<Button onclick={handleConfirm}>{m.mcp_confirm()}</Button>
-		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

@@ -123,6 +123,11 @@
 	--ui-chat-user-message-fg: var(--ui-accent-fg);
 	--ui-chat-assistant-message-fg: var(--ui-text);
 
+	/* Code Agent — exposed minimal knobs */
+	--ui-code-agent-primary: #8e47f0;
+	--ui-code-agent-border: #d9d9d9;
+	--ui-code-agent-border-active: rgba(142, 71, 240, 0.4);
+
 	/* Provider List — exposed minimal knobs */
 	--ui-provider-item-h: 3.5rem; /* h-14 */
 	--ui-provider-padding-x: 0.75rem; /* px-3 */
@@ -283,6 +288,11 @@
 	--color-chat-user-message-bg: var(--ui-chat-user-message-bg);
 	--color-chat-user-message-fg: var(--ui-chat-user-message-fg);
 	--color-chat-assistant-message-fg: var(--ui-chat-assistant-message-fg);
+
+	/* Code Agent bridge */
+	--color-code-agent-primary: var(--ui-code-agent-primary);
+	--color-code-agent-border: var(--ui-code-agent-border);
+	--color-code-agent-border-active: var(--ui-code-agent-border-active);
 
 	/* Provider List bridge */
 	--spacing-provider-item: var(--ui-provider-item-h);

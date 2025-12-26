@@ -77,7 +77,7 @@
 {/snippet}
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_resetData()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_resetData()}</Label>
 	<SettingInfoItem label={m.settings_clearChatHistory()} action={clearHistoryButton} />
 	<SettingInfoItem label={m.settings_resetAllData()} action={resetButton} />
 

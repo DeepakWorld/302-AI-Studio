@@ -89,7 +89,7 @@
 				{#if !isLoading}
 					<button
 						onclick={() => handleRemove(attachment.id)}
-						class="pointer-events-auto absolute top-0.5 right-0 size-4 text-destructive opacity-0 group-hover:opacity-100"
+						class="pointer-events-auto absolute top-0.5 right-0 size-4 text-destructive opacity-0 group-hover:opacity-100 cursor-pointer"
 					>
 						<Trash2 class="size-3.5 hover:text-destructive/80" />
 					</button>

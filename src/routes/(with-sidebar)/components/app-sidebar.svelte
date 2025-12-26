@@ -15,11 +15,11 @@
 	import { ChevronDown } from "@lucide/svelte";
 	import type { CodeAgentConfigMetadata, CodeAgentMetadata } from "@shared/storage/code-agent";
 	import { onMount } from "svelte";
+	import { SvelteMap } from "svelte/reactivity";
 	import RenameDialog from "./rename-dialog.svelte";
 	import ThreadDeleteDialog from "./thread-delete-dialog.svelte";
 	import ThreadItem from "./thread-item.svelte";
 
-	let searchQuery = $state("");
 	let searchInputElement: HTMLInputElement | null = $state(null);
 	let groupCollapsedState = $state<Record<TimeGroup, boolean>>({
 		[TimeGroup.TODAY]: true,
@@ -37,6 +37,9 @@
 	let deleteSessionId = $state<string | null>(null);
 
 	onMount(() => {
+		// Initialize search state for this tab
+		sidebarSearchState.initializeForTab();
+
 		// Register focus callback
 		const cleanup = sidebarSearchState.registerFocusCallback(() => {
 			searchInputElement?.focus();
@@ -88,10 +91,21 @@
 	}
 
 	const filteredThreadList = $derived.by(async () => {
-		if (!searchQuery.trim()) return threadsState.threads;
+		if (!sidebarSearchState.searchQuery.trim()) return threadsState.threads;
 
 		const threads = threadsState.threads;
-		const searchTerm = searchQuery.toLowerCase().trim();
+		const searchTerm = sidebarSearchState.searchQuery.toLowerCase().trim();
+
+		// Check if we have initial search results from tab creation
+		const initialResultIds = sidebarSearchState.getInitialSearchResultIds();
+		if (initialResultIds && initialResultIds.length > 0) {
+			// Use pre-computed results - just filter by IDs
+			const resultSet = new Set(initialResultIds);
+			const results = threads.filter((t) => resultSet.has(t.threadId));
+			// Cache for future tab creation
+			sidebarSearchState.setCachedSearchResultIds(initialResultIds);
+			return results;
+		}
 
 		const { storageService } = window.electronAPI;
 
@@ -133,11 +147,16 @@
 			}),
 		);
 
-		return filtered.filter((item) => item.match).map((item) => item.threadData);
+		const results = filtered.filter((item) => item.match).map((item) => item.threadData);
+
+		// Cache result IDs for future tab creation
+		sidebarSearchState.setCachedSearchResultIds(results.map((t) => t.threadId));
+
+		return results;
 	});
 
 	const groupedThreadList = $derived.by(() => {
-		if (searchQuery.trim()) return null;
+		if (sidebarSearchState.searchQuery.trim()) return null;
 
 		const threads = threadsState.threads;
 		const groups: Record<TimeGroup, typeof threads> = {
@@ -159,10 +178,21 @@
 			);
 		});
 
+		console.log("Grouped threads:", groups);
+
 		return groups;
 	});
 
 	// Helper function to check if a thread has code agent enabled
+	const codeAgentInfoPromiseCache = new SvelteMap<
+		string,
+		Promise<{
+			isCodeAgent: boolean;
+			sandboxId?: string;
+			sessionId?: string;
+		}>
+	>();
+
 	async function isCodeAgentThread(threadId: string): Promise<{
 		isCodeAgent: boolean;
 		sandboxId?: string;
@@ -220,13 +250,32 @@
 		return { isCodeAgent: false };
 	}
 
+	function getCodeAgentInfo(threadId: string) {
+		const cached = codeAgentInfoPromiseCache.get(threadId);
+		if (cached) return cached;
+		const promise = isCodeAgentThread(threadId);
+		// Cache the promise without triggering reactive updates in template context
+		Promise.resolve().then(() => {
+			codeAgentInfoPromiseCache.set(threadId, promise);
+		});
+		return promise;
+	}
+
 	async function handleThreadClick(threadId: string) {
+		// Get current search data to pass to new tab if clicking from search results
+		const searchData = sidebarSearchState.getSearchDataForNewTab();
+
 		const currentTabs = await tabBarState.getAllTabs();
 		const existingTab = currentTabs?.find((tab) => tab.threadId === threadId);
 		if (existingTab) {
 			await tabBarState.handleActivateTab(existingTab.id);
 		} else {
-			await tabBarState.handleNewTabForExistingThread(threadId);
+			// Pass search query and result IDs when creating new tab from search results
+			await tabBarState.handleNewTabForExistingThread(
+				threadId,
+				searchData?.query,
+				searchData?.resultIds,
+			);
 		}
 	}
 
@@ -351,7 +400,8 @@
 	<Sidebar.Header class="px-4 pb-2">
 		<Input
 			class="bg-background! h-10 rounded-[10px]"
-			bind:value={searchQuery}
+			value={sidebarSearchState.searchQuery}
+			oninput={(e) => (sidebarSearchState.searchQuery = e.currentTarget.value)}
 			bind:ref={searchInputElement}
 			placeholder={m.placeholder_input_search()}
 		/>
@@ -359,11 +409,11 @@
 	<Sidebar.Content class="bg-input pt-0">
 		<Sidebar.Group>
 			<Sidebar.GroupContent class="flex flex-col gap-y-1 px-3">
-				{#if searchQuery.trim()}
+				{#if sidebarSearchState.searchQuery.trim()}
 					{#await filteredThreadList then threads}
 						{#each threads as threadData (threadData.threadId)}
 							{@const { threadId, thread, isFavorite } = threadData}
-							{#await isCodeAgentThread(threadId) then agentInfo}
+							{#await getCodeAgentInfo(threadId) then agentInfo}
 								<ThreadItem
 									{threadId}
 									{thread}
@@ -402,7 +452,7 @@
 								<Collapsible.Content class="flex flex-col gap-y-1">
 									{#each group as threadData (threadData.threadId)}
 										{@const { threadId, thread, isFavorite } = threadData}
-										{#await isCodeAgentThread(threadId) then agentInfo}
+										{#await getCodeAgentInfo(threadId) then agentInfo}
 											<ThreadItem
 												{threadId}
 												{thread}

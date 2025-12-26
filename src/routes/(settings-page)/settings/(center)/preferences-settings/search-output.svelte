@@ -16,7 +16,7 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_searchProvider()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_searchProvider()}</Label>
 	<SettingSelect
 		name="searchProvider"
 		value={preferencesSettings.searchProvider}
