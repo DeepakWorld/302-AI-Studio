@@ -17,11 +17,12 @@
 </script>
 
 <script lang="ts">
+	import CodeMirrorEditor from "$lib/components/buss/editor/codemirror-editor.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
-	import { Textarea } from "$lib/components/ui/textarea/index.js";
 	import * as m from "$lib/paraglide/messages.js";
+	import { mode } from "mode-watcher";
 	import { toast } from "svelte-sonner";
 
 	let { open = $bindable(), onClose, onImport }: Props = $props();
@@ -121,7 +122,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="max-w-2xl">
+	<Dialog.Content class="w-[42rem]" data-mcp-import-dialog>
 		<Dialog.Header>
 			<Dialog.Title>{m.mcp_import_title()}</Dialog.Title>
 		</Dialog.Header>
@@ -129,12 +130,14 @@
 		<div class="space-y-4">
 			<div class="flex flex-col gap-2">
 				<Label for="jsonInput">{m.mcp_import_json_label()}</Label>
-				<Textarea
-					id="jsonInput"
-					bind:value={jsonInput}
-					placeholder={m.mcp_import_json_placeholder()}
-					class="min-h-48 resize-none rounded-settings-item bg-settings-item-bg font-mono text-sm"
-				/>
+				<div class="relative h-64 rounded-lg border overflow-hidden">
+					<CodeMirrorEditor
+						value={jsonInput}
+						language="json"
+						theme={mode.current === "dark" ? "dark" : "light"}
+						onChange={(value) => (jsonInput = value)}
+					/>
+				</div>
 			</div>
 		</div>
 

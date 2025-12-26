@@ -416,10 +416,11 @@
 	.codemirror-container :global(.cm-scroller) {
 		overflow: auto !important;
 		max-height: 100%;
+		height: 100%;
 	}
 
 	.codemirror-container :global(.cm-content) {
-		min-height: 0;
+		min-height: 100%;
 	}
 
 	.codemirror-container :global(.cm-gutters) {
