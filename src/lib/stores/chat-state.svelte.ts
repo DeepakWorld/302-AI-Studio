@@ -161,8 +161,34 @@ class ChatState {
 	private retryInProgress = $state(false);
 	private hydrateCheckInterval: ReturnType<typeof setInterval> | null = null;
 
+	// AbortController for canceling pending suggestions generation
+	private suggestionsAbortController: AbortController | null = null;
+
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
+
+	/**
+	 * Cancel any pending suggestions generation request.
+	 * Should be called before sending a new message to avoid race conditions.
+	 */
+	cancelPendingSuggestions() {
+		if (this.suggestionsAbortController) {
+			this.suggestionsAbortController.abort();
+			this.suggestionsAbortController = null;
+			console.log("[Suggestions] Cancelled pending suggestions generation");
+		}
+	}
+
+	/**
+	 * Create a new AbortController for suggestions generation.
+	 * Returns the AbortSignal to be passed to the fetch request.
+	 */
+	createSuggestionsAbortController(): AbortSignal {
+		// Cancel any existing pending request first
+		this.cancelPendingSuggestions();
+		this.suggestionsAbortController = new AbortController();
+		return this.suggestionsAbortController.signal;
+	}
 
 	constructor() {
 		// Watch for PersistedState hydration and sync messages to chat
@@ -488,6 +514,9 @@ class ChatState {
 
 	sendMessage = async () => {
 		if (this.sendMessageEnabled) {
+			// Cancel any pending suggestions generation to avoid race conditions
+			this.cancelPendingSuggestions();
+
 			try {
 				const currentModel = this.selectedModel!;
 				const currentAttachments = [...this.attachments];
@@ -650,6 +679,9 @@ class ChatState {
 			console.warn("Cannot regenerate: chat is not ready or no model selected");
 			return;
 		}
+
+		// Cancel any pending suggestions generation to avoid race conditions
+		this.cancelPendingSuggestions();
 
 		const currentModel = this.selectedModel!;
 
@@ -1560,6 +1592,11 @@ export const chat = new Chat({
 			const lastMessage = messages[messages.length - 1];
 			if (lastMessage && lastMessage.role === "assistant") {
 				const serverPort = window.app?.serverPort ?? 8089;
+				const targetMessageId = lastMessage.id;
+
+				// Create AbortController for this suggestions generation
+				// This will be cancelled if user sends a new message
+				const abortSignal = chatState.createSuggestionsAbortController();
 
 				// Don't await - let this run in the background
 				generateSuggestions(
@@ -1569,14 +1606,28 @@ export const chat = new Chat({
 					generalSettings.language,
 					preferencesSettings.suggestionsCount,
 					serverPort,
+					abortSignal,
 				)
 					.then((suggestions) => {
+						// Check if request was aborted (user sent a new message)
+						if (abortSignal.aborted) {
+							console.log("[Suggestions] Skipped: request was aborted");
+							return;
+						}
+
+						// Check if a new stream is in progress - don't update chat.messages
+						// to avoid breaking the ongoing stream
+						if (chatState.isStreaming || chatState.isSubmitted) {
+							console.log("[Suggestions] Skipped: new stream in progress");
+							return;
+						}
+
 						if (suggestions && suggestions.length > 0) {
 							console.log("[Suggestions] Adding to message:", suggestions);
 
 							// Find the message again (it might have changed)
 							const currentMessages = persistedMessagesState.current;
-							const messageIndex = currentMessages.findIndex((m) => m.id === lastMessage.id);
+							const messageIndex = currentMessages.findIndex((m) => m.id === targetMessageId);
 
 							if (messageIndex !== -1) {
 								// Check if suggestions already exist
@@ -1603,15 +1654,28 @@ export const chat = new Chat({
 									const updatedMessages = [...currentMessages];
 									updatedMessages[messageIndex] = updatedMessage;
 
-									// Update both the persisted state and chat.messages to trigger reactivity
+									// Update persisted state first
 									persistedMessagesState.current = updatedMessages;
-									chat.messages = updatedMessages;
-									console.log("[Suggestions] Successfully added to message");
+
+									// Only update chat.messages if not streaming/submitted
+									// This is a double-check since state could have changed during updates
+									if (!chatState.isStreaming && !chatState.isSubmitted) {
+										chat.messages = updatedMessages;
+										console.log("[Suggestions] Successfully added to message");
+									} else {
+										console.log(
+											"[Suggestions] Saved to persisted state, skipped chat.messages update due to active stream",
+										);
+									}
 								}
 							}
 						}
 					})
 					.catch((error) => {
+						// AbortError is expected when user sends a new message, don't log as error
+						if (error instanceof Error && error.name === "AbortError") {
+							return;
+						}
 						console.error("[Suggestions] Failed to generate:", error);
 					});
 			}
