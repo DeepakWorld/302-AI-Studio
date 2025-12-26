@@ -288,8 +288,8 @@ export function registerIpcHandlers() {
 	ipcMain.handle("aiApplicationService:getAiApplicationUrl", (event, applicationId) =>
 		aiApplicationService.getAiApplicationUrl(event, applicationId),
 	);
-	ipcMain.handle("aiApplicationService:handleAiApplicationReload", (event, tabId) =>
-		aiApplicationService.handleAiApplicationReload(event, tabId),
+	ipcMain.handle("aiApplicationService:handleAiApplicationReloadIpc", (event, tabId) =>
+		aiApplicationService.handleAiApplicationReloadIpc(event, tabId),
 	);
 
 	// appService service registration
@@ -477,7 +477,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("tabService:handleClearTabMessages");
 	ipcMain.removeHandler("tabService:handleGenerateTabTitle");
 	ipcMain.removeHandler("aiApplicationService:getAiApplicationUrl");
-	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReload");
+	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReloadIpc");
 	ipcMain.removeHandler("appService:getTheme");
 	ipcMain.removeHandler("appService:setTheme");
 	ipcMain.removeHandler("appService:restartApp");

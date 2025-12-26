@@ -83,7 +83,7 @@ export class ShortcutActionsHandler {
 
 	private handleRegenerateResponse(): void {
 		if (chatState.messages.length === 0) {
-			toast.error("No messages to regenerate");
+			// toast.error("No messages to regenerate");
 			return;
 		}
 		chatState.regenerateMessage();

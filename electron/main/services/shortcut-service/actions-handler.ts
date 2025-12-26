@@ -1,6 +1,7 @@
 import type { ShortcutContext } from "@shared/types/shortcut";
 import { BrowserWindow } from "electron";
 import { isNull } from "es-toolkit";
+import { aiApplicationService } from "../ai-application-service";
 import { tabService } from "../tab-service";
 import { windowService } from "../window-service";
 
@@ -254,6 +255,12 @@ export class ShortcutActionsHandler {
 				action: "regenerateResponse",
 				ctx,
 			});
+		} else {
+			// For tool view
+			console.log(
+				"[ShortcutActionsHandler] handleRegenerateResponse - activeView is null or destroyed",
+			);
+			await aiApplicationService.handleAiApplicationReload(windowId);
 		}
 	}
 

@@ -137,7 +137,7 @@
 							)}
 							{#if modifierKeys.length > 0}
 								<span class="text-settings-shortcut-size">
-									{formatShortcutLabel(modifierKeys)} + 1~9\
+									{formatShortcutLabel(modifierKeys)}+1~9
 								</span>
 							{:else}
 								<span class="text-settings-shortcut-size"> 1~9 </span>

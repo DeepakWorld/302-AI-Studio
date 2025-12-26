@@ -36,7 +36,7 @@
 	import type { Tab } from "@shared/types";
 	import { onDestroy } from "svelte";
 
-	const { handleAiApplicationReload } = window.electronAPI.aiApplicationService;
+	const { handleAiApplicationReloadIpc } = window.electronAPI.aiApplicationService;
 	const { storageService } = window.electronAPI;
 
 	const {
@@ -214,7 +214,7 @@
 		{/if}
 
 		{#if tab.type === "aiApplications"}
-			<ContextMenu.Item onSelect={() => handleAiApplicationReload(tab.id)}>
+			<ContextMenu.Item onSelect={() => handleAiApplicationReloadIpc(tab.id)}>
 				{m.label_button_reload()}
 			</ContextMenu.Item>
 			<ContextMenu.Separator />
