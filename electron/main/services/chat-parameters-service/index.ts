@@ -25,10 +25,32 @@ class ChatParametersService {
 	): Promise<ChatMessage[]> {
 		const previousMessages = await chatMessagesService.getMessagesByThreadId(threadId);
 
+		console.log(
+			"Resolving user prompt template variables for thread - before:",
+			JSON.stringify(previousMessages, null, 2),
+		);
+
+		// Find the last user message index
+		const lastUserMessageIndex = previousMessages.reduceRight((acc, msg, index) => {
+			return acc === -1 && msg.role === "user" ? index : acc;
+		}, -1);
+
+		// If user message is not the last message, truncate to include only messages up to and including the last user message
+		let messagesToTruncate = previousMessages;
+		if (lastUserMessageIndex !== -1 && lastUserMessageIndex < previousMessages.length - 1) {
+			messagesToTruncate = previousMessages.slice(0, lastUserMessageIndex + 1);
+			console.log(
+				"Truncated messages to last user message at index",
+				lastUserMessageIndex,
+				"new length:",
+				messagesToTruncate.length,
+			);
+		}
+
 		// Filter out the message to exclude (for regenerate case) before processing
 		const messagesToProcess = excludeLastUserMessageId
-			? previousMessages.filter((msg) => msg.id !== excludeLastUserMessageId)
-			: previousMessages;
+			? messagesToTruncate.filter((msg) => msg.id !== excludeLastUserMessageId)
+			: messagesToTruncate;
 
 		const resolvedMessages = messagesToProcess.map((message) => {
 			if (message.role !== "user") return message;
