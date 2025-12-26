@@ -904,18 +904,23 @@ app.post("/chat/gemini", async (c) => {
 });
 
 app.post("/generate-title", async (c) => {
-	const { messages, model, apiKey, baseUrl, providerType } = await c.req.json<{
-		messages: UIMessage[];
-		model: string;
-		apiKey?: string;
-		baseUrl?: string;
-		providerType: ModelProvider["apiType"];
-	}>();
+	const { messages, model, apiKey, baseUrl, providerType, previousSummary, isFirstGeneration } =
+		await c.req.json<{
+			messages: UIMessage[];
+			model: string;
+			apiKey?: string;
+			baseUrl?: string;
+			providerType: ModelProvider["apiType"];
+			previousSummary?: string;
+			isFirstGeneration?: boolean;
+		}>();
 
 	const conversationText = messages
 		.map((msg) => {
+			const role = msg.role === "user" ? "User" : "Assistant";
 			const textParts = msg.parts.filter((part) => part.type === "text");
-			return textParts.map((part) => ("text" in part ? part.text : "")).join(" ");
+			const text = textParts.map((part) => ("text" in part ? part.text : "")).join(" ");
+			return `${role}: ${text}`;
 		})
 		.join("\n");
 
@@ -959,9 +964,11 @@ app.post("/generate-title", async (c) => {
 	}
 
 	try {
-		const { text } = await generateText({
-			model: languageModel,
-			prompt: `Based on the following conversation, generate a concise title (Please limit your response to a very short length: approximately 10-20 words if in English, or 10-20 characters if in Chinese., no punctuation):
+		let prompt: string;
+
+		if (isFirstGeneration || !previousSummary) {
+			// First generation: only use user's first message
+			prompt = `Based on the following conversation, generate a concise title and summary(Please limit your response to a very short length: approximately 10-20 words if in English, or 10-20 characters if in Chinese., no punctuation):
 
 ${conversationText}
 
@@ -969,12 +976,54 @@ Requirements:
 - Accurately summarize the main topic
 - Be concise and clear
 - Do not use punctuation
-- Return only the title text`,
+
+Return ONLY a valid JSON object in this exact format (no markdown, no code blocks):
+{"title": "your title here", "summary": "your summary here"}`;
+		} else {
+			// Incremental generation: use previous summary + latest messages
+			prompt = `Based on the previous summary and latest conversation, update the title and summary(Please limit your response to a very short length: approximately 10-20 words if in English, or 10-20 characters if in Chinese., no punctuation):
+
+Previous Summary: ${previousSummary}
+
+Latest Conversation:
+${conversationText}
+
+Requirements:
+- Accurately summarize the main topic
+- Be concise and clear
+- Do not use punctuation
+
+Return ONLY a valid JSON object in this exact format (no markdown, no code blocks):
+{"title": "your title here", "summary": "your summary here"}`;
+		}
+
+		const { text } = await generateText({
+			model: languageModel,
+			prompt,
 		});
 
-		const title = text.trim();
+		// Parse JSON response with fallback handling
+		let title = "";
+		let summary = "";
 
-		return c.json({ title });
+		try {
+			// Try to extract JSON from the response (handle potential markdown code blocks)
+			let jsonStr = text.trim();
+			// Remove markdown code blocks if present
+			if (jsonStr.startsWith("```")) {
+				jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+			}
+			const parsed = JSON.parse(jsonStr);
+			title = parsed.title || "";
+			summary = parsed.summary || "";
+		} catch {
+			// Fallback: if JSON parsing fails, use the whole text as title
+			console.warn("Failed to parse title generation JSON response, using fallback");
+			title = text.trim().slice(0, 50);
+			summary = previousSummary || "";
+		}
+
+		return c.json({ title, summary });
 	} catch (error) {
 		console.error("Title generation error:", error);
 		return c.json({ error: "Failed to generate title" }, 500);

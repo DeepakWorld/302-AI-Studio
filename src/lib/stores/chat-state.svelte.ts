@@ -882,11 +882,37 @@ class ChatState {
 			const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 			const serverPort = window.app?.serverPort ?? 8089;
 
-			const generatedTitle = await generateTitle(this.messages, titleModel, provider, serverPort);
+			// Get previous summary and determine if first generation
+			const previousSummary = persistedChatParamsState.current.incrementalSummary;
+			const isFirstGeneration = this.messages.length === 2;
 
-			if (generatedTitle) {
-				persistedChatParamsState.current.title = generatedTitle;
-				await tabBarState.updateTabTitle(persistedChatParamsState.current.id, generatedTitle);
+			// Prepare messages for incremental generation
+			let messagesToSend: ChatMessage[];
+			if (isFirstGeneration) {
+				// First generation: only send the first user message
+				messagesToSend = this.messages.filter((m) => m.role === "user").slice(0, 1);
+			} else {
+				// Incremental: send previous assistant message + latest user message
+				const userMessages = this.messages.filter((m) => m.role === "user");
+				const assistantMessages = this.messages.filter((m) => m.role === "assistant");
+				const lastUserMsg = userMessages.at(-1);
+				const prevAssistantMsg = assistantMessages.at(-1);
+				messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
+			}
+
+			const result = await generateTitle(
+				messagesToSend,
+				titleModel,
+				provider,
+				serverPort,
+				previousSummary,
+				isFirstGeneration,
+			);
+
+			if (result) {
+				persistedChatParamsState.current.title = result.title;
+				persistedChatParamsState.current.incrementalSummary = result.summary;
+				await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
 
 				// Force flush to ensure all changes are persisted before broadcasting
 				persistedChatParamsState.flush();
@@ -1455,18 +1481,44 @@ export const chat = new Chat({
 				const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 				const serverPort = window.app?.serverPort ?? 8089;
 
-				const generatedTitle = await generateTitle(messages, titleModel, provider, serverPort);
-				if (generatedTitle) {
-					persistedChatParamsState.current.title = generatedTitle;
+				// Get previous summary for incremental generation
+				const previousSummary = persistedChatParamsState.current.incrementalSummary;
+
+				// Prepare messages for incremental generation
+				let messagesToSend: ChatMessage[];
+				if (isFirstMessage) {
+					// First generation: only send the first user message
+					messagesToSend = messages.filter((m) => m.role === "user").slice(0, 1);
+				} else {
+					// Incremental: send previous assistant message + latest user message
+					const userMessages = messages.filter((m) => m.role === "user");
+					const assistantMessages = messages.filter((m) => m.role === "assistant");
+					const lastUserMsg = userMessages.at(-1);
+					const prevAssistantMsg = assistantMessages.at(-1);
+					messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
+				}
+
+				const result = await generateTitle(
+					messagesToSend,
+					titleModel,
+					provider,
+					serverPort,
+					previousSummary,
+					isFirstMessage,
+				);
+
+				if (result) {
+					persistedChatParamsState.current.title = result.title;
+					persistedChatParamsState.current.incrementalSummary = result.summary;
 					if (codeAgentEnabled && provider) {
 						updateSessionNote(provider, {
-							note: generatedTitle,
+							note: result.title,
 							sandbox_id: claudeCodeAgentState.sandboxId,
 							session_id: claudeCodeAgentState.currentSessionId,
 						});
 					}
 
-					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, generatedTitle);
+					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
 				}
 			} catch (error) {
 				console.error("Failed to generate title:", error);
