@@ -416,7 +416,7 @@ class ProviderState {
 		}
 
 		// For 302.AI, try to find gemini-3-pro-preview as the preferred default model
-		const DEFAULT_MODEL_ID_302AI = "gemini-3-pro-preview";
+		const DEFAULT_MODEL_ID_302AI = "claude-sonnet-4-5-20250929";
 		let defaultModel =
 			provider.id === "302AI" ? models.find((m) => m.id === DEFAULT_MODEL_ID_302AI) : null;
 
