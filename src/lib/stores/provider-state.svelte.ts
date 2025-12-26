@@ -15,7 +15,7 @@ export const persistedProviderState = new PersistedState<ModelProvider[]>(
 	true,
 	300,
 );
-export const persistedModelState = new PersistedState<Model[]>("app-models", [], true, 500);
+export const persistedModelState = new PersistedState<Model[]>("app-models", [], true);
 
 const { providerService } = window.electronAPI;
 
@@ -120,10 +120,8 @@ class ProviderState {
 
 		const existingModel = persistedModelState.current.find((m) => m.id === input.id);
 		if (existingModel) {
-			// 检查 isAddedByUser 字段
-			const isAddedByUser = (existingModel as Model & { isAddedByUser?: boolean }).isAddedByUser;
 			// 如果 isAddedByUser 为 true，说明已经被用户添加过，不允许重复添加
-			if (isAddedByUser === true) {
+			if (existingModel.isAddedByUser === true) {
 				throw new Error(`Model with ID "${input.id}" already exists`);
 			}
 			// 如果 isAddedByUser 为 false 或 undefined，则更新该模型，将 isAddedByUser 设置为 true
@@ -149,7 +147,7 @@ class ProviderState {
 			return existingModel;
 		}
 
-		const model: Model & { isAddedByUser?: boolean } = {
+		const model: Model = {
 			id: input.id,
 			name: input.name,
 			remark: input.remark || "",
@@ -305,11 +303,26 @@ class ProviderState {
 			const result = await getModelsByProvider(latestProvider);
 			if (result.success && result.data) {
 				await this.updateProvider(latestProvider.id, { status: "connected" });
+
+				// 保留用户手动添加的模型
+				const userAddedModels = persistedModelState.current.filter((model) => {
+					return model.providerId === latestProvider.id && model.isAddedByUser === true;
+				});
+
+				// 获取用户添加的模型ID集合，用于去重
+				const userAddedModelIds = new Set(userAddedModels.map((m) => m.id));
+
+				// 过滤掉与用户添加模型ID重复的新模型
+				const newModelsWithoutDuplicates = result.data.models.filter(
+					(m) => !userAddedModelIds.has(m.id),
+				);
+
 				persistedModelState.current = persistedModelState.current
 					.filter((models) => {
 						return models.providerId !== latestProvider.id;
 					})
-					.concat(result.data.models);
+					.concat(userAddedModels)
+					.concat(newModelsWithoutDuplicates);
 
 				// 对于 302AI provider，只统计 isFeatured === true 或 isAddedByUser === true 的模型数量
 				const displayCount =
@@ -344,7 +357,20 @@ class ProviderState {
 		try {
 			const result = await getAllModels(persistedProviderState.current);
 			if (result.success && result.data) {
-				persistedModelState.current = result.data.models;
+				// 保留所有用户手动添加的模型
+				const userAddedModels = persistedModelState.current.filter((model) => {
+					return model.isAddedByUser === true;
+				});
+
+				// 获取用户添加的模型ID集合，用于去重
+				const userAddedModelIds = new Set(userAddedModels.map((m) => m.id));
+
+				// 过滤掉与用户添加模型ID重复的新模型
+				const newModelsWithoutDuplicates = result.data.models.filter(
+					(m) => !userAddedModelIds.has(m.id),
+				);
+
+				persistedModelState.current = [...userAddedModels, ...newModelsWithoutDuplicates];
 
 				return true;
 			}
@@ -359,6 +385,75 @@ class ProviderState {
 		if (!provider) return false;
 
 		return await this.fetchModelsForProvider(provider);
+	}
+
+	/**
+	 * Apply a default model for the provider if user hasn't already set a preference
+	 * This is called both after SSO login and after manually adding API key
+	 * Ensures users don't have to manually select a model to start chatting
+	 *
+	 * @param provider - The provider to apply default model for
+	 */
+	async applyDefaultModelIfNeeded(provider: ModelProvider): Promise<void> {
+		// Check if user already has a model preference set
+		const hasExistingModelPreference =
+			preferencesSettings.newSessionModel !== null || sessionState.latestUsedModel !== null;
+
+		if (hasExistingModelPreference) {
+			console.log(
+				`[Provider] User already has model preference, skipping default model setup for ${provider.name}`,
+			);
+			return;
+		}
+
+		// Find the default model from the fetched models
+		const models = persistedModelState.current;
+		if (models.length === 0) {
+			console.log(
+				`[Provider] No models available for ${provider.name}, skipping default model setup`,
+			);
+			return;
+		}
+
+		// For 302.AI, try to find gemini-3-pro-preview as the preferred default model
+		const DEFAULT_MODEL_ID_302AI = "gemini-3-pro-preview";
+		let defaultModel =
+			provider.id === "302AI" ? models.find((m) => m.id === DEFAULT_MODEL_ID_302AI) : null;
+
+		// If preferred model not found, fall back to any featured model from this provider
+		if (!defaultModel) {
+			defaultModel = models.find((m) => m.providerId === provider.id && m.isFeatured);
+		}
+
+		// If still no model found, use the first available model from this provider
+		if (!defaultModel) {
+			defaultModel = models.find((m) => m.providerId === provider.id);
+		}
+
+		if (defaultModel) {
+			// Set as the default model for future new sessions
+			// Flush model state to storage and wait for completion before broadcasting
+			// This ensures other windows can read the latest models when they receive the event
+			await persistedModelState.flush();
+			preferencesSettings.setNewSessionModel(defaultModel);
+
+			// Broadcast to all chat tabs to apply the default model
+			// This handles the case where chat tabs are already open but don't have a model selected
+			try {
+				// Clone the model object to ensure it can be serialized for IPC
+				// The original object may be a Proxy from Svelte's reactivity system
+				const modelForBroadcast = JSON.parse(JSON.stringify(defaultModel));
+				await window.electronAPI.broadcastService.broadcastToAll("apply-default-model", {
+					model: modelForBroadcast,
+				});
+				console.log(`[Provider] Applied default model "${defaultModel.name}" for ${provider.name}`);
+			} catch (error) {
+				console.error(
+					`[Provider] Failed to broadcast apply-default-model event for ${provider.name}:`,
+					error,
+				);
+			}
+		}
 	}
 
 	/**
@@ -422,6 +517,96 @@ class ProviderState {
 		console.log("[Provider] API key mismatch, not clearing (user may have modified it)");
 		return false;
 	}
+
+	/**
+	 * 静默获取供应商模型（不显示 toast 提示）
+	 */
+	async fetchModelsForProviderSilent(provider: ModelProvider): Promise<boolean> {
+		try {
+			const latestProvider = this.getProvider(provider.id);
+			if (!latestProvider) return false;
+
+			const result = await getModelsByProvider(latestProvider);
+			if (result.success && result.data) {
+				await this.updateProvider(latestProvider.id, { status: "connected" });
+
+				// 保留用户手动添加的模型
+				const userAddedModels = persistedModelState.current.filter((model) => {
+					return model.providerId === latestProvider.id && model.isAddedByUser === true;
+				});
+
+				// 获取用户添加的模型ID集合，用于去重
+				const userAddedModelIds = new Set(userAddedModels.map((m) => m.id));
+
+				// 过滤掉与用户添加模型ID重复的新模型
+				const newModelsWithoutDuplicates = result.data.models.filter(
+					(m) => !userAddedModelIds.has(m.id),
+				);
+
+				persistedModelState.current = persistedModelState.current
+					.filter((models) => models.providerId !== latestProvider.id)
+					.concat(userAddedModels)
+					.concat(newModelsWithoutDuplicates);
+				return true;
+			} else {
+				await this.updateProvider(latestProvider.id, { status: "error" });
+				return false;
+			}
+		} catch (error) {
+			console.error(`[Provider] Silent fetch failed for ${provider.id}:`, error);
+			await this.updateProvider(provider.id, { status: "error" });
+			return false;
+		}
+	}
+
+	/**
+	 * 自动更新所有开启了 autoUpdateModels 的供应商
+	 * 每天只执行一次
+	 */
+	async autoUpdateModelsForEligibleProviders(): Promise<void> {
+		const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+		const providers = persistedProviderState.current;
+
+		// 找出需要更新的供应商
+		const providersToUpdate = providers.filter((p) => {
+			if (!p.autoUpdateModels || !p.apiKey) return false;
+			return p.lastAutoUpdateDate !== today;
+		});
+
+		if (providersToUpdate.length === 0) return;
+
+		console.log(`[Provider] Auto-updating models for ${providersToUpdate.length} provider(s)`);
+
+		// 并行更新所有供应商（静默模式，不显示 toast）
+		const results = await Promise.allSettled(
+			providersToUpdate.map((p) => this.fetchModelsForProviderSilent(p)),
+		);
+
+		// 更新成功的供应商记录日期
+		providersToUpdate.forEach((p, index) => {
+			const result = results[index];
+			if (result.status === "fulfilled" && result.value) {
+				this.updateProvider(p.id, { lastAutoUpdateDate: today });
+			}
+		});
+
+		const successCount = results.filter((r) => r.status === "fulfilled" && r.value).length;
+		console.log(
+			`[Provider] Auto-update completed: ${successCount}/${providersToUpdate.length} succeeded`,
+		);
+	}
 }
 
 export const providerState = new ProviderState();
+
+// 应用启动时自动更新模型
+if (typeof window !== "undefined") {
+	const checkAndAutoUpdate = () => {
+		if (persistedProviderState.isHydrated) {
+			providerState.autoUpdateModelsForEligibleProviders();
+		} else {
+			setTimeout(checkAndAutoUpdate, 100);
+		}
+	};
+	setTimeout(checkAndAutoUpdate, 500);
+}

@@ -14,11 +14,11 @@
 
 {#if !userState.isLoggedIn}
 	<div class="gap-settings-gap flex flex-col">
-		<Label class="text-label-fg">{m.login_account_management()}</Label>
+		<Label class="text-label-fg font-normal">{m.login_account_management()}</Label>
 
 		<!-- SSO Quick Login Card -->
 		<button
-			class="bg-settings-item-bg hover:bg-hover-2 group relative flex items-center gap-4 overflow-hidden rounded-xl border border-transparent p-4 text-left transition-all hover:border-border disabled:cursor-not-allowed disabled:opacity-50"
+			class="bg-settings-item-bg hover:bg-hover-2 group relative flex items-center gap-4 overflow-hidden rounded-xl border border-transparent p-4 text-left transition-all hover:border-border disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 			onclick={() => ssoState.login()}
 			disabled={ssoState.isLoading}
 		>

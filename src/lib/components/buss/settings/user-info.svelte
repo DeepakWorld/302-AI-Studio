@@ -77,7 +77,7 @@
 {#if userState.isLoggedIn && userState.userInfo}
 	<!-- User Info Section -->
 	<div class="gap-settings-gap flex flex-col">
-		<Label class="text-label-fg">{m.settings_user_info_label()}</Label>
+		<Label class="text-label-fg font-normal">{m.settings_user_info_label()}</Label>
 		<div
 			class="rounded-settings-item bg-settings-item-bg px-settings-item-x py-settings-item-y flex w-full items-center gap-4"
 		>
@@ -126,40 +126,11 @@
 		</div>
 	</div>
 
-	<!-- Account Details Section -->
-	<div class="gap-settings-gap flex flex-col">
-		<Label class="text-label-fg">{m.settings_account_details()}</Label>
+	<!-- Account Details Section - only show if there's content -->
+	{#if userState.userInfo.invite_code}
+		<div class="gap-settings-gap flex flex-col">
+			<Label class="text-label-fg font-normal">{m.settings_account_details()}</Label>
 
-		{#snippet apiKeyAction()}
-			{@const displayApiKey = userState.ssoApiKey || userState.userInfo?.api_key}
-			{#if displayApiKey}
-				<div class="flex items-center gap-2">
-					<code
-						class="bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold"
-					>
-						{displayApiKey.slice(0, 8)}...
-					</code>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						onclick={() => copyToClipboard(displayApiKey, "api_key")}
-						class="relative"
-					>
-						{#each [{ Icon: Check, visible: copiedField === "api_key", id: "check" }, { Icon: Copy, visible: copiedField !== "api_key", id: "copy" }] as { Icon, visible, id } (id)}
-							<Icon
-								class={cn(
-									"absolute inset-0 m-auto size-4 transition-all duration-200 ease-in-out",
-									visible ? "scale-100 opacity-100" : "scale-0 opacity-0",
-								)}
-							/>
-						{/each}
-					</Button>
-				</div>
-			{/if}
-		{/snippet}
-		<SettingInfoItem label={m.settings_api_key()} action={apiKeyAction} />
-
-		{#if userState.userInfo.invite_code}
 			{#snippet inviteCodeAction()}
 				{#if userState.userInfo}
 					<div class="flex items-center gap-2">
@@ -187,13 +158,13 @@
 				{/if}
 			{/snippet}
 			<SettingInfoItem label={m.settings_invite_code()} action={inviteCodeAction} />
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	<!-- Balance Section -->
 	<div class="gap-settings-gap flex flex-col">
 		<div class="flex items-center justify-between">
-			<Label class="text-label-fg">{m.settings_balance_usage()}</Label>
+			<Label class="text-label-fg font-normal">{m.settings_balance_usage()}</Label>
 			<Button variant="outline" size="sm" onclick={openWallet} class="dark:hover:bg-muted gap-1.5">
 				{m.settings_recharge()}
 				<ExternalLink class="size-3.5" />
@@ -203,18 +174,22 @@
 		<SettingInfoItem
 			label={m.settings_current_balance()}
 			value="${formatCurrency(userState.userInfo.balance)}"
+			isBold
 		/>
 		<SettingInfoItem
 			label={m.settings_total_consumed()}
 			value="${formatCurrency(userState.userInfo.gpt_cost)}"
+			isBold
 		/>
 		<SettingInfoItem
 			label={m.settings_total_requests()}
 			value={String(userState.userInfo.gpt_request_times)}
+			isBold
 		/>
 		<SettingInfoItem
 			label={m.settings_total_earnings()}
 			value="${formatCurrency(userState.userInfo.total_earning)}"
+			isBold
 		/>
 	</div>
 

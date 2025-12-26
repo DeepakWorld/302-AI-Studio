@@ -119,7 +119,7 @@
 <div class="flex flex-col gap-settings-section-gap pb-settings-layout-pb">
 	{#each shortcutSettingsList() as shortcut (shortcut.id)}
 		<div class="flex max-w-[528px] min-w-[528px] flex-col">
-			<Label class="text-label-fg mb-2">
+			<Label class="text-label-fg mb-2 font-normal">
 				{shortcut.isGroup
 					? m.settings_shortcut_tabSwitchingGroup()
 					: m[`settings_shortcut_${shortcut.action}`]()}

@@ -173,7 +173,7 @@
 
 <!-- Modal Dialog -->
 <Dialog bind:open={isModalOpen}>
-	<DialogContent class="max-h-[80vh] flex flex-col">
+	<DialogContent class="max-h-[80vh] min-w-[60vw] flex flex-col">
 		<DialogHeader class="shrink-0">
 			<DialogTitle class="flex items-center gap-2">
 				<FilePenLine class="h-5 w-5" />

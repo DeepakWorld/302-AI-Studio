@@ -1,4 +1,5 @@
 import {
+	addClaudeCodeSandboxMCP,
 	createClaudeCodeSandbox,
 	deleteClaudeCodeSandbox,
 	listClaudeCodeSandboxes,
@@ -122,11 +123,6 @@ export class CodeAgentService {
 		threadId: string,
 		sandboxCfg: CreateClaudeCodeSandboxRequest,
 	): Promise<{ createdResult: CodeAgentCreateResult; sandboxId: string }> {
-		const { isOK, sandboxId } = await claudeCodeStorage.getClaudeCodeSandboxId(threadId);
-		if (isOK && sandboxId !== "") {
-			return { createdResult: "already-exist", sandboxId };
-		}
-
 		const response = await createClaudeCodeSandbox(sandboxCfg);
 		if (response.success) {
 			const { sandbox_id: sandboxId, sandbox_name: sandboxRemark } = response.data;
@@ -146,11 +142,9 @@ export class CodeAgentService {
 		await codeAgentStorage.removeCodeAgentState(threadId);
 	}
 
-	async createClaudeCodeSandbox(
-		threadId: string,
-		sandboxCfg: CreateClaudeCodeSandboxRequest,
-	): Promise<{ createdResult: CodeAgentCreateResult; sandboxId: string }> {
-		return this._createClaudeCodeSandbox(threadId, sandboxCfg);
+	async getClaudeCodeSandboxId(threadId: string): Promise<{ isOK: boolean; sandboxId: string }> {
+		const { isOK, sandboxId } = await claudeCodeStorage.getClaudeCodeSandboxId(threadId);
+		return { isOK, sandboxId };
 	}
 
 	// ******************************* IPC Methods ******************************* //
@@ -389,6 +383,20 @@ export class CodeAgentService {
 		}
 
 		return { isOK: false };
+	}
+
+	async addClaudeCodeSandboxMCP(
+		_event: IpcMainInvokeEvent,
+		sandboxId: string,
+		MCPInfos: { url: string; name: string }[],
+	): Promise<{ isOK: boolean }> {
+		try {
+			const result = await addClaudeCodeSandboxMCP(sandboxId, MCPInfos);
+			return { isOK: result.success };
+		} catch (error) {
+			console.error("Error adding Claude code sandbox MCP:", error);
+			return { isOK: false };
+		}
 	}
 }
 

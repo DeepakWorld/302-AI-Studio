@@ -6,7 +6,7 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_parseUrl()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_parseUrl()}</Label>
 	<SettingSwitchItem
 		label={m.settings_ParseUrlDesc()}
 		checked={preferencesSettings.autoParseUrl}

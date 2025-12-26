@@ -20,7 +20,7 @@
 <div class="space-y-6">
 	<div class="flex flex-col gap-4">
 		<div>
-			<Label class="text-sm font-medium">{m.text_theme_custom_css_title()}</Label>
+			<Label class="text-sm font-normal">{m.text_theme_custom_css_title()}</Label>
 			<p class="text-muted-foreground mt-1 text-xs">
 				{m.text_theme_custom_css_description()}
 			</p>

@@ -3,6 +3,7 @@
 	import EnableSupermarket from "./enable-supermarket.svelte";
 	import NewSessionModel from "./new-session-model.svelte";
 	import ParseUrl from "./parse-url.svelte";
+	import PrivacyMode from "./privacy-mode.svelte";
 	import SearchSettings from "./search-output.svelte";
 	import StreamSetting from "./stream-setting.svelte";
 	import SuggestionsSettings from "./suggestions-settings.svelte";
@@ -12,12 +13,13 @@
 
 <div class="flex flex-col gap-settings-section-gap pb-settings-layout-pb">
 	<ChatSettings />
-	<SearchSettings />
-	<ParseUrl />
-	<StreamSetting />
-	<SuggestionsSettings />
-	<EnableSupermarket />
 	<NewSessionModel />
 	<TitleGenerationModel />
 	<TitleGenerationTiming />
+	<EnableSupermarket />
+	<SearchSettings />
+	<ParseUrl />
+	<PrivacyMode />
+	<SuggestionsSettings />
+	<StreamSetting />
 </div>

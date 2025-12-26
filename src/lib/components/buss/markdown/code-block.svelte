@@ -2,15 +2,18 @@
 	/* eslint-disable svelte/no-at-html-tags */
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { CopyButton } from "$lib/components/buss/copy-button";
+	import * as m from "$lib/paraglide/messages.js";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { persistedThemeState } from "$lib/stores/theme.state.svelte";
-	import { ChevronDown, CodeXml, ImagePlay, MonitorPlay } from "@lucide/svelte";
+	import { ChevronDown, CodeXml, Download, ImagePlay, MonitorPlay } from "@lucide/svelte";
 	import type { GrammarState, ThemedToken } from "@shikijs/types";
 	import { onMount } from "svelte";
 	import { SvelteMap } from "svelte/reactivity";
+	import { toast } from "svelte-sonner";
 	import type { ShikiHighlighter } from "./highlighter";
 	import { ensureHighlighter, ensureLanguageLoaded, LANGUAGE_ALIASES } from "./highlighter";
+	import { downloadCode } from "./download-utils";
 
 	interface RenderedToken {
 		id: string;
@@ -130,6 +133,12 @@
 
 	const detectSvg = (code: string, language: string | null): boolean => {
 		if (language?.toLowerCase() === "svg") return true;
+
+		// If language is explicitly specified and is not SVG, don't detect from content
+		if (language && language !== "plaintext") {
+			return false;
+		}
+
 		const trimmed = code.trim();
 		return trimmed.startsWith("<svg") || (trimmed.startsWith("<?xml") && trimmed.includes("<svg"));
 	};
@@ -138,6 +147,11 @@
 		const htmlLanguages = ["html", "htm", "xhtml", "xml"];
 		if (language && htmlLanguages.includes(language.toLowerCase())) {
 			return true;
+		}
+
+		// If language is explicitly specified and is not HTML-like, don't detect from content
+		if (language && language !== "plaintext") {
+			return false;
 		}
 
 		const trimmed = code.trim();
@@ -167,6 +181,11 @@
 			blockId: props.blockId,
 			meta: props.meta ?? null,
 		});
+	};
+
+	const handleDownload = () => {
+		const fileName = downloadCode(props.code, resolvedLanguage);
+		toast.success(m.toast_download_file_success({ fileName }));
 	};
 
 	const buildTokenStyle = (token: ThemedToken): string | undefined => {
@@ -442,6 +461,14 @@
 					<CopyButton content={props.code} position="bottom" />
 					<ButtonWithTooltip
 						class="text-muted-foreground hover:!bg-chat-action-hover"
+						tooltip="Download"
+						tooltipSide="bottom"
+						onclick={handleDownload}
+					>
+						<Download />
+					</ButtonWithTooltip>
+					<ButtonWithTooltip
+						class="text-muted-foreground hover:!bg-chat-action-hover"
 						tooltip="Toggle collapse"
 						tooltipSide="bottom"
 						onclick={toggleCollapse}
@@ -472,6 +499,14 @@
 			>
 			<div class="flex items-center gap-1">
 				<CopyButton content={props.code} position="bottom" />
+				<ButtonWithTooltip
+					class="text-muted-foreground hover:!bg-chat-action-hover"
+					tooltip="Download"
+					tooltipSide="bottom"
+					onclick={handleDownload}
+				>
+					<Download />
+				</ButtonWithTooltip>
 				{#if isSvgCode}
 					<ButtonWithTooltip
 						class="text-muted-foreground hover:!bg-chat-action-hover"

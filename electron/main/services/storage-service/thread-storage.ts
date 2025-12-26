@@ -157,8 +157,8 @@ export class ThreadStorage extends StorageService<ThreadMetadata> {
 			}
 
 			allThreads.sort((a, b) => {
-				if (a.isFavorite && !b.isFavorite) return -1;
-				if (!a.isFavorite && b.isFavorite) return 1;
+				// if (a.isFavorite && !b.isFavorite) return -1;
+				// if (!a.isFavorite && b.isFavorite) return 1;
 
 				const dateA = new Date(a.thread.updatedAt).getTime();
 				const dateB = new Date(b.thread.updatedAt).getTime();

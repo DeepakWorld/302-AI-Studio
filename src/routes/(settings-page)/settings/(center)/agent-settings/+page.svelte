@@ -22,7 +22,7 @@
 	}
 </script>
 
-<div class="mx-auto flex h-full w-full max-w-3xl flex-col gap-6 p-6">
+<div class="mx-auto flex h-full w-full max-w-3xl flex-col gap-6">
 	<!-- Platform Section -->
 	<div class="space-y-2">
 		<h2 class="text-sm font-medium text-muted-foreground">{m.title_agent_platform()}</h2>

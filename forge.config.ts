@@ -163,6 +163,7 @@ const config: ForgeConfig = {
 			ensureNativePackagingDeps();
 		},
 	},
+	// TODO: Remove GitHub publisher after users migrate to new update server (updater.302.ai)
 	publishers: [
 		{
 			name: "@electron-forge/publisher-github",

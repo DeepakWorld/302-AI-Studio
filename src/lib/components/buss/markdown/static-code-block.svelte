@@ -138,7 +138,7 @@
 				: ''}"
 		>
 			{#if highlightedHtml}
-				<div class="inline-block">
+				<div class="inline-block w-full">
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html highlightedHtml}
 				</div>

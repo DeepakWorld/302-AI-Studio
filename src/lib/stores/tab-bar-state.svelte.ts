@@ -368,7 +368,11 @@ class TabBarState {
 		}
 	}
 
-	async handleNewTabForExistingThread(threadId: string) {
+	async handleNewTabForExistingThread(
+		threadId: string,
+		initialSearchQuery?: string,
+		initialSearchResultIds?: string[],
+	) {
 		// This method can be called from both shell views and tab views
 		// Use real window.windowId to ensure correct behavior regardless of context
 		const currentWindowId = this.currentWindowId;
@@ -409,6 +413,8 @@ class TabBarState {
 			threadData.thread.title,
 			"chat",
 			true,
+			initialSearchQuery,
+			initialSearchResultIds,
 		);
 		console.log(`[TabBarState] handleNewTabWithThread result:`, result);
 		// Wait for PersistedState sync to update frontend

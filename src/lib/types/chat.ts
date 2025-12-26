@@ -37,6 +37,10 @@ export const messageMetadataSchema = z.object({
 	feedback: z.enum(["like", "dislike"]).optional(),
 	// Result metadata from 302.AI Claude Code
 	result: resultMetadataSchema.optional(),
+	// User Prompt Template related fields
+	userPromptTemplateContent: z.string().optional(),
+	userPromptTemplateVariables: z.array(z.string()).optional(),
+	userPromptTemplateMap: z.record(z.string(), z.string()).optional(),
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;

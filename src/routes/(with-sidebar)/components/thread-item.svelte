@@ -67,7 +67,7 @@
 <ContextMenu.Root>
 	<ContextMenu.Trigger
 		class={cn(
-			"w-full text-left h-10 relative flex items-center pl-4 pr-2 rounded-[10px] cursor-default",
+			"w-full text-left h-10 relative cursor-pointer flex items-center pl-4 pr-2 rounded-[10px]",
 			isActive ? "bg-accent" : "hover:bg-secondary",
 		)}
 		onclick={() => handleClick(threadId)}

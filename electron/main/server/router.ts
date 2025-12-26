@@ -6,26 +6,31 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { serve } from "@hono/node-server";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { McpServer } from "@shared/types";
+import type { ChatMessage, McpServer } from "@shared/types";
 import {
-	Experimental_Agent as Agent,
+	ToolLoopAgent as Agent,
 	convertToModelMessages,
 	createUIMessageStreamResponse,
 	extractReasoningMiddleware,
 	generateText,
 	smoothStream,
 	stepCountIs,
-	streamText,
 	wrapLanguageModel,
 	type UIMessage,
 } from "ai";
 import getPort from "get-port";
 import { Hono, type Context } from "hono";
 import { codeAgentService, ssoService } from "../services";
+import { chatParametersService } from "../services/chat-parameters-service";
 import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
+import {
+	convertAiSdkMessagesToOpenAiMessages,
+	createUIMessageStreamFromGenerator,
+	isStreamingSupported,
+} from "./utils";
 
 export type RouterRequestBody = {
 	baseUrl?: string;
@@ -174,6 +179,8 @@ app.post("/chat/302ai", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -198,6 +205,8 @@ app.post("/chat/302ai", async (c) => {
 
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
+		threadId: string;
 	}>();
 	console.log(
 		baseUrl,
@@ -212,22 +221,9 @@ app.post("/chat/302ai", async (c) => {
 		isOnlineSearchActive,
 		messages,
 		speedOptions,
+		systemPrompt,
+		threadId,
 	);
-
-	const ai302 = createAI302({
-		baseURL: baseUrl || "https://api.openai.com/v1",
-		apiKey: apiKey || "[REDACTED:sk-secret]",
-		fetch: createCitationsFetch(),
-	});
-
-	const wrapModel = wrapLanguageModel({
-		model: ai302.chatModel(model, { thinking: { type: "enabled" } }),
-		middleware: [
-			extractReasoningMiddleware({ tagName: "think" }),
-			extractReasoningMiddleware({ tagName: "thinking" }),
-		],
-		providerId: "302.AI",
-	});
 
 	const provider302Options: Record<string, boolean | string> = {};
 
@@ -236,13 +232,32 @@ app.post("/chat/302ai", async (c) => {
 	}
 
 	if (isThinkingActive) {
-		provider302Options["r1-fusion"] = true;
+		provider302Options["fusion"] = true;
 	}
 
 	if (isOnlineSearchActive) {
 		provider302Options["web-search"] = true;
 		provider302Options["search-service"] = searchProvider;
 	}
+
+	const ai302 = createAI302({
+		baseURL: baseUrl || "https://api.openai.com/v1",
+		apiKey: apiKey || "[REDACTED:sk-secret]",
+		fetch: createCitationsFetch(provider302Options),
+	});
+
+	// Only enable thinking for DeepSeek models
+	const isDeepSeekModel = model.toLowerCase().includes("deepseek");
+	const modelOptions = isDeepSeekModel ? { thinking: { type: "enabled" as const } } : {};
+
+	const wrapModel = wrapLanguageModel({
+		model: ai302.chatModel(model, modelOptions),
+		middleware: [
+			extractReasoningMiddleware({ tagName: "think" }),
+			extractReasoningMiddleware({ tagName: "thinking" }),
+		],
+		providerId: "302.AI",
+	});
 
 	// Get MCP tools if MCP is active
 	let mcpTools = undefined;
@@ -257,13 +272,47 @@ app.post("/chat/302ai", async (c) => {
 			console.error("Failed to load MCP tools:", error);
 		}
 	}
+	let resolvedMessages = messages;
+	console.log(
+		"Resolving user prompt template variables for thread - before:",
+		JSON.stringify(resolvedMessages, null, 2),
+	);
+
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
+			);
+
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
+	console.log(
+		"Resolving user prompt template variables for thread - after:",
+		JSON.stringify(resolvedMessages, null, 2),
+	);
+
+	const convertedMessages = await convertToModelMessages(
+		enhanceMessagesWithFeedback(resolvedMessages),
+	);
 
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
 		providerOptions: {
 			"302": provider302Options,
 		},
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -275,21 +324,59 @@ app.post("/chat/302ai", async (c) => {
 		presencePenalty,
 	});
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[302ai] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"ai302",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
+	}
+
+	// Stream the main text response using Agent without waiting for suggestions
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
+		model: wrapModel,
+		...(systemPrompt && { instructions: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
+		providerOptions: {
+			"302": provider302Options,
+		},
+	};
+	addDefinedParams(agentConfig, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	const result = await new Agent(agentConfig).stream({
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response using Agent without waiting for suggestions
-	const result = await new Agent({
-		...streamTextOptionsWithTransform,
-		stopWhen: stepCountIs(20),
-	}).stream(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
@@ -328,6 +415,8 @@ app.post("/chat/openai", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -345,6 +434,8 @@ app.post("/chat/openai", async (c) => {
 		};
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
+		threadId: string;
 	}>();
 
 	const openai = createOpenAI({
@@ -374,9 +465,36 @@ app.post("/chat/openai", async (c) => {
 		}
 	}
 
+	// Resolve user prompt template variables
+	let resolvedMessages = messages;
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			// Resolve previous user messages (using metadata)
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
+			);
+			// Resolve last user message (using storage)
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
+	const convertedMessages = await convertToModelMessages(
+		enhanceMessagesWithFeedback(resolvedMessages),
+	);
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -388,18 +506,56 @@ app.post("/chat/openai", async (c) => {
 		presencePenalty,
 	});
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[openai] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"openai",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
+	}
+
+	// Stream the main text response using Agent
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
+		model: wrapModel,
+		...(systemPrompt && { instructions: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
+	};
+	addDefinedParams(agentConfig, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	const result = await new Agent(agentConfig).stream({
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response without waiting for suggestions
-	const result = streamText(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
@@ -427,6 +583,8 @@ app.post("/chat/anthropic", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -444,6 +602,8 @@ app.post("/chat/anthropic", async (c) => {
 		};
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
+		threadId: string;
 	}>();
 
 	const anthropic = createAnthropic({
@@ -473,9 +633,36 @@ app.post("/chat/anthropic", async (c) => {
 		}
 	}
 
+	// Resolve user prompt template variables
+	let resolvedMessages = messages;
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			// Resolve previous user messages (using metadata)
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
+			);
+			// Resolve last user message (using storage)
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
+	const convertedMessages = await convertToModelMessages(
+		enhanceMessagesWithFeedback(resolvedMessages),
+	);
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -487,18 +674,56 @@ app.post("/chat/anthropic", async (c) => {
 		presencePenalty,
 	});
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[anthropic] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"anthropic",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
+	}
+
+	// Stream the main text response using Agent
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
+		model: wrapModel,
+		...(systemPrompt && { instructions: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
+	};
+	addDefinedParams(agentConfig, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	const result = await new Agent(agentConfig).stream({
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response without waiting for suggestions
-	const result = streamText(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
@@ -526,6 +751,8 @@ app.post("/chat/gemini", async (c) => {
 		messages,
 		speedOptions,
 		language: _language,
+		systemPrompt,
+		threadId,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -543,6 +770,8 @@ app.post("/chat/gemini", async (c) => {
 		};
 		messages: UIMessage[];
 		language?: string;
+		systemPrompt?: string;
+		threadId: string;
 	}>();
 
 	const google = createGoogleGenerativeAI({
@@ -572,9 +801,35 @@ app.post("/chat/gemini", async (c) => {
 		}
 	}
 
+	let resolvedMessages = messages;
+	if (await chatParametersService.validateUserPromptTemplateVariables(threadId)) {
+		// Find the last user message
+		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+		if (lastUserMessage) {
+			// Resolve previous user messages (using metadata)
+			const prevResolvedMessages = await chatParametersService.resolvePrevUserMsgsByUserPromptTemp(
+				threadId,
+				model,
+				lastUserMessage.id, // Exclude last user message to avoid duplicate processing
+			);
+			// Resolve last user message (using storage)
+			const resolvedLastMessage = await chatParametersService.resolveLastUserTextByUserPromptTemp(
+				threadId,
+				lastUserMessage as ChatMessage,
+				model,
+			);
+			resolvedMessages = [...prevResolvedMessages, resolvedLastMessage];
+		}
+	}
+
+	const convertedMessages = await convertToModelMessages(
+		enhanceMessagesWithFeedback(resolvedMessages),
+	);
+
 	const streamTextOptions = {
 		model: wrapModel,
-		messages: convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+		messages: convertedMessages,
+		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -586,18 +841,56 @@ app.post("/chat/gemini", async (c) => {
 		presencePenalty,
 	});
 
-	const streamTextOptionsWithTransform = {
-		...streamTextOptions,
+	// Check if model supports streaming (image generation models don't)
+	if (!isStreamingSupported(model)) {
+		console.log(`[gemini] Model ${model} does not support streaming, using generateText`);
+
+		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
+		const stream = createUIMessageStreamFromGenerator(
+			async () => {
+				const result = await generateText(streamTextOptions);
+				return result.text || "";
+			},
+			model,
+			"gemini",
+		);
+
+		return new Response(stream, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"x-vercel-ai-ui-message-stream": "v1",
+			},
+		});
+	}
+
+	// Stream the main text response using Agent
+	// Note: Agent uses 'instructions' for system prompt, not 'system'
+	const agentConfig = {
+		model: wrapModel,
+		...(systemPrompt && { instructions: systemPrompt }),
+		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
+		stopWhen: stepCountIs(20),
+	};
+	addDefinedParams(agentConfig, {
+		temperature,
+		topP,
+		maxTokens,
+		frequencyPenalty,
+		presencePenalty,
+	});
+
+	const result = await new Agent(agentConfig).stream({
+		messages: convertedMessages,
 		...(speedOptions?.enabled && {
 			experimental_transform: smoothStream({
 				chunking: smartChunking,
 				delayInMs: getDelayForSpeed(speedOptions.speed),
 			}),
 		}),
-	};
-
-	// Stream the main text response without waiting for suggestions
-	const result = streamText(streamTextOptionsWithTransform);
+	});
 
 	const stream = result.toUIMessageStream({
 		messageMetadata: () => ({
@@ -611,18 +904,23 @@ app.post("/chat/gemini", async (c) => {
 });
 
 app.post("/generate-title", async (c) => {
-	const { messages, model, apiKey, baseUrl, providerType } = await c.req.json<{
-		messages: UIMessage[];
-		model: string;
-		apiKey?: string;
-		baseUrl?: string;
-		providerType: ModelProvider["apiType"];
-	}>();
+	const { messages, model, apiKey, baseUrl, providerType, previousSummary, isFirstGeneration } =
+		await c.req.json<{
+			messages: UIMessage[];
+			model: string;
+			apiKey?: string;
+			baseUrl?: string;
+			providerType: ModelProvider["apiType"];
+			previousSummary?: string;
+			isFirstGeneration?: boolean;
+		}>();
 
 	const conversationText = messages
 		.map((msg) => {
+			const role = msg.role === "user" ? "User" : "Assistant";
 			const textParts = msg.parts.filter((part) => part.type === "text");
-			return textParts.map((part) => ("text" in part ? part.text : "")).join(" ");
+			const text = textParts.map((part) => ("text" in part ? part.text : "")).join(" ");
+			return `${role}: ${text}`;
 		})
 		.join("\n");
 
@@ -666,9 +964,11 @@ app.post("/generate-title", async (c) => {
 	}
 
 	try {
-		const { text } = await generateText({
-			model: languageModel,
-			prompt: `Based on the following conversation, generate a concise title (Please limit your response to a very short length: approximately 10-20 words if in English, or 10-20 characters if in Chinese., no punctuation):
+		let prompt: string;
+
+		if (isFirstGeneration || !previousSummary) {
+			// First generation: only use user's first message
+			prompt = `Based on the following conversation, generate a concise title and summary(Please limit your response to a very short length: approximately 10-20 words if in English, or 10-20 characters if in Chinese., no punctuation):
 
 ${conversationText}
 
@@ -676,12 +976,54 @@ Requirements:
 - Accurately summarize the main topic
 - Be concise and clear
 - Do not use punctuation
-- Return only the title text`,
+
+Return ONLY a valid JSON object in this exact format (no markdown, no code blocks):
+{"title": "your title here", "summary": "your summary here"}`;
+		} else {
+			// Incremental generation: use previous summary + latest messages
+			prompt = `Based on the previous summary and latest conversation, update the title and summary(Please limit your response to a very short length: approximately 10-20 words if in English, or 10-20 characters if in Chinese., no punctuation):
+
+Previous Summary: ${previousSummary}
+
+Latest Conversation:
+${conversationText}
+
+Requirements:
+- Accurately summarize the main topic
+- Be concise and clear
+- Do not use punctuation
+
+Return ONLY a valid JSON object in this exact format (no markdown, no code blocks):
+{"title": "your title here", "summary": "your summary here"}`;
+		}
+
+		const { text } = await generateText({
+			model: languageModel,
+			prompt,
 		});
 
-		const title = text.trim();
+		// Parse JSON response with fallback handling
+		let title = "";
+		let summary = "";
 
-		return c.json({ title });
+		try {
+			// Try to extract JSON from the response (handle potential markdown code blocks)
+			let jsonStr = text.trim();
+			// Remove markdown code blocks if present
+			if (jsonStr.startsWith("```")) {
+				jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+			}
+			const parsed = JSON.parse(jsonStr);
+			title = parsed.title || "";
+			summary = parsed.summary || "";
+		} catch {
+			// Fallback: if JSON parsing fails, use the whole text as title
+			console.warn("Failed to parse title generation JSON response, using fallback");
+			title = text.trim().slice(0, 50);
+			summary = previousSummary || "";
+		}
+
+		return c.json({ title, summary });
 	} catch (error) {
 		console.error("Title generation error:", error);
 		return c.json({ error: "Failed to generate title" }, 500);
@@ -748,10 +1090,11 @@ app.post("/generate-suggestions", async (c) => {
 
 	try {
 		console.log("[Suggestions] Starting to generate suggestions...");
+		const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
 		const { text } = await generateText({
 			model: languageModel,
 			messages: [
-				...convertToModelMessages(enhanceMessagesWithFeedback(messages)),
+				...convertedMessages,
 				{
 					role: "user",
 					content: getSuggestionsPrompt(language, count),
@@ -798,30 +1141,11 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		messages,
 		threadId,
 		sessionId,
-		systemPrompt,
-		mcpServers,
-		sandboxName,
 	} = await c.req.json<RouterRequestBody>();
 
-	const cfg = {
-		llm_model: model,
-		system_prompt: systemPrompt,
-		mcp_servers: mcpServers,
-		sandbox_name: sandboxName,
-	};
-	const { sandboxId, createdResult } = await codeAgentService.createClaudeCodeSandbox(
-		threadId,
-		cfg,
-	);
+	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
 
-	console.log(
-		"[302ai-code-agent] Received request",
-		baseUrl,
-		sandboxId,
-		threadId,
-		sessionId,
-		createdResult,
-	);
+	console.log("[302ai-code-agent] Received request", baseUrl, sandboxId, threadId, sessionId);
 
 	// Generate messageId upfront for immediate start event
 	const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -830,9 +1154,15 @@ app.post("/chat/302ai-code-agent", async (c) => {
 	const claudeCodeFetch = createClaudeCodeFetch(messageId);
 
 	// Build request body for 302.AI Claude Code API
+	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
+	const lastAiSdkModelMessage = convertedMessages.at(-1);
+	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(
+		lastAiSdkModelMessage ? [lastAiSdkModelMessage] : [],
+	);
+
 	const requestBody = {
 		model: sandboxId,
-		messages: [convertToModelMessages(enhanceMessagesWithFeedback(messages)).at(-1)!],
+		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
 	};

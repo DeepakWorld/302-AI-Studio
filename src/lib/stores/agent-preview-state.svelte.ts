@@ -40,6 +40,8 @@ export interface AgentPreviewStorage {
 	deployedAt?: string;
 	// Selected file information
 	selectedFilePath?: string;
+	// File tree current directory for navigation
+	fileTreeCurrentDirectory?: string;
 	// Terminal current working directory
 	currentWorkingDirectory?: string;
 	// Terminal history (commands and outputs with their cwd)
@@ -440,6 +442,7 @@ export class AgentPreviewState {
 			deploymentId: storage?.deploymentId,
 			deployedAt: storage?.deployedAt,
 			selectedFilePath: storage?.selectedFilePath,
+			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
 			currentWorkingDirectory: storage?.currentWorkingDirectory,
 			terminalHistory: storage?.terminalHistory,
 			type: storage?.type,
@@ -472,6 +475,13 @@ export class AgentPreviewState {
 				fileList: storage.fileList,
 				fileContents: {}, // Clear all file contents
 				lastUpdated: getISOString(),
+				deployedUrl: storage.deployedUrl,
+				deploymentId: storage.deploymentId,
+				deployedAt: storage.deployedAt,
+				selectedFilePath: storage.selectedFilePath,
+				fileTreeCurrentDirectory: storage.fileTreeCurrentDirectory,
+				currentWorkingDirectory: storage.currentWorkingDirectory,
+				terminalHistory: storage.terminalHistory,
 				type: storage.type,
 			});
 		}
@@ -598,6 +608,7 @@ export class AgentPreviewState {
 			deploymentId: deploymentId,
 			deployedAt: getISOString(),
 			selectedFilePath: storage?.selectedFilePath, // Preserve selected file path
+			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
 			currentWorkingDirectory: storage?.currentWorkingDirectory,
 			terminalHistory: storage?.terminalHistory,
 			type: storage?.type,
@@ -655,6 +666,7 @@ export class AgentPreviewState {
 			deploymentId: storage?.deploymentId,
 			deployedAt: storage?.deployedAt,
 			selectedFilePath: filePath,
+			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
 			currentWorkingDirectory: storage?.currentWorkingDirectory,
 			terminalHistory: storage?.terminalHistory,
 			type: storage?.type,
@@ -699,6 +711,7 @@ export class AgentPreviewState {
 			deploymentId: storage?.deploymentId,
 			deployedAt: storage?.deployedAt,
 			selectedFilePath: storage?.selectedFilePath,
+			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
 			currentWorkingDirectory: cwd,
 			terminalHistory: storage?.terminalHistory,
 			type: storage?.type,
@@ -738,6 +751,7 @@ export class AgentPreviewState {
 			deploymentId: storage?.deploymentId,
 			deployedAt: storage?.deployedAt,
 			selectedFilePath: storage?.selectedFilePath,
+			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
 			currentWorkingDirectory: storage?.currentWorkingDirectory,
 			terminalHistory: history,
 			type: storage?.type,

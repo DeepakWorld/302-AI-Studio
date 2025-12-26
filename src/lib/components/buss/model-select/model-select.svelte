@@ -27,7 +27,7 @@
 	} from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils";
 	import { getFilteredModels } from "$lib/utils/model-filters.js";
-	import { Check, ChevronRight, Star } from "@lucide/svelte";
+	import { ChevronRight, Star } from "@lucide/svelte";
 	// import { CLUADE_CODE_MODELS } from "@shared/constants/codeAgentModel";
 	import type { Model, ModelCapability, Model as ProviderModel } from "@shared/types";
 
@@ -53,11 +53,6 @@
 
 		// 使用统一的过滤方法：只显示已启用且（isFeatured === true 或 isAddedByUser === true）的模型
 		const filteredModels = getFilteredModels(models, true);
-
-		// if (codeAgentState.enabled) {
-		// 	// When code agent is enabled, only show Claude Code models
-		// 	filteredModels = filteredModels.filter((model) => CLUADE_CODE_MODELS.includes(model.id));
-		// }
 
 		return filteredModels
 			.map((model): Model | null => {
@@ -374,24 +369,6 @@
 		}
 	}
 
-	// $effect(() => {
-	// 	if (codeAgentState.enabled) {
-	// 		// Find the claude-sonnet-4-5-20250929 model
-	// 		const targetModel = transformedModels.find(
-	// 			(model) => model.id === "claude-sonnet-4-5-20250929",
-	// 		);
-
-	// 		// If target model exists and is different from current selection, switch to it
-	// 		if (
-	// 			targetModel &&
-	// 			(selectedModel?.id !== targetModel.id ||
-	// 				selectedModel?.providerId !== targetModel.providerId)
-	// 		) {
-	// 			onModelSelect(targetModel);
-	// 		}
-	// 	}
-	// });
-
 	// 自动滚动到选中项
 	$effect(() => {
 		if (isOpen && listRef && selectedModel) {
@@ -583,11 +560,11 @@
 									</Button>
 								</div>
 
-								{#if isSelected}
+								<!-- {#if isSelected}
 									<div class="absolute top-1 right-1">
 										<Check class="h-3.5 w-3.5" />
 									</div>
-								{/if}
+								{/if} -->
 							</Command.Item>
 						{/each}
 					{/if}

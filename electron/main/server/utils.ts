@@ -1,0 +1,346 @@
+export type OpenAIChatContentPartText = {
+	type: "text";
+	text: string;
+};
+
+export type OpenAIChatContentPartImage = {
+	type: "image_url";
+	image_url: {
+		url: string;
+	};
+};
+
+export type OpenAIChatMessage = {
+	role: "system" | "user" | "assistant" | "tool";
+	content: string | Array<OpenAIChatContentPartText | OpenAIChatContentPartImage>;
+	name?: string;
+	tool_call_id?: string;
+};
+
+type AiSdkIntermediateTextPart = {
+	type: "text";
+	text: string;
+};
+
+type AiSdkIntermediateFilePart = {
+	type: "file";
+	mediaType?: string;
+	filename?: string;
+	url?: string;
+	data?: string;
+};
+
+type AiSdkIntermediatePart = AiSdkIntermediateTextPart | AiSdkIntermediateFilePart;
+
+type AiSdkIntermediateMessage = {
+	role: "system" | "user" | "assistant" | "tool";
+	content: string | AiSdkIntermediatePart[];
+	name?: string;
+	tool_call_id?: string;
+};
+
+function coerceToDataUrl(raw: string, mediaType?: string): string {
+	if (raw.startsWith("data:")) {
+		return raw;
+	}
+
+	if (mediaType && /^[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+$/.test(mediaType)) {
+		return `data:${mediaType};base64,${raw}`;
+	}
+
+	return raw;
+}
+
+function describeNonImageFilePart(part: AiSdkIntermediateFilePart): string {
+	const name =
+		typeof part.filename === "string" && part.filename.trim() ? part.filename.trim() : "(unnamed)";
+	const mediaType =
+		typeof part.mediaType === "string" && part.mediaType.trim() ? part.mediaType.trim() : "unknown";
+	return `[File: ${name}, mediaType: ${mediaType}] (content omitted)`;
+}
+
+/**
+ * List of model patterns that do not support streaming output.
+ * These models (like image generation models) return complete responses instead of SSE streams.
+ */
+const NON_STREAMING_MODEL_PATTERNS = [
+	"-image-", // e.g., gemini-2.5-flash-image-preview
+	"-image", // e.g., models ending with -image
+	"image-generation", // explicit image generation models
+	"dall-e", // OpenAI DALL-E models
+	"stable-diffusion", // Stable Diffusion models
+];
+
+/**
+ * Check if a model supports streaming output.
+ * Image generation models and some other special models don't support streaming.
+ */
+export function isStreamingSupported(modelId: string): boolean {
+	const lowerModelId = modelId.toLowerCase();
+	return !NON_STREAMING_MODEL_PATTERNS.some((pattern) => lowerModelId.includes(pattern));
+}
+
+/**
+ * Convert a non-streaming response to UI message stream format (SSE).
+ * This is used for models that don't support streaming (like image generation models).
+ *
+ * This function creates a stream that:
+ * 1. Immediately sends a "start" event for optimistic UI update
+ * 2. Executes the async content generator
+ * 3. Streams the content and finish events
+ *
+ * @param contentGenerator - An async function that returns the text content
+ * @param model - The model ID
+ * @param provider - The provider name
+ * @returns A ReadableStream that emits SSE events compatible with toUIMessageStream
+ */
+export function createUIMessageStreamFromGenerator(
+	contentGenerator: () => Promise<string>,
+	model: string,
+	provider: string,
+): ReadableStream<Uint8Array> {
+	const encoder = new TextEncoder();
+
+	return new ReadableStream({
+		async start(controller) {
+			const messageMetadata = {
+				model,
+				provider,
+				createdAt: new Date().toISOString(),
+			};
+
+			// 1. Send start event immediately for optimistic UI update
+			controller.enqueue(
+				encoder.encode(
+					`data: ${JSON.stringify({
+						type: "start",
+						messageMetadata,
+					})}\n\n`,
+				),
+			);
+			console.log(
+				`[createUIMessageStreamFromGenerator] Sent immediate start event for model ${model}`,
+			);
+
+			try {
+				// 2. Execute the async content generator
+				const content = await contentGenerator();
+
+				// 3. Generate a unique ID for this text part
+				const textId = `text-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+				// 4. Send start-step event (NO messageMetadata)
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({
+							type: "start-step",
+						})}\n\n`,
+					),
+				);
+
+				// 5. Send text-start event
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({
+							type: "text-start",
+							id: textId,
+						})}\n\n`,
+					),
+				);
+
+				// 6. Send text-delta event with the full content
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({
+							type: "text-delta",
+							id: textId,
+							delta: content,
+						})}\n\n`,
+					),
+				);
+
+				// 7. Send text-end event
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({
+							type: "text-end",
+							id: textId,
+						})}\n\n`,
+					),
+				);
+
+				// 8. Send finish-step event (NO messageMetadata)
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({
+							type: "finish-step",
+						})}\n\n`,
+					),
+				);
+
+				// 9. Send message-metadata event
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({
+							type: "message-metadata",
+							messageMetadata,
+						})}\n\n`,
+					),
+				);
+
+				// 10. Send finish event (with messageMetadata)
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({
+							type: "finish",
+							finishReason: "stop",
+							messageMetadata,
+						})}\n\n`,
+					),
+				);
+
+				// 11. Send [DONE] marker
+				controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+
+				controller.close();
+			} catch (error) {
+				console.error(`[createUIMessageStreamFromGenerator] Error for model ${model}:`, error);
+
+				// Send error as text-delta so user sees it
+				const errorId = `error-${Date.now()}`;
+				const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+				controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "start-step" })}\n\n`));
+				controller.enqueue(
+					encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: errorId })}\n\n`),
+				);
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({ type: "text-delta", id: errorId, delta: `**Error**: ${errorMessage}` })}\n\n`,
+					),
+				);
+				controller.enqueue(
+					encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: errorId })}\n\n`),
+				);
+				controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "finish-step" })}\n\n`));
+				controller.enqueue(
+					encoder.encode(
+						`data: ${JSON.stringify({ type: "finish", finishReason: "error", messageMetadata })}\n\n`,
+					),
+				);
+				controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+				controller.close();
+			}
+		},
+	});
+}
+
+/**
+ * Convert a non-streaming response to UI message stream format (SSE).
+ * This is used for models that don't support streaming (like image generation models).
+ *
+ * @param content - The text content from the non-streaming response
+ * @param model - The model ID
+ * @param provider - The provider name
+ * @returns A ReadableStream that emits SSE events compatible with toUIMessageStream
+ * @deprecated Use createUIMessageStreamFromGenerator for immediate start event support
+ */
+export function createUIMessageStreamFromText(
+	content: string,
+	model: string,
+	provider: string,
+): ReadableStream<Uint8Array> {
+	return createUIMessageStreamFromGenerator(() => Promise.resolve(content), model, provider);
+}
+
+export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIChatMessage[] {
+	if (!Array.isArray(messages)) {
+		return [];
+	}
+
+	return (messages as AiSdkIntermediateMessage[]).flatMap((message): OpenAIChatMessage[] => {
+		if (!message || typeof message !== "object") {
+			return [];
+		}
+
+		const { role, name, tool_call_id } = message;
+		const content = (message as AiSdkIntermediateMessage).content;
+
+		if (typeof content === "string") {
+			const msg: OpenAIChatMessage = {
+				role,
+				content,
+				...(name ? { name } : {}),
+				...(tool_call_id ? { tool_call_id } : {}),
+			};
+			return [msg];
+		}
+
+		if (!Array.isArray(content)) {
+			const msg: OpenAIChatMessage = {
+				role,
+				content: "",
+				...(name ? { name } : {}),
+				...(tool_call_id ? { tool_call_id } : {}),
+			};
+			return [msg];
+		}
+
+		const parts: Array<OpenAIChatContentPartText | OpenAIChatContentPartImage> = [];
+		const nonImageFileDescriptions: string[] = [];
+
+		for (const part of content) {
+			if (!part || typeof part !== "object") {
+				continue;
+			}
+
+			if ((part as AiSdkIntermediateTextPart).type === "text") {
+				const text = (part as AiSdkIntermediateTextPart).text;
+				parts.push({ type: "text", text: typeof text === "string" ? text : "" });
+				continue;
+			}
+
+			if ((part as AiSdkIntermediateFilePart).type === "file") {
+				const filePart = part as AiSdkIntermediateFilePart;
+				const mediaType = typeof filePart.mediaType === "string" ? filePart.mediaType : undefined;
+				const raw =
+					typeof filePart.url === "string"
+						? filePart.url
+						: typeof filePart.data === "string"
+							? filePart.data
+							: undefined;
+
+				if (!raw) {
+					nonImageFileDescriptions.push(describeNonImageFilePart(filePart));
+					continue;
+				}
+
+				if (mediaType?.startsWith("image/")) {
+					parts.push({
+						type: "image_url",
+						image_url: {
+							url: coerceToDataUrl(raw, mediaType),
+						},
+					});
+				} else {
+					nonImageFileDescriptions.push(describeNonImageFilePart(filePart));
+				}
+			}
+		}
+
+		if (nonImageFileDescriptions.length > 0) {
+			parts.unshift({
+				type: "text",
+				text: nonImageFileDescriptions.join("\n"),
+			});
+		}
+
+		const msg: OpenAIChatMessage = {
+			role,
+			content: parts,
+			...(name ? { name } : {}),
+			...(tool_call_id ? { tool_call_id } : {}),
+		};
+		return [msg];
+	});
+}

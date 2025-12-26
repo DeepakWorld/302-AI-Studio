@@ -162,3 +162,53 @@ export function getClaudeCodeToolLabel(toolName: string): string {
 			return "Claude Code";
 	}
 }
+
+/**
+ * MCP tool type prefix for sandbox agent mode
+ * Format: "tool-mcp__serverId__toolName"
+ */
+const MCP_TOOL_TYPE_PREFIX = "tool-mcp__";
+
+/**
+ * Parsed MCP tool info
+ */
+export interface McpToolInfo {
+	serverId: string;
+	toolName: string;
+}
+
+/**
+ * Check if a part type is an MCP tool type (e.g., "tool-mcp__basic-mcp-server__calculator")
+ * This is used in sandbox agent mode where MCP tools have a different format
+ */
+export function isMcpToolType(partType: string): boolean {
+	return partType.startsWith(MCP_TOOL_TYPE_PREFIX);
+}
+
+/**
+ * Extract MCP server ID and tool name from part type
+ * Format: "tool-mcp__serverId__toolName" -> { serverId: "serverId", toolName: "toolName" }
+ *
+ * @param partType - The part type string (e.g., "tool-mcp__basic-mcp-server__calculator")
+ * @returns The parsed MCP tool info or null if not a valid MCP tool type
+ */
+export function extractMcpToolInfo(partType: string): McpToolInfo | null {
+	if (!isMcpToolType(partType)) {
+		return null;
+	}
+
+	// Remove "tool-mcp__" prefix
+	const remainder = partType.slice(MCP_TOOL_TYPE_PREFIX.length);
+
+	// Split by "__" - the first part is serverId, the rest is toolName
+	const parts = remainder.split("__");
+	if (parts.length < 2) {
+		return null;
+	}
+
+	const serverId = parts[0];
+	// Join the rest with "__" in case tool name contains "__"
+	const toolName = parts.slice(1).join("__");
+
+	return { serverId, toolName };
+}

@@ -6,6 +6,6 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.version_information()}</Label>
+	<Label class="text-label-fg font-normal">{m.version_information()}</Label>
 	<SettingInfoItem label={m.settings_currentVersion()} value={appInfo.version} />
 </div>

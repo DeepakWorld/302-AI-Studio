@@ -126,13 +126,14 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content class="min-w-[568px] rounded-2xl p-6">
-		<!-- Header -->
-		<div class="mb-6">
-			<h2 class="text-lg font-semibold text-foreground">
+		<Dialog.Header>
+			<Dialog.Title>
 				{sandbox?.sandboxRemark || sandbox?.sandboxId || "Sandbox"}
-			</h2>
-			<p class="text-sm text-muted-foreground">{sandbox?.sandboxId}</p>
-		</div>
+			</Dialog.Title>
+			<Dialog.Description>
+				{sandbox?.sandboxId}
+			</Dialog.Description>
+		</Dialog.Header>
 
 		<!-- Main View -->
 		<div>

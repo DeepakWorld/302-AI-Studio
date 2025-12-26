@@ -5,13 +5,17 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 
+	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
 	import { Bot, Globe, Lightbulb, Settings2 } from "@lucide/svelte";
 	import { AttachmentUploader } from "../attachment";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
-	import ParametersPanel from "./parameters-panel.svelte";
+	import ParametersPanel from "./parameter/parameters-panel.svelte";
+
+	const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
 
 	interface Props {
 		disabled?: boolean;
@@ -22,22 +26,28 @@
 
 	let isParametersOpen = $state(false);
 	let isMCPSelectorOpen = $state(false);
+	let addingMCP = $state(false);
 
 	function handleParametersClose() {
 		isParametersOpen = false;
-	}
-
-	function handleMCPSelectorClose() {
-		isMCPSelectorOpen = false;
 	}
 
 	function handleMCPClick() {
 		isMCPSelectorOpen = true;
 	}
 
-	function handleMCPServerConfirm(selectedIds: string[]) {
-		chatState.handleMCPServerIdsChange(selectedIds);
-		chatState.handleMCPActiveChange(selectedIds.length > 0);
+	async function handleMCPServerConfirm(selectedIds: string[]) {
+		if (selectedIds.length > 0 && codeAgentState.enabled) {
+			const sandboxId = codeAgentState.sandboxId;
+			if (sandboxId) {
+				addingMCP = true;
+				const infos = mcpState.getMCPInfosByIds(selectedIds);
+				await addClaudeCodeSandboxMCP(sandboxId, infos);
+				addingMCP = false;
+			}
+		}
+
+		chatState.handleMCPServerChange(selectedIds);
 	}
 
 	function handleCodeAgentClick() {
@@ -90,24 +100,28 @@
 		)}
 		tooltip={m.title_mcpServers()}
 		onclick={handleMCPClick}
-		{disabled}
+		disabled={disabled || addingMCP}
 	>
-		<img
-			src={mcpIcon}
-			alt="MCP"
-			class={cn(
-				"size-chat-icon group-hover:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:invert",
-				chatState.isMCPActive &&
-					"[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)]",
-			)}
-		/>
+		{#if addingMCP}
+			<LdrsLoader type="line-spinner" size={16} />
+		{:else}
+			<img
+				src={mcpIcon}
+				alt="MCP"
+				class={cn(
+					"size-chat-icon group-hover:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:invert",
+					chatState.isMCPActive &&
+						"[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)]",
+				)}
+			/>
+		{/if}
 	</ButtonWithTooltip>
 
 	<McpServerSelector
 		bind:open={isMCPSelectorOpen}
 		selectedServerIds={chatState.mcpServerIds}
-		onClose={handleMCPSelectorClose}
 		onConfirm={handleMCPServerConfirm}
+		filterType={codeAgentState.enabled ? "streamableHTTP" : undefined}
 	/>
 {/snippet}
 
@@ -139,7 +153,8 @@
 		class={cn(
 			"h-9 px-2.5",
 			"hover:!bg-chat-action-hover group/code-agent",
-			codeAgentState.enabled && "!bg-chat-action-active hover:!bg-chat-action-active",
+			codeAgentState.enabled &&
+				"!bg-chat-action-active hover:!bg-chat-action-active border border-[color:var(--code-agent-primary)] rounded-[10px]",
 		)}
 		tooltip={m.title_code_agent()}
 		onclick={() => handleCodeAgentClick()}
@@ -148,9 +163,15 @@
 	>
 		<div class="flex items-center">
 			<Bot class={cn("size-4", codeAgentState.enabled && "!text-chat-action-active-fg")} />
+			<div
+				class={cn(
+					"h-3.5 border-l mx-1.5",
+					codeAgentState.enabled ? "code-agent-divider-active" : "code-agent-divider",
+				)}
+			></div>
 			<span
 				class={cn(
-					"transition-all duration-300 ease-in-out opacity-0 group-hover/code-agent:ml-2 group-hover/code-agent:opacity-100 max-w-0 group-hover/code-agent:max-w-[200px]",
+					"transition-all duration-300 ease-in-out opacity-100 max-w-[200px]",
 					codeAgentState.enabled && "!text-chat-action-active-fg",
 				)}
 			>
@@ -169,13 +190,18 @@
 {/snippet}
 
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
+	{@render actionUploadAttachment()}
+
 	{#if !codeAgentState.enabled}
-		{@render actionUploadAttachment()}
 		{#if chatState.providerType === "302ai"}
-			{@render actionEnableThinking()}
 			{@render actionEnableOnlineSearch()}
+			{@render actionEnableThinking()}
 		{/if}
-		{@render actionEnableMCP()}
+	{/if}
+
+	{@render actionEnableMCP()}
+
+	{#if !codeAgentState.enabled}
 		{@render actionSetParameters()}
 	{/if}
 

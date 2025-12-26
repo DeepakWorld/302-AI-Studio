@@ -17,13 +17,15 @@
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
-	import {
-		claudeCodeAgentState,
-		claudeCodeSandboxState,
-		codeAgentState,
-	} from "$lib/stores/code-agent";
+	import { chatState } from "$lib/stores/chat-state.svelte";
+	// Import directly from source files to avoid circular dependency
+	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import { ChevronsUpDownIcon, RefreshCcw } from "@lucide/svelte";
+	import { toast } from "svelte-sonner";
 
 	const { windowService } = window.electronAPI;
 
@@ -59,6 +61,22 @@
 
 		onClose();
 	}
+
+	function handleCodeAgentEnabled() {
+		// 过滤不兼容的 MCP 服务器（只保留 streamableHTTP 类型）
+		if (chatState.mcpServerIds.length > 0) {
+			const { compatibleIds, filteredNames } = mcpState.filterStreamableHTTPServers(
+				chatState.mcpServerIds,
+			);
+
+			if (filteredNames.length > 0) {
+				toast.warning(m.mcp_filtered_warning({ names: filteredNames.join(", ") }));
+				chatState.handleMCPServerChange(compatibleIds);
+			}
+		}
+
+		handleOverlayAction("enabled");
+	}
 </script>
 
 {#snippet selectSession()}
@@ -77,7 +95,7 @@
 		<SettingSelect
 			name="session"
 			value={claudeCodeAgentState.selectedSessionId}
-			options={claudeCodeSandboxState.sessions}
+			groupedOptions={claudeCodeSandboxState.groupedSessions}
 			placeholder={m.select_session_placeholder()}
 			{disabled}
 			contentClass="max-w-[600px]"
@@ -164,7 +182,7 @@
 					{m.click_here_manage_sandbox()}
 					<button
 						type="button"
-						class="text-primary hover:underline hover:underline-offset-2"
+						class="text-primary hover:underline hover:underline-offset-2 cursor-pointer"
 						onclick={() => {
 							windowService.handleOpenSettingsWindow("/settings/agent-settings");
 						}}
@@ -181,10 +199,7 @@
 		<Button variant="secondary" onclick={() => handleOverlayAction("cancel")}>
 			{m.common_cancel()}
 		</Button>
-		<Button
-			disabled={codeAgentState.inCodeAgentMode}
-			onclick={() => handleOverlayAction("enabled")}
-		>
+		<Button disabled={codeAgentState.inCodeAgentMode} onclick={handleCodeAgentEnabled}>
 			{m.text_button_open()}
 		</Button>
 	</div>

@@ -781,7 +781,7 @@ function interceptSSEResponse(response: Response, processor: ClaudeCodeProcessor
 							controller.enqueue(encoder.encode(processedChunk));
 						} catch (_error) {
 							// Client disconnected or controller closed
-							console.log("[ClaudeCodeProcessor] Controller closed, stopping stream");
+							console.log("[ClaudeCodeProcessor] Controller closed, stopping stream", _error);
 							reader.cancel().catch(() => {
 								// Ignore cancel errors
 							});

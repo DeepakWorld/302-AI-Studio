@@ -131,7 +131,7 @@
 {/snippet}
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.settings_importData()}</Label>
+	<Label class="text-label-fg font-normal">{m.settings_importData()}</Label>
 	<SettingInfoItem label={m.settings_importFromBackup()} action={importButton} />
 	<SettingInfoItem label={m.settings_importLegacyJson()} action={legacyImportButton} />
 

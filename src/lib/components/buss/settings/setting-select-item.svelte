@@ -49,7 +49,7 @@
 	</div>
 	<Select.Root type="single" name={label} bind:value {onValueChange}>
 		<Select.Trigger
-			class="!bg-settings-bg dark:!bg-settings-bg data-[size=default]:h-9 min-w-[120px]"
+			class="bg-white dark:bg-secondary/50 border-border hover:bg-secondary/50 dark:hover:bg-secondary/70 data-[size=default]:h-9 min-w-[120px]"
 		>
 			{placeholder && !value ? placeholder : getLabel(value ?? "")}
 		</Select.Trigger>

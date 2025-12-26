@@ -16,7 +16,7 @@
 	let { label, tips, value, onChange }: Props = $props();
 
 	let errorMessage: string | null = $state(null);
-	let inputValue = $derived(value ? value.toString() : "");
+	let inputValue = $derived(value !== null ? value.toString() : "");
 
 	const validateInteger = (inputValue: string): boolean => {
 		if (inputValue === "") return true;

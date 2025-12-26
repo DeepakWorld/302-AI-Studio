@@ -112,7 +112,7 @@
 </script>
 
 <div class="gap-settings-gap flex flex-col">
-	<Label class="text-label-fg">{m.version_update()}</Label>
+	<Label class="text-label-fg font-normal">{m.version_update()}</Label>
 	<SettingSwitchItem
 		label={m.auto_update()}
 		checked={generalSettings.autoUpdate}

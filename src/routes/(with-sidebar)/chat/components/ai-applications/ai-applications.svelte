@@ -91,7 +91,7 @@
 	{#if showMainContent}
 		<div transition:fly={{ y: 20, duration: 500 }} class="flex flex-col w-[720px] gap-y-3">
 			<div class="flex flex-row items-center justify-between">
-				<Label class="font-light">{m.label_ai_applications()}</Label>
+				<Label>{m.label_ai_applications()}</Label>
 				<Sheet.Root>
 					<Sheet.Trigger
 						class={buttonVariants({

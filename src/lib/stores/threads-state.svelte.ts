@@ -41,16 +41,23 @@ class ThreadsState {
 
 	toggleFavorite = debounce(async (threadId: string) => {
 		const threadData = this.threads.find((t) => t.threadId === threadId);
-		const isFavoriteNow = threadData?.isFavorite ?? false;
+
+		if (!threadData) {
+			return;
+		}
+
+		const isFavoriteNow = threadData.isFavorite;
 
 		if (isFavoriteNow) {
+			threadData.isFavorite = false;
 			await threadService.removeFavorite(threadId);
 		} else {
+			threadData.isFavorite = true;
 			await threadService.addFavorite(threadId);
 		}
 
-		await broadcastService.broadcastToAll("thread-list-updated", {});
-	}, 200);
+		await broadcastService.broadcastExcludeSource("thread-list-updated", {});
+	}, 100);
 
 	async renameThread(threadId: string, newName: string): Promise<void> {
 		await threadService.renameThread(threadId, newName);

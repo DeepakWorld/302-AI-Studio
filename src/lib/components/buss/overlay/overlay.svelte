@@ -92,7 +92,7 @@
 			"fixed inset-0 z-40 flex items-center justify-center bg-black/50 duration-200",
 			!isClosing ? "animate-in fade-in-0" : "animate-out fade-out-0",
 		)}
-		onclick={handleOverlayClick}
+		onmousedown={handleOverlayClick}
 		onkeydown={handleOverlayKeydown}
 		role="presentation"
 		tabindex="-1"
@@ -102,14 +102,14 @@
 				"relative w-fit max-w-[calc(100vw-2rem)] rounded-lg border bg-overlay p-4 shadow-lg duration-200",
 				!isClosing ? "animate-in fade-in-0 zoom-in-95" : "animate-out fade-out-0 zoom-out-95",
 			)}
-			onclick={(e) => e.stopPropagation()}
+			onmousedown={(e) => e.stopPropagation()}
 			onkeydown={handleDialogKeydown}
 			role="dialog"
 			aria-modal="true"
 			tabindex="0"
 		>
 			<button
-				class="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100"
+				class="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 cursor-pointer"
 				onclick={onClose}
 			>
 				<X class="h-4 w-4" />

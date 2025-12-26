@@ -14,6 +14,7 @@ export class UpdaterService {
 	private updateDownloaded = false;
 	private static isInstallingUpdate = false;
 	private currentChannel: UpdateChannel = "stable";
+	private isChecking = false;
 
 	constructor() {
 		const platform = process.platform;
@@ -30,17 +31,19 @@ export class UpdaterService {
 	}
 
 	private buildUpdateFeedUrl(channel: UpdateChannel): string {
-		const server = "https://update.electronjs.org";
-		const repo = "302ai/302-AI-Studio-sv";
-		let version = app.getVersion();
+		const server = "https://updater.302.ai";
+		const appId = "302-ai-studio";
 		const platform = process.platform;
 
-		// For beta channel, append -beta suffix if not already present
-		if (channel === "beta" && !version.includes("-beta")) {
-			version = `${version}-beta`;
+		if (platform === "win32") {
+			// Windows Squirrel expects base URL without version
+			// It will automatically request /RELEASES file
+			return `${server}/update/${appId}/${channel}/${platform}/${process.arch}`;
 		}
 
-		return `${server}/${repo}/${platform}-${process.arch}/${version}`;
+		// macOS Squirrel needs version in URL for update check
+		const version = app.getVersion();
+		return `${server}/update/${appId}/${channel}/${platform}/${process.arch}/${version}`;
 	}
 
 	private updateFeedUrlForChannel(channel: UpdateChannel) {
@@ -77,11 +80,13 @@ export class UpdaterService {
 
 		autoUpdater.on("update-available", () => {
 			console.log("Update available");
+			this.isChecking = false;
 			broadcastService.broadcastChannelToAll("updater:update-available");
 		});
 
 		autoUpdater.on("update-not-available", () => {
 			console.log("Update not available");
+			this.isChecking = false;
 			broadcastService.broadcastChannelToAll("updater:update-not-available");
 		});
 
@@ -99,7 +104,23 @@ export class UpdaterService {
 
 		autoUpdater.on("error", (error) => {
 			console.error("Update error:", error);
-			broadcastService.broadcastChannelToAll("updater:update-error", { message: error.message });
+			this.isChecking = false;
+
+			// Check if this is a "no releases available" error (common on Windows)
+			// These errors should be treated as "no update available" rather than errors
+			const errorMessage = error.message || "";
+			const isNoReleasesError =
+				errorMessage.includes("empty or corrupted") ||
+				errorMessage.includes("RELEASES") ||
+				errorMessage.includes("404") ||
+				errorMessage.includes("Not Found");
+
+			if (isNoReleasesError) {
+				console.log("No releases available on server, treating as no update available");
+				broadcastService.broadcastChannelToAll("updater:update-not-available");
+			} else {
+				broadcastService.broadcastChannelToAll("updater:update-error", { message: error.message });
+			}
 		});
 	}
 
@@ -124,9 +145,16 @@ export class UpdaterService {
 	}
 
 	private checkForUpdates() {
+		if (this.isChecking) {
+			console.log("Update check already in progress, skipping...");
+			return;
+		}
+
 		try {
+			this.isChecking = true;
 			autoUpdater.checkForUpdates();
 		} catch (error) {
+			this.isChecking = false;
 			console.error("Failed to check for updates:", error);
 		}
 	}
