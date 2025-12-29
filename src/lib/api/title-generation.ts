@@ -65,11 +65,18 @@ export async function generateTitle(
 }
 
 const reasoningBlockPattern = /<(think|thinking|reason|reasoning)>[\s\S]*?<\/\1>/gi;
+// Pattern for unclosed thinking tags (when response is truncated)
+const unclosedReasoningPattern = /<(think|thinking|reason|reasoning)>[\s\S]*/gi;
 
 function sanitizeGeneratedTitle(rawTitle: string): string {
 	if (!rawTitle) {
 		return "";
 	}
 
-	return rawTitle.replace(reasoningBlockPattern, "").trim();
+	// First, remove complete thinking blocks with closing tags
+	let sanitized = rawTitle.replace(reasoningBlockPattern, "");
+	// Then, remove any unclosed thinking blocks (handles truncated responses)
+	sanitized = sanitized.replace(unclosedReasoningPattern, "");
+
+	return sanitized.trim();
 }
