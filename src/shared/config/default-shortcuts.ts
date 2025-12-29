@@ -35,6 +35,7 @@ export type CreateShortcutData = {
 	keys: Set<string>;
 	action: ShortcutAction;
 	scope: "global" | "app";
+	version: number;
 };
 
 export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
@@ -44,6 +45,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "clearMessages",
 		keys: new Set(["Cmd", "L"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "regenerateResponse",
@@ -51,6 +53,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "regenerateResponse",
 		keys: new Set(["Cmd", "R"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "createBranch",
@@ -58,6 +61,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "createBranch",
 		keys: new Set(["Cmd", "Shift", "N"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "branchAndSend",
@@ -65,6 +69,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "branchAndSend",
 		keys: new Set(["Cmd", "Shift", "Enter"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "search",
@@ -72,6 +77,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "search",
 		keys: new Set(["Cmd", "F"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "newTab",
@@ -79,6 +85,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "newTab",
 		keys: new Set(["Cmd", "T"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "closeCurrentTab",
@@ -86,6 +93,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "closeCurrentTab",
 		keys: new Set(["Cmd", "W"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "closeOtherTabs",
@@ -93,6 +101,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "closeOtherTabs",
 		keys: new Set(["Cmd", "Option", "W"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "nextTab",
@@ -100,6 +109,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "nextTab",
 		keys: new Set(["Ctrl", "Tab"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "previousTab",
@@ -107,6 +117,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "previousTab",
 		keys: new Set(["Ctrl", "Shift", "Tab"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab1",
@@ -114,6 +125,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab1",
 		keys: new Set(["Cmd", "1"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab2",
@@ -121,6 +133,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab2",
 		keys: new Set(["Cmd", "2"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab3",
@@ -128,6 +141,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab3",
 		keys: new Set(["Cmd", "3"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab4",
@@ -135,6 +149,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab4",
 		keys: new Set(["Cmd", "4"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab5",
@@ -142,6 +157,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab5",
 		keys: new Set(["Cmd", "5"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab6",
@@ -149,6 +165,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab6",
 		keys: new Set(["Cmd", "6"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab7",
@@ -156,6 +173,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab7",
 		keys: new Set(["Cmd", "7"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab8",
@@ -163,6 +181,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab8",
 		keys: new Set(["Cmd", "8"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "switchToTab9",
@@ -170,6 +189,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "switchToTab9",
 		keys: new Set(["Cmd", "9"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "toggleSidebar",
@@ -177,6 +197,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "toggleSidebar",
 		keys: new Set(["Cmd", "B"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "toggleSidebarRight",
@@ -184,13 +205,23 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "toggleSidebarRight",
 		keys: new Set(["Cmd", "Shift", "B"]),
 		scope: "app",
+		version: 1,
+	},
+	{
+		id: "toggleSidebarRight",
+		order: 41,
+		action: "toggleSidebarRight",
+		keys: new Set(["Cmd", "Shift", "B"]),
+		scope: "app",
+		version: 1,
 	},
 	{
 		id: "toggleModelPanel",
 		order: 42,
 		action: "toggleModelPanel",
-		keys: new Set(["Cmd", "M"]),
+		keys: new Set(["Ctrl", "M"]),
 		scope: "app",
+		version: 2,
 	},
 	{
 		id: "toggleIncognitoMode",
@@ -198,6 +229,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "toggleIncognitoMode",
 		keys: new Set(["Cmd", "E"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "openSettings",
@@ -205,6 +237,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "openSettings",
 		keys: new Set(["Cmd", ","]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "stopGeneration",
@@ -212,6 +245,7 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "stopGeneration",
 		keys: new Set(["Cmd", "D"]),
 		scope: "app",
+		version: 1,
 	},
 	{
 		id: "deleteCurrentThread",
@@ -219,5 +253,6 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		action: "deleteCurrentThread",
 		keys: new Set([]),
 		scope: "app",
+		version: 1,
 	},
 ];
