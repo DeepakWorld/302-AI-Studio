@@ -96,7 +96,7 @@
 		<Button
 			variant="ghost"
 			size="icon"
-			class="h-8 w-8 text-muted-foreground hover:text-foreground"
+			class="h-8 w-8 text-muted-foreground hover:text-primary"
 			onclick={handleRefresh}
 			disabled={isLoading}
 		>
