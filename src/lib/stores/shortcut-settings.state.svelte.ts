@@ -51,11 +51,7 @@ class ShortcutSettingsManager {
 
 	private applyMigration(): void {
 		const state = persistedShortcutSettings.current;
-<<<<<<< HEAD
-		let currentShortcuts = [...state.shortcuts]; // Create a copy to work with
-=======
 		const currentShortcuts = [...state.shortcuts]; // Create a copy to work with
->>>>>>> f9edb36 (feat(shortcuts): add toggle right sidebar shortcut and Gemini context documentation)
 		let needsUpdate = false;
 
 		// Check if we're on Mac
@@ -89,75 +85,6 @@ class ShortcutSettingsManager {
 			}
 		}
 
-<<<<<<< HEAD
-		// Sync shortcuts with DEFAULT_SHORTCUTS
-		// This applies to all platforms (Mac, Windows, Linux)
-		const defaultShortcutsMap = new Map(DEFAULT_SHORTCUTS.map((ds) => [ds.action, ds]));
-		const existingShortcutsMap = new Map(currentShortcuts.map((s) => [s.action, s]));
-
-		const syncedShortcuts: ShortcutBinding[] = [];
-		const newShortcuts: string[] = [];
-		const orderChanged: string[] = [];
-
-		// Process each default shortcut
-		for (const [action, defaultShortcut] of defaultShortcutsMap) {
-			const existingShortcut = existingShortcutsMap.get(action);
-
-			if (!existingShortcut) {
-				// New shortcut not in stored shortcuts
-				syncedShortcuts.push({
-					id: defaultShortcut.id,
-					action: defaultShortcut.action,
-					keys: Array.from(defaultShortcut.keys),
-					scope: defaultShortcut.scope,
-					order: defaultShortcut.order,
-				});
-				newShortcuts.push(action);
-				needsUpdate = true;
-			} else {
-				// Existing shortcut - check if order or scope changed
-				let hasChanges = false;
-
-				if (existingShortcut.order !== defaultShortcut.order) {
-					hasChanges = true;
-					orderChanged.push(action);
-				}
-
-				if (existingShortcut.scope !== defaultShortcut.scope) {
-					hasChanges = true;
-				}
-
-				if (hasChanges) {
-					// Update order and scope, but keep user's custom keys
-					syncedShortcuts.push({
-						...existingShortcut,
-						order: defaultShortcut.order,
-						scope: defaultShortcut.scope,
-					});
-					needsUpdate = true;
-				} else {
-					// No changes, keep as is
-					syncedShortcuts.push(existingShortcut);
-				}
-			}
-		}
-
-		if (newShortcuts.length > 0 || orderChanged.length > 0) {
-			const changes: string[] = [];
-			if (newShortcuts.length > 0) changes.push(`added: ${newShortcuts.join(", ")}`);
-			if (orderChanged.length > 0) changes.push(`order updated: ${orderChanged.join(", ")}`);
-
-			console.log(`[Shortcut Migration] ${changes.join("; ")}`);
-		}
-
-		// Sort shortcuts by order
-		syncedShortcuts.sort((a, b) => a.order - b.order);
-
-		currentShortcuts = syncedShortcuts;
-
-		if (needsUpdate) {
-			this._updateShortcuts(currentShortcuts);
-=======
 		// Sync shortcuts with DEFAULT_SHORTCUTS based on version
 		// This applies to all platforms (Mac, Windows, Linux)
 		const updatedShortcuts: ShortcutBinding[] = [];
@@ -218,7 +145,6 @@ class ShortcutSettingsManager {
 
 		if (needsUpdate) {
 			this._updateShortcuts(updatedShortcuts);
->>>>>>> f9edb36 (feat(shortcuts): add toggle right sidebar shortcut and Gemini context documentation)
 		}
 	}
 
