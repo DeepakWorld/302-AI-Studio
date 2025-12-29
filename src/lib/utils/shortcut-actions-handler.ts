@@ -1,4 +1,5 @@
 import { m } from "$lib/paraglide/messages";
+import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
 import { codeAgentState } from "$lib/stores/code-agent";
 import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
@@ -65,6 +66,10 @@ export class ShortcutActionsHandler {
 				case "search":
 					this.handleSearch();
 					break;
+				case "toggleSidebarRight":
+					this.handleToggleSidebarRight();
+					break;
+
 				default:
 					console.warn(`Unhandled shortcut action: ${action}`);
 			}
@@ -231,6 +236,15 @@ export class ShortcutActionsHandler {
 
 	private handleSearch(): void {
 		sidebarSearchState.triggerFocus();
+	}
+
+	private handleToggleSidebarRight(): void {
+		if (!codeAgentState.inCodeAgentMode || !codeAgentState.sandboxId) return;
+		if (agentPreviewState.isVisible) {
+			agentPreviewState.closePreview();
+		} else {
+			agentPreviewState.openPreview(codeAgentState.sandboxId);
+		}
 	}
 }
 

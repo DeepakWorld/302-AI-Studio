@@ -37,6 +37,7 @@
 			deleteCurrentThread: "settings_shortcut_hints_deleteCurrentThread",
 			openSettings: "settings_shortcut_hints_openSettings",
 			toggleSidebar: "settings_shortcut_hints_toggleSidebar",
+			toggleSidebarRight: "settings_shortcut_hints_toggleSidebarRight",
 			stopGeneration: "settings_shortcut_hints_stopGeneration",
 			newTab: "settings_shortcut_hints_newTab",
 			regenerateResponse: "settings_shortcut_hints_regenerateResponse",

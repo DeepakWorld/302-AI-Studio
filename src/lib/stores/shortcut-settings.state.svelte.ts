@@ -48,39 +48,108 @@ class ShortcutSettingsManager {
 	}
 
 	private applyMigration(): void {
-		// Check if we're on Mac - if so, no migration needed
-		const isMac = typeof window !== "undefined" && window.app?.platform === "darwin";
-		if (isMac) return;
-
 		const state = persistedShortcutSettings.current;
+		let currentShortcuts = [...state.shortcuts]; // Create a copy to work with
 		let needsUpdate = false;
 
-		// Check if any shortcut has Cmd or Option
-		const hasOldKeys = state.shortcuts.some((s) =>
-			s.keys.some((key) => key === "Cmd" || key === "Option"),
-		);
+		// Check if we're on Mac
+		const isMac = typeof window !== "undefined" && window.app?.platform === "darwin";
 
-		if (!hasOldKeys) return;
+		// Only apply platform-specific migration on non-Mac platforms
+		if (!isMac) {
+			// Check if any shortcut has Cmd or Option
+			const hasOldKeys = currentShortcuts.some((s) =>
+				s.keys.some((key) => key === "Cmd" || key === "Option"),
+			);
 
-		// Migrate Cmd -> Ctrl and Option -> Alt
-		const migratedShortcuts = state.shortcuts.map((shortcut) => ({
-			...shortcut,
-			keys: shortcut.keys.map((key) => {
-				if (key === "Cmd") {
-					needsUpdate = true;
-					return "Ctrl";
+			if (hasOldKeys) {
+				// Migrate Cmd -> Ctrl and Option -> Alt (Windows/Linux only)
+				const migratedShortcuts = currentShortcuts.map((shortcut) => ({
+					...shortcut,
+					keys: shortcut.keys.map((key) => {
+						if (key === "Cmd") {
+							needsUpdate = true;
+							return "Ctrl";
+						}
+						if (key === "Option") {
+							needsUpdate = true;
+							return "Alt";
+						}
+						return key;
+					}),
+				}));
+
+				currentShortcuts.splice(0, currentShortcuts.length, ...migratedShortcuts);
+			}
+		}
+
+		// Sync shortcuts with DEFAULT_SHORTCUTS
+		// This applies to all platforms (Mac, Windows, Linux)
+		const defaultShortcutsMap = new Map(DEFAULT_SHORTCUTS.map((ds) => [ds.action, ds]));
+		const existingShortcutsMap = new Map(currentShortcuts.map((s) => [s.action, s]));
+
+		const syncedShortcuts: ShortcutBinding[] = [];
+		const newShortcuts: string[] = [];
+		const orderChanged: string[] = [];
+
+		// Process each default shortcut
+		for (const [action, defaultShortcut] of defaultShortcutsMap) {
+			const existingShortcut = existingShortcutsMap.get(action);
+
+			if (!existingShortcut) {
+				// New shortcut not in stored shortcuts
+				syncedShortcuts.push({
+					id: defaultShortcut.id,
+					action: defaultShortcut.action,
+					keys: Array.from(defaultShortcut.keys),
+					scope: defaultShortcut.scope,
+					order: defaultShortcut.order,
+				});
+				newShortcuts.push(action);
+				needsUpdate = true;
+			} else {
+				// Existing shortcut - check if order or scope changed
+				let hasChanges = false;
+
+				if (existingShortcut.order !== defaultShortcut.order) {
+					hasChanges = true;
+					orderChanged.push(action);
 				}
-				if (key === "Option") {
-					needsUpdate = true;
-					return "Alt";
+
+				if (existingShortcut.scope !== defaultShortcut.scope) {
+					hasChanges = true;
 				}
-				return key;
-			}),
-		}));
+
+				if (hasChanges) {
+					// Update order and scope, but keep user's custom keys
+					syncedShortcuts.push({
+						...existingShortcut,
+						order: defaultShortcut.order,
+						scope: defaultShortcut.scope,
+					});
+					needsUpdate = true;
+				} else {
+					// No changes, keep as is
+					syncedShortcuts.push(existingShortcut);
+				}
+			}
+		}
+
+		if (newShortcuts.length > 0 || orderChanged.length > 0) {
+			const changes: string[] = [];
+			if (newShortcuts.length > 0) changes.push(`added: ${newShortcuts.join(", ")}`);
+			if (orderChanged.length > 0) changes.push(`order updated: ${orderChanged.join(", ")}`);
+
+			console.log(`[Shortcut Migration] ${changes.join("; ")}`);
+		}
+
+		// Sort shortcuts by order
+		syncedShortcuts.sort((a, b) => a.order - b.order);
+
+		currentShortcuts = syncedShortcuts;
 
 		if (needsUpdate) {
-			console.log("[Shortcut Migration] Migrating shortcuts from Cmd to Ctrl");
-			persistedShortcutSettings.current = { shortcuts: migratedShortcuts };
+			this._updateShortcuts(currentShortcuts);
 		}
 	}
 
@@ -96,11 +165,18 @@ class ShortcutSettingsManager {
 		return persistedShortcutSettings.current.shortcuts.find((s) => s.action === action);
 	}
 
+	private _updateShortcuts(newShortcuts: ShortcutBinding[]): void {
+		persistedShortcutSettings.current = {
+			...persistedShortcutSettings.current,
+			shortcuts: newShortcuts,
+		};
+	}
+
 	updateShortcut(action: ShortcutAction, keys: string[]): void {
 		const shortcuts = persistedShortcutSettings.current.shortcuts.map((s) =>
 			s.action === action ? { ...s, keys } : s,
 		);
-		persistedShortcutSettings.current = { ...persistedShortcutSettings.current, shortcuts };
+		this._updateShortcuts(shortcuts);
 	}
 
 	resetShortcut(action: ShortcutAction): void {

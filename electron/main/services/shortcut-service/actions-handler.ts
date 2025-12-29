@@ -71,6 +71,9 @@ export class ShortcutActionsHandler {
 				case "toggleSidebar":
 					await this.handleToggleSidebar(windowId);
 					break;
+				case "toggleSidebarRight":
+					await this.handleToggleSidebarRight(windowId);
+					break;
 				case "toggleModelPanel":
 					await this.handleToggleModelPanel(windowId);
 					break;
@@ -191,6 +194,25 @@ export class ShortcutActionsHandler {
 		if (view && !view.webContents.isDestroyed()) {
 			view.webContents.send("shortcut:action", {
 				action: "toggleSidebar",
+				ctx: { windowId },
+			});
+		} else {
+			console.log(`[ActionsHandler] Cannot send - view is null or destroyed`);
+		}
+	}
+
+	private async handleToggleSidebarRight(windowId: number): Promise<void> {
+		const activeTabId = tabService.getActiveTabId(windowId);
+		if (!activeTabId) {
+			console.log(`[ActionsHandler] No active tab found`);
+			return;
+		}
+
+		const view = tabService.getTabView(activeTabId);
+
+		if (view && !view.webContents.isDestroyed()) {
+			view.webContents.send("shortcut:action", {
+				action: "toggleSidebarRight",
 				ctx: { windowId },
 			});
 		} else {

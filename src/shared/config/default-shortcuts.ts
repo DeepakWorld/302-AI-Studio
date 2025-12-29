@@ -6,6 +6,7 @@ export type ShortcutAction =
 	| "deleteCurrentThread"
 	| "openSettings"
 	| "toggleSidebar"
+	| "toggleSidebarRight"
 	| "stopGeneration"
 	| "newTab"
 	| "regenerateResponse"
@@ -178,15 +179,22 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		scope: "app",
 	},
 	{
-		id: "toggleModelPanel",
+		id: "toggleSidebarRight",
 		order: 41,
+		action: "toggleSidebarRight",
+		keys: new Set(["Cmd", "Shift", "B"]),
+		scope: "app",
+	},
+	{
+		id: "toggleModelPanel",
+		order: 42,
 		action: "toggleModelPanel",
 		keys: new Set(["Cmd", "M"]),
 		scope: "app",
 	},
 	{
 		id: "toggleIncognitoMode",
-		order: 42,
+		order: 43,
 		action: "toggleIncognitoMode",
 		keys: new Set(["Cmd", "E"]),
 		scope: "app",

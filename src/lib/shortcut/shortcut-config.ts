@@ -22,6 +22,7 @@ export const SHORTCUT_MODES: Record<
 	deleteCurrentThread: "record",
 	openSettings: "display",
 	toggleSidebar: "display",
+	toggleSidebarRight: "display",
 	stopGeneration: "record",
 	newTab: "display",
 	regenerateResponse: "record",
@@ -53,6 +54,7 @@ export const SHORTCUT_OPTIONS: Record<ShortcutActionWithoutSendMessage, Shortcut
 	deleteCurrentThread: [],
 	openSettings: [],
 	toggleSidebar: [],
+	toggleSidebarRight: [],
 
 	stopGeneration: [],
 	newTab: [],
