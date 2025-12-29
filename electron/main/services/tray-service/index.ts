@@ -100,7 +100,7 @@ export class TrayService {
 			return path.join(import.meta.dirname, "../../../static/tray-icon.png");
 		} else {
 			// Production mode - icon is in the renderer folder
-			return path.join(import.meta.dirname, "../../renderer/main_window/icon.png");
+			return path.join(import.meta.dirname, "../../renderer/main_window/tray-icon.png");
 		}
 	}
 
