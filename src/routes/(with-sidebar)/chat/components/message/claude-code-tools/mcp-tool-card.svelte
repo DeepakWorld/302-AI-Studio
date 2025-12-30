@@ -82,6 +82,23 @@
 		(part.state === "output-available" && part.output) ||
 			(part.state === "output-error" && part.errorText),
 	);
+
+	const outputContent = $derived.by(() => {
+		if (part.state === "output-available" && part.output) {
+			if (typeof part.output === "string") {
+				return part.output;
+			}
+			return formatJson(part.output);
+		}
+		return "";
+	});
+
+	const outputLanguage = $derived.by(() => {
+		if (typeof part.output === "string") {
+			return "plaintext";
+		}
+		return "json";
+	});
 </script>
 
 <!-- Card Button -->
@@ -163,8 +180,8 @@
 							class="h-full [&_.shiki]:overflow-y-auto [&_.shiki]:overflow-x-hidden [&_.shiki]:text-xs [&_.shiki_code]:whitespace-pre-wrap [&_.shiki_code]:break-all"
 						>
 							<StaticCodeBlock
-								code={formatJson(part.output)}
-								language="json"
+								code={outputContent}
+								language={outputLanguage}
 								canCollapse={false}
 								title={m.tool_call_result()}
 								showCollapseButton={false}
