@@ -18,6 +18,7 @@ import {
 	Zap,
 	type Icon,
 } from "@lucide/svelte";
+import { m } from "$lib/paraglide/messages.js";
 
 // Claude Code tool names
 export const CLAUDE_CODE_TOOLS = [
@@ -119,47 +120,47 @@ export function getClaudeCodeToolIcon(toolName: string): typeof Icon {
 export function getClaudeCodeToolLabel(toolName: string): string {
 	switch (toolName) {
 		case "TodoWrite":
-			return "Task List";
+			return m.tool_call_label_task_list();
 		case "Write":
-			return "Write File";
+			return m.tool_call_label_write_file();
 		case "Edit":
-			return "Edit File";
+			return m.tool_call_label_edit_file();
 		case "Read":
-			return "Read File";
+			return m.tool_call_label_read_file();
 		case "Bash":
-			return "Execute Command";
+			return m.tool_call_label_execute_command();
 		case "BashOutput":
-			return "Shell Output";
+			return m.tool_call_label_shell_output();
 		case "Glob":
-			return "Find Files";
+			return m.tool_call_label_find_files();
 		case "Grep":
-			return "Search Content";
+			return m.tool_call_label_search_content();
 		case "WebFetch":
-			return "Fetch URL";
+			return m.tool_call_label_fetch_url();
 		case "WebSearch":
-			return "Web Search";
+			return m.tool_call_label_web_search();
 		case "NotebookEdit":
-			return "Edit Notebook";
+			return m.tool_call_label_edit_notebook();
 		case "KillShell":
-			return "Kill Process";
+			return m.tool_call_label_kill_process();
 		case "Task":
-			return "Launch Agent";
+			return m.tool_call_label_launch_agent();
 		case "Skill":
-			return "Execute Skill";
+			return m.tool_call_label_execute_skill();
 		case "SlashCommand":
-			return "Slash Command";
+			return m.tool_call_label_slash_command();
 		case "AskUserQuestion":
-			return "Ask User";
+			return m.tool_call_label_ask_user();
 		case "ListMcpResourcesTool":
-			return "List Resources";
+			return m.tool_call_label_list_resources();
 		case "ReadMcpResourceTool":
-			return "Read Resource";
+			return m.tool_call_label_read_resource();
 		case "ExitPlanMode":
-			return "Exit Plan Mode";
+			return m.tool_call_label_exit_plan_mode();
 		case "EnterPlanMode":
-			return "Enter Plan Mode";
+			return m.tool_call_label_enter_plan_mode();
 		default:
-			return "Claude Code";
+			return m.tool_call_label_claude_code();
 	}
 }
 

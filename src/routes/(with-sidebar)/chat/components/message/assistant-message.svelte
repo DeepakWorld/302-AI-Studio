@@ -44,6 +44,7 @@
 		McpToolCard,
 		TodoWriteCard,
 		WriteCard,
+		SkillCard,
 		extractToolNameFromType,
 		isClaudeCodeTool,
 		isClaudeCodeToolType,
@@ -551,6 +552,8 @@
 						<TodoWriteCard {part} messageId={message.id} />
 					{:else if part.toolName === "Write" || part.toolName === "Edit"}
 						<WriteCard {part} messageId={message.id} messagePartIndex={partIndex} />
+					{:else if part.toolName === "Skill"}
+						<SkillCard {part} messageId={message.id} />
 					{:else}
 						<ClaudeCodeToolCard {part} messageId={message.id} />
 					{/if}
@@ -615,6 +618,8 @@
 					<TodoWriteCard part={toolPart} messageId={message.id} />
 				{:else if toolName === "Write" || toolName === "Edit"}
 					<WriteCard part={toolPart} messageId={message.id} messagePartIndex={partIndex} />
+				{:else if toolName === "Skill"}
+					<SkillCard part={toolPart} messageId={message.id} />
 				{:else}
 					<ClaudeCodeToolCard part={toolPart} messageId={message.id} />
 				{/if}

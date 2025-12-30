@@ -40,6 +40,7 @@ interface ClaudeCodeEvent {
 		model?: string;
 		content: Array<{
 			type: string;
+			text?: string;
 			// For tool_result
 			tool_use_id?: string;
 			content?: string | Array<{ type: string; text?: string }>;
@@ -148,6 +149,8 @@ class ClaudeCodeProcessor {
 	private pendingFinishEvent: string | null = null;
 	// Track if we're in OpenAI streaming mode (for /deploy command)
 	private openaiTextId: string | null = null;
+	// Track the last skill tool call ID to associate synthetic messages with it
+	private lastSkillToolCallId: string | null = null;
 
 	constructor(preGeneratedMessageId?: string) {
 		if (preGeneratedMessageId) {
@@ -242,6 +245,11 @@ class ClaudeCodeProcessor {
 		// These contain tool_use content that needs tool-input-start and tool-input-available
 		if (data.type === "assistant" && data.message?.content) {
 			return this.handleAssistantMessage(data);
+		}
+
+		// Handle synthetic user messages (used for skill content)
+		if (data.type === "user" && data.isSynthetic && data.message?.content) {
+			return this.handleSyntheticMessage(data);
 		}
 
 		// Handle tool result events from user messages
@@ -465,11 +473,54 @@ class ClaudeCodeProcessor {
 					output: resultContent,
 				};
 
+				// If this is a skill tool, track it to associate with synthetic messages
+				if (typeof resultContent === "string" && resultContent.startsWith("Launching skill:")) {
+					this.lastSkillToolCallId = content.tool_use_id;
+				} else if (
+					typeof resultContent === "object" &&
+					resultContent !== null &&
+					"commandName" in resultContent
+				) {
+					// 302.AI might return an object for skill result
+					this.lastSkillToolCallId = content.tool_use_id;
+				} else {
+					this.lastSkillToolCallId = null;
+				}
+
 				results.push(`data: ${JSON.stringify(toolOutputEvent)}`);
 			}
 		}
 
 		return results.length > 0 ? results.join("\n\n") : null;
+	}
+
+	/**
+	 * Handle synthetic user messages that contain skill content.
+	 * Associate the content with the last skill tool call.
+	 */
+	private handleSyntheticMessage(data: ClaudeCodeEvent): string | null {
+		if (!this.lastSkillToolCallId || !data.message?.content) {
+			return null;
+		}
+
+		const textParts = data.message.content
+			.filter((c) => c.type === "text" && c.text)
+			.map((c) => c.text)
+			.join("\n");
+
+		if (!textParts) return null;
+
+		// Emit an updated tool-output-available event with the full content
+		const toolOutputEvent = {
+			type: "tool-output-available",
+			toolCallId: this.lastSkillToolCallId,
+			output: textParts,
+		};
+
+		// Reset last skill tool call ID after association
+		this.lastSkillToolCallId = null;
+
+		return `data: ${JSON.stringify(toolOutputEvent)}`;
 	}
 
 	private transformAnthropicEvent(event: AnthropicEvent): string | null {
