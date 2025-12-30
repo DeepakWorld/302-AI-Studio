@@ -15,6 +15,7 @@
 	} from "$lib/shortcut/shortcut-config";
 	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
 	import ShortcutRecorder from "./shortcut-recorder.svelte";
+	import ShortcutSelect from "./shortcut-select.svelte";
 
 	interface ShortcutSetting {
 		id: string;
@@ -172,19 +173,28 @@
 				{:else}
 					{m.settings_shortcut_noShortcut()}
 				{/if}
-			{:else}
-				<ShortcutRecorder
-					value={shortcut.keys}
-					onValueChange={(keys) => shortcutSettings.updateShortcut(shortcut.action, keys)}
-					onRecordingChange={(_isRecording) => {}}
-					disabled={false}
-					allShortcuts={shortcutSettingsList()?.map((s) => ({
-						action: s.action,
-						keys: s.keys,
-					}))}
-					onReset={() => shortcutSettings.resetShortcut(shortcut.action)}
-					className="flex-1"
-				/>
+			{:else if shortcut.mode === "record"}
+				{#if shortcut.action === "sendMessage"}
+					<ShortcutSelect
+						value={shortcut.keys}
+						onValueChange={(keys) => shortcutSettings.updateShortcut(shortcut.action, keys)}
+						disabled={false}
+						className="flex-1"
+					/>
+				{:else}
+					<ShortcutRecorder
+						value={shortcut.keys}
+						onValueChange={(keys) => shortcutSettings.updateShortcut(shortcut.action, keys)}
+						onRecordingChange={(_isRecording) => {}}
+						disabled={false}
+						allShortcuts={shortcutSettingsList()?.map((s) => ({
+							action: s.action,
+							keys: s.keys,
+						}))}
+						onReset={() => shortcutSettings.resetShortcut(shortcut.action)}
+						className="flex-1"
+					/>
+				{/if}
 			{/if}
 			{#if shortcut.hint}
 				<p class="text-settings-shortcut-hint mt-1 text-left text-xs">

@@ -29,6 +29,7 @@
 	"layout": "Layout",
 	"placeholder_input": "Please enter...",
 	"placeholder_input_chat": "Enter your message here. Enter to send, Shift + Enter to line break",
+	"placeholder_input_chat_modifier_send": "Enter your message here. {modifier} + Enter to send, Enter to line break",
 	"placeholder_input_model_id": "Enter model ID",
 	"placeholder_input_model_name": "Enter model name",
 	"placeholder_input_model_remark": "Enter model remark (optional)",

@@ -27,6 +27,7 @@
 	"layout": "布局",
 	"placeholder_input": "请输入...",
 	"placeholder_input_chat": "在这里输入消息，按 Enter 发送，按 Shift + Enter 换行",
+	"placeholder_input_chat_modifier_send": "在这里输入消息，按 {modifier} + Enter 发送，按 Enter 换行",
 	"placeholder_input_model_id": "输入模型 ID",
 	"placeholder_input_model_name": "输入模型名称",
 	"placeholder_input_model_remark": "输入模型备注（可选）",

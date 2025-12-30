@@ -11,6 +11,7 @@
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
 	import { cn } from "$lib/utils";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { isMac } from "$lib/utils/platform";
@@ -242,6 +243,17 @@
 		}
 	}
 
+	const placeholderText = $derived.by(() => {
+		const sendMessageShortcut = shortcutSettings.getShortcut("sendMessage");
+		const keys = sendMessageShortcut?.keys ?? ["Enter"];
+		const modifier = isMac ? "Cmd" : "Ctrl";
+		const isEnterSend = keys.length === 1 && keys[0].toLowerCase() === "enter";
+
+		return isEnterSend
+			? m.placeholder_input_chat()
+			: m.placeholder_input_chat_modifier_send({ modifier });
+	});
+
 	onMount(() => {
 		const unsub = onShortcutAction((action) => {
 			if (action.action === "sendMessage" && textareaRef === document.activeElement) {
@@ -277,14 +289,8 @@
 					"border-none shadow-none focus-within:ring-0 focus-within:outline-hidden focus-visible:ring-0",
 				)}
 				bind:value={chatState.inputValue}
-				placeholder={m.placeholder_input_chat()}
-				oncompositionstart={() => {
-					console.log("Composition started");
-				}}
-				oncompositionend={() => {
-					console.log("Composition ended");
-					compositionEndTime = Date.now();
-				}}
+				placeholder={placeholderText}
+				oncompositionend={() => (compositionEndTime = Date.now())}
 				onpaste={handlePaste}
 				disabled={codeAgentState.isDeleted}
 			/>
