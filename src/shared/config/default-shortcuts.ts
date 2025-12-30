@@ -13,6 +13,7 @@ export type ShortcutAction =
 	| "regenerateResponse"
 	| "search"
 	| "createBranch"
+	| "toggleChatParametersPanel"
 	| "restoreLastTab"
 	| "screenshot"
 	| "nextTab"
@@ -229,6 +230,14 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		order: 43,
 		action: "toggleIncognitoMode",
 		keys: new Set(["Cmd", "E"]),
+		scope: "app",
+		version: 1,
+	},
+	{
+		id: "toggleChatParametersPanel",
+		order: 44,
+		action: "toggleChatParametersPanel",
+		keys: new Set(["Cmd", "P"]),
 		scope: "app",
 		version: 1,
 	},

@@ -166,6 +166,7 @@ class ChatState {
 
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
+	isParametersOpen = $state(false);
 
 	/**
 	 * Cancel any pending suggestions generation request.

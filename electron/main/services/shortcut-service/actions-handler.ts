@@ -83,6 +83,9 @@ export class ShortcutActionsHandler {
 				case "toggleIncognitoMode":
 					await this.handleToggleIncognitoMode(windowId);
 					break;
+				case "toggleChatParametersPanel":
+					await this.handleToggleChatParametersPanel(windowId);
+					break;
 
 				case "newChat":
 					await this.handleNewChat(windowId);
@@ -335,6 +338,16 @@ export class ShortcutActionsHandler {
 			activeView.send("shortcut:action", {
 				action: "search",
 				ctx,
+			});
+		}
+	}
+
+	private async handleToggleChatParametersPanel(windowId: number): Promise<void> {
+		const activeView = this.getActiveTabWebContents(windowId);
+		if (activeView && !activeView.isDestroyed()) {
+			activeView.send("shortcut:action", {
+				action: "toggleChatParametersPanel",
+				ctx: { windowId },
 			});
 		}
 	}

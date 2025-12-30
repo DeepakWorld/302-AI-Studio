@@ -24,12 +24,11 @@
 
 	let actionDisabled = $derived(chatState.providerType !== "302ai");
 
-	let isParametersOpen = $state(false);
 	let isMCPSelectorOpen = $state(false);
 	let addingMCP = $state(false);
 
 	function handleParametersClose() {
-		isParametersOpen = false;
+		chatState.isParametersOpen = false;
 	}
 
 	function handleMCPClick() {
@@ -129,7 +128,7 @@
 	<ButtonWithTooltip
 		class="hover:!bg-chat-action-hover"
 		tooltip={m.title_chat_parameters()}
-		onclick={() => (isParametersOpen = true)}
+		onclick={() => (chatState.isParametersOpen = true)}
 		{disabled}
 	>
 		<Settings2 />
@@ -137,7 +136,7 @@
 
 	<Overlay
 		title={m.title_chat_parameters()}
-		open={isParametersOpen}
+		open={chatState.isParametersOpen}
 		onClose={handleParametersClose}
 	>
 		<ParametersPanel />

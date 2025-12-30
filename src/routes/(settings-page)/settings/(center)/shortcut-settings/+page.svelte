@@ -9,7 +9,6 @@
 		SHORTCUT_MODES,
 		SHORTCUT_OPTIONS,
 		type ShortcutAction,
-		type ShortcutActionWithoutSendMessage,
 		type ShortcutOption,
 		type ShortcutScope,
 	} from "$lib/shortcut/shortcut-config";
@@ -30,7 +29,7 @@
 	}
 
 	const shortcutSettingsList = $derived((): ShortcutSetting[] => {
-		const shortcutHints: Record<ShortcutActionWithoutSendMessage, string> = {
+		const shortcutHints: Record<ShortcutAction, string> = {
 			newChat: "settings_shortcut_hints_newChat",
 			clearMessages: "settings_shortcut_hints_clearMessages",
 			closeCurrentTab: "settings_shortcut_hints_closeCurrentTab",
@@ -38,6 +37,7 @@
 			deleteCurrentThread: "settings_shortcut_hints_deleteCurrentThread",
 			openSettings: "settings_shortcut_hints_openSettings",
 			toggleSidebar: "settings_shortcut_hints_toggleSidebar",
+			toggleChatParametersPanel: "settings_shortcut_hints_toggleChatParametersPanel",
 			toggleSidebarRight: "settings_shortcut_hints_toggleSidebarRight",
 			stopGeneration: "settings_shortcut_hints_stopGeneration",
 			newTab: "settings_shortcut_hints_newTab",
@@ -71,7 +71,7 @@
 				scope: shortcut.scope,
 				mode: SHORTCUT_MODES[shortcut.action],
 				options: SHORTCUT_OPTIONS[shortcut.action],
-				hint: shortcutHints[shortcut.action as ShortcutActionWithoutSendMessage],
+				hint: shortcutHints[shortcut.action as ShortcutAction],
 			}),
 		);
 		const tabSwitchActions = [

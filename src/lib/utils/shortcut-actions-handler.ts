@@ -72,6 +72,9 @@ export class ShortcutActionsHandler {
 				case "toggleSidebarRight":
 					this.handleToggleSidebarRight();
 					break;
+				case "toggleChatParametersPanel":
+					this.handleToggleChatParametersPanel();
+					break;
 
 				default:
 					console.warn(`Unhandled shortcut action: ${action}`);
@@ -248,6 +251,10 @@ export class ShortcutActionsHandler {
 		} else {
 			agentPreviewState.openPreview(codeAgentState.sandboxId);
 		}
+	}
+
+	private handleToggleChatParametersPanel(): void {
+		chatState.isParametersOpen = !chatState.isParametersOpen;
 	}
 }
 
