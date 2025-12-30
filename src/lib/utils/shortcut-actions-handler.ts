@@ -39,6 +39,9 @@ export class ShortcutActionsHandler {
 
 		try {
 			switch (action) {
+				case "sendMessage":
+					// Handled by the chat input component directly
+					break;
 				case "clearMessages":
 					this.handleClearMessages();
 					break;

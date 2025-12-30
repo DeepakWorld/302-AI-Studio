@@ -2,7 +2,7 @@ import type { ShortcutAction } from "@shared/config/default-shortcuts";
 
 export type { ShortcutAction };
 
-export type ShortcutActionWithoutSendMessage = Exclude<ShortcutAction, "send-message">;
+export type ShortcutActionWithoutSendMessage = ShortcutAction;
 
 export type ShortcutScope = "global" | "app";
 export interface ShortcutOption {
@@ -15,6 +15,7 @@ export const SHORTCUT_MODES: Record<
 	ShortcutActionWithoutSendMessage,
 	"preset" | "record" | "display"
 > = {
+	sendMessage: "record",
 	newChat: "record",
 	clearMessages: "record",
 	closeCurrentTab: "display",
@@ -47,6 +48,7 @@ export const SHORTCUT_MODES: Record<
 };
 
 export const SHORTCUT_OPTIONS: Record<ShortcutActionWithoutSendMessage, ShortcutOption[]> = {
+	sendMessage: [],
 	newChat: [],
 	clearMessages: [],
 	closeCurrentTab: [],

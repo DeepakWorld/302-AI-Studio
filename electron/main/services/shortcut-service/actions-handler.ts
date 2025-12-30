@@ -35,6 +35,9 @@ export class ShortcutActionsHandler {
 
 		try {
 			switch (action) {
+				case "sendMessage":
+					await this.handleSendMessage(windowId, ctx);
+					break;
 				case "newTab":
 					await this.handleNewTab(windowId);
 					break;
@@ -111,6 +114,16 @@ export class ShortcutActionsHandler {
 			}
 		} catch (error) {
 			console.error(`Error handling shortcut action ${action}:`, error);
+		}
+	}
+
+	private async handleSendMessage(windowId: number, ctx: ShortcutContext): Promise<void> {
+		const activeView = this.getActiveTabWebContents(windowId);
+		if (activeView && !activeView.isDestroyed()) {
+			activeView.send("shortcut:action", {
+				action: "sendMessage",
+				ctx,
+			});
 		}
 	}
 

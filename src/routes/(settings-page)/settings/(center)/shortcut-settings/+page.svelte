@@ -49,6 +49,7 @@
 			previousTab: "settings_shortcut_hints_previousTab",
 			toggleModelPanel: "settings_shortcut_hints_toggleModelPanel",
 			toggleIncognitoMode: "settings_shortcut_hints_toggleIncognitoMode",
+			sendMessage: "settings_shortcut_hints_sendMessage",
 			branchAndSend: "settings_shortcut_hints_branchAndSend",
 			switchToTab1: "settings_shortcut_hints_switchToTab1",
 			switchToTab2: "settings_shortcut_hints_switchToTab2",

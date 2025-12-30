@@ -1,5 +1,5 @@
 export type ShortcutAction =
-	// | "sendMessage"
+	| "sendMessage"
 	| "newChat"
 	| "clearMessages"
 	| "closeCurrentTab"
@@ -40,14 +40,14 @@ export type CreateShortcutData = {
 };
 
 export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
-	// {
-	// 	id: "sendMessage",
-	// 	order: 1,
-	// 	action: "sendMessage",
-	// 	keys: new Set(["Enter"]),
-	// 	scope: "app",
-	// 	version: 1,
-	// },
+	{
+		id: "sendMessage",
+		order: 1,
+		action: "sendMessage",
+		keys: new Set(["Enter"]),
+		scope: "app",
+		version: 1,
+	},
 	{
 		id: "clearMessages",
 		order: 2,
