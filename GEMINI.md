@@ -28,6 +28,20 @@ This document provides a comprehensive overview of the 302 AI Studio project, it
     - **`TabService` (`electron/main/services/tab-service/index.ts`):** Manages the entire lifecycle of tabs within each Shell Window. It keeps track of which `WebContentsView` belongs to which tab and which window, and orchestrates switching between them.
     - **`WebContentsFactory` (`electron/main/factories/web-contents-factory.ts`):** A factory that centralizes the creation and configuration of all `WebContentsView`s (for shells, tabs, and AI applications). This ensures consistent settings, preload scripts, and context for each view.
 
+  ### State Management & Persistence
+
+  The application handles state persistence and synchronization across windows/tabs using a custom reactive solution.
+  - **`PersistedState` Class (`src/lib/hooks/persisted-state.svelte.ts`):** This is the core utility for managing persistent state.
+    - **Reactivity:** Built on Svelte 5 Runes (`$state`), it provides a reactive `current` property. Changes to this property automatically trigger UI updates in Svelte components.
+    - **Persistence:** It communicates with the Electron main process via `window.electronAPI.storageService` to save state to disk (using `unstorage` in the backend).
+    - **Synchronization:** It listens for `onPersistedStateSync` IPC events. This ensures that if a state changes in one window (e.g., settings update), it is automatically reflected in all other open windows or tabs that use the same state key.
+    - **Debouncing:** Writes to storage are debounced by default to prevent performance bottlenecks during rapid state changes.
+
+  - **Global Stores:** Most application-wide state is defined in `src/lib/stores` using `PersistedState`. Examples include:
+    - `persistedThemeState`: Manages the application theme.
+    - `persistedUserState`: Stores user session and profile info.
+    - `persistedChatParametersState`: Saves chat configuration preferences.
+
 - **Key Technologies:**
   - **Framework:** SvelteKit 5 - **Desktop:** Electron 38
   - **Language:** TypeScript
