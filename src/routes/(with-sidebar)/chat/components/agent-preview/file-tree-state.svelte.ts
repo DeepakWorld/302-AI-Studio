@@ -927,12 +927,16 @@ export class FileTreeState {
 			}
 
 			const { zipPath, folderName } = result;
+
+			// Generate unique folder name to avoid conflicts with existing folders
+			const uniqueFolderName = this.generateUniqueName(targetPath, folderName);
+
 			toast.loading(m.toast_file_upload_reading_zip(), { id: uploadToastId });
 
 			// Read the zip file from the temp path using Electron IPC
 			const fileResponse = await fetch(`file://${zipPath}`);
 			const zipBlob = await fileResponse.blob();
-			const zipFile = new File([zipBlob], `${folderName}.zip`, { type: "application/zip" });
+			const zipFile = new File([zipBlob], `${uniqueFolderName}.zip`, { type: "application/zip" });
 
 			toast.loading(m.toast_file_upload_uploading_folder(), { id: uploadToastId });
 
