@@ -18,8 +18,8 @@
 		checked && "bg-[#F7F7F7] dark:bg-muted rounded-[10px]",
 	)}
 >
-	<div class="flex items-center gap-3 min-w-0 flex-1">
-		<Checkbox {checked} {onCheckedChange} />
+	<div class="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+		<Checkbox {checked} {onCheckedChange} class="shrink-0" />
 		<span class="truncate text-sm">{preview}</span>
 	</div>
 	<span class="text-sm text-muted-foreground shrink-0 ml-4">{roleLabel}</span>

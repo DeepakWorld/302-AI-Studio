@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { SvelteSet } from "svelte/reactivity";
-	import { format } from "date-fns";
 	import { Button } from "$lib/components/ui/button";
 	import { Checkbox } from "$lib/components/ui/checkbox";
 	import * as Dialog from "$lib/components/ui/dialog";
@@ -8,7 +6,9 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { format } from "date-fns";
 	import { toast } from "svelte-sonner";
+	import { SvelteSet } from "svelte/reactivity";
 	import ExportMessageList from "./export-message-list.svelte";
 
 	type ExportFormat = "markdown" | "text" | "json";
@@ -294,7 +294,7 @@
 </script>
 
 <Dialog.Root bind:open {onOpenChange}>
-	<Dialog.Content class="!min-w-[638px] !h-[540px] flex flex-col">
+	<Dialog.Content class="!w-[638px] !min-w-[638px] !max-w-[638px] !h-[540px] flex flex-col">
 		<Dialog.Header>
 			<Dialog.Title>{m.export_dialog_title()}</Dialog.Title>
 		</Dialog.Header>
@@ -323,17 +323,13 @@
 					>{m.export_selected_count({ count: selectedCount })}</span
 				>
 			</div>
-			<div class="flex items-center gap-2">
-				<button type="button" class="text-sm text-primary hover:underline" onclick={selectAll}>
+			<div class="flex items-center gap-1">
+				<Button variant="ghost" size="sm" class="text-primary" onclick={selectAll}>
 					{m.export_select_all()}
-				</button>
-				<button
-					type="button"
-					class="text-sm text-primary hover:underline"
-					onclick={invertSelection}
-				>
+				</Button>
+				<Button variant="ghost" size="sm" class="text-primary" onclick={invertSelection}>
 					{m.export_invert_selection()}
-				</button>
+				</Button>
 			</div>
 		</div>
 

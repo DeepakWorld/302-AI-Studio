@@ -27,7 +27,7 @@
 		const textParts = message.parts.filter((p) => p.type === "text");
 		const text = textParts.map((p) => p.text).join(" ");
 		const cleaned = text.replace(/\s+/g, " ").trim();
-		return cleaned.length > 50 ? cleaned.slice(0, 50) + "..." : cleaned || m.export_empty_message();
+		return cleaned || m.export_empty_message();
 	}
 
 	function getRoleLabel(role: string): string {
@@ -40,7 +40,7 @@
 	}
 
 	function getSystemPromptPreview(prompt: string): string {
-		return prompt.length > 50 ? prompt.slice(0, 50) + "..." : prompt;
+		return prompt.replace(/\s+/g, " ").trim();
 	}
 </script>
 
