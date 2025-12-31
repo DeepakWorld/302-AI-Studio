@@ -4,7 +4,7 @@ import archiver from "archiver";
 import { type IpcMainInvokeEvent, app, dialog } from "electron";
 import extract from "extract-zip";
 import { createWriteStream, existsSync } from "fs";
-import { cp, mkdir, readdir, readFile, rm } from "fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { userDataManager } from "../app-service/user-data-manager";
 import { importLegacyJson } from "./legacy-import";
@@ -435,6 +435,40 @@ export class DataService {
 			return { zipPath, folderName };
 		} catch (error) {
 			console.error("Failed to create zip for upload:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Export chat content to a file
+	 * @param content - The content to export
+	 * @param extension - File extension (md, txt, json, html)
+	 * @param filterName - Filter name for save dialog
+	 * @param defaultFileName - Default file name
+	 * @returns The path to the exported file, or null if cancelled
+	 */
+	async exportChatToFile(
+		_event: IpcMainInvokeEvent,
+		content: string,
+		extension: string,
+		filterName: string,
+		defaultFileName: string,
+	): Promise<string | null> {
+		try {
+			const { canceled, filePath } = await dialog.showSaveDialog({
+				title: "导出会话记录",
+				defaultPath: defaultFileName,
+				filters: [{ name: filterName, extensions: [extension] }],
+			});
+
+			if (canceled || !filePath) {
+				return null;
+			}
+
+			await writeFile(filePath, content, "utf-8");
+			return filePath;
+		} catch (error) {
+			console.error("Failed to export chat:", error);
 			throw error;
 		}
 	}

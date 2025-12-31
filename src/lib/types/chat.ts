@@ -41,6 +41,10 @@ export const messageMetadataSchema = z.object({
 	userPromptTemplateContent: z.string().optional(),
 	userPromptTemplateVariables: z.array(z.string()).optional(),
 	userPromptTemplateMap: z.record(z.string(), z.string()).optional(),
+	// System Prompt related fields (for assistant messages)
+	systemPromptContent: z.string().optional(),
+	systemPromptVariables: z.array(z.string()).optional(),
+	systemPromptMap: z.record(z.string(), z.string()).optional(),
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;

@@ -319,6 +319,11 @@ export function registerIpcHandlers() {
 	ipcMain.handle("dataService:zipFolderForUpload", (event) =>
 		dataService.zipFolderForUpload(event),
 	);
+	ipcMain.handle(
+		"dataService:exportChatToFile",
+		(event, content, extension, filterName, defaultFileName) =>
+			dataService.exportChatToFile(event, content, extension, filterName, defaultFileName),
+	);
 
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
@@ -492,6 +497,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:openBackupDirectory");
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
+	ipcMain.removeHandler("dataService:exportChatToFile");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");

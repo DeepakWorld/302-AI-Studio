@@ -987,5 +987,19 @@
 	"text_terse_and_effective_type": "简洁高效型",
 	"text_deep_thinking_type": "深度思考型",
 	"context_menu_download_image": "下载图片",
-	"context_menu_copy_image": "复制图片"
+	"context_menu_copy_image": "复制图片",
+	"export_dialog_title": "导出会话记录",
+	"export_format_plain_text": "纯文本",
+	"export_select_range": "选择范围",
+	"export_selected_count": "已选择{count}条",
+	"export_select_all": "全选",
+	"export_invert_selection": "反选",
+	"export_include_thinking": "包含思考过程",
+	"export_exporting": "导出中...",
+	"export_button": "导出",
+	"export_at_least_one_message": "请至少选择一条消息",
+	"export_success": "导出成功",
+	"export_failed": "导出失败",
+	"export_conversation_title": "会话记录",
+	"export_empty_message": "(空消息)"
 }

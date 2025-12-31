@@ -991,5 +991,19 @@
 	"text_terse_and_effective_type": "Terse and Effective Type",
 	"text_deep_thinking_type": "Deep Thinking Type",
 	"context_menu_download_image": "Download Image",
-	"context_menu_copy_image": "Copy Image"
+	"context_menu_copy_image": "Copy Image",
+	"export_dialog_title": "Export Conversation",
+	"export_format_plain_text": "Plain Text",
+	"export_select_range": "Select Range",
+	"export_selected_count": "{count} selected",
+	"export_select_all": "Select All",
+	"export_invert_selection": "Invert",
+	"export_include_thinking": "Include Thinking",
+	"export_exporting": "Exporting...",
+	"export_button": "Export",
+	"export_at_least_one_message": "Please select at least one message",
+	"export_success": "Export successful",
+	"export_failed": "Export failed",
+	"export_conversation_title": "Conversation",
+	"export_empty_message": "(Empty message)"
 }
