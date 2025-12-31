@@ -13,6 +13,10 @@ class CodeAgentSendMessageButtonState {
 	async *enableCodeAgentFlow(fn: () => void) {
 		this.isChecking = true;
 
+		if (chatState.selectedModel && codeAgentState.currentModel !== chatState.selectedModel.id) {
+			codeAgentState.updateSandboxModel(chatState.selectedModel.id);
+		}
+
 		const { isOK, sandboxInfo } = await codeAgentState.executeCodeAgentMode();
 		if (!isOK) {
 			this.isChecking = false;

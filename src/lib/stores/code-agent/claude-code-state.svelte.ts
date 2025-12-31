@@ -80,6 +80,10 @@ class ClaudeCodeAgentState {
 		this.updateState({ sandboxRemark });
 	}
 
+	updateSandboxModel(model: string): void {
+		this.updateState({ model });
+	}
+
 	async handleAgentModeExecute(): Promise<{
 		isOK: boolean;
 		sandboxInfo?: ClaudeCodeSandboxInfo;
