@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SvelteSet } from "svelte/reactivity";
 	import { Button } from "$lib/components/ui/button";
 	import { Checkbox } from "$lib/components/ui/checkbox";
 	import * as Dialog from "$lib/components/ui/dialog";
@@ -7,7 +8,6 @@
 	import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { toast } from "svelte-sonner";
-	import { SvelteSet } from "svelte/reactivity";
 	import ExportMessageList from "./export-message-list.svelte";
 
 	type ExportFormat = "markdown" | "text" | "json";
@@ -15,32 +15,46 @@
 	interface ExportDialogProps {
 		open: boolean;
 		onOpenChange: (open: boolean) => void;
+		startFromMessageId?: string | null;
 	}
 
-	let { open = $bindable(), onOpenChange }: ExportDialogProps = $props();
+	let { open = $bindable(), onOpenChange, startFromMessageId = null }: ExportDialogProps = $props();
 
 	// State
 	let exportFormat = $state<ExportFormat>("markdown");
-	let selectedMessageIds = new SvelteSet<string>();
+	let selectedMessageIds = $state<Set<string>>(new Set());
 	let includeSystemPrompt = $state(true);
 	let includeThinking = $state(false);
 	let isExporting = $state(false);
 
-	// Derived
-	const messages = $derived(chatState.messages);
+	// 使用函数直接计算过滤后的消息，避免 derived 缓存问题
+	// 从第一条消息开始，到点击的 assistant 消息结束（包含该消息及之前所有消息）
+	function getFilteredMessages() {
+		const allMessages = chatState.messages;
+		if (!startFromMessageId) return allMessages;
+
+		const assistantIndex = allMessages.findIndex((m) => m.id === startFromMessageId);
+		if (assistantIndex === -1) return allMessages;
+
+		// 返回从开头到点击的 assistant 消息（包含）
+		return allMessages.slice(0, assistantIndex + 1);
+	}
+
 	// Read systemPrompt from the last assistant message's metadata (most recent value used)
 	// Fallback to current chatParameters for backward compatibility with old messages
-	const systemPrompt = $derived.by(() => {
+	function getSystemPrompt() {
+		const msgs = getFilteredMessages();
 		// Find the last assistant message that has systemPromptContent in metadata
-		const lastAssistantMsgWithPrompt = [...messages]
+		const lastAssistantMsgWithPrompt = [...msgs]
 			.reverse()
 			.find((m) => m.role === "assistant" && m.metadata?.systemPromptContent);
 		if (lastAssistantMsgWithPrompt?.metadata?.systemPromptContent) {
 			return lastAssistantMsgWithPrompt.metadata.systemPromptContent;
 		}
 		return chatParameters.systemPromptContent;
-	});
-	const hasSystemPrompt = $derived(!!systemPrompt?.trim());
+	}
+
+	const hasSystemPrompt = $derived(!!getSystemPrompt()?.trim());
 
 	const selectedCount = $derived(
 		selectedMessageIds.size + (includeSystemPrompt && hasSystemPrompt ? 1 : 0),
@@ -49,26 +63,41 @@
 	const formatOptions = $derived([
 		{ value: "markdown", label: "Markdown" },
 		{ value: "text", label: m.export_format_plain_text() },
-		{ value: "json", label: "JSON (OpenAI)" },
+		{ value: "json", label: "JSON" },
 	]);
+
+	// 用于模板的消息列表
+	const messages = $derived.by(() => {
+		// 只有当 dialog 打开时才计算过滤后的消息
+		if (!open) return [];
+		const filtered = getFilteredMessages();
+
+		return filtered;
+	});
 
 	// Initialize selection when dialog opens
 	$effect(() => {
 		if (open) {
-			selectedMessageIds.clear();
-			for (const msg of messages) {
-				selectedMessageIds.add(msg.id);
+			// 重新获取过滤后的消息
+			const filteredMsgs = getFilteredMessages();
+
+			// 创建新的 Set 来存储选中的消息 ID
+			const newSelectedIds = new SvelteSet<string>();
+			for (const msg of filteredMsgs) {
+				newSelectedIds.add(msg.id);
 			}
+			selectedMessageIds = newSelectedIds;
 			includeSystemPrompt = hasSystemPrompt;
 		}
 	});
 
 	// Selection functions
 	function selectAll() {
-		selectedMessageIds.clear();
+		const newSelectedIds = new SvelteSet<string>();
 		for (const msg of messages) {
-			selectedMessageIds.add(msg.id);
+			newSelectedIds.add(msg.id);
 		}
+		selectedMessageIds = newSelectedIds;
 		if (hasSystemPrompt) includeSystemPrompt = true;
 	}
 
@@ -79,19 +108,18 @@
 				newSelection.add(msg.id);
 			}
 		}
-		selectedMessageIds.clear();
-		for (const id of newSelection) {
-			selectedMessageIds.add(id);
-		}
+		selectedMessageIds = newSelection;
 		if (hasSystemPrompt) includeSystemPrompt = !includeSystemPrompt;
 	}
 
 	function toggleMessage(id: string) {
-		if (selectedMessageIds.has(id)) {
-			selectedMessageIds.delete(id);
+		const newSelectedIds = new SvelteSet(selectedMessageIds);
+		if (newSelectedIds.has(id)) {
+			newSelectedIds.delete(id);
 		} else {
-			selectedMessageIds.add(id);
+			newSelectedIds.add(id);
 		}
+		selectedMessageIds = newSelectedIds;
 	}
 
 	function toggleSystemPrompt() {
@@ -125,6 +153,7 @@
 	// Export formatters
 	function formatAsMarkdown(): string {
 		const lines: string[] = [];
+		const systemPrompt = getSystemPrompt();
 
 		if (includeSystemPrompt && hasSystemPrompt) {
 			lines.push("## System\n");
@@ -138,7 +167,7 @@
 			const content = getMessageContent(msg, false);
 			lines.push(`## ${role}\n`);
 
-			// 思考过程放在消息内容之前
+			// 思考过程
 			if (includeThinking && msg.role === "assistant") {
 				const reasoningParts = msg.parts.filter((p) => p.type === "reasoning");
 				if (reasoningParts.length > 0) {
@@ -157,6 +186,7 @@
 
 	function formatAsText(): string {
 		const lines: string[] = [];
+		const systemPrompt = getSystemPrompt();
 
 		if (includeSystemPrompt && hasSystemPrompt) {
 			lines.push("[System]");
@@ -191,6 +221,7 @@
 
 	function formatAsJson(): string {
 		const result: { role: string; content: string }[] = [];
+		const systemPrompt = getSystemPrompt();
 
 		if (includeSystemPrompt && hasSystemPrompt) {
 			result.push({ role: "system", content: systemPrompt });
@@ -309,7 +340,7 @@
 			<ExportMessageList
 				{messages}
 				selectedIds={selectedMessageIds}
-				{systemPrompt}
+				systemPrompt={getSystemPrompt()}
 				{hasSystemPrompt}
 				{includeSystemPrompt}
 				onToggleMessage={toggleMessage}

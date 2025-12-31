@@ -10,6 +10,7 @@
 		onCreateBranch?: () => void | Promise<void>;
 		onDelete?: () => void | Promise<void>;
 		onDownloadImage?: (src: string) => void | Promise<void>;
+		onExport?: () => void | Promise<void>;
 		children: import("svelte").Snippet;
 	}
 
@@ -21,6 +22,7 @@
 		onCreateBranch,
 		onDelete,
 		onDownloadImage,
+		onExport,
 		children,
 	}: Props = $props();
 
@@ -92,6 +94,12 @@
 		{#if onCreateBranch}
 			<ContextMenu.Item onSelect={onCreateBranch}>
 				{m.common_create_branch()}
+			</ContextMenu.Item>
+		{/if}
+
+		{#if onExport}
+			<ContextMenu.Item onSelect={onExport}>
+				{m.export_button()}
 			</ContextMenu.Item>
 		{/if}
 

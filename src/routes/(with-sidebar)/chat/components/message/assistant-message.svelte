@@ -56,9 +56,9 @@
 		isMcpToolType,
 	} from "./claude-code-tools";
 	import AgentTaskResult from "./code-agent/agent-task-result.svelte";
+	import ExportDialog from "./export-dialog.svelte";
 	import MessageActions from "./message-actions.svelte";
 	import MessageContextMenu from "./message-context-menu.svelte";
-	import ExportDialog from "./export-dialog.svelte";
 	import ToolCallModal from "./tool-call-modal.svelte";
 	import { formatTimeAgo, getAssistantMessageContent } from "./utils";
 
@@ -492,6 +492,9 @@
 	onCreateBranch={handleCreateBranch}
 	onDelete={handleDelete}
 	onDownloadImage={handleDownloadImage}
+	onExport={() => {
+		isExportDialogOpen = true;
+	}}
 >
 	<div class="group flex flex-col gap-1" data-message-id={message.id}>
 		{@render messageHeader(message.metadata?.model || "gpt-4o")}
@@ -680,6 +683,7 @@
 		<!-- Export Dialog -->
 		<ExportDialog
 			bind:open={isExportDialogOpen}
+			startFromMessageId={message.id}
 			onOpenChange={(open) => {
 				isExportDialogOpen = open;
 			}}
