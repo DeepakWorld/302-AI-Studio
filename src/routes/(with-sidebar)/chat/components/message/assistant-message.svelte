@@ -11,6 +11,10 @@
 <script lang="ts">
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader/index.js";
+	import {
+		copyImageToClipboard,
+		downloadImage,
+	} from "$lib/components/buss/markdown/download-utils";
 	import { MarkdownRenderer } from "$lib/components/buss/markdown/index.js";
 	import { ModelIcon } from "$lib/components/buss/model-icon/index.js";
 	import {
@@ -30,6 +34,7 @@
 	import {
 		ChevronDown,
 		Lightbulb,
+		MessageSquareShare,
 		Server,
 		ThumbsDown,
 		ThumbsUp,
@@ -42,20 +47,17 @@
 	import {
 		ClaudeCodeToolCard,
 		McpToolCard,
+		SkillCard,
 		TodoWriteCard,
 		WriteCard,
-		SkillCard,
+		extractMcpToolInfo,
 		extractToolNameFromType,
 		isClaudeCodeTool,
 		isClaudeCodeToolType,
 		isMcpToolType,
-		extractMcpToolInfo,
 	} from "./claude-code-tools";
-	import {
-		downloadImage,
-		copyImageToClipboard,
-	} from "$lib/components/buss/markdown/download-utils";
 	import AgentTaskResult from "./code-agent/agent-task-result.svelte";
+	import ExportDialog from "./export-dialog.svelte";
 	import MessageActions from "./message-actions.svelte";
 	import MessageContextMenu from "./message-context-menu.svelte";
 	import ToolCallModal from "./tool-call-modal.svelte";
@@ -66,6 +68,7 @@
 	let isReasoningExpanded = $state(!preferencesSettings.autoCollapseThink);
 	let selectedToolPart = $state<DynamicToolUIPart | null>(null);
 	let isToolModalOpen = $state(false);
+	let isExportDialogOpen = $state(false);
 	let isReading = $state(false);
 	let _currentUtterance: SpeechSynthesisUtterance | null = null;
 	let _isUserCancelled = $state(false);
@@ -435,6 +438,17 @@
 				</ButtonWithTooltip>
 			{/if}
 
+			<ButtonWithTooltip
+				tooltipSide="bottom"
+				class="text-muted-foreground hover:!bg-chat-action-hover"
+				tooltip={m.export_button()}
+				onclick={() => {
+					isExportDialogOpen = true;
+				}}
+			>
+				<MessageSquareShare />
+			</ButtonWithTooltip>
+
 			{#if codeAgentState.inCodeAgentMode && message.metadata?.result}
 				<AgentTaskResult result={message.metadata.result} />
 			{/if}
@@ -479,6 +493,9 @@
 	onCreateBranch={handleCreateBranch}
 	onDelete={handleDelete}
 	onDownloadImage={handleDownloadImage}
+	onExport={() => {
+		isExportDialogOpen = true;
+	}}
 >
 	<div class="group flex flex-col gap-1" data-message-id={message.id}>
 		{@render messageHeader(message.metadata?.model || "gpt-4o")}
@@ -667,6 +684,15 @@
 				}}
 			/>
 		{/if}
+
+		<!-- Export Dialog -->
+		<ExportDialog
+			bind:open={isExportDialogOpen}
+			startFromMessageId={message.id}
+			onOpenChange={(open) => {
+				isExportDialogOpen = open;
+			}}
+		/>
 
 		{@render messageFooter()}
 

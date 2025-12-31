@@ -1366,6 +1366,35 @@ export const chat = new Chat({
 			messages = updatedMessages;
 		}
 
+		// Save systemPrompt to the last assistant message
+		const lastAssistantMessage = [...messages].reverse().find((msg) => msg.role === "assistant");
+		if (lastAssistantMessage && chatParameters.systemPromptContent) {
+			const resolvedSystemPrompt = resolvePrompt(chatParameters.systemPromptContent, {
+				modelId: chatState.selectedModel?.id ?? "",
+				language: generalSettings.language,
+				cachedMap: chatParameters.systemPromptMap,
+				variables: chatParameters.systemPromptVariables,
+			});
+
+			const updatedMessages = messages.map((msg) => {
+				if (msg.id === lastAssistantMessage.id) {
+					return {
+						...msg,
+						metadata: {
+							...msg.metadata,
+							systemPromptContent: resolvedSystemPrompt.content,
+							systemPromptVariables: [...chatParameters.systemPromptVariables],
+							systemPromptMap: { ...chatParameters.systemPromptMap },
+						},
+					};
+				}
+				return msg;
+			});
+
+			chat.messages = updatedMessages;
+			messages = updatedMessages;
+		}
+
 		const codeAgentEnabled = codeAgentState.enabled;
 		console.log("onFinish: async ({ messages }) pendingResultMetadata", pendingResultMetadata);
 		if (codeAgentEnabled && pendingResultMetadata) {
