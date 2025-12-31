@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { SvelteSet } from "svelte/reactivity";
+	import { format } from "date-fns";
 	import { Button } from "$lib/components/ui/button";
 	import { Checkbox } from "$lib/components/ui/checkbox";
 	import * as Dialog from "$lib/components/ui/dialog";
@@ -269,7 +270,8 @@
 					break;
 			}
 
-			const defaultFileName = `chat-export-${new Date().toISOString().split("T")[0]}.${extension}`;
+			const timestamp = format(new Date(), "yyyyMMddHHmmss");
+			const defaultFileName = `chat-export-${timestamp}.${extension}`;
 
 			const filePath = await window.electronAPI.dataService.exportChatToFile(
 				content,
