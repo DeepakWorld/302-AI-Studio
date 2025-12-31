@@ -1,28 +1,22 @@
 <script lang="ts">
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
-	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
-	import { Button } from "$lib/components/ui/button";
 	import * as ContextMenu from "$lib/components/ui/context-menu";
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input";
-	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
-	import { codeAgentGlobalConfigsState } from "$lib/stores/code-agent";
 	import {
 		claudeCodeSandboxState,
 		persistedClaudeCodeSandboxState,
 	} from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { cn } from "$lib/utils";
 	import { formatDateTimeFull } from "$lib/utils/date-format";
-	import { Eye, EyeOff, RotateCw, Search, SlidersHorizontal } from "@lucide/svelte";
+	import { RotateCw, Search } from "@lucide/svelte";
 	import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
 	import SandboxDeleteConfirmDialog from "./sandbox-delete-confirm-dialog.svelte";
 	import SandboxDialog from "./sandbox-dialog.svelte";
 	import SandboxRemarkDialog from "./sandbox-remark-dialog.svelte";
 
-	const { openExternalLink } = window.electronAPI.externalLinkService;
+	// const { openExternalLink } = window.electronAPI.externalLinkService;
 
 	let searchQuery = $state("");
 	let isLoading = $state(false);
@@ -31,9 +25,9 @@
 	let isRenameDialogOpen = $state(false);
 	let isDeleteDialogOpen = $state(false);
 	let targetSandbox = $state<ClaudeCodeSandboxInfo | null>(null);
-	let isRemoteModeSettingsOpen = $state(false);
-	let showApiKey = $state(false);
-	let tempApiKey = $state("");
+	// let isRemoteModeSettingsOpen = $state(false);
+	// let showApiKey = $state(false);
+	// let tempApiKey = $state("");
 
 	// Filter sandboxes based on search query
 	const filteredSandboxes = $derived.by(() => {
@@ -94,26 +88,26 @@
 		// await handleRefresh();
 	}
 
-	function handleRemoteSettings() {
-		if (!isRemoteModeSettingsOpen) {
-			tempApiKey = codeAgentGlobalConfigsState.apiKey;
-		}
-		isRemoteModeSettingsOpen = !isRemoteModeSettingsOpen;
-	}
+	// function handleRemoteSettings() {
+	// 	if (!isRemoteModeSettingsOpen) {
+	// 		tempApiKey = codeAgentGlobalConfigsState.apiKey;
+	// 	}
+	// 	isRemoteModeSettingsOpen = !isRemoteModeSettingsOpen;
+	// }
 
-	async function handleSaveSettings() {
-		const oldApiKey = codeAgentGlobalConfigsState.apiKey;
-		codeAgentGlobalConfigsState.updateApiKey(tempApiKey);
-		const success = await handleRefresh();
-		if (success) {
-			isRemoteModeSettingsOpen = false;
-		} else {
-			codeAgentGlobalConfigsState.updateApiKey(oldApiKey);
-		}
-	}
+	// async function handleSaveSettings() {
+	// 	const oldApiKey = codeAgentGlobalConfigsState.apiKey;
+	// 	codeAgentGlobalConfigsState.updateApiKey(tempApiKey);
+	// 	const success = await handleRefresh();
+	// 	if (success) {
+	// 		isRemoteModeSettingsOpen = false;
+	// 	} else {
+	// 		codeAgentGlobalConfigsState.updateApiKey(oldApiKey);
+	// 	}
+	// }
 </script>
 
-{#snippet remoteModeSettings()}
+<!-- {#snippet remoteModeSettings()}
 	<Dialog.Root bind:open={isRemoteModeSettingsOpen}>
 		<ButtonWithTooltip
 			class="hover:!bg-chat-action-hover"
@@ -193,7 +187,7 @@
 			</Dialog.Footer>
 		</Dialog.Content>
 	</Dialog.Root>
-{/snippet}
+{/snippet} -->
 
 <!-- Agent Sandbox List Section -->
 <div class="space-y-3">
@@ -209,7 +203,7 @@
 				<RotateCw class={cn("h-4 w-4", isLoading ? "animate-spin" : "")} />
 			</ButtonWithTooltip>
 
-			{@render remoteModeSettings()}
+			<!-- {@render remoteModeSettings()} -->
 		</div>
 	</div>
 

@@ -28,7 +28,7 @@ import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelt
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { agentPreviewState } from "./agent-preview-state.svelte";
-import { codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
+import { codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -961,10 +961,10 @@ class ChatState {
 	 * Get the API key for a specific provider
 	 */
 	getApiKey(providerId: string): string | undefined {
-		const codeAgentEnabled = codeAgentState.enabled;
-		if (codeAgentEnabled) {
-			return codeAgentGlobalConfigsState.apiKey;
-		}
+		// const codeAgentEnabled = codeAgentState.enabled;
+		// if (codeAgentEnabled) {
+		// 	return codeAgentGlobalConfigsState.apiKey;
+		// }
 
 		const apiKey = persistedProviderState.current.find((p) => p.id === providerId)?.apiKey;
 		return apiKey;
