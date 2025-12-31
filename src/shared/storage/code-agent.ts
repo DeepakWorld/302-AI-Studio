@@ -79,3 +79,8 @@ export const createClaudeCodeSandboxResponse = type({
 	},
 });
 export type CreateClaudeCodeSandboxResponse = typeof createClaudeCodeSandboxResponse.infer;
+
+export const codeAgentGlobalConfigs = type({
+	apiKey: "string",
+});
+export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;

@@ -4,8 +4,7 @@ import {
 	type CreateClaudeCodeSandboxResponse,
 } from "@shared/storage/code-agent";
 import { type } from "arktype";
-import ky from "ky";
-import { _302AIKy } from "./core/_302ai-ky";
+import { codeAgentKy } from "./core/code-agent-ky";
 
 export const sessionInfoSchema = type({
 	session_id: "string",
@@ -26,7 +25,7 @@ export async function createClaudeCodeSandbox(
 ): Promise<CreateClaudeCodeSandboxResponse> {
 	try {
 		console.debug("request", request);
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/create", {
 				json: {
 					...request,
@@ -70,7 +69,7 @@ export async function updateClaudeCodeSandbox(
 	sandbox_name?: string,
 ): Promise<UpdateClaudeCodeSandboxResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/reset", {
 				json: { sandbox_id, llm_model, sandbox_name, auto_pause_seconds: 30 },
 			})
@@ -104,7 +103,7 @@ export async function deleteClaudeCodeSandbox(
 	sandbox_id: string,
 ): Promise<DeleteClaudeCodeSandboxResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/delete", {
 				json: { sandbox_id },
 			})
@@ -155,20 +154,9 @@ export type ListClaudeCodeSandboxesResponse = typeof listClaudeCodeSandboxesResp
  * List all claude code sandboxes
  * @returns The list of claude code sandboxes
  */
-export async function listClaudeCodeSandboxes(
-	apiKey?: string,
-): Promise<ListClaudeCodeSandboxesResponse> {
+export async function listClaudeCodeSandboxes(): Promise<ListClaudeCodeSandboxesResponse> {
 	try {
-		const response =
-			apiKey && apiKey.trim() !== ""
-				? await ky
-						.get("https://api.302.ai/302/claude-code/sandbox/list", {
-							headers: {
-								Authorization: `Bearer ${apiKey}`,
-							},
-						})
-						.json()
-				: await _302AIKy.get("302/claude-code/sandbox/list").json();
+		const response = await codeAgentKy.get("302/claude-code/sandbox/list").json();
 
 		const validated = listClaudeCodeSandboxesResponse(response);
 		if (validated instanceof type.errors) {
@@ -198,7 +186,7 @@ export async function listClaudeCodeSessions(
 	sandbox_id: string,
 ): Promise<ListClaudeCodeSessionsResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.get(`302/claude-code/sandbox/session?sandbox_id=${sandbox_id}`)
 			.json();
 
@@ -235,7 +223,7 @@ export async function addClaudeCodeSandboxMCP(
 		(info) => `claude mcp add --transport http ${info.name} ${info.url}`,
 	);
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/mcp/add", {
 				json: { sandbox_id: sandboxId, mcp_servers: commands },
 			})

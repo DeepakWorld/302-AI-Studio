@@ -3,6 +3,8 @@
  * 302.AI 沙盒文件系统 API
  */
 
+import { getApiKeyByProviderKey } from "./utils";
+
 export interface SandboxFileInfo {
 	name: string;
 	path: string;
@@ -52,7 +54,7 @@ export async function listSandboxFiles(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
 		},
 		body: JSON.stringify({
 			sandbox_id: sandboxId,
@@ -117,7 +119,7 @@ export async function downloadSandboxFile(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
 		},
 		body: JSON.stringify({ sandbox_id: sandboxId, path }),
 	});
@@ -176,7 +178,7 @@ export async function writeSandboxFile(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
 		},
 		body: JSON.stringify({
 			sandbox_id: sandboxId,
@@ -207,7 +209,7 @@ export async function getFileContent(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
 		},
 		body: JSON.stringify({
 			sandbox_id: sandboxId,
@@ -293,7 +295,7 @@ async function sandboxFileOperation(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
 		},
 		body: JSON.stringify(requestBody),
 	});
@@ -380,7 +382,7 @@ export async function uploadSandboxFile(
 		const response = await fetch(`${baseUrl}/302/claude-code/sandbox/file/upload`, {
 			method: "POST",
 			headers: {
-				Authorization: `Bearer ${apiKey}`,
+				Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
 			},
 			body: formData,
 		});

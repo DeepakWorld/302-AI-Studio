@@ -133,9 +133,10 @@ class ClaudeCodeSandboxState {
 		const { isOK } = await updateClaudeCodeSandboxesByIpc();
 		if (!isOK) {
 			toast.error(m.refresh_failed());
+		} else {
+			toast.success(m.refresh_success());
 		}
 
-		toast.success(m.refresh_success());
 		return isOK;
 	}
 

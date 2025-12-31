@@ -4,6 +4,7 @@
  */
 
 import type { ModelProvider } from "@shared/types";
+import { getApiKeyByProvider } from "./utils";
 
 export interface UpdateSessionNoteRequest {
 	/**
@@ -75,7 +76,7 @@ export async function updateSessionNote(
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: `Bearer ${provider.apiKey}`,
+				Authorization: `Bearer ${getApiKeyByProvider(provider)}`,
 			},
 			body: JSON.stringify(request),
 		});
@@ -160,7 +161,7 @@ export async function deleteSession(
 		const response = await fetch(endpoint, {
 			method: "DELETE",
 			headers: {
-				Authorization: `Bearer ${provider.apiKey}`,
+				Authorization: `Bearer ${getApiKeyByProvider(provider)}`,
 			},
 		});
 

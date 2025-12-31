@@ -28,7 +28,7 @@ import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelt
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { agentPreviewState } from "./agent-preview-state.svelte";
-import { codeAgentState } from "./code-agent";
+import { codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -609,8 +609,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -624,8 +623,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -646,8 +644,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -657,8 +654,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -733,8 +729,7 @@ class ChatState {
 				...(regenerateMessageId && { messageId: regenerateMessageId }),
 				body: {
 					model: currentModel.id,
-					apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-						?.apiKey,
+					apiKey: this.getApiKey(currentModel.providerId),
 				},
 			});
 		} catch (error) {
@@ -886,8 +881,7 @@ class ChatState {
 			await chat.sendMessage(undefined, {
 				body: {
 					model: currentModel.id,
-					apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-						?.apiKey,
+					apiKey: this.getApiKey(currentModel.providerId),
 				},
 			});
 		} catch (error) {
@@ -961,6 +955,19 @@ class ChatState {
 			console.error("Failed to generate title manually:", error);
 			toast.error(m.toast_title_generation_failed());
 		}
+	}
+
+	/**
+	 * Get the API key for a specific provider
+	 */
+	getApiKey(providerId: string): string | undefined {
+		const codeAgentEnabled = codeAgentState.enabled;
+		if (codeAgentEnabled) {
+			return codeAgentGlobalConfigsState.apiKey;
+		}
+
+		const apiKey = persistedProviderState.current.find((p) => p.id === providerId)?.apiKey;
+		return apiKey;
 	}
 
 	/**
