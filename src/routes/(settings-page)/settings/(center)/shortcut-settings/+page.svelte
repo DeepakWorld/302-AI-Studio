@@ -9,12 +9,12 @@
 		SHORTCUT_MODES,
 		SHORTCUT_OPTIONS,
 		type ShortcutAction,
-		type ShortcutActionWithoutSendMessage,
 		type ShortcutOption,
 		type ShortcutScope,
 	} from "$lib/shortcut/shortcut-config";
 	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
 	import ShortcutRecorder from "./shortcut-recorder.svelte";
+	import ShortcutSelect from "./shortcut-select.svelte";
 
 	interface ShortcutSetting {
 		id: string;
@@ -29,7 +29,7 @@
 	}
 
 	const shortcutSettingsList = $derived((): ShortcutSetting[] => {
-		const shortcutHints: Record<ShortcutActionWithoutSendMessage, string> = {
+		const shortcutHints: Record<ShortcutAction, string> = {
 			newChat: "settings_shortcut_hints_newChat",
 			clearMessages: "settings_shortcut_hints_clearMessages",
 			closeCurrentTab: "settings_shortcut_hints_closeCurrentTab",
@@ -37,6 +37,8 @@
 			deleteCurrentThread: "settings_shortcut_hints_deleteCurrentThread",
 			openSettings: "settings_shortcut_hints_openSettings",
 			toggleSidebar: "settings_shortcut_hints_toggleSidebar",
+			toggleChatParametersPanel: "settings_shortcut_hints_toggleChatParametersPanel",
+			toggleSidebarRight: "settings_shortcut_hints_toggleSidebarRight",
 			stopGeneration: "settings_shortcut_hints_stopGeneration",
 			newTab: "settings_shortcut_hints_newTab",
 			regenerateResponse: "settings_shortcut_hints_regenerateResponse",
@@ -48,6 +50,7 @@
 			previousTab: "settings_shortcut_hints_previousTab",
 			toggleModelPanel: "settings_shortcut_hints_toggleModelPanel",
 			toggleIncognitoMode: "settings_shortcut_hints_toggleIncognitoMode",
+			sendMessage: "settings_shortcut_hints_sendMessage",
 			branchAndSend: "settings_shortcut_hints_branchAndSend",
 			switchToTab1: "settings_shortcut_hints_switchToTab1",
 			switchToTab2: "settings_shortcut_hints_switchToTab2",
@@ -68,7 +71,7 @@
 				scope: shortcut.scope,
 				mode: SHORTCUT_MODES[shortcut.action],
 				options: SHORTCUT_OPTIONS[shortcut.action],
-				hint: shortcutHints[shortcut.action as ShortcutActionWithoutSendMessage],
+				hint: shortcutHints[shortcut.action as ShortcutAction],
 			}),
 		);
 		const tabSwitchActions = [
@@ -137,7 +140,7 @@
 							)}
 							{#if modifierKeys.length > 0}
 								<span class="text-settings-shortcut-size">
-									{formatShortcutLabel(modifierKeys)} + 1~9\
+									{formatShortcutLabel(modifierKeys)}+1~9
 								</span>
 							{:else}
 								<span class="text-settings-shortcut-size"> 1~9 </span>
@@ -170,19 +173,28 @@
 				{:else}
 					{m.settings_shortcut_noShortcut()}
 				{/if}
-			{:else}
-				<ShortcutRecorder
-					value={shortcut.keys}
-					onValueChange={(keys) => shortcutSettings.updateShortcut(shortcut.action, keys)}
-					onRecordingChange={(_isRecording) => {}}
-					disabled={false}
-					allShortcuts={shortcutSettingsList()?.map((s) => ({
-						action: s.action,
-						keys: s.keys,
-					}))}
-					onReset={() => shortcutSettings.resetShortcut(shortcut.action)}
-					className="flex-1"
-				/>
+			{:else if shortcut.mode === "record"}
+				{#if shortcut.action === "sendMessage"}
+					<ShortcutSelect
+						value={shortcut.keys}
+						onValueChange={(keys) => shortcutSettings.updateShortcut(shortcut.action, keys)}
+						disabled={false}
+						className="flex-1"
+					/>
+				{:else}
+					<ShortcutRecorder
+						value={shortcut.keys}
+						onValueChange={(keys) => shortcutSettings.updateShortcut(shortcut.action, keys)}
+						onRecordingChange={(_isRecording) => {}}
+						disabled={false}
+						allShortcuts={shortcutSettingsList()?.map((s) => ({
+							action: s.action,
+							keys: s.keys,
+						}))}
+						onReset={() => shortcutSettings.resetShortcut(shortcut.action)}
+						className="flex-1"
+					/>
+				{/if}
 			{/if}
 			{#if shortcut.hint}
 				<p class="text-settings-shortcut-hint mt-1 text-left text-xs">

@@ -4,6 +4,7 @@
  */
 
 import type { ModelProvider } from "@shared/types";
+import { getApiKeyByProvider } from "./utils";
 
 export interface DeploySandboxRequest {
 	sandbox_id: string;
@@ -40,7 +41,7 @@ export async function deploySandboxProject(
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: `Bearer ${provider.apiKey}`,
+				Authorization: `Bearer ${getApiKeyByProvider(provider)}`,
 			},
 			body: JSON.stringify(request),
 		});

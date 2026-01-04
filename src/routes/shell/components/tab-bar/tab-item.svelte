@@ -36,8 +36,7 @@
 	import type { Tab } from "@shared/types";
 	import { onDestroy } from "svelte";
 
-	const { handleAiApplicationReload } = window.electronAPI.aiApplicationService;
-	const { storageService } = window.electronAPI;
+	const { handleAiApplicationReloadIpc } = window.electronAPI.aiApplicationService;
 
 	const {
 		tab,
@@ -58,7 +57,6 @@
 	let triggerRef = $state<HTMLElement | null>(null);
 	let isCompact = $state(false);
 	let windowTabsInfo = $derived(tabBarState.windowTabsInfo);
-	let hasMessages = $state(false);
 
 	$effect(() => {
 		if (!triggerRef?.parentElement) return;
@@ -83,41 +81,12 @@
 		}
 	});
 
-	// Check if the tab has messages for screenshot functionality
-	$effect(() => {
-		if (tab.type === "chat" && tab.threadId) {
-			(async () => {
-				try {
-					const messages = await storageService.getItem(`app-chat-messages:${tab.threadId}`);
-					hasMessages = Array.isArray(messages) && messages.length > 0;
-				} catch (error) {
-					console.warn("Failed to check messages for tab:", error);
-					hasMessages = false;
-				}
-			})();
-		} else {
-			hasMessages = false;
-		}
-	});
-
 	onDestroy(() => {
 		window.cancelAnimationFrame?.(0);
 	});
 
 	const handleScreenshot = async () => {
 		if (tab.type === "chat" && tab.threadId) {
-			// Check if there are messages before taking screenshot
-			if (!hasMessages) {
-				// Broadcast toast message to tab view (content area) so it displays on top
-				// Include threadId so only the current tab shows the toast
-				await window.electronAPI?.broadcastService?.broadcastToAll("show-toast", {
-					type: "warning",
-					message: m.screenshot_no_messages(),
-					threadId: tab.threadId,
-				});
-				return;
-			}
-
 			await window.electronAPI?.broadcastService?.broadcastToAll("trigger-screenshot", {
 				threadId: tab.threadId,
 			});
@@ -214,7 +183,7 @@
 		{/if}
 
 		{#if tab.type === "aiApplications"}
-			<ContextMenu.Item onSelect={() => handleAiApplicationReload(tab.id)}>
+			<ContextMenu.Item onSelect={() => handleAiApplicationReloadIpc(tab.id)}>
 				{m.label_button_reload()}
 			</ContextMenu.Item>
 			<ContextMenu.Separator />

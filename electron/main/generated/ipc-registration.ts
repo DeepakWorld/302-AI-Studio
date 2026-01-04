@@ -288,8 +288,8 @@ export function registerIpcHandlers() {
 	ipcMain.handle("aiApplicationService:getAiApplicationUrl", (event, applicationId) =>
 		aiApplicationService.getAiApplicationUrl(event, applicationId),
 	);
-	ipcMain.handle("aiApplicationService:handleAiApplicationReload", (event, tabId) =>
-		aiApplicationService.handleAiApplicationReload(event, tabId),
+	ipcMain.handle("aiApplicationService:handleAiApplicationReloadIpc", (event, tabId) =>
+		aiApplicationService.handleAiApplicationReloadIpc(event, tabId),
 	);
 
 	// appService service registration
@@ -318,6 +318,11 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("dataService:zipFolderForUpload", (event) =>
 		dataService.zipFolderForUpload(event),
+	);
+	ipcMain.handle(
+		"dataService:exportChatToFile",
+		(event, content, extension, filterName, defaultFileName) =>
+			dataService.exportChatToFile(event, content, extension, filterName, defaultFileName),
 	);
 
 	// externalLinkService service registration
@@ -477,7 +482,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("tabService:handleClearTabMessages");
 	ipcMain.removeHandler("tabService:handleGenerateTabTitle");
 	ipcMain.removeHandler("aiApplicationService:getAiApplicationUrl");
-	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReload");
+	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReloadIpc");
 	ipcMain.removeHandler("appService:getTheme");
 	ipcMain.removeHandler("appService:setTheme");
 	ipcMain.removeHandler("appService:restartApp");
@@ -492,6 +497,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:openBackupDirectory");
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
+	ipcMain.removeHandler("dataService:exportChatToFile");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");

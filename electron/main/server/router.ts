@@ -1009,6 +1009,17 @@ Return ONLY a valid JSON object in this exact format (no markdown, no code block
 		try {
 			// Try to extract JSON from the response (handle potential markdown code blocks)
 			let jsonStr = text.trim();
+
+			// Strip thinking/reasoning blocks from model response (handles both closed and unclosed tags)
+			// Pattern 1: Complete thinking blocks with closing tags
+			jsonStr = jsonStr.replace(/<(think|thinking|reason|reasoning)>[\s\S]*?<\/\1>/gi, "");
+			// Pattern 2: Unclosed thinking blocks (tag at start without closing)
+			jsonStr = jsonStr.replace(/^<(think|thinking|reason|reasoning)>[\s\S]*?(?=\{)/i, "");
+			// Pattern 3: Any remaining opening thinking tags that might be at the start
+			jsonStr = jsonStr.replace(/^<(think|thinking|reason|reasoning)>[\s\S]*/i, "");
+
+			jsonStr = jsonStr.trim();
+
 			// Remove markdown code blocks if present
 			if (jsonStr.startsWith("```")) {
 				jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
@@ -1019,7 +1030,15 @@ Return ONLY a valid JSON object in this exact format (no markdown, no code block
 		} catch {
 			// Fallback: if JSON parsing fails, use the whole text as title
 			console.warn("Failed to parse title generation JSON response, using fallback");
-			title = text.trim().slice(0, 50);
+			// Strip any thinking tags from fallback text too
+			let fallbackText = text.trim();
+			fallbackText = fallbackText.replace(
+				/<(think|thinking|reason|reasoning)>[\s\S]*?<\/\1>/gi,
+				"",
+			);
+			fallbackText = fallbackText.replace(/<(think|thinking|reason|reasoning)>[\s\S]*/gi, "");
+			fallbackText = fallbackText.trim();
+			title = fallbackText.slice(0, 50);
 			summary = previousSummary || "";
 		}
 

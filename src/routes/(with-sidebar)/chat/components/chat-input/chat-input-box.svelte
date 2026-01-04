@@ -11,8 +11,10 @@
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
 	import { cn } from "$lib/utils";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
+	import { isMac } from "$lib/utils/platform";
 	import type { AttachmentFile, Model } from "@shared/types";
 	import { nanoid } from "nanoid";
 	import { onMount } from "svelte";
@@ -23,10 +25,20 @@
 	import SendMessageButton from "./code-agent/send-message-button.svelte";
 	import StreamingIndicator from "./streaming-indicator.svelte";
 
+	const { onShortcutAction } = window.electronAPI.shortcut;
+
 	let openModelSelect = $state<() => void>();
-	let isComposing = $state(false); // 跟踪输入法composition状态
 	let textareaRef = $state<HTMLTextAreaElement | null>(null);
 	let isCodeAgentModelChanging = $state(false);
+
+	// 输入法冷却期：compositionend 后的一段时间内仍然认为正在输入
+	// 用于解决 Mac 输入法按 Enter 确认时误触发发送消息的问题
+	let compositionEndTime = 0;
+	const COMPOSITION_COOLDOWN_MS = 150;
+
+	function isInCompositionCooldown(): boolean {
+		return Date.now() - compositionEndTime < COMPOSITION_COOLDOWN_MS;
+	}
 
 	// 自动聚焦到输入框
 	function focusInput() {
@@ -230,6 +242,28 @@
 			chatState.handleSelectedModelChange(model);
 		}
 	}
+
+	const placeholderText = $derived.by(() => {
+		const sendMessageShortcut = shortcutSettings.getShortcut("sendMessage");
+		const keys = sendMessageShortcut?.keys ?? ["Enter"];
+		const modifier = isMac ? "Cmd" : "Ctrl";
+		const isEnterSend = keys.length === 1 && keys[0].toLowerCase() === "enter";
+
+		return isEnterSend
+			? m.placeholder_input_chat()
+			: m.placeholder_input_chat_modifier_send({ modifier });
+	});
+
+	onMount(() => {
+		const unsub = onShortcutAction((action) => {
+			if (action.action === "sendMessage" && textareaRef === document.activeElement) {
+				if (isMac && isInCompositionCooldown()) return;
+
+				handleSendMessage();
+			}
+		});
+		return () => unsub();
+	});
 </script>
 
 <div class="relative w-full max-w-chat-max-w" data-layoutid="chat-input-container">
@@ -248,25 +282,15 @@
 	>
 		<div class="min-h-0 flex-1 overflow-auto">
 			<Textarea
+				id="chat-input-textarea"
 				bind:ref={textareaRef}
 				class={cn(
 					"w-full resize-none p-0",
 					"border-none shadow-none focus-within:ring-0 focus-within:outline-hidden focus-visible:ring-0",
 				)}
 				bind:value={chatState.inputValue}
-				onkeydown={(e) => {
-					if (e.key === "Enter" && !e.shiftKey && !isComposing) {
-						handleSendMessage();
-						e.preventDefault();
-					}
-				}}
-				placeholder={m.placeholder_input_chat()}
-				oncompositionstart={() => {
-					isComposing = true;
-				}}
-				oncompositionend={() => {
-					isComposing = false;
-				}}
+				placeholder={placeholderText}
+				oncompositionend={() => (compositionEndTime = Date.now())}
 				onpaste={handlePaste}
 				disabled={codeAgentState.isDeleted}
 			/>

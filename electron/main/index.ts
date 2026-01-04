@@ -14,6 +14,7 @@ import { initializePluginSystem } from "./plugin-manager";
 import { initServer } from "./server/router";
 import { appService, shortcutService, ssoService, trayService, windowService } from "./services";
 import { UpdaterService } from "./services/updater-service";
+import { setupNetworkInterceptor } from "./utils/network-interceptor";
 
 protocol.registerSchemesAsPrivileged([
 	{ scheme: "app", privileges: { standard: true, secure: true } },
@@ -66,6 +67,10 @@ if (!gotTheLock) {
 	// Some APIs can only be used after this event occurs.
 	app.on("ready", async () => {
 		await init();
+
+		// Configure Custom Headers and User Agent
+		setupNetworkInterceptor();
+
 		const serverPort = await initServer();
 		console.log(`Server initialized on port ${serverPort}`);
 		WebContentsFactory.setServerPort(serverPort);

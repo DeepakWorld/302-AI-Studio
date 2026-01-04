@@ -35,3 +35,4 @@ dist
 
 plugins/external
 .aider*
+.ace-tool/

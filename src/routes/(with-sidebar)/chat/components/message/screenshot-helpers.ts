@@ -60,8 +60,11 @@ export function createScreenshotWrapper(): HTMLDivElement {
     padding: ${SCREENSHOT_CONFIG.PADDING}px;
     width: ${SCREENSHOT_CONFIG.WIDTH}px;
     position: fixed;
-    left: -9999px;
-    z-index: -1;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    pointer-events: none;
+    opacity: 0;
   `;
 	return wrapper;
 }
@@ -127,18 +130,21 @@ export function create302Watermark(isDarkMode: boolean): HTMLDivElement {
 }
 
 /**
- * 截图配置
+ * 截图配置 (modern-screenshot)
  */
 export function getScreenshotOptions(isDarkMode: boolean) {
 	return {
 		backgroundColor: isDarkMode
 			? SCREENSHOT_CONFIG.COLORS.DARK_BG
 			: SCREENSHOT_CONFIG.COLORS.LIGHT_BG,
-		// scale: 1.2,
-		embedFonts: true,
-		compress: false,
 		quality: 0.9,
-		skipAutoScale: false,
-		logging: false,
+		scale: 2,
+		style: {
+			visibility: "visible",
+			opacity: "1",
+		},
+		features: {
+			removeControlCharacter: true,
+		},
 	};
 }

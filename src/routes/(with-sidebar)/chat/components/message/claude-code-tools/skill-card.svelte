@@ -1,14 +1,16 @@
 <script lang="ts" module>
 	import type { DynamicToolUIPart } from "ai";
 
-	export interface ClaudeCodeToolCardProps {
+	export interface SkillCardProps {
 		part: DynamicToolUIPart;
 		messageId: string;
 	}
 </script>
 
 <script lang="ts">
+	import { MarkdownRenderer } from "$lib/components/buss/markdown";
 	import StaticCodeBlock from "$lib/components/buss/markdown/static-code-block.svelte";
+	import { CopyButton } from "$lib/components/buss/copy-button";
 	import {
 		Dialog,
 		DialogContent,
@@ -16,10 +18,10 @@
 		DialogTitle,
 	} from "$lib/components/ui/dialog/index.js";
 	import { m } from "$lib/paraglide/messages.js";
-	import { Ban, Circle, CircleCheck, LoaderCircle } from "@lucide/svelte";
-	import { getClaudeCodeToolIcon, getClaudeCodeToolLabel } from "./utils";
+	import { persistedThemeState } from "$lib/stores/theme.state.svelte";
+	import { Ban, Circle, CircleCheck, LoaderCircle, Zap } from "@lucide/svelte";
 
-	let { part, messageId: _messageId }: ClaudeCodeToolCardProps = $props();
+	let { part, messageId }: SkillCardProps = $props();
 
 	let isModalOpen = $state(false);
 
@@ -76,40 +78,23 @@
 		}
 	});
 
-	const ToolIcon = $derived(getClaudeCodeToolIcon(part.toolName));
-	const toolLabel = $derived(getClaudeCodeToolLabel(part.toolName));
+	const skillName = $derived.by(() => {
+		const input = part.input as { skill?: string } | undefined;
+		return input?.skill || "Unknown Skill";
+	});
+
+	const outputText = $derived.by(() => {
+		if (part.state === "output-available" && part.output) {
+			return typeof part.output === "string" ? part.output : formatJson(part.output);
+		}
+		return "";
+	});
 
 	// 判断是否有输出内容
 	const hasOutput = $derived(
 		(part.state === "output-available" && part.output) ||
 			(part.state === "output-error" && part.errorText),
 	);
-
-	const outputContent = $derived.by(() => {
-		if (part.state === "output-available" && part.output) {
-			if (typeof part.output === "string") {
-				return part.output;
-			}
-			return formatJson(part.output);
-		}
-		return "";
-	});
-
-	const outputLanguage = $derived.by(() => {
-		if (part.toolName === "Read") {
-			const input = part.input as { file_path?: string } | undefined;
-			const filePath = input?.file_path || "";
-			const ext = filePath.split(".").pop()?.toLowerCase();
-			return ext || "plaintext";
-		}
-		if (part.toolName === "Bash" || part.toolName === "BashOutput") {
-			return "bash";
-		}
-		if (typeof part.output === "string") {
-			return "plaintext";
-		}
-		return "json";
-	});
 </script>
 
 <!-- Card Button -->
@@ -124,15 +109,15 @@
 		<!-- Left: Tool Icon and Name -->
 		<div class="flex items-center gap-3">
 			<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-				<ToolIcon class="h-5 w-5" />
+				<Zap class="h-5 w-5" />
 			</div>
 
 			<!-- Tool Name -->
 			<div class="flex flex-col items-start gap-1">
 				<h3 class="text-sm font-medium text-foreground">
-					{part.toolName}
+					{skillName}
 				</h3>
-				<p class="text-xs text-muted-foreground">{toolLabel}</p>
+				<p class="text-xs text-muted-foreground">{m.tool_call_label_execute_skill()}</p>
 			</div>
 		</div>
 
@@ -156,8 +141,8 @@
 	>
 		<DialogHeader class="shrink-0 mb-4">
 			<DialogTitle class="flex items-center gap-2">
-				<ToolIcon class="h-5 w-5" />
-				<span>{part.toolName}</span>
+				<Zap class="h-5 w-5" />
+				<span>{skillName}</span>
 			</DialogTitle>
 		</DialogHeader>
 
@@ -185,15 +170,30 @@
 				<div class="flex-1 min-h-0 min-w-0 overflow-y-auto">
 					{#if part.state === "output-available" && part.output}
 						<div
-							class="h-full [&_.shiki]:overflow-y-auto [&_.shiki]:overflow-x-hidden [&_.shiki]:text-xs [&_.shiki_code]:whitespace-pre-wrap [&_.shiki_code]:break-all"
+							class="rounded-xl overflow-hidden border border-border w-full flex flex-col h-full"
 						>
-							<StaticCodeBlock
-								code={outputContent}
-								language={outputLanguage}
-								canCollapse={false}
-								title={m.tool_call_result()}
-								showCollapseButton={false}
-							/>
+							<div
+								class="flex justify-between items-center px-4 py-2 bg-muted border-b border-border min-h-10 flex-shrink-0"
+							>
+								<span class="text-sm font-medium text-muted-foreground select-none">
+									{m.tool_call_result()}
+								</span>
+								<div class="flex items-center gap-1">
+									<CopyButton content={outputText} position="bottom" />
+								</div>
+							</div>
+							<div class="flex-1 min-h-0 w-full overflow-y-auto p-4">
+								<div class="prose prose-sm dark:prose-invert max-w-none">
+									<MarkdownRenderer
+										content={outputText}
+										{messageId}
+										isStreaming={false}
+										codeTheme={persistedThemeState.current.shouldUseDarkColors
+											? "vitesse-dark"
+											: "vitesse-light"}
+									/>
+								</div>
+							</div>
 						</div>
 					{:else if part.state === "output-error" && part.errorText}
 						<div

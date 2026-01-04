@@ -20,6 +20,12 @@ export async function fetch302AIUserInfo(apiKey: string): Promise<Ai302UserInfo>
 	try {
 		const response = await ky
 			.get("https://dash-api.302.ai/user/info", {
+				timeout: 60000,
+				retry: {
+					limit: 3,
+					methods: ["get"],
+					delay: (attemptCount) => 0.5 * 2 ** (attemptCount - 1) * 1000,
+				},
 				headers: {
 					Authorization: `Bearer ${apiKey}`,
 				},
@@ -63,6 +69,12 @@ export async function fetch302AIToolList(
 	try {
 		const response = await ky
 			.get("https://dash-api.302.ai/gpt/api/tool/list", {
+				timeout: 60000,
+				retry: {
+					limit: 3,
+					methods: ["get"],
+					delay: (attemptCount) => 0.5 * 2 ** (attemptCount - 1) * 1000,
+				},
 				headers: {
 					Lang: lang,
 				},

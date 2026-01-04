@@ -1,10 +1,10 @@
-import { providerStorage } from "@electron/main/services/storage-service/provider-storage";
+import { codeAgentGlobalConfigsStorage } from "@electron/main/services/storage-service/code-agent";
 import { getCustomUserAgentFragment } from "@electron/main/utils/user-agent";
 import ky from "ky";
 
 const userAgent = getCustomUserAgentFragment();
 
-export const _302AIKy = ky.create({
+export const codeAgentKy = ky.create({
 	timeout: 60000,
 	prefixUrl: "https://api.302.ai",
 	headers: {
@@ -15,9 +15,9 @@ export const _302AIKy = ky.create({
 	hooks: {
 		beforeRequest: [
 			async (request) => {
-				const { valid, apiKey } = await providerStorage.validate302AIProvider();
-				if (!valid) throw new Error("302.ai API key validation failed");
-				request.headers.set("Authorization", `Bearer ${apiKey}`);
+				const { isOK, data } = await codeAgentGlobalConfigsStorage.getGlobalConfigs();
+				if (!isOK) throw new Error("302.ai API key validation failed");
+				request.headers.set("Authorization", `Bearer ${data.apiKey}`);
 			},
 		],
 	},

@@ -6,8 +6,8 @@ import type {
 } from "@shared/types/shortcut";
 import type { IpcMainInvokeEvent } from "electron";
 import { ipcMain, webContents } from "electron";
-import { ShortcutEngine } from "./engine";
 import { shortcutActionsHandler } from "./actions-handler";
+import { ShortcutEngine } from "./engine";
 
 export class ShortcutService {
 	private engine: ShortcutEngine;
@@ -17,7 +17,7 @@ export class ShortcutService {
 		this.engine = new ShortcutEngine();
 	}
 
-	async init(event: IpcMainInvokeEvent, shortcuts: ShortcutBinding[]): Promise<void> {
+	async init(_event: IpcMainInvokeEvent, shortcuts: ShortcutBinding[]): Promise<void> {
 		this.engine.init(shortcuts, async (action, ctx) => {
 			await shortcutActionsHandler.handle(action, ctx);
 		});

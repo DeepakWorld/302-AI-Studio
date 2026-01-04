@@ -817,6 +817,59 @@
 		}
 	};
 
+	const handleCopyImage = async () => {
+		if (!fileViewer.previewUrl || fileViewer.previewType !== "image") return;
+
+		try {
+			const response = await fetch(fileViewer.previewUrl);
+			const blob = await response.blob();
+
+			// Convert to PNG if needed (clipboard API requires PNG for images)
+			let pngBlob = blob;
+			if (blob.type !== "image/png") {
+				const img = new Image();
+				const canvas = document.createElement("canvas");
+				const ctx = canvas.getContext("2d");
+
+				await new Promise<void>((resolve, reject) => {
+					img.onload = () => {
+						canvas.width = img.width;
+						canvas.height = img.height;
+						ctx?.drawImage(img, 0, 0);
+						resolve();
+					};
+					img.onerror = reject;
+					img.src = fileViewer.previewUrl!;
+				});
+
+				pngBlob = await new Promise<Blob>((resolve, reject) => {
+					canvas.toBlob((b) => {
+						if (b) resolve(b);
+						else reject(new Error("Failed to convert to PNG"));
+					}, "image/png");
+				});
+			}
+
+			await navigator.clipboard.write([
+				new ClipboardItem({
+					"image/png": pngBlob,
+				}),
+			]);
+
+			toast.success(m.toast_copied_success());
+
+			isCopied = true;
+			if (copyTimeoutId) {
+				clearTimeout(copyTimeoutId);
+			}
+			copyTimeoutId = setTimeout(() => {
+				isCopied = false;
+			}, 2000);
+		} catch (_e) {
+			toast.error(m.toast_copied_failed());
+		}
+	};
+
 	const handleDownloadFile = () => {
 		if (!fileViewer.selectedFile) return;
 
@@ -990,11 +1043,13 @@
 													</button>
 												</div>
 											{:else}
-												<!-- Copy button - only for text files -->
-												{#if fileViewer.previewType === "text"}
+												<!-- Copy button - for text and image files -->
+												{#if fileViewer.previewType === "text" || fileViewer.previewType === "image"}
 													<button
 														class="relative rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer h-6 w-6"
-														onclick={handleCopyContent}
+														onclick={fileViewer.previewType === "image"
+															? handleCopyImage
+															: handleCopyContent}
 														title={m.title_copy()}
 													>
 														<Check

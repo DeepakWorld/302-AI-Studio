@@ -92,7 +92,7 @@ class CodeAgentState {
 		return { isOK: false };
 	}
 
-	async updateCurrentSessionId(sessionId: string): Promise<void> {
+	updateCurrentSessionId(sessionId: string): void {
 		if (this.currentAgentId === "claude-code") {
 			claudeCodeAgentState.updateCurrentSessionId(sessionId);
 		}
@@ -125,6 +125,12 @@ class CodeAgentState {
 			.otherwise(() => "");
 	}
 
+	get currentModel(): string {
+		return match(this.currentAgentId)
+			.with("claude-code", () => claudeCodeAgentState.model)
+			.otherwise(() => "");
+	}
+
 	async handleCodeAgentModelChange(model: Model): Promise<boolean> {
 		if (this.currentAgentId === "claude-code") {
 			const { isOK } = await updateClaudeCodeSandboxModel(threadId, this.sandboxId, model.id);
@@ -132,6 +138,12 @@ class CodeAgentState {
 		}
 
 		return false;
+	}
+
+	updateSandboxModel(model: string): void {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.updateSandboxModel(model);
+		}
 	}
 }
 

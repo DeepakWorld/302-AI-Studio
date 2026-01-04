@@ -8,6 +8,7 @@ export interface ShortcutBinding {
 	keys: string[];
 	scope: ShortcutScope;
 	order: number;
+	version?: number;
 }
 
 export interface ShortcutSettingsState {
@@ -21,6 +22,7 @@ const getDefaults = (): ShortcutSettingsState => ({
 		keys: Array.from(s.keys),
 		scope: s.scope,
 		order: s.order,
+		version: s.version,
 	})),
 });
 
@@ -48,39 +50,101 @@ class ShortcutSettingsManager {
 	}
 
 	private applyMigration(): void {
-		// Check if we're on Mac - if so, no migration needed
-		const isMac = typeof window !== "undefined" && window.app?.platform === "darwin";
-		if (isMac) return;
-
 		const state = persistedShortcutSettings.current;
+		const currentShortcuts = [...state.shortcuts]; // Create a copy to work with
 		let needsUpdate = false;
 
-		// Check if any shortcut has Cmd or Option
-		const hasOldKeys = state.shortcuts.some((s) =>
-			s.keys.some((key) => key === "Cmd" || key === "Option"),
-		);
+		// Check if we're on Mac
+		const isMac = typeof window !== "undefined" && window.app?.platform === "darwin";
 
-		if (!hasOldKeys) return;
+		// Only apply platform-specific migration on non-Mac platforms
+		if (!isMac) {
+			// Check if any shortcut has Cmd or Option
+			const hasOldKeys = currentShortcuts.some((s) =>
+				s.keys.some((key) => key === "Cmd" || key === "Option"),
+			);
 
-		// Migrate Cmd -> Ctrl and Option -> Alt
-		const migratedShortcuts = state.shortcuts.map((shortcut) => ({
-			...shortcut,
-			keys: shortcut.keys.map((key) => {
-				if (key === "Cmd") {
-					needsUpdate = true;
-					return "Ctrl";
+			if (hasOldKeys) {
+				// Migrate Cmd -> Ctrl and Option -> Alt (Windows/Linux only)
+				const migratedShortcuts = currentShortcuts.map((shortcut) => ({
+					...shortcut,
+					keys: shortcut.keys.map((key) => {
+						if (key === "Cmd") {
+							needsUpdate = true;
+							return "Ctrl";
+						}
+						if (key === "Option") {
+							needsUpdate = true;
+							return "Alt";
+						}
+						return key;
+					}),
+				}));
+
+				currentShortcuts.splice(0, currentShortcuts.length, ...migratedShortcuts);
+			}
+		}
+
+		// Sync shortcuts with DEFAULT_SHORTCUTS based on version
+		// This applies to all platforms (Mac, Windows, Linux)
+		const updatedShortcuts: ShortcutBinding[] = [];
+		const updates: string[] = [];
+
+		for (const defaultShortcut of DEFAULT_SHORTCUTS) {
+			const userShortcut = currentShortcuts.find((s) => s.action === defaultShortcut.action);
+			const userVersion = userShortcut?.version || 0;
+
+			if (userVersion < defaultShortcut.version) {
+				// Need to update this shortcut
+				let newKeys: string[];
+
+				// Special case: toggleModelPanel version 2 changes default keys from Cmd+M to Ctrl+M
+				if (defaultShortcut.action === "toggleModelPanel" && userVersion < 2) {
+					// Only update keys if user hasn't customized this shortcut
+					// Check if user's keys are the same as old default (Cmd+M)
+					const oldDefaultKeys = ["Cmd", "M"];
+					const isUsingOldDefault =
+						userShortcut &&
+						userShortcut.keys.length === oldDefaultKeys.length &&
+						oldDefaultKeys.every((key) => userShortcut.keys.includes(key));
+
+					if (isUsingOldDefault || !userShortcut) {
+						// User is using old default or doesn't have this shortcut, update to new default
+						newKeys = Array.from(defaultShortcut.keys);
+					} else {
+						// User has customized the keys, keep their setting
+						newKeys = userShortcut.keys;
+					}
+				} else {
+					// For all other updates (new shortcuts, order changes, etc.) keep user's keys
+					newKeys = userShortcut?.keys || Array.from(defaultShortcut.keys);
 				}
-				if (key === "Option") {
-					needsUpdate = true;
-					return "Alt";
-				}
-				return key;
-			}),
-		}));
+
+				updatedShortcuts.push({
+					id: defaultShortcut.id,
+					action: defaultShortcut.action,
+					keys: newKeys,
+					scope: defaultShortcut.scope,
+					order: defaultShortcut.order,
+					version: defaultShortcut.version,
+				});
+				updates.push(defaultShortcut.action);
+				needsUpdate = true;
+			} else {
+				// No update needed, keep user's shortcut as is
+				updatedShortcuts.push(userShortcut!);
+			}
+		}
+
+		if (updates.length > 0) {
+			console.log(`[Shortcut Migration] Updated ${updates.length} shortcuts:`, updates.join(", "));
+		}
+
+		// Sort shortcuts by order
+		updatedShortcuts.sort((a, b) => a.order - b.order);
 
 		if (needsUpdate) {
-			console.log("[Shortcut Migration] Migrating shortcuts from Cmd to Ctrl");
-			persistedShortcutSettings.current = { shortcuts: migratedShortcuts };
+			this._updateShortcuts(updatedShortcuts);
 		}
 	}
 
@@ -96,11 +160,18 @@ class ShortcutSettingsManager {
 		return persistedShortcutSettings.current.shortcuts.find((s) => s.action === action);
 	}
 
+	private _updateShortcuts(newShortcuts: ShortcutBinding[]): void {
+		persistedShortcutSettings.current = {
+			...persistedShortcutSettings.current,
+			shortcuts: newShortcuts,
+		};
+	}
+
 	updateShortcut(action: ShortcutAction, keys: string[]): void {
 		const shortcuts = persistedShortcutSettings.current.shortcuts.map((s) =>
 			s.action === action ? { ...s, keys } : s,
 		);
-		persistedShortcutSettings.current = { ...persistedShortcutSettings.current, shortcuts };
+		this._updateShortcuts(shortcuts);
 	}
 
 	resetShortcut(action: ShortcutAction): void {

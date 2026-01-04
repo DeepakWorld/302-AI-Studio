@@ -23,6 +23,7 @@ export async function generateSuggestions(
 	language?: string,
 	count?: number,
 	serverPort?: number,
+	abortSignal?: AbortSignal,
 ): Promise<string[]> {
 	const port = serverPort ?? 8089;
 
@@ -42,6 +43,7 @@ export async function generateSuggestions(
 				language,
 				count: count ?? 3,
 			} satisfies GenerateSuggestionsRequest),
+			signal: abortSignal,
 		});
 
 		if (!response.ok) {
@@ -53,6 +55,11 @@ export async function generateSuggestions(
 		console.log("[Suggestions] Received suggestions:", data.suggestions);
 		return data.suggestions;
 	} catch (error) {
+		// Don't log abort errors as they are expected when user sends a new message
+		if (error instanceof Error && error.name === "AbortError") {
+			console.log("[Suggestions] Generation aborted");
+			return [];
+		}
 		console.error("[Suggestions] Generation failed:", error);
 		return [];
 	}

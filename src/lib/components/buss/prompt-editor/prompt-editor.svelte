@@ -100,8 +100,19 @@
 						initialValueSet = true;
 						// If value is already Lexical JSON, parse and set directly
 						if (isLexicalEditorState(value)) {
-							const parsed = editor.parseEditorState(value);
-							editor.setEditorState(parsed);
+							try {
+								const parsed = editor.parseEditorState(value);
+								// Try to set editor state in try-catch, if it fails use fallback
+								editor.setEditorState(parsed);
+							} catch (error) {
+								console.error("Failed to set editor state, using fallback:", error);
+								// Fallback to safe empty state
+								const safeJson = textJsonToEditorState("");
+								if (safeJson) {
+									const safeParsed = editor.parseEditorState(safeJson);
+									editor.setEditorState(safeParsed);
+								}
+							}
 						} else {
 							// Convert plain text to editor state
 							const jsonState = textJsonToEditorState(value);

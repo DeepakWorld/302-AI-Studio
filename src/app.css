@@ -227,6 +227,9 @@
 	[data-slot="dialog-content"][data-tool-card-dialog] {
 		max-width: 60vw !important;
 	}
+	[data-slot="dialog-content"][data-mcp-import-dialog] {
+		max-width: 42rem !important;
+	}
 }
 
 /* Design System tokens for new buss components */

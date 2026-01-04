@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button";
+	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import * as ContextMenu from "$lib/components/ui/context-menu";
 	import * as Empty from "$lib/components/ui/empty/index.js";
 	import { Input } from "$lib/components/ui/input";
@@ -8,13 +8,15 @@
 		claudeCodeSandboxState,
 		persistedClaudeCodeSandboxState,
 	} from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { cn } from "$lib/utils";
 	import { formatDateTimeFull } from "$lib/utils/date-format";
 	import { RotateCw, Search } from "@lucide/svelte";
 	import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
-	import { onMount } from "svelte";
 	import SandboxDeleteConfirmDialog from "./sandbox-delete-confirm-dialog.svelte";
 	import SandboxDialog from "./sandbox-dialog.svelte";
 	import SandboxRemarkDialog from "./sandbox-remark-dialog.svelte";
+
+	// const { openExternalLink } = window.electronAPI.externalLinkService;
 
 	let searchQuery = $state("");
 	let isLoading = $state(false);
@@ -23,6 +25,9 @@
 	let isRenameDialogOpen = $state(false);
 	let isDeleteDialogOpen = $state(false);
 	let targetSandbox = $state<ClaudeCodeSandboxInfo | null>(null);
+	// let isRemoteModeSettingsOpen = $state(false);
+	// let showApiKey = $state(false);
+	// let tempApiKey = $state("");
 
 	// Filter sandboxes based on search query
 	const filteredSandboxes = $derived.by(() => {
@@ -46,7 +51,7 @@
 	async function handleRefresh() {
 		isLoading = true;
 		try {
-			await claudeCodeSandboxState.refreshSandboxes();
+			return await claudeCodeSandboxState.refreshSandboxes();
 		} finally {
 			isLoading = false;
 		}
@@ -83,25 +88,123 @@
 		// await handleRefresh();
 	}
 
-	// Auto-refresh on mount
-	onMount(() => {
-		// handleRefresh();
-	});
+	// function handleRemoteSettings() {
+	// 	if (!isRemoteModeSettingsOpen) {
+	// 		tempApiKey = codeAgentGlobalConfigsState.apiKey;
+	// 	}
+	// 	isRemoteModeSettingsOpen = !isRemoteModeSettingsOpen;
+	// }
+
+	// async function handleSaveSettings() {
+	// 	const oldApiKey = codeAgentGlobalConfigsState.apiKey;
+	// 	codeAgentGlobalConfigsState.updateApiKey(tempApiKey);
+	// 	const success = await handleRefresh();
+	// 	if (success) {
+	// 		isRemoteModeSettingsOpen = false;
+	// 	} else {
+	// 		codeAgentGlobalConfigsState.updateApiKey(oldApiKey);
+	// 	}
+	// }
 </script>
+
+<!-- {#snippet remoteModeSettings()}
+	<Dialog.Root bind:open={isRemoteModeSettingsOpen}>
+		<ButtonWithTooltip
+			class="hover:!bg-chat-action-hover"
+			tooltip={m.title_settings()}
+			onclick={handleRemoteSettings}
+		>
+			<SlidersHorizontal class="h-4 w-4" />
+		</ButtonWithTooltip>
+		<Dialog.Content class="!min-w-[600px]">
+			<Dialog.Header>
+				<Dialog.Title>{m.title_remote_mode_settings()}</Dialog.Title>
+			</Dialog.Header>
+			<div class="flex flex-col gap-1">
+				<div class="flex flex-row justify-between items-center">
+					<Label class="text-label-fg">API Key</Label>
+					<Button
+						variant="ghost"
+						class="hover:bg-transparent h-8 text-primary hover:text-primary dark:hover:bg-transparent"
+						onclick={() => (tempApiKey = codeAgentGlobalConfigsState.getDefaultApiKey())}
+						>{m.label_button_reset_api_key()}
+					</Button>
+				</div>
+				<div class="relative">
+					<Input
+						class="!bg-settings-item-bg pr-10 dark:!bg-settings-item-bg h-10 rounded-[10px]"
+						bind:value={tempApiKey}
+						placeholder={m.placeholder_input_api_key()}
+						type={showApiKey ? "text" : "password"}
+					/>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class="absolute top-1 right-1 hover:bg-transparent dark:hover:bg-transparent"
+						onclick={() => (showApiKey = !showApiKey)}
+					>
+						{#if showApiKey}
+							<EyeOff class="h-4 w-4" />
+						{:else}
+							<Eye class="h-4 w-4" />
+						{/if}
+					</Button>
+				</div>
+			</div>
+
+			<Field.Description class="text-sm">
+				{m.description_sandbox_management_1()}
+				<button
+					type="button"
+					class="text-primary cursor-pointer hover:underline hover:underline-offset-2"
+					onclick={() => openExternalLink("https://302.ai/apis/list")}
+				>
+					{m.link_api_list()}
+				</button>
+				{m.description_sandbox_management_2()}
+				<button
+					type="button"
+					class="text-primary cursor-pointer hover:underline hover:underline-offset-2"
+					onclick={() => openExternalLink("https://302.ai/agents/list")}
+				>
+					{m.link_generated_agents()}
+				</button>
+				{m.description_sandbox_management_3()}
+				<br />
+				{m.description_sandbox_management_4()}
+			</Field.Description>
+
+			<Dialog.Footer class="flex flex-row items-center sm:justify-between">
+				<Button variant="secondary" onclick={() => (isRemoteModeSettingsOpen = false)}>
+					{m.common_cancel()}
+				</Button>
+				<Button variant="default" disabled={isLoading} onclick={() => handleSaveSettings()}>
+					{#if isLoading}
+						<LdrsLoader type="line-spinner" size={16} />
+					{/if}
+					{m.text_button_save()}
+				</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
+{/snippet} -->
 
 <!-- Agent Sandbox List Section -->
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
 		<h2 class="text-base font-medium">{m.title_agent_sandbox_list()}</h2>
-		<Button
-			variant="ghost"
-			size="icon"
-			class="h-8 w-8 text-muted-foreground hover:text-foreground"
-			onclick={handleRefresh}
-			disabled={isLoading}
-		>
-			<RotateCw class="h-4 w-4 {isLoading ? 'animate-spin' : ''}" />
-		</Button>
+		<div class="flex gap-1">
+			<ButtonWithTooltip
+				class="hover:!bg-chat-action-hover"
+				tooltip={m.label_button_reload()}
+				onclick={handleRefresh}
+				disabled={isLoading}
+			>
+				<RotateCw class={cn("h-4 w-4", isLoading ? "animate-spin" : "")} />
+			</ButtonWithTooltip>
+
+			<!-- {@render remoteModeSettings()} -->
+		</div>
 	</div>
 
 	<!-- Search -->

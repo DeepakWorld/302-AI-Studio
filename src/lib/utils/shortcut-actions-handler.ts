@@ -1,4 +1,5 @@
 import { m } from "$lib/paraglide/messages";
+import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
 import { codeAgentState } from "$lib/stores/code-agent";
 import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
@@ -38,6 +39,9 @@ export class ShortcutActionsHandler {
 
 		try {
 			switch (action) {
+				case "sendMessage":
+					// Handled by the chat input component directly
+					break;
 				case "clearMessages":
 					this.handleClearMessages();
 					break;
@@ -65,6 +69,13 @@ export class ShortcutActionsHandler {
 				case "search":
 					this.handleSearch();
 					break;
+				case "toggleSidebarRight":
+					this.handleToggleSidebarRight();
+					break;
+				case "toggleChatParametersPanel":
+					this.handleToggleChatParametersPanel();
+					break;
+
 				default:
 					console.warn(`Unhandled shortcut action: ${action}`);
 			}
@@ -83,7 +94,7 @@ export class ShortcutActionsHandler {
 
 	private handleRegenerateResponse(): void {
 		if (chatState.messages.length === 0) {
-			toast.error("No messages to regenerate");
+			// toast.error("No messages to regenerate");
 			return;
 		}
 		chatState.regenerateMessage();
@@ -231,6 +242,19 @@ export class ShortcutActionsHandler {
 
 	private handleSearch(): void {
 		sidebarSearchState.triggerFocus();
+	}
+
+	private handleToggleSidebarRight(): void {
+		if (!codeAgentState.inCodeAgentMode || !codeAgentState.sandboxId) return;
+		if (agentPreviewState.isVisible) {
+			agentPreviewState.closePreview();
+		} else {
+			agentPreviewState.openPreview(codeAgentState.sandboxId);
+		}
+	}
+
+	private handleToggleChatParametersPanel(): void {
+		chatState.isParametersOpen = !chatState.isParametersOpen;
 	}
 }
 

@@ -118,6 +118,16 @@ export class AiApplicationService {
 		broadcastService.broadcastChannelToAll("ai-applications:loading", false);
 	}
 
+	async handleAiApplicationReload(windowId: number): Promise<void> {
+		const tabId = tabService.getActiveTabId(windowId);
+		if (isUndefined(tabId)) return;
+
+		const tabView = tabService.getTabView(tabId);
+		if (isUndefined(tabView)) return;
+
+		tabView.webContents.reload();
+	}
+
 	// ******************************* IPC Methods ******************************* //
 	async getAiApplicationUrl(
 		_event: IpcMainInvokeEvent,
@@ -136,7 +146,7 @@ export class AiApplicationService {
 		};
 	}
 
-	async handleAiApplicationReload(_event: IpcMainInvokeEvent, tabId: string): Promise<void> {
+	async handleAiApplicationReloadIpc(_event: IpcMainInvokeEvent, tabId: string): Promise<void> {
 		const tabView = tabService.getTabView(tabId);
 		if (isUndefined(tabView)) return;
 
