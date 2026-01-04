@@ -1017,6 +1017,7 @@
 	"context_menu_copy_image": "复制图片",
 	"export_dialog_title": "导出会话记录",
 	"export_format_plain_text": "纯文本",
+	"export_format_html": "HTML 网页",
 	"export_select_range": "选择范围",
 	"export_selected_count": "已选择{count}条",
 	"export_select_all": "全选",

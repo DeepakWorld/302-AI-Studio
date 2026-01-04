@@ -1021,6 +1021,7 @@
 	"context_menu_copy_image": "Copy Image",
 	"export_dialog_title": "Export Conversation",
 	"export_format_plain_text": "Plain Text",
+	"export_format_html": "HTML",
 	"export_select_range": "Select Range",
 	"export_selected_count": "{count} selected",
 	"export_select_all": "Select All",
