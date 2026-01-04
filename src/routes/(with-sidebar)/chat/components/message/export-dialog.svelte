@@ -650,6 +650,18 @@
 			.prose a:hover {
 				text-decoration: underline;
 			}
+			.prose img {
+				max-width: 100%;
+				height: auto;
+				border-radius: 0.5rem;
+				margin: 1rem 0;
+			}
+			/* User message images */
+			.message.user .message-content img {
+				max-width: 100%;
+				height: auto;
+				border-radius: 0.375rem;
+			}
 		`;
 
 		const messageElements: string[] = [];
