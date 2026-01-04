@@ -1079,6 +1079,7 @@
 													<button
 														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
 														onclick={handleStartEdit}
+														title={m.title_button_edit()}
 													>
 														<Pencil class="h-4 w-4" strokeWidth={1.25} />
 													</button>
