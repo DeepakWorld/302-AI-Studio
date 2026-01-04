@@ -99,7 +99,7 @@ export class TrayService {
 			// Development mode
 			return path.join(
 				import.meta.dirname,
-				isMac || isLinux ? "../../../static/tray-icon.png" : "../../../static/tray-icon-win.png",
+				isMac || isLinux ? "../../../static/tray-icon.png" : "../../../static/icon.ico",
 			);
 		} else {
 			// Production mode - icon is in the renderer folder
