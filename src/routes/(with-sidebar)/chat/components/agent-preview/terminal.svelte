@@ -125,6 +125,21 @@
 			return;
 		}
 
+		// Handle clear command locally - don't send to server
+		if (cmd === "clear") {
+			agentPreviewState.updateState(sandboxId, sessionId, () => ({
+				terminalHistory: [],
+			}));
+			commandInput = "";
+			cursorPosition = 0;
+			// Add to history
+			if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
+				commandHistory = [...commandHistory.slice(-49), cmd];
+			}
+			historyIndex = -1;
+			return;
+		}
+
 		// Record the cwd at the time of command execution
 		const commandCwd = currentWorkingDirectory;
 
