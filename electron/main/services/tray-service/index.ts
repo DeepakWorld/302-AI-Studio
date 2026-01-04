@@ -1,7 +1,7 @@
 import type { LanguageCode } from "@shared/storage/general-settings";
 import { app, Menu, nativeImage, Tray } from "electron";
 import path from "node:path";
-import { isMac } from "../../constants";
+import { isLinux, isMac } from "../../constants";
 import { emitter } from "../broadcast-service";
 import { generalSettingsStorage } from "../storage-service/general-settings-storage";
 import { windowService } from "../window-service";
@@ -97,10 +97,18 @@ export class TrayService {
 		// In production, use the packaged icon
 		if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
 			// Development mode
-			return path.join(import.meta.dirname, "../../../static/tray-icon.png");
+			return path.join(
+				import.meta.dirname,
+				isMac || isLinux ? "../../../static/tray-icon.png" : "../../../static/tray-icon-win.png",
+			);
 		} else {
 			// Production mode - icon is in the renderer folder
-			return path.join(import.meta.dirname, "../../renderer/main_window/tray-icon.png");
+			return path.join(
+				import.meta.dirname,
+				isMac || isLinux
+					? "../../renderer/main_window/tray-icon.png"
+					: "../../renderer/main_window/tray-icon-win.png",
+			);
 		}
 	}
 
