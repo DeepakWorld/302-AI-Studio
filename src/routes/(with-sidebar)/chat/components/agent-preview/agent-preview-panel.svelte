@@ -1017,10 +1017,21 @@
 									<!-- Toolbar for file operations -->
 									{#if !fileViewer.isLoading}
 										<div
-											class="flex items-center justify-end gap-2 border-b border-border bg-background px-3 py-2"
+											class="flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-2 min-w-0"
 										>
-											{#if isEditing}
-												<div class="flex items-center gap-2">
+											<!-- 左侧：文件路径 -->
+											<div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+												<span
+													class="text-xs text-muted-foreground truncate"
+													title={fileViewer.selectedFile?.path}
+												>
+													{fileViewer.selectedFile?.path}
+												</span>
+											</div>
+
+											<!-- 右侧：操作按钮 -->
+											<div class="flex items-center gap-2 shrink-0">
+												{#if isEditing}
 													<button
 														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 														onclick={handleCancelEdit}
@@ -1041,50 +1052,50 @@
 															<Save class="h-4 w-4 flex-shrink-0" strokeWidth={1.25} />
 														{/if}
 													</button>
-												</div>
-											{:else}
-												<!-- Copy button - for text and image files -->
-												{#if fileViewer.previewType === "text" || fileViewer.previewType === "image"}
-													<button
-														class="relative rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer h-6 w-6"
-														onclick={fileViewer.previewType === "image"
-															? handleCopyImage
-															: handleCopyContent}
-														title={m.title_copy()}
-													>
-														<Check
-															class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
-																? 'scale-100 opacity-100'
-																: 'scale-0 opacity-0'}"
-															strokeWidth={1.25}
-														/>
-														<Copy
-															class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
-																? 'scale-0 opacity-0'
-																: 'scale-100 opacity-100'}"
-															strokeWidth={1.25}
-														/>
-													</button>
-												{/if}
-												<!-- Download button - for all file types -->
-												<button
-													class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-													onclick={handleDownloadFile}
-													title={m.label_file_tree_download()}
-												>
-													<Download class="h-4 w-4" strokeWidth={1.25} />
-												</button>
-												<!-- Edit button - only for text files -->
-												{#if fileViewer.previewType === "text"}
+												{:else}
+													<!-- Copy button - for text and image files -->
+													{#if fileViewer.previewType === "text" || fileViewer.previewType === "image"}
+														<button
+															class="relative rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer h-6 w-6"
+															onclick={fileViewer.previewType === "image"
+																? handleCopyImage
+																: handleCopyContent}
+															title={m.title_copy()}
+														>
+															<Check
+																class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
+																	? 'scale-100 opacity-100'
+																	: 'scale-0 opacity-0'}"
+																strokeWidth={1.25}
+															/>
+															<Copy
+																class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
+																	? 'scale-0 opacity-0'
+																	: 'scale-100 opacity-100'}"
+																strokeWidth={1.25}
+															/>
+														</button>
+													{/if}
+													<!-- Download button - for all file types -->
 													<button
 														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-														onclick={handleStartEdit}
-														title={m.title_button_edit()}
+														onclick={handleDownloadFile}
+														title={m.label_file_tree_download()}
 													>
-														<Pencil class="h-4 w-4" strokeWidth={1.25} />
+														<Download class="h-4 w-4" strokeWidth={1.25} />
 													</button>
+													<!-- Edit button - only for text files -->
+													{#if fileViewer.previewType === "text"}
+														<button
+															class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+															onclick={handleStartEdit}
+															title={m.title_button_edit()}
+														>
+															<Pencil class="h-4 w-4" strokeWidth={1.25} />
+														</button>
+													{/if}
 												{/if}
-											{/if}
+											</div>
 										</div>
 									{/if}
 
