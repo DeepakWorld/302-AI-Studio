@@ -231,6 +231,7 @@ export class AgentPreviewState {
 	isVisible = $state(false);
 	mode = $state<HtmlPreviewMode>("preview");
 	sandBoxId = $state<string | undefined>(undefined);
+	isDeploying = $state(false);
 	private syncBus = new SyncBus(syncInstanceId);
 
 	// Use global preferencesSettings for isPinned

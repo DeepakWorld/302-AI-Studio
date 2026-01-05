@@ -156,7 +156,6 @@
 
 	// Grouped Deployment State
 	let deployment = $state({
-		isDeploying: false,
 		url: null as string | null,
 		deploymentId: null as string | null,
 	});
@@ -623,7 +622,7 @@
 		const provider = validateDeployPreconditions();
 		if (!provider) return;
 
-		deployment.isDeploying = true;
+		agentPreviewState.isDeploying = true;
 		try {
 			const result = await deployAction(provider);
 
@@ -652,7 +651,7 @@
 				rawMessage.length > 300 ? rawMessage.slice(0, 300) + "..." : rawMessage;
 			toast.error(`${m.toast_deploy_failed()}: ${truncatedMessage}`);
 		} finally {
-			deployment.isDeploying = false;
+			agentPreviewState.isDeploying = false;
 		}
 	}
 
@@ -912,7 +911,7 @@
 				{activeTab}
 				{tabs}
 				{deviceMode}
-				isDeploying={deployment.isDeploying}
+				isDeploying={agentPreviewState.isDeploying}
 				deployedUrl={isAgentMode ? deployment.url : null}
 				compactDeployButton={false}
 				isPinned={agentPreviewState.isPinned}
@@ -957,9 +956,12 @@
 					<div class="flex-1 flex flex-col min-w-[140px] min-h-0">
 						{#if activeTab === TAB_PREVIEW}
 							{#if isAgentMode}
-								{#if isRestoringState}
-									<div class="flex h-full items-center justify-center">
+								{#if isRestoringState || agentPreviewState.isDeploying}
+									<div class="flex h-full flex-col gap-2 items-center justify-center">
 										<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+										{#if agentPreviewState.isDeploying}
+											<span class="text-sm text-muted-foreground">{m.text_deploying()}...</span>
+										{/if}
 									</div>
 								{:else if deployment.url}
 									<div class="flex-1 overflow-auto bg-muted/30 min-h-0">
@@ -991,9 +993,9 @@
 										<Button
 											class=" flex rounded-xs items-center gap-1.5 mt-3.5   bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 											onclick={handleDeploySandbox}
-											disabled={deployment.isDeploying || chatState.isStreaming}
+											disabled={agentPreviewState.isDeploying || chatState.isStreaming}
 										>
-											{#if deployment.isDeploying}
+											{#if agentPreviewState.isDeploying}
 												<Loader2 class="h-4 w-4 animate-spin" />
 												{m.text_deploying()}
 											{:else}

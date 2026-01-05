@@ -1443,6 +1443,7 @@ export const chat = new Chat({
 					const sessionId = claudeCodeAgentState.currentSessionId;
 
 					if (provider && sandboxId) {
+						agentPreviewState.isDeploying = true;
 						try {
 							const result = await deploySandboxProject(provider, {
 								sandbox_id: sandboxId,
@@ -1460,6 +1461,8 @@ export const chat = new Chat({
 						} catch (error) {
 							console.error("[ChatState] Deployment error:", error);
 							toast.error(`${m.toast_deploy_failed()}: ${String(error)}`);
+						} finally {
+							agentPreviewState.isDeploying = false;
 						}
 					}
 				}
