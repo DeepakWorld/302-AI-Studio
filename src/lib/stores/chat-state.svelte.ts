@@ -25,7 +25,7 @@ import { toast } from "svelte-sonner";
 import { updateSessionNote } from "$lib/api/sandbox-session";
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 
-import { deploySandboxProject } from "$lib/api/sandbox-deploy";
+import { _deploySandboxProject } from "$lib/api/sandbox-deploy";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { agentPreviewState } from "./agent-preview-state.svelte";
@@ -1438,25 +1438,25 @@ export const chat = new Chat({
 				const metadata = lastMessage.metadata as any;
 				if (metadata?.result?.preDeploy?.success) {
 					console.log("[ChatState] Pre-deploy check passed, triggering deployment...");
-					const provider = chatState.currentProvider;
+					// const provider = chatState.currentProvider;
 					const sandboxId = claudeCodeAgentState.sandboxId;
 					const sessionId = claudeCodeAgentState.currentSessionId;
 
-					if (provider && sandboxId) {
+					if (sandboxId) {
 						agentPreviewState.isDeploying = true;
 						try {
-							const result = await deploySandboxProject(provider, {
+							const result = await _deploySandboxProject({
 								sandbox_id: sandboxId,
 								session_id: sessionId,
 							});
 
-							if (result.success && result.data) {
-								console.log("[ChatState] Deployment successful:", result.data);
+							if (result.success) {
+								console.log("[ChatState] Deployment successful:", result);
 								isDeploy = true;
-								deployInfo = result.data;
+								deployInfo = result;
 							} else {
-								console.error("[ChatState] Deployment failed:", result.error);
-								toast.error(`${m.toast_deploy_failed()}: ${result.error || "Unknown error"}`);
+								console.error("[ChatState] Deployment failed:", result);
+								toast.error(`${m.toast_deploy_failed()}`);
 							}
 						} catch (error) {
 							console.error("[ChatState] Deployment error:", error);

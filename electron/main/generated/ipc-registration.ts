@@ -293,6 +293,9 @@ export function registerIpcHandlers() {
 	);
 
 	// appService service registration
+	ipcMain.handle("appService:getUserAgentFragment", (event) =>
+		appService.getUserAgentFragment(event),
+	);
 	ipcMain.handle("appService:getTheme", (event) => appService.getTheme(event));
 	ipcMain.handle("appService:setTheme", (event, theme) => appService.setTheme(event, theme));
 	ipcMain.handle("appService:restartApp", (event) => appService.restartApp(event));
@@ -341,6 +344,9 @@ export function registerIpcHandlers() {
 	// providerService service registration
 	ipcMain.handle("providerService:handle302AIProviderChange", (event, apiKey) =>
 		providerService.handle302AIProviderChange(event, apiKey),
+	);
+	ipcMain.handle("providerService:get302AIApiKey", (event) =>
+		providerService.get302AIApiKey(event),
 	);
 
 	// ssoService service registration
@@ -483,6 +489,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("tabService:handleGenerateTabTitle");
 	ipcMain.removeHandler("aiApplicationService:getAiApplicationUrl");
 	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReloadIpc");
+	ipcMain.removeHandler("appService:getUserAgentFragment");
 	ipcMain.removeHandler("appService:getTheme");
 	ipcMain.removeHandler("appService:setTheme");
 	ipcMain.removeHandler("appService:restartApp");
@@ -502,6 +509,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
 	ipcMain.removeHandler("providerService:handle302AIProviderChange");
+	ipcMain.removeHandler("providerService:get302AIApiKey");
 	ipcMain.removeHandler("ssoService:openSsoLogin");
 	ipcMain.removeHandler("ssoService:waitForSsoCallback");
 	ipcMain.removeHandler("ssoService:cancelSsoLogin");

@@ -22,14 +22,28 @@ export interface DeployHtmlResponse {
 	error?: string;
 }
 
+export interface UploadWebserveRequest {
+	file: File;
+	add_cover?: boolean;
+	add_watermarks?: boolean;
+}
+
+export interface UploadWebserveResponse {
+	success: boolean;
+	data?: {
+		cover: string;
+		id: string;
+		url: string;
+	};
+	error?: string;
+}
+
 /**
  * Validate 302.AI provider configuration
  */
-export function validate302Provider(providers: ModelProvider[]): {
-	valid: boolean;
-	provider?: ModelProvider;
-	error?: string;
-} {
+export function validate302Provider(
+	providers: ModelProvider[],
+): { valid: true; provider: ModelProvider } | { valid: false; error: string } {
 	const provider302 = providers.find((p) => p.apiType === "302ai");
 
 	if (!provider302) {
@@ -53,6 +67,30 @@ export function validate302Provider(providers: ModelProvider[]): {
 }
 
 /**
+ * Extract error message from API error response
+ */
+function extractErrorMessage(errorData: unknown): string | null {
+	if (!errorData || typeof errorData !== "object") return null;
+
+	const data = errorData as Record<string, unknown>;
+
+	// Handle nested error object: { error: { message: "..." } }
+	if (data.error && typeof data.error === "object") {
+		const errorObj = data.error as Record<string, unknown>;
+		if (typeof errorObj.message === "string") return errorObj.message;
+		if (typeof errorObj.message_cn === "string") return errorObj.message_cn;
+	}
+
+	// Handle direct error string: { error: "..." }
+	if (typeof data.error === "string") return data.error;
+
+	// Handle direct message: { message: "..." }
+	if (typeof data.message === "string") return data.message;
+
+	return null;
+}
+
+/**
  * Deploy HTML to 302.AI hosting service
  */
 export async function deployHtmlTo302(
@@ -73,31 +111,23 @@ export async function deployHtmlTo302(
 			body: JSON.stringify(request),
 		});
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+		const data = await response.json();
 
-			try {
-				const errorData = JSON.parse(errorText);
-				if (errorData.error) {
-					errorMessage = errorData.error;
-				} else if (errorData.message) {
-					errorMessage = errorData.message;
-				}
-			} catch {
-				// If error response is not JSON, use the text as is
-				if (errorText) {
-					errorMessage = errorText;
-				}
-			}
-
+		// Check for error in response body (even if status is 200)
+		const errorMessage = extractErrorMessage(data);
+		if (errorMessage) {
 			return {
 				success: false,
 				error: errorMessage,
 			};
 		}
 
-		const data = await response.json();
+		if (!response.ok) {
+			return {
+				success: false,
+				error: `API request failed: ${response.status} ${response.statusText}`,
+			};
+		}
 
 		return {
 			success: true,
@@ -107,6 +137,64 @@ export async function deployHtmlTo302(
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : "Failed to deploy HTML",
+		};
+	}
+}
+
+/**
+ * Upload file to 302.AI webserve hosting
+ */
+export async function uploadToWebserve(
+	provider: ModelProvider,
+	request: UploadWebserveRequest,
+): Promise<UploadWebserveResponse> {
+	try {
+		const baseUrl = provider.baseUrl.replace(/\/v1\/?$/, "");
+		const endpoint = `${baseUrl}/302/webserve/upload`;
+
+		const formData = new FormData();
+		formData.append("file", request.file);
+		if (request.add_watermarks !== undefined) {
+			formData.append("add_watermarks", String(request.add_watermarks));
+		}
+		if (request.add_cover !== undefined) {
+			formData.append("add_cover", String(request.add_cover));
+		}
+
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${provider.apiKey}`,
+			},
+			body: formData,
+		});
+
+		const data = await response.json();
+
+		// Check for error in response body (even if status is 200)
+		const errorMessage = extractErrorMessage(data);
+		if (errorMessage) {
+			return {
+				success: false,
+				error: errorMessage,
+			};
+		}
+
+		if (!response.ok) {
+			return {
+				success: false,
+				error: `API request failed: ${response.status} ${response.statusText}`,
+			};
+		}
+
+		return {
+			success: true,
+			data: data,
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Failed to upload file",
 		};
 	}
 }

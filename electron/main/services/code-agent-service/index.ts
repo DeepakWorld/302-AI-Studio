@@ -148,6 +148,7 @@ export class CodeAgentService {
 	}
 
 	// ******************************* IPC Methods ******************************* //
+
 	async updateClaudeCodeSandboxModel(
 		_event: IpcMainInvokeEvent,
 		threadId: string,
