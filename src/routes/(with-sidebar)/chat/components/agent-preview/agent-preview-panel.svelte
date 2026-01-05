@@ -601,7 +601,7 @@
 	// 提取通用的 Deploy 验证逻辑
 	function validateDeployPreconditions() {
 		const validation = validate302Provider(persistedProviderState.current);
-		if (!validation.valid || !validation.provider) {
+		if (!validation.valid) {
 			const errorMsg =
 				validation.error === "toast_deploy_no_302_provider"
 					? m.toast_deploy_no_302_provider()

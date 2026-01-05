@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { uploadToWebserve, validate302Provider } from "$lib/api/webserve-deploy";
 	import {
 		ensureHighlighter,
 		ensureLanguageLoaded,
@@ -7,10 +8,13 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Checkbox } from "$lib/components/ui/checkbox";
 	import * as Dialog from "$lib/components/ui/dialog";
+	import { Input } from "$lib/components/ui/input";
 	import * as Select from "$lib/components/ui/select";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+	import { Copy, ExternalLink } from "@lucide/svelte";
 	import { format } from "date-fns";
 	import katex from "katex";
 	import markdownIt from "markdown-it";
@@ -24,7 +28,7 @@
 	// Types
 	// ============================================================================
 
-	type ExportFormat = "markdown" | "text" | "json" | "html";
+	type ExportFormat = "markdown" | "text" | "json" | "html" | "link";
 
 	interface ExportDialogProps {
 		open: boolean;
@@ -43,6 +47,8 @@
 	let includeSystemPrompt = $state(true);
 	let includeThinking = $state(false);
 	let isExporting = $state(false);
+	let shareDialogOpen = $state(false);
+	let shareUrl = $state("");
 
 	// ============================================================================
 	// Derived State
@@ -57,6 +63,7 @@
 		{ value: "text", label: m.export_format_plain_text() },
 		{ value: "json", label: "JSON" },
 		{ value: "html", label: m.export_format_html() },
+		{ value: "link", label: m.export_format_link() },
 	]);
 	const messages = $derived.by(() => {
 		if (!open) return [];
@@ -292,7 +299,10 @@
 
 			let highlightedCode: string;
 			try {
-				highlightedCode = highlighter.codeToHtml(code, { lang: lang as never, theme });
+				highlightedCode = highlighter.codeToHtml(code, {
+					lang: lang as never,
+					theme: theme ?? "vitesse-light",
+				});
 			} catch {
 				const escapedCode = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 				highlightedCode = `<pre><code>${escapedCode}</code></pre>`;
@@ -408,6 +418,19 @@
 	// Export Handler
 	// ============================================================================
 
+	function handleOpenLink() {
+		window.electronAPI?.externalLinkService.openExternalLink(shareUrl);
+	}
+
+	async function handleCopyLink() {
+		try {
+			await navigator.clipboard.writeText(shareUrl);
+			toast.success(m.toast_copied_success());
+		} catch {
+			toast.error(m.toast_copied_failed());
+		}
+	}
+
 	async function handleExport() {
 		if (selectedCount === 0) {
 			toast.error(m.export_at_least_one_message());
@@ -417,6 +440,34 @@
 		isExporting = true;
 
 		try {
+			// Handle link export separately (upload to webserve)
+			if (exportFormat === "link") {
+				const htmlContent = await formatAsHtml();
+				const htmlFile = new File([htmlContent], "chat-export.html", { type: "text/html" });
+
+				const validation = validate302Provider(persistedProviderState.current);
+				if (!validation.valid) {
+					const errorKey = validation.error;
+					const messages = m as unknown as Record<string, () => string>;
+					toast.error(messages[errorKey]?.() || errorKey);
+					return;
+				}
+
+				const result = await uploadToWebserve(validation.provider, {
+					file: htmlFile,
+					add_watermarks: true,
+				});
+
+				if (result.success && result.data) {
+					shareUrl = result.data.url;
+					shareDialogOpen = true;
+				} else {
+					toast.error(result.error || m.export_upload_failed());
+				}
+				return;
+			}
+
+			// Handle file export formats
 			let content: string;
 			let extension: string;
 			let filterName: string;
@@ -530,5 +581,27 @@
 				{isExporting ? m.export_exporting() : m.export_button()}
 			</Button>
 		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Share Link Dialog -->
+<Dialog.Root bind:open={shareDialogOpen}>
+	<Dialog.Content class="min-w-[431px]">
+		<Dialog.Header>
+			<Dialog.Title>{m.export_share_link_title()}</Dialog.Title>
+		</Dialog.Header>
+
+		<Input value={shareUrl} readonly />
+
+		<Dialog.Footer class="flex sm:justify-between">
+			<Button variant="outline" onclick={handleOpenLink}>
+				<ExternalLink class="size-4" />
+				{m.export_open_link()}
+			</Button>
+			<Button onclick={handleCopyLink}>
+				<Copy class="size-4" />
+				{m.export_copy_link()}
+			</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

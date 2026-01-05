@@ -1033,6 +1033,11 @@
 	"export_success": "Export successful",
 	"export_failed": "Export failed",
 	"export_conversation_title": "Conversation",
+	"export_format_link": "Link",
+	"export_share_link_title": "Share Link",
+	"export_open_link": "Open",
+	"export_copy_link": "Copy",
+	"export_upload_failed": "Upload failed",
 	"title_remote_mode_settings": "Remote Sandbox Settings",
 	"placeholder_input_api_key": "Please enter API Key...",
 	"label_button_reset_api_key": "Reset to 302.AI default API Key"
