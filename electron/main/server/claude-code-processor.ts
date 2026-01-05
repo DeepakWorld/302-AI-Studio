@@ -67,6 +67,9 @@ interface ClaudeCodeEvent {
 	session_id?: string;
 	total_cost_usd?: number;
 	uuid?: string;
+	// pre_deploy_check fields
+	success?: boolean;
+	find_ifile?: string;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[key: string]: any;
 }
@@ -151,6 +154,9 @@ class ClaudeCodeProcessor {
 	private openaiTextId: string | null = null;
 	// Track the last skill tool call ID to associate synthetic messages with it
 	private lastSkillToolCallId: string | null = null;
+	// Store result metadata to merge with pre_deploy_check
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private resultMetadata: any = null;
 
 	constructor(preGeneratedMessageId?: string) {
 		if (preGeneratedMessageId) {
@@ -222,6 +228,11 @@ class ClaudeCodeProcessor {
 		// Skip 302.AI Claude Code specific metadata events
 		if (data.type === "alias_info" || data.type === "system") {
 			return null;
+		}
+
+		// Handle pre_deploy_check event
+		if (data.type === "pre_deploy_check") {
+			return this.handlePreDeployCheck(data);
 		}
 
 		// Handle error payload from upstream (e.g., sandbox deployment failures)
@@ -381,16 +392,41 @@ class ClaudeCodeProcessor {
 			uuid: data.uuid,
 		};
 
+		// Store result metadata for later merging with pre_deploy_check
+		this.resultMetadata = resultMetadata;
+
 		// Send as message-metadata event for frontend to process
 		const metadataEvent = {
 			type: "message-metadata",
 			metadata: resultMetadata,
 		};
 
+		return `data: ${JSON.stringify(metadataEvent)}`;
+	}
+
+	/**
+	 * Handle pre_deploy_check event from 302.AI Claude Code
+	 * This event typically follows the result event in deployment scenarios.
+	 */
+	private handlePreDeployCheck(data: ClaudeCodeEvent): string | null {
+		// Merge with stored result metadata if available
+		const metadata = this.resultMetadata ? { ...this.resultMetadata } : {};
+
+		// Add preDeploy field
+		metadata.preDeploy = {
+			type: "pre_deploy_check",
+			success: data.success,
+			find_ifile: data.find_ifile,
+		};
+
+		const metadataEvent = {
+			type: "message-metadata",
+			metadata: metadata,
+		};
+
 		const metadataStr = `data: ${JSON.stringify(metadataEvent)}`;
 
-		// If there's a pending finish event, send metadata first, then finish
-		// This ensures onFinish callback receives the metadata
+		// Flush pending finish event if present
 		if (this.pendingFinishEvent) {
 			const result = `${metadataStr}\n\n${this.pendingFinishEvent}`;
 			this.pendingFinishEvent = null;

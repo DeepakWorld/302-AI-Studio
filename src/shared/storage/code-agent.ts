@@ -82,5 +82,6 @@ export type CreateClaudeCodeSandboxResponse = typeof createClaudeCodeSandboxResp
 
 export const codeAgentGlobalConfigs = type({
 	apiKey: "string",
+	autoDeploy: "boolean",
 });
 export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;

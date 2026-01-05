@@ -25,10 +25,11 @@ import { toast } from "svelte-sonner";
 import { updateSessionNote } from "$lib/api/sandbox-session";
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 
+import { deploySandboxProject } from "$lib/api/sandbox-deploy";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { agentPreviewState } from "./agent-preview-state.svelte";
-import { codeAgentState } from "./code-agent";
+import { codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -1340,6 +1341,8 @@ export const chat = new Chat({
 
 					return result.content;
 				})(),
+
+				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 			};
 		},
 	}),
@@ -1430,6 +1433,37 @@ export const chat = new Chat({
 		if (codeAgentEnabled) {
 			const lastMessage = messages[messages.length - 1];
 			if (lastMessage && lastMessage.role === "assistant") {
+				// Check for preDeploy success in metadata (which was merged into .result)
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const metadata = lastMessage.metadata as any;
+				if (metadata?.result?.preDeploy?.success) {
+					console.log("[ChatState] Pre-deploy check passed, triggering deployment...");
+					const provider = chatState.currentProvider;
+					const sandboxId = claudeCodeAgentState.sandboxId;
+					const sessionId = claudeCodeAgentState.currentSessionId;
+
+					if (provider && sandboxId) {
+						try {
+							const result = await deploySandboxProject(provider, {
+								sandbox_id: sandboxId,
+								session_id: sessionId,
+							});
+
+							if (result.success && result.data) {
+								console.log("[ChatState] Deployment successful:", result.data);
+								isDeploy = true;
+								deployInfo = result.data;
+							} else {
+								console.error("[ChatState] Deployment failed:", result.error);
+								toast.error(`${m.toast_deploy_failed()}: ${result.error || "Unknown error"}`);
+							}
+						} catch (error) {
+							console.error("[ChatState] Deployment error:", error);
+							toast.error(`${m.toast_deploy_failed()}: ${String(error)}`);
+						}
+					}
+				}
+
 				// Extract text content from the message parts
 				const textContent = lastMessage.parts
 					.filter((part): part is { type: "text"; text: string } => part.type === "text")

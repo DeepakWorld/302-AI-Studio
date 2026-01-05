@@ -1031,5 +1031,6 @@
 	"export_empty_message": "(空消息)",
 	"title_remote_mode_settings": "远程沙盒设置",
 	"placeholder_input_api_key": "请输入API Key...",
-	"label_button_reset_api_key": "重置为302.AI默认API Key"
+	"label_button_reset_api_key": "重置为302.AI默认API Key",
+	"auto_deploy": "自动部署项目"
 }

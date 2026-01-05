@@ -31,13 +31,17 @@ class CodeAgentGlobalConfigsStorage extends StorageService<CodeAgentGlobalConfig
 	}
 
 	async getGlobalConfigs(): Promise<{ isOK: boolean; data: CodeAgentGlobalConfigs }> {
+		const defaultData = {
+			apiKey: "",
+			autoDeploy: true,
+		};
 		try {
 			const data = await this.getItemInternal("code-agent-global-configs");
-			if (isNull(data)) return { isOK: false, data: { apiKey: "" } };
+			if (isNull(data)) return { isOK: false, data: defaultData };
 			return { isOK: true, data };
 		} catch (error) {
 			console.error("Error getting global configs:", error);
-			return { isOK: false, data: { apiKey: "" } };
+			return { isOK: false, data: defaultData };
 		}
 	}
 }

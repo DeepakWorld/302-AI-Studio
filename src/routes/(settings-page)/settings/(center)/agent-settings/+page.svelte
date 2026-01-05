@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { SettingSwitchItem } from "$lib/components/buss/settings";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { codeAgentGlobalConfigsState } from "$lib/stores/code-agent/code-agent-global-configs-state.svelte";
 	import LocalPlatform from "./local-platform.svelte";
 	import RemotePlatform from "./remote-platform.svelte";
 
@@ -30,6 +32,12 @@
 			options={platformOptions}
 			selectedKey={selectedPlatform}
 			onSelect={handlePlatformSelect}
+		/>
+
+		<SettingSwitchItem
+			label={m.auto_deploy()}
+			checked={codeAgentGlobalConfigsState.autoDeploy}
+			onCheckedChange={() => codeAgentGlobalConfigsState.toggleAutoDeploy()}
 		/>
 	</div>
 

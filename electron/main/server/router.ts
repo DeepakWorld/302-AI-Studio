@@ -58,6 +58,7 @@ export type RouterRequestBody = {
 	systemPrompt?: string;
 	mcpServers?: string[];
 	sandboxName?: string;
+	autoDeploy?: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1160,11 +1161,23 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		messages,
 		threadId,
 		sessionId,
+		autoDeploy,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
 
-	console.log("[302ai-code-agent] Received request", baseUrl, sandboxId, threadId, sessionId);
+	console.log(
+		"[302ai-code-agent] Received request",
+		JSON.stringify({
+			baseUrl,
+			model,
+			apiKey,
+			messages,
+			threadId,
+			sessionId,
+			autoDeploy,
+		}),
+	);
 
 	// Generate messageId upfront for immediate start event
 	const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -1184,6 +1197,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
+		enable_pre_deploy_check: autoDeploy ?? true,
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));
