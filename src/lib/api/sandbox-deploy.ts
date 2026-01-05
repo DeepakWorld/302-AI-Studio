@@ -4,11 +4,53 @@
  */
 
 import type { ModelProvider } from "@shared/types";
+import { type } from "arktype";
+import { _302AIKy } from "./core/_302ai-ky";
 import { getApiKeyByProvider } from "./utils";
 
 export interface DeploySandboxRequest {
 	sandbox_id: string;
 	session_id?: string;
+}
+
+export const deploySandboxRequestSchema = type({
+	sandbox_id: "string",
+	session_id: "string?",
+});
+export type _DeploySandboxRequest = typeof deploySandboxRequestSchema.infer;
+export const deploySandboxResponseSchema = type({
+	success: "boolean",
+	status: "string",
+	id: "string",
+	url: "string",
+	cover: "string",
+});
+
+export type _DeploySandboxResponse = typeof deploySandboxResponseSchema.infer;
+
+/**
+ * Deploy sandbox project to 302.AI hosting service (New implementation)
+ */
+export async function _deploySandboxProject(
+	request: DeploySandboxRequest,
+): Promise<_DeploySandboxResponse> {
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/deploy", {
+				json: request,
+			})
+			.json();
+
+		const validated = deploySandboxResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate deploy sandbox response:", validated.summary);
+			throw new Error("Invalid response format from deploy sandbox API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to deploy sandbox project:", error);
+		throw error;
+	}
 }
 
 export interface DeploySandboxResponse {

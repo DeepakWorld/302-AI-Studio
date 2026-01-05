@@ -7,9 +7,14 @@ import {
 	type IpcMainInvokeEvent,
 } from "electron";
 import { CONFIG, isMac, UNSUPPORTED_INJECTING_THEME } from "../../constants";
+import { getCustomUserAgentFragment } from "../../utils/user-agent";
 import { themeStorage } from "../storage-service/theme-storage";
 
 export class AppService {
+	async getUserAgentFragment(_event: IpcMainInvokeEvent): Promise<string> {
+		return getCustomUserAgentFragment();
+	}
+
 	async initFromStorage() {
 		const state = await themeStorage.getThemeState();
 		console.log(`state = ${JSON.stringify(state)}, ${typeof state}`);
