@@ -33,6 +33,7 @@ function getInitialData() {
 		currentSessionId: "",
 		sandboxId: "",
 		sandboxRemark: "",
+		skills: [],
 	};
 	return initialData;
 }

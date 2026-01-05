@@ -10,6 +10,11 @@ export const CodeAgentConfigMetadata = type({
 	isDeleted: "boolean",
 });
 export type CodeAgentConfigMetadata = typeof CodeAgentConfigMetadata.infer;
+export const skill = type({
+	name: "string",
+	description: "string",
+});
+export type Skill = typeof skill.infer;
 
 export const codeAgentMetadata = type({
 	model: "string",
@@ -25,6 +30,7 @@ export const codeAgentMetadata = type({
 	currentSessionId: "string",
 	sandboxId: "string",
 	sandboxRemark: "string",
+	skills: skill.array(),
 });
 export type CodeAgentMetadata = typeof codeAgentMetadata.infer;
 
@@ -85,3 +91,9 @@ export const codeAgentGlobalConfigs = type({
 	autoDeploy: "boolean",
 });
 export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;
+
+export const skillList = type({
+	userSkills: skill.array(),
+	builtinSkills: skill.array(),
+});
+export type SkillList = typeof skillList.infer;
