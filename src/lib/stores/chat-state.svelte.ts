@@ -22,13 +22,11 @@ import { hashApiKey } from "@shared/utils/hash";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 
-import { updateSessionNote } from "$lib/api/sandbox-session";
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 
-import { _deploySandboxProject } from "$lib/api/sandbox-deploy";
+import { emitter, EventNames } from "$lib/event/emitter";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
-import { agentPreviewState } from "./agent-preview-state.svelte";
 import { codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
@@ -1420,92 +1418,10 @@ export const chat = new Chat({
 			clearPendingResultMetadata();
 		}
 
-		// Parse deploy sandbox info from the last message
-		let isDeploy = false;
-		let deployInfo: {
-			success: boolean;
-			status: string;
-			id: string;
-			url: string;
-			cover: string;
-		} | null = null;
-
-		if (codeAgentEnabled) {
-			const lastMessage = messages[messages.length - 1];
-			if (lastMessage && lastMessage.role === "assistant") {
-				// Check for preDeploy success in metadata (which was merged into .result)
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const metadata = lastMessage.metadata as any;
-				if (metadata?.result?.preDeploy?.success) {
-					console.log("[ChatState] Pre-deploy check passed, triggering deployment...");
-					// const provider = chatState.currentProvider;
-					const sandboxId = claudeCodeAgentState.sandboxId;
-					const sessionId = claudeCodeAgentState.currentSessionId;
-
-					if (sandboxId) {
-						agentPreviewState.isDeploying = true;
-						try {
-							const result = await _deploySandboxProject({
-								sandbox_id: sandboxId,
-								session_id: sessionId,
-							});
-
-							if (result.success) {
-								console.log("[ChatState] Deployment successful:", result);
-								isDeploy = true;
-								deployInfo = result;
-							} else {
-								console.error("[ChatState] Deployment failed:", result);
-								toast.error(`${m.toast_deploy_failed()}`);
-							}
-						} catch (error) {
-							console.error("[ChatState] Deployment error:", error);
-							toast.error(`${m.toast_deploy_failed()}: ${String(error)}`);
-						} finally {
-							agentPreviewState.isDeploying = false;
-						}
-					}
-				}
-
-				// Extract text content from the message parts
-				const textContent = lastMessage.parts
-					.filter((part): part is { type: "text"; text: string } => part.type === "text")
-					.map((part) => part.text)
-					.join("\n");
-
-				// Check if deploy was successful
-				if (textContent.includes("**deploy sandbox successfully**")) {
-					isDeploy = true;
-
-					// Extract the Python dict-like structure after the success message
-					// Pattern matches: {'success': True, 'status': '...', 'id': '...', 'url': '...', 'cover': '...'}
-					const deployInfoRegex =
-						/\{[^{}]*'success'\s*:\s*(True|False)[^{}]*'status'\s*:\s*'([^']*)'[^{}]*'id'\s*:\s*'([^']*)'[^{}]*'url'\s*:\s*'([^']*)'[^{}]*'cover'\s*:\s*'([^']*)'\s*\}/;
-					const match = textContent.match(deployInfoRegex);
-
-					if (match) {
-						deployInfo = {
-							success: match[1] === "True",
-							status: match[2],
-							id: match[3],
-							url: match[4],
-							cover: match[5],
-						};
-						console.log("[ChatState] Parsed deploy info:", deployInfo);
-					}
-				}
-			}
-		}
-
-		if (isDeploy && deployInfo) {
-			await agentPreviewState.setDeploymentInfo(
-				claudeCodeAgentState.sandboxId,
-				claudeCodeAgentState.currentSessionId,
-				deployInfo.url,
-				deployInfo.id,
-			);
-			console.log("[ChatState] Deploy detected:", { isDeploy, deployInfo });
-		}
+		emitter.emit(EventNames.CHAT_FINISHED, {
+			canDeploy: codeAgentEnabled,
+			lastMessage: messages[messages.length - 1],
+		});
 
 		persistedMessagesState.current = messages;
 
@@ -1616,13 +1532,8 @@ export const chat = new Chat({
 				if (result) {
 					persistedChatParamsState.current.title = result.title;
 					persistedChatParamsState.current.incrementalSummary = result.summary;
-					if (codeAgentEnabled && provider) {
-						updateSessionNote(provider, {
-							note: result.title,
-							sandbox_id: claudeCodeAgentState.sandboxId,
-							session_id: claudeCodeAgentState.currentSessionId,
-						});
-					}
+
+					emitter.emit(EventNames.THREAD_TITLE_UPDATED, { title: result.title });
 
 					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
 				}

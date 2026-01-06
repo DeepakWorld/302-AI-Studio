@@ -1,5 +1,7 @@
+import { emitter, EventNames } from "$lib/event/emitter";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
+import type { ChatMessage } from "$lib/types/chat";
 import type { Model } from "@302ai/studio-plugin-sdk";
 import {
 	CodeAgentConfigMetadata,
@@ -56,6 +58,18 @@ class CodeAgentState {
 			)
 			.otherwise(() => "waiting-for-sandbox");
 	});
+
+	handleChatFinished = (event: { canDeploy: boolean; lastMessage: ChatMessage }) => {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.handleChatFinished(event);
+		}
+	};
+
+	handleThreadTitleUpdated = (event: { title: string }) => {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.handleThreadTitleUpdated(event);
+		}
+	};
 
 	private updateState(partial: Partial<CodeAgentConfigMetadata>): void {
 		persistedCodeAgentConfigState.current = {
@@ -148,3 +162,20 @@ class CodeAgentState {
 }
 
 export const codeAgentState = new CodeAgentState();
+
+$effect.root(() => {
+	$effect(() => {
+		if (codeAgentState.enabled) {
+			const offChat = emitter.on(EventNames.CHAT_FINISHED, codeAgentState.handleChatFinished);
+			const offTitle = emitter.on(
+				EventNames.THREAD_TITLE_UPDATED,
+				codeAgentState.handleThreadTitleUpdated,
+			);
+
+			return () => {
+				offChat();
+				offTitle();
+			};
+		}
+	});
+});
