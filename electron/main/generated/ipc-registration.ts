@@ -301,6 +301,13 @@ export function registerIpcHandlers() {
 	ipcMain.handle("appService:restartApp", (event) => appService.restartApp(event));
 	ipcMain.handle("appService:resetAllData", (event) => appService.resetAllData(event));
 	ipcMain.handle("appService:clearChatHistory", (event) => appService.clearChatHistory(event));
+	ipcMain.handle("appService:extractZipBlob", (event, zipData) =>
+		appService.extractZipBlob(event, zipData),
+	);
+	ipcMain.handle("appService:scanDirectory", (event, dirPath) =>
+		appService.scanDirectory(event, dirPath),
+	);
+	ipcMain.handle("appService:readFile", (event, filePath) => appService.readFile(event, filePath));
 
 	// dataService service registration
 	ipcMain.handle("dataService:importLegacyJson", (event) => dataService.importLegacyJson(event));
@@ -495,6 +502,9 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("appService:restartApp");
 	ipcMain.removeHandler("appService:resetAllData");
 	ipcMain.removeHandler("appService:clearChatHistory");
+	ipcMain.removeHandler("appService:extractZipBlob");
+	ipcMain.removeHandler("appService:scanDirectory");
+	ipcMain.removeHandler("appService:readFile");
 	ipcMain.removeHandler("dataService:importLegacyJson");
 	ipcMain.removeHandler("dataService:exportStorage");
 	ipcMain.removeHandler("dataService:importStorage");

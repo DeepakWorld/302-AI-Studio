@@ -204,3 +204,10 @@ export interface BackupInfo {
 	timestamp: Date;
 	size: number;
 }
+
+export interface FileNode {
+	name: string;
+	path: string;
+	type: "file" | "directory";
+	children?: FileNode[];
+}

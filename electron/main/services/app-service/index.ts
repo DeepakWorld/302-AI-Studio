@@ -1,4 +1,4 @@
-import type { Theme } from "@shared/types";
+import type { FileNode, Theme } from "@shared/types";
 import {
 	app,
 	BrowserWindow,
@@ -6,6 +6,9 @@ import {
 	WebContentsView,
 	type IpcMainInvokeEvent,
 } from "electron";
+import extract from "extract-zip";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "fs/promises";
+import { join } from "path";
 import { CONFIG, isMac, UNSUPPORTED_INJECTING_THEME } from "../../constants";
 import { getCustomUserAgentFragment } from "../../utils/user-agent";
 import { themeStorage } from "../storage-service/theme-storage";
@@ -243,6 +246,110 @@ export class AppService {
 			app.exit(0);
 		} catch (error) {
 			console.error("Failed to clear chat history:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Extract a zip file from ArrayBuffer to a temporary directory
+	 * @returns The path to the extracted directory
+	 */
+	async extractZipBlob(_event: IpcMainInvokeEvent, zipData: ArrayBuffer): Promise<string> {
+		try {
+			const tempDir = app.getPath("temp");
+			const timestamp = Date.now();
+			const zipFileName = `skill-download-${timestamp}.zip`;
+			const zipPath = join(tempDir, zipFileName);
+			const extractDirName = `skill-extract-${timestamp}`;
+			const extractPath = join(tempDir, extractDirName);
+
+			// Write zip file
+			await writeFile(zipPath, Buffer.from(zipData));
+
+			// Create extract directory
+			await mkdir(extractPath, { recursive: true });
+
+			// Extract
+			await this.extractZip(zipPath, extractPath);
+
+			// Cleanup zip file
+			await rm(zipPath, { force: true });
+
+			return extractPath;
+		} catch (error) {
+			console.error("Failed to extract zip blob:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Recursively scan a directory and return a file tree structure
+	 */
+	async scanDirectory(_event: IpcMainInvokeEvent, dirPath: string): Promise<FileNode> {
+		try {
+			const stats = await stat(dirPath);
+			const name = dirPath.split(/[/\\]/).pop() || "";
+
+			if (!stats.isDirectory()) {
+				return {
+					name,
+					path: dirPath,
+					type: "file",
+				};
+			}
+
+			const children: FileNode[] = [];
+			const entries = await readdir(dirPath);
+
+			for (const entry of entries) {
+				// Skip hidden files/folders (optional, but usually good practice)
+				if (entry.startsWith(".")) continue;
+
+				const fullPath = join(dirPath, entry);
+				const childNode = await this.scanDirectory(_event, fullPath);
+				children.push(childNode);
+			}
+
+			// Sort: directories first, then files, both alphabetically
+			children.sort((a, b) => {
+				if (a.type === b.type) {
+					return a.name.localeCompare(b.name);
+				}
+				return a.type === "directory" ? -1 : 1;
+			});
+
+			return {
+				name,
+				path: dirPath,
+				type: "directory",
+				children,
+			};
+		} catch (error) {
+			console.error("Failed to scan directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Read file content as text
+	 */
+	async readFile(_event: IpcMainInvokeEvent, filePath: string): Promise<string> {
+		try {
+			return await readFile(filePath, "utf-8");
+		} catch (error) {
+			console.error("Failed to read file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Extract zip file to destination
+	 */
+	private async extractZip(zipPath: string, destPath: string): Promise<void> {
+		try {
+			await extract(zipPath, { dir: destPath });
+		} catch (error) {
+			console.error("Failed to extract zip:", error);
 			throw error;
 		}
 	}
