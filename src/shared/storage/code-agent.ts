@@ -92,9 +92,3 @@ export const codeAgentGlobalConfigs = type({
 	autoDeploy: "boolean",
 });
 export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;
-
-export const skillList = type({
-	userSkills: skill.array(),
-	builtinSkills: skill.array(),
-});
-export type SkillList = typeof skillList.infer;

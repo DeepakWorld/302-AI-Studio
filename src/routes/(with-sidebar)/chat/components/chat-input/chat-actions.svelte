@@ -5,6 +5,7 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 
+	import { listSkills } from "$lib/api/skills";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
@@ -192,7 +193,7 @@
 	<ButtonWithTooltip
 		class="hover:!bg-chat-action-hover"
 		tooltip={m.title_skills()}
-		onclick={() => {}}
+		onclick={() => listSkills({})}
 		{disabled}
 	>
 		<Zap />
