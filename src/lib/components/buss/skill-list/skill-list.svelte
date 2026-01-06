@@ -1,11 +1,13 @@
 <script lang="ts">
 	import Button from "$lib/components/ui/button/button.svelte";
 	import Input from "$lib/components/ui/input/input.svelte";
+	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { m } from "$lib/paraglide/messages";
 	import { Plus, Search } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import SkillCard from "./skill-card.svelte";
 	import SkillDetailDialog from "./skill-detail-dialog.svelte";
+	import SkillCreateDialog from "./skill-create-dialog.svelte";
 
 	interface SkillWithSource {
 		skill: Skill;
@@ -17,11 +19,9 @@
 		builtinSkills: Skill[];
 		title?: string;
 		showSearch?: boolean;
-		onNew?: () => void;
+		loading?: boolean;
+		showNewButton?: boolean;
 		onUse?: (skill: Skill) => void;
-		onEdit?: (skill: Skill) => void;
-		onDownload?: (skill: Skill) => void;
-		onDelete?: (skill: Skill) => void;
 	}
 
 	const {
@@ -29,15 +29,14 @@
 		builtinSkills,
 		title = m.skills_title(),
 		showSearch = true,
-		onNew,
+		loading = false,
+		showNewButton = true,
 		onUse,
-		onEdit,
-		onDownload,
-		onDelete,
 	}: Props = $props();
 
 	let searchQuery = $state("");
 	let detailDialogOpen = $state(false);
+	let createDialogOpen = $state(false);
 	let selectedSkill = $state<Skill | null>(null);
 
 	// Combine skills with source flag
@@ -58,16 +57,32 @@
 		selectedSkill = skill;
 		detailDialogOpen = true;
 	}
+
+	function handleNew() {
+		createDialogOpen = true;
+	}
+
+	function handleEdit(skill: Skill) {
+		console.log("Edit skill:", skill.name);
+	}
+
+	function handleDownload(skill: Skill) {
+		console.log("Download skill:", skill.name);
+	}
+
+	function handleDelete(skill: Skill) {
+		console.log("Delete skill:", skill.name);
+	}
 </script>
 
 <div class="flex flex-col gap-6">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
-		<h1 class="text-xl font-semibold">{title}</h1>
+		<h1 class="text-lg font-medium text-[#333333] dark:text-[#E6E6E6]">{title}</h1>
 	</div>
 
 	<!-- Search and New Button -->
-	{#if showSearch || onNew}
+	{#if showSearch || showNewButton}
 		<div class="flex items-center gap-3">
 			{#if showSearch}
 				<div class="relative flex-1">
@@ -80,8 +95,8 @@
 					/>
 				</div>
 			{/if}
-			{#if onNew}
-				<Button class="gap-2 bg-violet-500 hover:bg-violet-600" onclick={onNew}>
+			{#if showNewButton}
+				<Button class="gap-2 bg-violet-500 hover:bg-violet-600" onclick={handleNew}>
 					<Plus class="h-4 w-4" />
 					{m.skills_new()}
 				</Button>
@@ -90,25 +105,33 @@
 	{/if}
 
 	<!-- Skills Grid -->
-	<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-		{#each filteredSkills as item (item.skill.name)}
-			<SkillCard
-				skill={item.skill}
-				isBuiltin={item.isBuiltin}
-				onSelect={handleSelectSkill}
-				{onUse}
-				{onEdit}
-				{onDownload}
-				{onDelete}
-			/>
-		{/each}
-	</div>
-
-	<!-- Empty State -->
-	{#if filteredSkills.length === 0}
-		<div class="text-muted-foreground flex flex-col items-center justify-center py-12 text-center">
-			<p>{m.no_search_results()}</p>
+	{#if loading}
+		<div class="flex h-48 items-center justify-center text-primary">
+			<LdrsLoader type="dot-pulse" size={40} />
 		</div>
+	{:else}
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			{#each filteredSkills as item (item.skill.name)}
+				<SkillCard
+					skill={item.skill}
+					isBuiltin={item.isBuiltin}
+					onSelect={handleSelectSkill}
+					{onUse}
+					onEdit={handleEdit}
+					onDownload={handleDownload}
+					onDelete={handleDelete}
+				/>
+			{/each}
+		</div>
+
+		<!-- Empty State -->
+		{#if filteredSkills.length === 0}
+			<div
+				class="text-muted-foreground flex flex-col items-center justify-center py-12 text-center"
+			>
+				<p>{m.no_search_results()}</p>
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -117,6 +140,9 @@
 	bind:open={detailDialogOpen}
 	skill={selectedSkill}
 	{onUse}
-	{onEdit}
-	{onDownload}
+	onEdit={handleEdit}
+	onDownload={handleDownload}
 />
+
+<!-- Create Dialog -->
+<SkillCreateDialog bind:open={createDialogOpen} />

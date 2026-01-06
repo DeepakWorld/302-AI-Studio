@@ -1064,5 +1064,6 @@
 	"skills_create_history": "从历史记录",
 	"skills_create_history_desc": "从对话中生成",
 	"skills_create_select_required": "请选择创建方式",
-	"skills_create_coming_soon": "即将推出..."
+	"skills_create_coming_soon": "即将推出...",
+	"skills_load_failed": "获取 Skills 列表失败"
 }

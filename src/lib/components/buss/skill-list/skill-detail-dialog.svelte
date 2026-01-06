@@ -2,7 +2,7 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
-	import { ChevronLeft, Sparkles } from "@lucide/svelte";
+	import { ChevronLeft, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
 	interface Props {
@@ -73,7 +73,7 @@
 			<div
 				class="bg-primary/10 text-primary mb-4 flex h-20 w-20 items-center justify-center rounded-2xl"
 			>
-				<Sparkles class="h-10 w-10" />
+				<Zap class="h-10 w-10" />
 			</div>
 
 			<!-- Skill Name -->

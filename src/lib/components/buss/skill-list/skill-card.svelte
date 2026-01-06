@@ -3,7 +3,7 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { m } from "$lib/paraglide/messages";
-	import { Ellipsis, Sparkles } from "@lucide/svelte";
+	import { Ellipsis, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
 	interface Props {
@@ -41,7 +41,7 @@
 	<div class="flex items-center gap-3">
 		<!-- Default Icon -->
 		<div class="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
-			<Sparkles class="h-5 w-5" />
+			<Zap class="h-5 w-5" />
 		</div>
 		<!-- Name and Badge -->
 		<div class="flex flex-col gap-1">
