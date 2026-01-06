@@ -1,0 +1,114 @@
+<script lang="ts">
+	import Button from "$lib/components/ui/button/button.svelte";
+	import * as Dialog from "$lib/components/ui/dialog";
+	import { m } from "$lib/paraglide/messages";
+	import { ChevronLeft, Sparkles } from "@lucide/svelte";
+	import type { Skill } from "@shared/types";
+
+	interface Props {
+		open: boolean;
+		skill: Skill | null;
+		onOpenChange?: (open: boolean) => void;
+		onUse?: (skill: Skill) => void;
+		onEdit?: (skill: Skill) => void;
+		onDownload?: (skill: Skill) => void;
+	}
+
+	let {
+		open = $bindable(false),
+		skill = null,
+		onOpenChange,
+		onUse,
+		onEdit,
+		onDownload,
+	}: Props = $props();
+
+	function handleClose() {
+		open = false;
+		onOpenChange?.(false);
+	}
+
+	function handleUse() {
+		if (skill && onUse) {
+			onUse(skill);
+			handleClose();
+		}
+	}
+
+	function handleEdit() {
+		if (skill && onEdit) {
+			onEdit(skill);
+			handleClose();
+		}
+	}
+
+	function handleDownload() {
+		if (skill && onDownload) {
+			onDownload(skill);
+		}
+	}
+
+	const showFooter = $derived(!!onUse || !!onEdit || !!onDownload);
+</script>
+
+<Dialog.Root bind:open onOpenChange={(v) => onOpenChange?.(v)}>
+	<Dialog.Content class="max-w-md rounded-2xl p-0" showCloseButton={false}>
+		<!-- Header -->
+		<div class="flex items-center justify-between border-b px-4 py-3">
+			<Button
+				variant="ghost"
+				class="text-[14px] flex items-center text-center text-muted-foreground"
+				size="sm"
+				onclick={handleClose}
+			>
+				<ChevronLeft class="h-4 w-4" />
+				{m.skills_back()}
+			</Button>
+			<span class="text-foreground text-base font-semibold">{m.skills_detail_title()}</span>
+		</div>
+
+		<!-- Content -->
+		<div class="flex flex-col items-center px-6 py-8">
+			<!-- Large Icon -->
+			<div
+				class="bg-primary/10 text-primary mb-4 flex h-20 w-20 items-center justify-center rounded-2xl"
+			>
+				<Sparkles class="h-10 w-10" />
+			</div>
+
+			<!-- Skill Name -->
+			<h2 class="mb-8 text-xl font-semibold">{skill?.name ?? ""}</h2>
+
+			<!-- Description Section -->
+			<div class="w-full">
+				<h3 class="text-[#6b7280] dark:text-gray-400 mb-2 text-sm font-semibold">
+					{m.skills_description()}
+				</h3>
+				<p class="text-[#6b7280] dark:text-gray-400 text-sm leading-relaxed">
+					{skill?.description ?? ""}
+				</p>
+			</div>
+		</div>
+
+		<!-- Footer -->
+		{#if showFooter}
+			<div class="flex gap-3 border-t px-6 py-4">
+				{#if onDownload}
+					<Button variant="secondary" class="flex-1" onclick={handleDownload}>
+						{m.skills_download()}
+					</Button>
+				{/if}
+				{#if onEdit}
+					<Button class="flex-1" onclick={handleEdit}>
+						{m.text_button_edit()}
+					</Button>
+				{/if}
+				{#if onUse}
+					<Button class="flex-1 " onclick={handleUse}>
+						{m.skills_use_this()}
+					</Button>
+				{/if}
+			</div>
+		{/if}
+	</Dialog.Content>
+</Dialog.Root>

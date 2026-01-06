@@ -1042,5 +1042,16 @@
 	"placeholder_input_api_key": "Please enter API Key...",
 	"label_button_reset_api_key": "Reset to 302.AI default API Key",
 	"auto_deploy": "Automatically Deploy Project",
-	"error_update_session_note": "Failed to update sandbox session notes"
+	"error_update_session_note": "Failed to update sandbox session notes",
+	"text_button_settings_skills": "Skills",
+	"skills_title": "Skills Management",
+	"skills_search_placeholder": "Search Skills...",
+	"skills_new": "New",
+	"skills_use": "Use",
+	"skills_download": "Download",
+	"skills_builtin": "Built-in",
+	"skills_detail_title": "Skills Detail",
+	"skills_description": "Description",
+	"skills_back": "Back",
+	"skills_use_this": "Use this Skill"
 }

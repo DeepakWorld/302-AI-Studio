@@ -1039,5 +1039,16 @@
 	"placeholder_input_api_key": "请输入API Key...",
 	"label_button_reset_api_key": "重置为302.AI默认API Key",
 	"auto_deploy": "自动部署项目",
-	"error_update_session_note": "更新沙盒会话备注失败"
+	"error_update_session_note": "更新沙盒会话备注失败",
+	"text_button_settings_skills": "Skills",
+	"skills_title": "Skills 管理",
+	"skills_search_placeholder": "搜索 Skills...",
+	"skills_new": "新建",
+	"skills_use": "使用",
+	"skills_download": "下载",
+	"skills_builtin": "内置",
+	"skills_detail_title": "Skills 详情",
+	"skills_description": "描述",
+	"skills_back": "返回",
+	"skills_use_this": "使用此 Skill"
 }
