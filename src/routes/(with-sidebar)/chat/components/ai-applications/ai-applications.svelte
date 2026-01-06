@@ -1,6 +1,6 @@
 <script lang="ts">
 	import LdrsLoader from "$lib/components/buss/ldrs-loader/ldrs-loader.svelte";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { Button, buttonVariants } from "$lib/components/ui/button";
 	import * as Collapsible from "$lib/components/ui/collapsible";
 	import { Input } from "$lib/components/ui/input";
 	import Label from "$lib/components/ui/label/label.svelte";
@@ -8,7 +8,7 @@
 	import { m } from "$lib/paraglide/messages";
 	import { aiApplicationsState } from "$lib/stores/ai-applications-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
-	import { ChevronDown, LayoutGrid } from "@lucide/svelte";
+	import { ChevronDown, LayoutGrid, RotateCw } from "@lucide/svelte";
 	import type { AiApplication } from "@shared/types";
 	import { toast } from "svelte-sonner";
 	import { fly } from "svelte/transition";
@@ -70,6 +70,10 @@
 		showMainContent = true;
 	}
 
+	async function handleRefresh() {
+		await aiApplicationService.refreshAiApplications();
+	}
+
 	$effect(() => {
 		if (groupedAppList) {
 			Object.keys(groupedAppList).forEach((category) => {
@@ -91,7 +95,17 @@
 	{#if showMainContent}
 		<div transition:fly={{ y: 20, duration: 500 }} class="flex flex-col w-[720px] gap-y-3">
 			<div class="flex flex-row items-center justify-between">
-				<Label>{m.label_ai_applications()}</Label>
+				<div class="flex items-center gap-x-1">
+					<Label>{m.label_ai_applications()}</Label>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						class="hover:bg-secondary/80 dark:hover:bg-secondary/80 !border-border !text-foreground !font-normal text-xs"
+						onclick={handleRefresh}
+					>
+						<RotateCw class="h-4 w-4" />
+					</Button>
+				</div>
 				<Sheet.Root>
 					<Sheet.Trigger
 						class={buttonVariants({

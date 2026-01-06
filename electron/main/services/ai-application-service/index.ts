@@ -156,6 +156,10 @@ export class AiApplicationService {
 
 		tabView.webContents.reload();
 	}
+
+	async refreshAiApplications(_event: IpcMainInvokeEvent): Promise<void> {
+		await this.initAiApplications();
+	}
 }
 
 export const aiApplicationService = new AiApplicationService();
