@@ -13,6 +13,7 @@ export type CodeAgentConfigMetadata = typeof CodeAgentConfigMetadata.infer;
 export const skill = type({
 	name: "string",
 	description: "string",
+	content: "string?",
 });
 export type Skill = typeof skill.infer;
 
