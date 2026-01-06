@@ -10,7 +10,7 @@
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { Bot, Globe, Lightbulb, Settings2 } from "@lucide/svelte";
+	import { Bot, Globe, Lightbulb, Settings2, Zap } from "@lucide/svelte";
 	import { AttachmentUploader } from "../attachment";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
@@ -188,19 +188,30 @@
 	</Overlay>
 {/snippet}
 
+{#snippet actionEnableSkills()}
+	<ButtonWithTooltip
+		class="hover:!bg-chat-action-hover"
+		tooltip={m.title_skills()}
+		onclick={() => {}}
+		{disabled}
+	>
+		<Zap />
+	</ButtonWithTooltip>
+{/snippet}
+
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
 	{@render actionUploadAttachment()}
 
-	{#if !codeAgentState.enabled}
-		{#if chatState.providerType === "302ai"}
-			{@render actionEnableOnlineSearch()}
-			{@render actionEnableThinking()}
-		{/if}
+	{#if !codeAgentState.enabled && chatState.providerType === "302ai"}
+		{@render actionEnableOnlineSearch()}
+		{@render actionEnableThinking()}
 	{/if}
 
 	{@render actionEnableMCP()}
 
-	{#if !codeAgentState.enabled}
+	{#if codeAgentState.enabled}
+		{@render actionEnableSkills()}
+	{:else}
 		{@render actionSetParameters()}
 	{/if}
 
