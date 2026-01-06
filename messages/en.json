@@ -1041,5 +1041,6 @@
 	"title_remote_mode_settings": "Remote Sandbox Settings",
 	"placeholder_input_api_key": "Please enter API Key...",
 	"label_button_reset_api_key": "Reset to 302.AI default API Key",
-	"auto_deploy": "Automatically Deploy Project"
+	"auto_deploy": "Automatically Deploy Project",
+	"error_update_session_note": "Failed to update sandbox session notes"
 }
