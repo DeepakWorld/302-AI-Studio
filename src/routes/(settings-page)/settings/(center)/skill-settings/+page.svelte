@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { listSkills } from "$lib/api/skills";
+	import { listSkills } from "$lib/api/skills/base-apis";
 	import { SkillList } from "$lib/components/buss/skill-list";
 	import { m } from "$lib/paraglide/messages";
 	import type { Skill } from "@shared/types";
