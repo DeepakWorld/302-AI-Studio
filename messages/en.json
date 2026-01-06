@@ -228,6 +228,7 @@
 	"text_button_add_model": "Add Model",
 	"text_button_add_provider": "Add",
 	"text_button_cancel": "Cancel",
+	"text_button_confirm": "Confirm",
 	"text_button_clear_models": "Clear",
 	"text_button_confirm_edit": "Confirm Edit",
 	"text_button_delete": "Delete",
@@ -1054,5 +1055,17 @@
 	"skills_description": "Description",
 	"skills_back": "Back",
 	"skills_use_this": "Use this Skill",
-	"title_skills": "Search Skills"
+	"title_skills": "Search Skills",
+	"skills_create_title": "Create Skill",
+	"skills_create_select_method": "Choose creation method:",
+	"skills_create_manual": "Manual",
+	"skills_create_manual_desc": "Create .md file",
+	"skills_create_upload": "Upload ZIP",
+	"skills_create_upload_desc": "Import skills folder",
+	"skills_create_github": "GitHub Link",
+	"skills_create_github_desc": "Import from repository",
+	"skills_create_history": "From History",
+	"skills_create_history_desc": "Generate from conversation",
+	"skills_create_select_required": "Please select a creation method",
+	"skills_create_coming_soon": "Coming soon..."
 }

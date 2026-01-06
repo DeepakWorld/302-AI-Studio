@@ -225,6 +225,7 @@
 	"text_button_add_provider": "添加",
 	"text_button_cancel": "取消",
 	"text_button_clear_models": "清空",
+	"text_button_confirm": "确认",
 	"text_button_confirm_edit": "确认编辑",
 	"text_button_delete": "删除",
 	"text_button_edit": "编辑",
@@ -1050,6 +1051,18 @@
 	"skills_detail_title": "Skills 详情",
 	"skills_description": "描述",
 	"skills_back": "返回",
+	"title_skills": "搜索Skills",
 	"skills_use_this": "使用此 Skill",
-	"title_skills": "搜索Skills"
+	"skills_create_title": "创建 Skill",
+	"skills_create_select_method": "选择创建方式：",
+	"skills_create_manual": "手动创建",
+	"skills_create_manual_desc": "创建 .md 文件",
+	"skills_create_upload": "上传 ZIP",
+	"skills_create_upload_desc": "导入 skills 文件夹",
+	"skills_create_github": "GitHub 链接",
+	"skills_create_github_desc": "从代码仓库导入",
+	"skills_create_history": "从历史记录",
+	"skills_create_history_desc": "从对话中生成",
+	"skills_create_select_required": "请选择创建方式",
+	"skills_create_coming_soon": "即将推出..."
 }

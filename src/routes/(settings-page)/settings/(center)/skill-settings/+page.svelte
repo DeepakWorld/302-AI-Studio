@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SkillList } from "$lib/components/buss/skill-list";
+	import { SkillCreateDialog, SkillList } from "$lib/components/buss/skill-list";
 	import type { Skill } from "@shared/types";
 
 	const builtinSkills: Skill[] = [
@@ -31,8 +31,10 @@
 		},
 	];
 
+	let createDialogOpen = $state(false);
+
 	function handleNew() {
-		console.log("Create new skill");
+		createDialogOpen = true;
 	}
 
 	// function handleUse(skill: Skill) {
@@ -60,3 +62,5 @@
 	onDownload={handleDownload}
 	onDelete={handleDelete}
 />
+
+<SkillCreateDialog bind:open={createDialogOpen} />
