@@ -98,3 +98,36 @@ export async function _editSkillDetails(request: SkillDetailsRequest): Promise<B
 		throw error;
 	}
 }
+
+// export const deleteSkillRequestSchema = type({
+// 	skillNames: "string[]",
+// });
+// export type DeleteSkillRequest = typeof deleteSkillRequestSchema.infer;
+// export const deleteSkillResponseSchema = type({
+// 	success: "boolean",
+// 	message: "string",
+// });
+// export type DeleteSkillResponse = typeof deleteSkillResponseSchema.infer;
+
+// export async function deleteSkill(request: DeleteSkillRequest): Promise<DeleteSkillResponse> {
+// 	const { skillNames } = request;
+// 	try {
+// 		const response = await testKy
+// 			.delete("api/v1/claude-code/skills/delete", {
+// 				searchParams: {
+// 					names: skillNames.join(","),
+// 				},
+// 			})
+// 			.json();
+
+// 		const validated = deleteSkillResponseSchema(response);
+// 		if (validated instanceof type.errors) {
+// 			console.error("Failed to validate delete skill response:", validated.summary);
+// 			throw new Error("Invalid response format from delete skill API");
+// 		}
+// 		return validated;
+// 	} catch (error) {
+// 		console.error("Failed to delete skill:", error);
+// 		throw error;
+// 	}
+// }
