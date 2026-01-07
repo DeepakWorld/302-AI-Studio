@@ -5,6 +5,8 @@
 	import { ChevronLeft, FileEdit, Link, MessageSquareText, Package, X } from "@lucide/svelte";
 	import type { Component } from "svelte";
 	import { toast } from "svelte-sonner";
+	import SkillHistoryForm from "./skill-history-form.svelte";
+	import SkillManualForm from "./skill-manual-form.svelte";
 
 	export type SkillCreateMethod = "manual" | "upload" | "github" | "history";
 
@@ -24,6 +26,23 @@
 	let { open = $bindable(false), onOpenChange, onCreate }: Props = $props();
 
 	let currentView = $state<"select" | SkillCreateMethod>("select");
+
+	// Manual creation form data
+	const defaultContent = `# Skill 标题
+
+描述这个 skill 的功能和使用场景...
+
+## 使用方法
+
+`;
+	let manualFormData = $state({
+		name: "",
+		description: "",
+		content: defaultContent,
+	});
+
+	let manualFormRef = $state<SkillManualForm | undefined>();
+	let historyFormRef = $state<SkillHistoryForm | undefined>();
 
 	const createOptions: CreateOption[] = [
 		{
@@ -56,6 +75,11 @@
 
 	function resetState() {
 		currentView = "select";
+		manualFormData = {
+			name: "",
+			description: "",
+			content: defaultContent,
+		};
 	}
 
 	function handleClose() {
@@ -86,8 +110,15 @@
 	}
 
 	function handleConfirmCreate() {
-		// TODO: Implement actual creation logic
-		onCreate?.(currentView as SkillCreateMethod, {});
+		if (currentView === "manual") {
+			if (!manualFormRef?.validate()) return;
+			onCreate?.(currentView, { ...manualFormData });
+		} else if (currentView === "history") {
+			console.log("跳转");
+		} else {
+			// TODO: Implement other creation methods
+			onCreate?.(currentView as SkillCreateMethod, {});
+		}
 		handleClose();
 	}
 </script>
@@ -134,7 +165,7 @@
 				</Button>
 			</div>
 		{:else}
-			<!-- Secondary View (Placeholder) -->
+			<!-- Secondary View -->
 			<div class="flex items-center justify-between border-b px-4 py-3">
 				<Button
 					variant="ghost"
@@ -151,16 +182,25 @@
 				</Button>
 			</div>
 
-			<div class="flex flex-col items-center justify-center px-6 py-12">
-				<div
-					class="bg-primary/10 text-primary mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
-				>
-					{#if currentOption}
-						<currentOption.icon class="h-8 w-8" />
-					{/if}
+			{#if currentView === "manual"}
+				<!-- Manual Creation Form -->
+				<SkillManualForm bind:formData={manualFormData} bind:this={manualFormRef} />
+			{:else if currentView === "history"}
+				<!-- History Selection Form -->
+				<SkillHistoryForm bind:this={historyFormRef} />
+			{:else}
+				<!-- Coming Soon Placeholder -->
+				<div class="flex flex-col items-center justify-center px-6 py-12">
+					<div
+						class="bg-primary/10 text-primary mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
+					>
+						{#if currentOption}
+							<currentOption.icon class="h-8 w-8" />
+						{/if}
+					</div>
+					<p class="text-muted-foreground text-sm">{m.skills_create_coming_soon()}</p>
 				</div>
-				<p class="text-muted-foreground text-sm">{m.skills_create_coming_soon()}</p>
-			</div>
+			{/if}
 
 			<div class="flex gap-3 border-t px-6 py-4">
 				<Button variant="outline" class="flex-1" onclick={handleClose}>
