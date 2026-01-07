@@ -291,6 +291,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("aiApplicationService:handleAiApplicationReloadIpc", (event, tabId) =>
 		aiApplicationService.handleAiApplicationReloadIpc(event, tabId),
 	);
+	ipcMain.handle("aiApplicationService:refreshAiApplications", (event) =>
+		aiApplicationService.refreshAiApplications(event),
+	);
 
 	// appService service registration
 	ipcMain.handle("appService:getUserAgentFragment", (event) =>
@@ -496,6 +499,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("tabService:handleGenerateTabTitle");
 	ipcMain.removeHandler("aiApplicationService:getAiApplicationUrl");
 	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReloadIpc");
+	ipcMain.removeHandler("aiApplicationService:refreshAiApplications");
 	ipcMain.removeHandler("appService:getUserAgentFragment");
 	ipcMain.removeHandler("appService:getTheme");
 	ipcMain.removeHandler("appService:setTheme");
