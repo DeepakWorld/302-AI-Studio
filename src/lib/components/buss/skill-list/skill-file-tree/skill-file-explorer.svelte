@@ -21,7 +21,7 @@
 	let language = $derived(filePath.split(".").pop() || "txt");
 </script>
 
-<div class="h-[80vh] w-full">
+<div class="h-full w-full">
 	<Resizable.PaneGroup direction="horizontal" class="h-full w-full rounded-lg border">
 		<Resizable.Pane defaultSize={25} minSize={15} maxSize={40}>
 			<div class="h-full p-2">

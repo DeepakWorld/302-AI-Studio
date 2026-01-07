@@ -1,4 +1,6 @@
 <script lang="ts">
+	import SkillFileExplorer from "$lib/components/buss/skill-list/skill-file-tree/skill-file-explorer.svelte";
+	import Button from "$lib/components/ui/button/button.svelte";
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { Label } from "$lib/components/ui/label";
 	import Textarea from "$lib/components/ui/textarea/textarea.svelte";
@@ -13,9 +15,12 @@
 
 	interface Props {
 		formData: SkillFormData;
+		rootPath?: string; // 文件树根路径，传入时显示切换按钮
 	}
 
-	let { formData = $bindable() }: Props = $props();
+	let { formData = $bindable(), rootPath }: Props = $props();
+
+	let viewMode = $state<"default" | "tree">("default");
 
 	// 解析 front matter
 	function parseFrontMatter(content: string): { data: Record<string, string>; body: string } {
@@ -155,14 +160,49 @@
 	</div>
 
 	<div class="space-y-2">
-		<Label for="skill-content" class="text-sm font-medium">
-			{m.skills_form_content()} <span class="text-destructive">*</span>
-		</Label>
-		<Textarea
-			id="skill-content"
-			bind:value={formData.content}
-			class="min-h-[200px] max-h-[300px] w-full max-w-full resize-none overflow-y-auto overflow-x-hidden break-all font-mono text-sm"
-		/>
-		<p class="text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
+		<!-- Label with toggle buttons -->
+		<div class="flex items-center justify-between">
+			<Label for="skill-content" class="text-sm font-medium">
+				{m.skills_form_content()} <span class="text-destructive">*</span>
+			</Label>
+			{#if rootPath}
+				<div class="flex rounded-md border">
+					<Button
+						variant="ghost"
+						size="sm"
+						class="h-7 rounded-r-none px-3 text-xs {viewMode === 'default'
+							? 'bg-violet-500 text-white hover:bg-violet-600 hover:text-white'
+							: ''}"
+						onclick={() => (viewMode = "default")}
+					>
+						默认
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="h-7 rounded-l-none px-3 text-xs {viewMode === 'tree'
+							? 'bg-violet-500 text-white hover:bg-violet-600 hover:text-white'
+							: ''}"
+						onclick={() => (viewMode = "tree")}
+					>
+						文件树
+					</Button>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Content area -->
+		{#if viewMode === "default"}
+			<Textarea
+				id="skill-content"
+				bind:value={formData.content}
+				class="min-h-[200px] max-h-[300px] w-full max-w-full resize-none overflow-y-auto overflow-x-hidden break-all font-mono text-sm"
+			/>
+			<p class="text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
+		{:else if rootPath}
+			<div class="h-[300px] overflow-hidden rounded-md">
+				<SkillFileExplorer {rootPath} />
+			</div>
+		{/if}
 	</div>
 </div>

@@ -54,7 +54,7 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={(v) => onOpenChange?.(v)}>
-	<Dialog.Content class="max-w-md rounded-2xl p-0" showCloseButton={false}>
+	<Dialog.Content class="min-w-md rounded-2xl p-0" showCloseButton={false}>
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b px-4 py-3">
 			<Button

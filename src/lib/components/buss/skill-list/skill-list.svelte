@@ -11,6 +11,7 @@
 	import SkillCard from "./skill-card.svelte";
 	import SkillCreateDialog from "./skill-create-dialog.svelte";
 	import SkillDetailDialog from "./skill-detail-dialog.svelte";
+	import SkillEditDialog from "./skill-edit-dialog.svelte";
 
 	interface Props {
 		userSkills: Skill[];
@@ -39,7 +40,9 @@
 	let searchQuery = $state("");
 	let detailDialogOpen = $state(false);
 	let createDialogOpen = $state(false);
+	let editDialogOpen = $state(false);
 	let selectedSkill = $state<Skill | null>(null);
+	let editingSkill = $state<Skill | null>(null);
 	let downloadingSkills = new SvelteSet<string>();
 
 	// Combine skills with source flag
@@ -63,7 +66,8 @@
 	}
 
 	function handleEdit(skill: Skill) {
-		console.log("Edit skill:", skill.name);
+		editingSkill = skill;
+		editDialogOpen = true;
 	}
 
 	async function handleDownload(skill: Skill) {
@@ -175,3 +179,6 @@
 
 <!-- Create Dialog -->
 <SkillCreateDialog bind:open={createDialogOpen} />
+
+<!-- Edit Dialog -->
+<SkillEditDialog bind:open={editDialogOpen} skill={editingSkill} />
