@@ -131,3 +131,7 @@ export async function _editSkillDetails(request: SkillDetailsRequest): Promise<B
 // 		throw error;
 // 	}
 // }
+
+export async function downloadSkill(skillName: string, builtin: boolean = false): Promise<Blob> {
+	return _editSkillDetails({ skillName, builtin });
+}

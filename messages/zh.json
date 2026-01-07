@@ -1044,7 +1044,7 @@
 	"text_button_settings_skills": "Skills",
 	"skills_title": "Skills 管理",
 	"skills_search_placeholder": "搜索 Skills...",
-	"skills_new": "新建",
+	"skills_new": "安装",
 	"skills_use": "使用",
 	"skills_download": "下载",
 	"skills_builtin": "内置",
@@ -1066,5 +1066,8 @@
 	"skills_create_select_required": "请选择创建方式",
 	"skills_create_coming_soon": "即将推出...",
 	"skills_load_failed": "获取 Skills 列表失败",
-	"title_skills_management": "Skills管理"
+	"title_skills_management": "Skills管理",
+	"skills_downloading": "正在下载 Skill...",
+	"skills_download_success": "下载成功",
+	"skills_download_failed": "下载 Skill 失败"
 }

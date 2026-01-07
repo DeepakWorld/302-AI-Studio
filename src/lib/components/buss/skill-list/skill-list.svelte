@@ -1,13 +1,16 @@
 <script lang="ts">
+	import { downloadSkill } from "$lib/api/skills/base-apis";
+	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import Input from "$lib/components/ui/input/input.svelte";
-	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { m } from "$lib/paraglide/messages";
 	import { Plus, Search } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
+	import { toast } from "svelte-sonner";
+	import { SvelteSet } from "svelte/reactivity";
 	import SkillCard from "./skill-card.svelte";
-	import SkillDetailDialog from "./skill-detail-dialog.svelte";
 	import SkillCreateDialog from "./skill-create-dialog.svelte";
+	import SkillDetailDialog from "./skill-detail-dialog.svelte";
 
 	interface SkillWithSource {
 		skill: Skill;
@@ -38,6 +41,7 @@
 	let detailDialogOpen = $state(false);
 	let createDialogOpen = $state(false);
 	let selectedSkill = $state<Skill | null>(null);
+	let downloadingSkills = new SvelteSet<string>();
 
 	// Combine skills with source flag
 	const allSkills = $derived<SkillWithSource[]>([
@@ -66,8 +70,33 @@
 		console.log("Edit skill:", skill.name);
 	}
 
-	function handleDownload(skill: Skill) {
-		console.log("Download skill:", skill.name);
+	async function handleDownload(skill: Skill) {
+		// 防止重复点击
+		if (downloadingSkills.has(skill.name)) return;
+
+		downloadingSkills.add(skill.name);
+
+		const toastId = toast.loading(m.skills_downloading());
+		try {
+			const isBuiltin = allSkills.find((s) => s.skill.name === skill.name)?.isBuiltin ?? false;
+			const blob = await downloadSkill(skill.name, isBuiltin);
+
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `${skill.name}.zip`;
+			a.click();
+			URL.revokeObjectURL(url);
+
+			toast.dismiss(toastId);
+			toast.success(m.skills_download_success());
+		} catch (e) {
+			console.error("Failed to download skill:", e);
+			toast.dismiss(toastId);
+			toast.error(m.skills_download_failed());
+		} finally {
+			downloadingSkills.delete(skill.name);
+		}
 	}
 
 	function handleDelete(skill: Skill) {
@@ -115,6 +144,7 @@
 				<SkillCard
 					skill={item.skill}
 					isBuiltin={item.isBuiltin}
+					downloading={downloadingSkills.has(item.skill.name)}
 					onSelect={handleSelectSkill}
 					{onUse}
 					onEdit={handleEdit}
@@ -139,6 +169,7 @@
 <SkillDetailDialog
 	bind:open={detailDialogOpen}
 	skill={selectedSkill}
+	downloading={selectedSkill ? downloadingSkills.has(selectedSkill.name) : false}
 	{onUse}
 	onEdit={handleEdit}
 	onDownload={handleDownload}

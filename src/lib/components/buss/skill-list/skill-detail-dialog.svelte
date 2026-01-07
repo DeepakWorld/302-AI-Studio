@@ -2,12 +2,13 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
-	import { ChevronLeft, Zap } from "@lucide/svelte";
+	import { ChevronLeft, Loader2, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
 	interface Props {
 		open: boolean;
 		skill: Skill | null;
+		downloading?: boolean;
 		onOpenChange?: (open: boolean) => void;
 		onUse?: (skill: Skill) => void;
 		onEdit?: (skill: Skill) => void;
@@ -17,6 +18,7 @@
 	let {
 		open = $bindable(false),
 		skill = null,
+		downloading = false,
 		onOpenChange,
 		onUse,
 		onEdit,
@@ -94,7 +96,15 @@
 		{#if showFooter}
 			<div class="flex gap-3 border-t px-6 py-4">
 				{#if onDownload}
-					<Button variant="secondary" class="flex-1" onclick={handleDownload}>
+					<Button
+						variant="secondary"
+						class="flex-1"
+						onclick={handleDownload}
+						disabled={downloading}
+					>
+						{#if downloading}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						{/if}
 						{m.skills_download()}
 					</Button>
 				{/if}

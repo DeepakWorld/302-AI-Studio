@@ -3,12 +3,13 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { m } from "$lib/paraglide/messages";
-	import { Ellipsis, Zap } from "@lucide/svelte";
+	import { Ellipsis, Loader2, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
 	interface Props {
 		skill: Skill;
 		isBuiltin: boolean;
+		downloading?: boolean;
 		onSelect?: (skill: Skill) => void;
 		onUse?: (skill: Skill) => void;
 		onEdit?: (skill: Skill) => void;
@@ -16,7 +17,16 @@
 		onDelete?: (skill: Skill) => void;
 	}
 
-	const { skill, isBuiltin, onSelect, onUse, onEdit, onDownload, onDelete }: Props = $props();
+	const {
+		skill,
+		isBuiltin,
+		downloading = false,
+		onSelect,
+		onUse,
+		onEdit,
+		onDownload,
+		onDelete,
+	}: Props = $props();
 
 	// Built-in skills can only edit and download, user skills can also delete
 	const canDelete = $derived(!isBuiltin && !!onDelete);
@@ -92,9 +102,16 @@
 							>
 						{/if}
 						{#if onDownload}
-							<DropdownMenu.Item onclick={() => onDownload(skill)}
-								>{m.skills_download()}</DropdownMenu.Item
+							<DropdownMenu.Item
+								disabled={downloading}
+								onclick={() => onDownload(skill)}
+								class={downloading ? "opacity-50" : ""}
 							>
+								{#if downloading}
+									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								{/if}
+								{m.skills_download()}
+							</DropdownMenu.Item>
 						{/if}
 						{#if canDelete}
 							<DropdownMenu.Item class="text-destructive" onclick={() => onDelete?.(skill)}>

@@ -1047,7 +1047,7 @@
 	"text_button_settings_skills": "Skills",
 	"skills_title": "Skills Management",
 	"skills_search_placeholder": "Search Skills...",
-	"skills_new": "New",
+	"skills_new": "Install",
 	"skills_use": "Use",
 	"skills_download": "Download",
 	"skills_builtin": "Built-in",
@@ -1069,5 +1069,8 @@
 	"skills_create_select_required": "Please select a creation method",
 	"skills_create_coming_soon": "Coming soon...",
 	"skills_load_failed": "Failed to load Skills",
-	"title_skills_management": "Skills Management"
+	"title_skills_management": "Skills Management",
+	"skills_downloading": "Downloading Skill...",
+	"skills_download_success": "Download successful",
+	"skills_download_failed": "Failed to download Skill"
 }
