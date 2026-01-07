@@ -99,6 +99,35 @@ export async function _editSkillDetails(request: SkillDetailsRequest): Promise<B
 	}
 }
 
+export const createSkillResponseSchema = type({
+	success: "boolean",
+	message: "string?",
+});
+export type CreateSkillResponse = typeof createSkillResponseSchema.infer;
+
+export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> {
+	try {
+		const formData = new FormData();
+		formData.append("file", zipFile);
+
+		const response = await testKy
+			.post("api/v1/claude-code/skills", {
+				body: formData,
+			})
+			.json();
+
+		const validated = createSkillResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate create skill response:", validated.summary);
+			throw new Error("Invalid response format from create skill API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to create skill:", error);
+		throw error;
+	}
+}
+
 // export const deleteSkillRequestSchema = type({
 // 	skillNames: "string[]",
 // });

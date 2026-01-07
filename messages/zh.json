@@ -1082,5 +1082,8 @@
 	"skills_form_content_hint": "Skill 文件是 Markdown 格式，定义了 Claude 的专业知识和行为",
 	"skills_form_name_required": "请输入 Skill 名称",
 	"skills_form_desc_required": "请输入描述",
-	"skills_form_content_required": "请输入 Skill 内容"
+	"skills_form_content_required": "请输入 Skill 内容",
+	"skills_creating": "创建中...",
+	"skills_create_success": "Skill 创建成功",
+	"skills_create_failed": "Skill 创建失败"
 }

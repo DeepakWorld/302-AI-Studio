@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { createSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
@@ -26,14 +27,14 @@
 	let { open = $bindable(false), onOpenChange, onCreate }: Props = $props();
 
 	let currentView = $state<"select" | SkillCreateMethod>("select");
+	let isCreating = $state(false);
 
 	// Manual creation form data
-	const defaultContent = `# Skill 标题
-
-描述这个 skill 的功能和使用场景...
-
-## 使用方法
-
+	const defaultContent = `---
+name:
+description:
+license: Complete terms in LICENSE.txt
+---
 `;
 	let manualFormData = $state({
 		name: "",
@@ -109,17 +110,38 @@
 		toast.warning(m.skills_create_select_required());
 	}
 
-	function handleConfirmCreate() {
+	async function handleConfirmCreate() {
 		if (currentView === "manual") {
 			if (!manualFormRef?.validate()) return;
-			onCreate?.(currentView, { ...manualFormData });
+
+			isCreating = true;
+			try {
+				const result = await createSkill({
+					name: manualFormData.name,
+					description: manualFormData.description,
+					content: manualFormData.content,
+				});
+
+				if (result.success) {
+					toast.success(m.skills_create_success());
+					onCreate?.(currentView, { ...manualFormData });
+					handleClose();
+				} else {
+					toast.error(result.message || m.skills_create_failed());
+				}
+			} catch (error) {
+				console.error("Failed to create skill:", error);
+				toast.error(m.skills_create_failed());
+			} finally {
+				isCreating = false;
+			}
 		} else if (currentView === "history") {
 			console.log("跳转");
 		} else {
 			// TODO: Implement other creation methods
 			onCreate?.(currentView as SkillCreateMethod, {});
+			handleClose();
 		}
-		handleClose();
 	}
 </script>
 
@@ -203,11 +225,15 @@
 			{/if}
 
 			<div class="flex gap-3 border-t px-6 py-4">
-				<Button variant="outline" class="flex-1" onclick={handleClose}>
+				<Button variant="outline" class="flex-1" onclick={handleClose} disabled={isCreating}>
 					{m.text_button_cancel()}
 				</Button>
-				<Button class="flex-1 bg-violet-500 hover:bg-violet-600" onclick={handleConfirmCreate}>
-					{m.text_button_confirm()}
+				<Button
+					class="flex-1 bg-violet-500 hover:bg-violet-600"
+					onclick={handleConfirmCreate}
+					disabled={isCreating}
+				>
+					{isCreating ? m.skills_creating() : m.text_button_confirm()}
 				</Button>
 			</div>
 		{/if}

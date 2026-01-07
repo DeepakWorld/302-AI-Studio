@@ -1,5 +1,6 @@
+import JSZip from "jszip";
 import type { ListSkillsRequest, ListSkillsResponse, SkillDetailsRequest } from "./base-apis";
-import { _editSkillDetails, _listSkills } from "./base-apis";
+import { _createSkill, _editSkillDetails, _listSkills } from "./base-apis";
 
 const { extractZipBlob } = window.electronAPI.appService;
 
@@ -28,4 +29,27 @@ export async function listSkills(request: ListSkillsRequest): Promise<ListSkills
 
 	const result = await _listSkills(request);
 	return pipeline(result);
+}
+
+export interface CreateSkillData {
+	name: string;
+	description: string;
+	content: string;
+}
+
+export async function createSkill(data: CreateSkillData) {
+	const { name, content } = data;
+
+	// 创建 zip 文件，文件夹名与 skill 名一致
+	const zip = new JSZip();
+	const folder = zip.folder(name);
+	if (!folder) {
+		throw new Error("Failed to create skill folder in zip");
+	}
+	folder.file("SKILL.md", content);
+
+	const zipBlob = await zip.generateAsync({ type: "blob" });
+	const zipFile = new File([zipBlob], `${name}.zip`, { type: "application/zip" });
+
+	return _createSkill(zipFile);
 }

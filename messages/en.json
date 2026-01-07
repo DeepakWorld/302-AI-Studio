@@ -1085,5 +1085,8 @@
 	"skills_form_content_hint": "Skill files are in Markdown format, defining Claude's expertise and behavior",
 	"skills_form_name_required": "Please enter a Skill name",
 	"skills_form_desc_required": "Please enter a description",
-	"skills_form_content_required": "Please enter Skill content"
+	"skills_form_content_required": "Please enter Skill content",
+	"skills_creating": "Creating...",
+	"skills_create_success": "Skill created successfully",
+	"skills_create_failed": "Failed to create Skill"
 }
