@@ -5,7 +5,6 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 
-	import { editSkillDetails } from "$lib/api/skills";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
@@ -61,6 +60,10 @@
 
 	function handleCodeAgentPanelClose() {
 		codeAgentState.isCodeAgentPanelOpen = false;
+	}
+
+	function handleSkillsPanelToggle() {
+		codeAgentState.isSkillsPanelOpen = !codeAgentState.isSkillsPanelOpen;
 	}
 </script>
 
@@ -191,13 +194,25 @@
 
 {#snippet actionEnableSkills()}
 	<ButtonWithTooltip
-		class="hover:!bg-chat-action-hover"
+		class={cn(
+			"hover:!bg-chat-action-hover",
+			codeAgentState.skills.length > 0 && "!bg-chat-action-active hover:!bg-chat-action-active",
+		)}
 		tooltip={m.title_skills()}
-		onclick={() => editSkillDetails({ skillName: "algorithmic-art", builtin: true })}
-		{disabled}
+		onclick={handleSkillsPanelToggle}
 	>
 		<Zap />
 	</ButtonWithTooltip>
+
+	<Overlay
+		title={m.title_skills_management()}
+		open={codeAgentState.isSkillsPanelOpen}
+		onClose={handleSkillsPanelToggle}
+	>
+		<div class="p-4">
+			<!-- <SkillList {builtinSkills} {userSkills} {loading} /> -->
+		</div>
+	</Overlay>
 {/snippet}
 
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">

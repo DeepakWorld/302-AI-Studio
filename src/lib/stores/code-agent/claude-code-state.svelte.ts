@@ -65,6 +65,7 @@ class ClaudeCodeAgentState {
 	currentSessionId = $derived(persistedClaudeCodeAgentState.current?.currentSessionId ?? "");
 	sandboxId = $derived(persistedClaudeCodeAgentState.current?.sandboxId ?? "");
 	sandboxRemark = $derived(persistedClaudeCodeAgentState.current?.sandboxRemark ?? "");
+	skills = $derived(persistedClaudeCodeAgentState.current?.skills ?? []);
 	agentMode = $derived.by(() => {
 		return this.selectedSessionId === "new" ? "new" : "existing";
 	});

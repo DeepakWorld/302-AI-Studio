@@ -40,6 +40,7 @@ const { updateClaudeCodeSandboxModel } = window.electronAPI.codeAgentService;
 
 class CodeAgentState {
 	isCodeAgentPanelOpen = $state(false);
+	isSkillsPanelOpen = $state(false);
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
 	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
@@ -143,6 +144,12 @@ class CodeAgentState {
 		return match(this.currentAgentId)
 			.with("claude-code", () => claudeCodeAgentState.model)
 			.otherwise(() => "");
+	}
+
+	get skills(): string[] {
+		return match(this.currentAgentId)
+			.with("claude-code", () => claudeCodeAgentState.skills.map((skill) => skill.name))
+			.otherwise(() => []);
 	}
 
 	async handleCodeAgentModelChange(model: Model): Promise<boolean> {
