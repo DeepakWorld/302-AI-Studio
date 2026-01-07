@@ -1049,6 +1049,7 @@
 	"skills_search_placeholder": "Search Skills...",
 	"skills_new": "Install",
 	"skills_use": "Use",
+	"skills_remove": "Disable",
 	"skills_download": "Download",
 	"skills_builtin": "Built-in",
 	"skills_detail_title": "Skills Detail",

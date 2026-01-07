@@ -236,6 +236,9 @@
 				builtinSkills={skillsData.builtin_skills}
 				userSkills={skillsData.user_skills}
 				loading={codeAgentState.isLoadingSkills}
+				usedSkills={codeAgentState.skills}
+				onUse={(skill) => codeAgentState.handleSkillsUse([skill])}
+				onRemove={(skill) => codeAgentState.handleSkillsRemove([skill])}
 			/>
 		</div>
 	</Overlay>

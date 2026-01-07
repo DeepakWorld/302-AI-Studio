@@ -15,21 +15,25 @@
 	interface Props {
 		userSkills: Skill[];
 		builtinSkills: Skill[];
+		usedSkills?: Skill[];
 		title?: string;
 		showSearch?: boolean;
 		loading?: boolean;
 		showNewButton?: boolean;
 		onUse?: (skill: Skill) => void;
+		onRemove?: (skill: Skill) => void;
 	}
 
 	const {
 		userSkills,
 		builtinSkills,
+		usedSkills = [],
 		title,
 		showSearch = true,
 		loading = false,
 		showNewButton = true,
 		onUse,
+		onRemove,
 	}: Props = $props();
 
 	let searchQuery = $state("");
@@ -136,17 +140,18 @@
 			{#each filteredSkills as item (item.name)}
 				<SkillCard
 					skill={item}
-					isBuiltin={item.isBuiltin ?? false}
-					downloading={downloadingSkills.has(item.name)}
+					isBuiltin={!!item.isBuiltin}
+					isUsed={usedSkills.some((s) => s.name === item.name)}
 					onSelect={handleSelectSkill}
 					{onUse}
+					{onRemove}
 					onEdit={handleEdit}
 					onDownload={handleDownload}
 					onDelete={handleDelete}
+					downloading={downloadingSkills.has(item.name)}
 				/>
 			{/each}
 		</div>
-
 		<!-- Empty State -->
 		{#if filteredSkills.length === 0}
 			<div

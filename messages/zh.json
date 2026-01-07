@@ -1046,6 +1046,7 @@
 	"skills_search_placeholder": "搜索 Skills...",
 	"skills_new": "安装",
 	"skills_use": "使用",
+	"skills_remove": "禁用",
 	"skills_download": "下载",
 	"skills_builtin": "内置",
 	"skills_detail_title": "Skills 详情",

@@ -294,8 +294,17 @@ class ClaudeCodeAgentState {
 	}
 
 	handleSkillUse(skills: Skill[]): void {
-		const newSkills = [...this.skills, ...skills];
-		this.updateSkills(newSkills);
+		const currentSkillNames = new Set(this.skills.map((s) => s.name));
+		const uniqueNewSkills = skills.filter((s) => !currentSkillNames.has(s.name));
+		if (uniqueNewSkills.length > 0) {
+			this.updateSkills([...this.skills, ...uniqueNewSkills]);
+		}
+	}
+
+	handleSkillRemove(skills: Skill[]): void {
+		const skillNamesToRemove = new Set(skills.map((s) => s.name));
+		const filteredSkills = this.skills.filter((s) => !skillNamesToRemove.has(s.name));
+		this.updateSkills(filteredSkills);
 	}
 }
 

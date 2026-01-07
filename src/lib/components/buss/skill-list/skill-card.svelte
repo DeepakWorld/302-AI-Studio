@@ -9,9 +9,11 @@
 	interface Props {
 		skill: Skill;
 		isBuiltin: boolean;
+		isUsed?: boolean;
 		downloading?: boolean;
 		onSelect?: (skill: Skill) => void;
 		onUse?: (skill: Skill) => void;
+		onRemove?: (skill: Skill) => void;
 		onEdit?: (skill: Skill) => void;
 		onDownload?: (skill: Skill) => void;
 		onDelete?: (skill: Skill) => void;
@@ -20,9 +22,11 @@
 	const {
 		skill,
 		isBuiltin,
+		isUsed = false,
 		downloading = false,
 		onSelect,
 		onUse,
+		onRemove,
 		onEdit,
 		onDownload,
 		onDelete,
@@ -39,6 +43,11 @@
 	function handleUseClick(e: MouseEvent) {
 		e.stopPropagation();
 		onUse?.(skill);
+	}
+
+	function handleRemoveClick(e: MouseEvent) {
+		e.stopPropagation();
+		onRemove?.(skill);
 	}
 </script>
 
@@ -71,7 +80,13 @@
 
 	<!-- Footer: Use Button + Menu -->
 	<div class="mt-auto flex items-center gap-2">
-		{#if onUse}
+		{#if isUsed}
+			{#if onRemove}
+				<Button variant="destructive" class="flex-1" onclick={handleRemoveClick}>
+					{m.skills_remove()}
+				</Button>
+			{/if}
+		{:else if onUse}
 			<Button
 				variant="default"
 				class="flex-1 bg-violet-500 hover:bg-violet-600"

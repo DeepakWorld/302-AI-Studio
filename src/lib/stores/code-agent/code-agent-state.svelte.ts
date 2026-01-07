@@ -166,9 +166,9 @@ class CodeAgentState {
 			.otherwise(() => "");
 	}
 
-	get skills(): string[] {
+	get skills(): Skill[] {
 		return match(this.currentAgentId)
-			.with("claude-code", () => claudeCodeAgentState.skills.map((skill) => skill.name))
+			.with("claude-code", () => claudeCodeAgentState.skills)
 			.otherwise(() => []);
 	}
 
@@ -205,6 +205,12 @@ class CodeAgentState {
 	handleSkillsUse(skills: Skill[]): void {
 		if (this.currentAgentId === "claude-code") {
 			claudeCodeAgentState.handleSkillUse(skills);
+		}
+	}
+
+	handleSkillsRemove(skills: Skill[]): void {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.handleSkillRemove(skills);
 		}
 	}
 }
