@@ -31,20 +31,35 @@ class ChatParametersService {
 		);
 
 		// Find the last user message index
-		const lastUserMessageIndex = previousMessages.reduceRight((acc, msg, index) => {
-			return acc === -1 && msg.role === "user" ? index : acc;
-		}, -1);
-
-		// If user message is not the last message, truncate to include only messages up to and including the last user message
 		let messagesToTruncate = previousMessages;
-		if (lastUserMessageIndex !== -1 && lastUserMessageIndex < previousMessages.length - 1) {
-			messagesToTruncate = previousMessages.slice(0, lastUserMessageIndex + 1);
-			console.log(
-				"Truncated messages to last user message at index",
-				lastUserMessageIndex,
-				"new length:",
-				messagesToTruncate.length,
-			);
+
+		if (excludeLastUserMessageId) {
+			const targetIndex = previousMessages.findIndex((msg) => msg.id === excludeLastUserMessageId);
+			if (targetIndex !== -1) {
+				// If target message exists in storage (e.g. regeneration), truncate everything after it
+				messagesToTruncate = previousMessages.slice(0, targetIndex + 1);
+				console.log(
+					"Truncated messages to target user message at index",
+					targetIndex,
+					"new length:",
+					messagesToTruncate.length,
+				);
+			}
+		} else {
+			const lastUserMessageIndex = previousMessages.reduceRight((acc, msg, index) => {
+				return acc === -1 && msg.role === "user" ? index : acc;
+			}, -1);
+
+			// If user message is not the last message, truncate to include only messages up to and including the last user message
+			if (lastUserMessageIndex !== -1 && lastUserMessageIndex < previousMessages.length - 1) {
+				messagesToTruncate = previousMessages.slice(0, lastUserMessageIndex + 1);
+				console.log(
+					"Truncated messages to last user message at index",
+					lastUserMessageIndex,
+					"new length:",
+					messagesToTruncate.length,
+				);
+			}
 		}
 
 		// Filter out the message to exclude (for regenerate case) before processing
