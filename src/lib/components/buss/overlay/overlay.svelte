@@ -8,9 +8,10 @@
 		onClose: () => void;
 		title: string;
 		children: Snippet;
+		class?: string;
 	}
 
-	let { open, onClose, title, children }: Props = $props();
+	let { open, onClose, title, children, class: className }: Props = $props();
 	let isClosing = $state(false);
 	let shouldRender = $state(false);
 
@@ -101,6 +102,7 @@
 			class={cn(
 				"relative w-fit max-w-[calc(100vw-2rem)] rounded-lg border bg-overlay p-4 shadow-lg duration-200",
 				!isClosing ? "animate-in fade-in-0 zoom-in-95" : "animate-out fade-out-0 zoom-out-95",
+				className,
 			)}
 			onmousedown={(e) => e.stopPropagation()}
 			onkeydown={handleDialogKeydown}

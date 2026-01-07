@@ -1,3 +1,4 @@
+import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 import { emitter, EventNames } from "$lib/event/emitter";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
@@ -38,9 +39,27 @@ export const persistedCodeAgentConfigState = new PersistedState<CodeAgentConfigM
 
 const { updateClaudeCodeSandboxModel } = window.electronAPI.codeAgentService;
 
+/**
+ * Functional utility to wrap an async operation with a loading state.
+ * @param setLoading A setter function to update the loading state.
+ * @param fn The async operation to perform.
+ */
+async function withLoadingState<T>(
+	setLoading: (loading: boolean) => void,
+	fn: () => Promise<T> | T,
+): Promise<T> {
+	setLoading(true);
+	try {
+		return await fn();
+	} finally {
+		setLoading(false);
+	}
+}
+
 class CodeAgentState {
 	isCodeAgentPanelOpen = $state(false);
 	isSkillsPanelOpen = $state(false);
+	isLoadingSkills = $state(false);
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
 	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
@@ -152,6 +171,21 @@ class CodeAgentState {
 			.otherwise(() => []);
 	}
 
+	async getSkillList(isInit: boolean): Promise<ListSkillsResponse> {
+		return withLoadingState(
+			(loading) => (this.isLoadingSkills = loading),
+			() =>
+				match(this.currentAgentId)
+					.with("claude-code", () => claudeCodeAgentState.listClaudeCodeSkills(isInit))
+					.otherwise(() => ({
+						success: false,
+						user_skills: [],
+						builtin_skills: [],
+						project_skills: [],
+					})),
+		);
+	}
+
 	async handleCodeAgentModelChange(model: Model): Promise<boolean> {
 		if (this.currentAgentId === "claude-code") {
 			const { isOK } = await updateClaudeCodeSandboxModel(threadId, this.sandboxId, model.id);
@@ -164,6 +198,12 @@ class CodeAgentState {
 	updateSandboxModel(model: string): void {
 		if (this.currentAgentId === "claude-code") {
 			claudeCodeAgentState.updateSandboxModel(model);
+		}
+	}
+
+	handleSkillsUse(skillNames: string[]): void {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.handleSkillUse(skillNames);
 		}
 	}
 }

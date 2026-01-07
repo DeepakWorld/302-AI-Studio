@@ -30,5 +30,5 @@
 </script>
 
 <div class="pb-settings-layout-pb">
-	<SkillList {builtinSkills} {userSkills} {loading} />
+	<SkillList title={m.skills_title()} {builtinSkills} {userSkills} {loading} />
 </div>

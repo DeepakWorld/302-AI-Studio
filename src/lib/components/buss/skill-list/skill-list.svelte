@@ -30,7 +30,7 @@
 	const {
 		userSkills,
 		builtinSkills,
-		title = m.skills_title(),
+		title,
 		showSearch = true,
 		loading = false,
 		showNewButton = true,
@@ -107,7 +107,9 @@
 <div class="flex flex-col gap-6">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
-		<h1 class="text-lg font-medium text-[#333333] dark:text-[#E6E6E6]">{title}</h1>
+		{#if title}
+			<h1 class="text-lg font-medium text-[#333333] dark:text-[#E6E6E6]">{title}</h1>
+		{/if}
 	</div>
 
 	<!-- Search and New Button -->

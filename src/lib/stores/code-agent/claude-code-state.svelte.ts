@@ -1,9 +1,10 @@
 import { deploySandboxProject, type DeploySandboxResponse } from "$lib/api/sandbox-deploy";
 import { _updateSessionNote } from "$lib/api/sandbox-session";
+import { listSkills, type ListSkillsResponse } from "$lib/api/skills/base-apis";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import type { ChatMessage } from "$lib/types/chat";
-import { type CodeAgentMetadata } from "@shared/storage/code-agent";
+import { type CodeAgentMetadata, type Skill } from "@shared/storage/code-agent";
 import { toast } from "svelte-sonner";
 import { agentPreviewState } from "../agent-preview-state.svelte";
 
@@ -56,9 +57,9 @@ class ClaudeCodeAgentState {
 
 	customSandboxName = $state("");
 
-	selectedSessionId = $state("new");
+	selectedSessionId = $state<"new" | string>("new");
 	selectedSessionRemark = $state("");
-	selectedSandboxId = $state("auto");
+	selectedSandboxId = $state<"auto" | string>("auto");
 	selectedSandboxRemark = $state("");
 
 	model = $derived(persistedClaudeCodeAgentState.current?.model ?? "");
@@ -198,6 +199,10 @@ class ClaudeCodeAgentState {
 		this.updateState({ model });
 	}
 
+	updateSkills(skills: Skill[]): void {
+		this.updateState({ skills });
+	}
+
 	async handleAgentModeExecute(): Promise<{
 		isOK: boolean;
 		sandboxInfo?: ClaudeCodeSandboxInfo;
@@ -261,6 +266,35 @@ class ClaudeCodeAgentState {
 		this.selectedSandboxId = sandboxId;
 		toast.success(m.success_create_sandbox());
 		return true;
+	}
+
+	async listClaudeCodeSkills(isInit: boolean): Promise<ListSkillsResponse> {
+		const [selectedSandboxId, selectedSessionId] = [this.selectedSandboxId, this.selectedSessionId];
+		const isListExistsSessionSkills = selectedSandboxId !== "auto" && selectedSessionId !== "new";
+
+		const listSkillsResponse = await listSkills(
+			isListExistsSessionSkills
+				? {
+						sandboxId: selectedSandboxId,
+						sessionId: selectedSessionId,
+					}
+				: {},
+		);
+
+		if (isInit) {
+			const skillsPineline = (skills: ListSkillsResponse) => {
+				const { user_skills, builtin_skills } = skills;
+				return [...user_skills, ...builtin_skills];
+			};
+			this.updateSkills(skillsPineline(listSkillsResponse));
+		}
+
+		return listSkillsResponse;
+	}
+
+	handleSkillUse(skillNames: string[]): void {
+		// TODO: Implement skill usage logic
+		console.log("Using skills:", skillNames);
 	}
 }
 

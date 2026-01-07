@@ -5,7 +5,9 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 
+	import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
+	import { SkillList } from "$lib/components/buss/skill-list";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
@@ -26,6 +28,10 @@
 
 	let isMCPSelectorOpen = $state(false);
 	let addingMCP = $state(false);
+	let skillsData = $state<Omit<ListSkillsResponse, "success" | "project_skills">>({
+		builtin_skills: [],
+		user_skills: [],
+	});
 
 	function handleParametersClose() {
 		chatState.isParametersOpen = false;
@@ -65,6 +71,14 @@
 	function handleSkillsPanelToggle() {
 		codeAgentState.isSkillsPanelOpen = !codeAgentState.isSkillsPanelOpen;
 	}
+
+	$effect(() => {
+		if (codeAgentState.isSkillsPanelOpen) {
+			codeAgentState.getSkillList(false).then((data) => {
+				skillsData = data;
+			});
+		}
+	});
 </script>
 
 {#snippet actionEnableThinking()}
@@ -196,21 +210,33 @@
 	<ButtonWithTooltip
 		class={cn(
 			"hover:!bg-chat-action-hover",
-			codeAgentState.skills.length > 0 && "!bg-chat-action-active hover:!bg-chat-action-active",
+			codeAgentState.skills.length > 0 &&
+				!codeAgentState.isLoadingSkills &&
+				"!bg-chat-action-active hover:!bg-chat-action-active",
 		)}
 		tooltip={m.title_skills()}
 		onclick={handleSkillsPanelToggle}
+		disabled={codeAgentState.isLoadingSkills}
 	>
-		<Zap />
+		{#if codeAgentState.isLoadingSkills}
+			<LdrsLoader type="line-spinner" size={16} />
+		{:else}
+			<Zap class={cn(codeAgentState.skills.length > 0 && "!text-chat-action-active-fg")} />
+		{/if}
 	</ButtonWithTooltip>
 
 	<Overlay
 		title={m.title_skills_management()}
 		open={codeAgentState.isSkillsPanelOpen}
 		onClose={handleSkillsPanelToggle}
+		class="h-[70vh] w-[80vw] flex flex-col"
 	>
-		<div class="p-4">
-			<!-- <SkillList {builtinSkills} {userSkills} {loading} /> -->
+		<div class="flex-1 overflow-y-auto min-h-0">
+			<SkillList
+				builtinSkills={skillsData.builtin_skills}
+				userSkills={skillsData.user_skills}
+				loading={codeAgentState.isLoadingSkills}
+			/>
 		</div>
 	</Overlay>
 {/snippet}
