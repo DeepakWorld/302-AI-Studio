@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { downloadSkill } from "$lib/api/skills/base-apis";
+	import { downloadSkill } from "$lib/api/skills";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import Input from "$lib/components/ui/input/input.svelte";
@@ -11,11 +11,6 @@
 	import SkillCard from "./skill-card.svelte";
 	import SkillCreateDialog from "./skill-create-dialog.svelte";
 	import SkillDetailDialog from "./skill-detail-dialog.svelte";
-
-	interface SkillWithSource {
-		skill: Skill;
-		isBuiltin: boolean;
-	}
 
 	interface Props {
 		userSkills: Skill[];
@@ -44,16 +39,13 @@
 	let downloadingSkills = new SvelteSet<string>();
 
 	// Combine skills with source flag
-	const allSkills = $derived<SkillWithSource[]>([
-		...builtinSkills.map((skill) => ({ skill, isBuiltin: true })),
-		...userSkills.map((skill) => ({ skill, isBuiltin: false })),
-	]);
+	const allSkills = $derived<Skill[]>([...builtinSkills, ...userSkills]);
 
 	const filteredSkills = $derived(
 		allSkills.filter(
 			(item) =>
-				item.skill.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				item.skill.description.toLowerCase().includes(searchQuery.toLowerCase()),
+				item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				item.description.toLowerCase().includes(searchQuery.toLowerCase()),
 		),
 	);
 
@@ -78,8 +70,7 @@
 
 		const toastId = toast.loading(m.skills_downloading());
 		try {
-			const isBuiltin = allSkills.find((s) => s.skill.name === skill.name)?.isBuiltin ?? false;
-			const blob = await downloadSkill(skill.name, isBuiltin);
+			const blob = await downloadSkill(skill.name, skill.isBuiltin);
 
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement("a");
@@ -142,11 +133,11 @@
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			{#each filteredSkills as item (item.skill.name)}
+			{#each filteredSkills as item (item.name)}
 				<SkillCard
-					skill={item.skill}
-					isBuiltin={item.isBuiltin}
-					downloading={downloadingSkills.has(item.skill.name)}
+					skill={item}
+					isBuiltin={item.isBuiltin ?? false}
+					downloading={downloadingSkills.has(item.name)}
 					onSelect={handleSelectSkill}
 					{onUse}
 					onEdit={handleEdit}

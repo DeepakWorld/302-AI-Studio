@@ -16,7 +16,7 @@ export const listSkillsResponseSchema = type({
 });
 export type ListSkillsResponse = typeof listSkillsResponseSchema.infer;
 
-export async function listSkills(request: ListSkillsRequest): Promise<ListSkillsResponse> {
+export async function _listSkills(request: ListSkillsRequest): Promise<ListSkillsResponse> {
 	const { sandboxId, sessionId, projectPath } = request;
 	try {
 		const response = await testKy
@@ -131,7 +131,3 @@ export async function _editSkillDetails(request: SkillDetailsRequest): Promise<B
 // 		throw error;
 // 	}
 // }
-
-export async function downloadSkill(skillName: string, builtin: boolean = false): Promise<Blob> {
-	return _editSkillDetails({ skillName, builtin });
-}

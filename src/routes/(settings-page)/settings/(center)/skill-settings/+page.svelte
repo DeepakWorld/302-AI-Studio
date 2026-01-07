@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { listSkills } from "$lib/api/skills/base-apis";
+	import { listSkills } from "$lib/api/skills";
 	import { SkillList } from "$lib/components/buss/skill-list";
 	import { m } from "$lib/paraglide/messages";
 	import type { Skill } from "@shared/types";
@@ -13,9 +13,8 @@
 	async function loadSkills() {
 		loading = true;
 		try {
-			const response = await listSkills({});
-			builtinSkills = response.builtin_skills;
-			userSkills = [...response.user_skills, ...response.project_skills];
+			const { builtin_skills, user_skills } = await listSkills({});
+			[builtinSkills, userSkills] = [builtin_skills, user_skills];
 		} catch (e) {
 			console.error("Failed to load skills:", e);
 			toast.error(m.skills_load_failed());

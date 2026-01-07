@@ -1,6 +1,7 @@
 import { deploySandboxProject, type DeploySandboxResponse } from "$lib/api/sandbox-deploy";
 import { _updateSessionNote } from "$lib/api/sandbox-session";
-import { listSkills, type ListSkillsResponse } from "$lib/api/skills/base-apis";
+import { listSkills } from "$lib/api/skills";
+import { type ListSkillsResponse } from "$lib/api/skills/base-apis";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import type { ChatMessage } from "$lib/types/chat";
@@ -292,9 +293,9 @@ class ClaudeCodeAgentState {
 		return listSkillsResponse;
 	}
 
-	handleSkillUse(skillNames: string[]): void {
-		// TODO: Implement skill usage logic
-		console.log("Using skills:", skillNames);
+	handleSkillUse(skills: Skill[]): void {
+		const newSkills = [...this.skills, ...skills];
+		this.updateSkills(newSkills);
 	}
 }
 

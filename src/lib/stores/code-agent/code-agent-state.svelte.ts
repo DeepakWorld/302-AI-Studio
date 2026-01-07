@@ -9,6 +9,7 @@ import {
 	type CodeAgentCfgs,
 	type CodeAgentSandboxStatus,
 	type CodeAgentType,
+	type Skill,
 } from "@shared/storage/code-agent";
 import { match } from "ts-pattern";
 import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-state.svelte";
@@ -201,9 +202,9 @@ class CodeAgentState {
 		}
 	}
 
-	handleSkillsUse(skillNames: string[]): void {
+	handleSkillsUse(skills: Skill[]): void {
 		if (this.currentAgentId === "claude-code") {
-			claudeCodeAgentState.handleSkillUse(skillNames);
+			claudeCodeAgentState.handleSkillUse(skills);
 		}
 	}
 }
