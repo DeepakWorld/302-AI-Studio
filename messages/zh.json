@@ -1067,6 +1067,8 @@
 	"skills_history_select_title": "选择历史对话，AI 将分析并生成可复用的 Skill",
 	"skills_history_conversation_count": "{count} 轮对话",
 	"skills_history_select_required": "请选择一个历史对话",
+	"skills_history_thread_not_found": "未找到对应的会话记录",
+	"skills_history_navigate_failed": "跳转失败",
 	"skills_create_select_required": "请选择创建方式",
 	"skills_create_coming_soon": "即将推出...",
 	"skills_load_failed": "获取 Skills 列表失败",

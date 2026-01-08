@@ -1070,6 +1070,8 @@
 	"skills_history_select_title": "Select a conversation, AI will analyze and generate a reusable Skill",
 	"skills_history_conversation_count": "{count} turns",
 	"skills_history_select_required": "Please select a conversation",
+	"skills_history_thread_not_found": "No corresponding conversation found",
+	"skills_history_navigate_failed": "Navigation failed",
 	"skills_create_select_required": "Please select a creation method",
 	"skills_create_coming_soon": "Coming soon...",
 	"skills_load_failed": "Failed to load Skills",

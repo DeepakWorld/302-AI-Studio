@@ -136,7 +136,47 @@ license: Complete terms in LICENSE.txt
 				isCreating = false;
 			}
 		} else if (currentView === "history") {
-			console.log("跳转");
+			if (!historyFormRef?.validate()) return;
+
+			const selected = historyFormRef.getSelectedConversation();
+			if (!selected) return;
+
+			isCreating = true;
+			try {
+				const { sandboxId, sessionId } = selected;
+
+				// 1. 根据 sessionId 查找 threadId
+				const { isOK, threadId } = await window.electronAPI.codeAgentService.getThreadIdBySessionId(
+					sandboxId,
+					sessionId,
+				);
+
+				if (!isOK || !threadId) {
+					toast.error(m.skills_history_thread_not_found());
+					return;
+				}
+
+				// 2. 获取当前窗口 ID（如果是在 chat page 中使用，用于决定在哪个窗口创建新 tab）
+				// window.windowId 在 shell view 中可用
+				const currentWindowId = window.windowId || undefined;
+
+				// 3. 导航到 thread（自动处理所有场景：激活已存在的 tab 或创建新 tab）
+				const result = await window.electronAPI.windowService.navigateToThread(
+					threadId,
+					currentWindowId,
+				);
+
+				if (result.success) {
+					handleClose();
+				} else {
+					toast.error(m.skills_history_navigate_failed());
+				}
+			} catch (error) {
+				console.error("Failed to navigate to history thread:", error);
+				toast.error(m.skills_history_navigate_failed());
+			} finally {
+				isCreating = false;
+			}
 		} else {
 			// TODO: Implement other creation methods
 			onCreate?.(currentView as SkillCreateMethod, {});

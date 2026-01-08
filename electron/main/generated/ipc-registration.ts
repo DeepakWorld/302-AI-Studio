@@ -186,6 +186,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos) =>
 		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos),
 	);
+	ipcMain.handle("codeAgentService:getThreadIdBySessionId", (event, sandboxId, sessionId) =>
+		codeAgentService.getThreadIdBySessionId(event, sandboxId, sessionId),
+	);
 
 	// ghostWindowService service registration
 	ipcMain.handle("ghostWindowService:startTracking", (event) =>
@@ -215,6 +218,9 @@ export function registerIpcHandlers() {
 		"windowService:handleMoveTabIntoExistingWindow",
 		(event, triggerTabId, windowId, insertIndex) =>
 			windowService.handleMoveTabIntoExistingWindow(event, triggerTabId, windowId, insertIndex),
+	);
+	ipcMain.handle("windowService:navigateToThread", (event, threadId, sourceWindowId) =>
+		windowService.navigateToThread(event, threadId, sourceWindowId),
 	);
 
 	// shortcutService service registration
@@ -478,6 +484,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSession");
 	ipcMain.removeHandler("codeAgentService:findClaudeCodeSandboxWithValidDisk");
 	ipcMain.removeHandler("codeAgentService:addClaudeCodeSandboxMCP");
+	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
 	ipcMain.removeHandler("ghostWindowService:startTracking");
 	ipcMain.removeHandler("ghostWindowService:stopTracking");
 	ipcMain.removeHandler("ghostWindowService:updateInsertIndex");
@@ -486,6 +493,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("windowService:handleDropAtPointer");
 	ipcMain.removeHandler("windowService:handleSplitShellWindow");
 	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
+	ipcMain.removeHandler("windowService:navigateToThread");
 	ipcMain.removeHandler("shortcutService:init");
 	ipcMain.removeHandler("shortcutService:updateShortcuts");
 	ipcMain.removeHandler("shortcutService:getConflicts");

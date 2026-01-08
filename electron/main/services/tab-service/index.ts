@@ -511,6 +511,61 @@ export class TabService {
 		view.webContents.focus();
 	}
 
+	/**
+	 * Create a tab for an existing thread (internal method for window-service)
+	 * @returns Tab ID if successful, null otherwise
+	 */
+	async createTabForExistingThread(
+		targetWindow: BrowserWindow,
+		threadId: string,
+		title: string = "Chat",
+		type: TabType = "chat",
+		active: boolean = true,
+	): Promise<{ tabId: string | null }> {
+		const windowId = targetWindow.id.toString();
+
+		const { getHref } = getTabConfig(type);
+		const newTabId = nanoid();
+		const newTab: Tab = {
+			id: newTabId,
+			title,
+			href: getHref(newTabId),
+			type,
+			active,
+			threadId,
+		};
+
+		const view = await this.newWebContentsView(targetWindow.id, newTab);
+		this.attachViewToWindow(targetWindow, view);
+		this.switchActiveTab(targetWindow, newTab.id);
+
+		this.tabMap.set(newTab.id, newTab);
+
+		const windowViews = this.windowTabView.get(targetWindow.id) || [];
+		if (!windowViews.includes(view)) {
+			windowViews.push(view);
+			this.windowTabView.set(targetWindow.id, windowViews);
+		}
+
+		this.scheduleWindowResize(targetWindow);
+
+		// Add new tab to storage
+		const finalTabState = await tabStorage.getItemInternal("tab-bar-state");
+		if (!isNull(finalTabState)) {
+			const currentTabs = finalTabState[windowId]?.tabs || [];
+			const updatedTabs = active
+				? [...currentTabs.map((t) => ({ ...t, active: false })), newTab]
+				: [...currentTabs, newTab];
+			finalTabState[windowId] = { tabs: updatedTabs };
+			await tabStorage.setItemInternal("tab-bar-state", finalTabState);
+			console.log(
+				`[TabService] Created tab ${newTabId} for thread ${threadId} in window ${windowId}`,
+			);
+		}
+
+		return { tabId: newTabId };
+	}
+
 	// ******************************* IPC Methods ******************************* //
 	async handleNewTabWithThread(
 		event: IpcMainInvokeEvent,

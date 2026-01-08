@@ -399,6 +399,29 @@ export class CodeAgentService {
 			return { isOK: false };
 		}
 	}
+
+	async getThreadIdBySessionId(
+		_event: IpcMainInvokeEvent,
+		sandboxId: string,
+		sessionId: string,
+	): Promise<{ isOK: boolean; threadId: string }> {
+		try {
+			const keys = await claudeCodeStorage.getKeysInternal();
+			for (const key of keys) {
+				if (key.startsWith("claude-code-agent-state-")) {
+					const threadId = key.replace("claude-code-agent-state-", "").replace(".json", "");
+					const state = await claudeCodeStorage.getItemInternal(key);
+					if (state && state.sandboxId === sandboxId && state.currentSessionId === sessionId) {
+						return { isOK: true, threadId };
+					}
+				}
+			}
+			return { isOK: false, threadId: "" };
+		} catch (error) {
+			console.error("Error finding thread by session:", error);
+			return { isOK: false, threadId: "" };
+		}
+	}
 }
 
 export const codeAgentService = new CodeAgentService();
