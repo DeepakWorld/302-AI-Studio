@@ -2,6 +2,7 @@ import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 import { emitter, EventNames } from "$lib/event/emitter";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
+import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 import type { ChatMessage } from "$lib/types/chat";
 import type { Model } from "@302ai/studio-plugin-sdk";
 import {
@@ -12,7 +13,9 @@ import {
 	type Skill,
 } from "@shared/storage/code-agent";
 import { match } from "ts-pattern";
+import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-state.svelte";
+import { withLoadingState } from "./utils";
 
 const tab = window.tab ?? null;
 
@@ -40,27 +43,12 @@ export const persistedCodeAgentConfigState = new PersistedState<CodeAgentConfigM
 
 const { updateClaudeCodeSandboxModel } = window.electronAPI.codeAgentService;
 
-/**
- * Functional utility to wrap an async operation with a loading state.
- * @param setLoading A setter function to update the loading state.
- * @param fn The async operation to perform.
- */
-async function withLoadingState<T>(
-	setLoading: (loading: boolean) => void,
-	fn: () => Promise<T> | T,
-): Promise<T> {
-	setLoading(true);
-	try {
-		return await fn();
-	} finally {
-		setLoading(false);
-	}
-}
-
 class CodeAgentState {
 	isCodeAgentPanelOpen = $state(false);
 	isSkillsPanelOpen = $state(false);
 	isLoadingSkills = $state(false);
+	isUpdatingSandboxRemark = $state(false);
+	isUpdatingSessionRemark = $state(false);
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
 	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
@@ -212,6 +200,39 @@ class CodeAgentState {
 		if (this.currentAgentId === "claude-code") {
 			claudeCodeAgentState.handleSkillRemove(skills);
 		}
+	}
+
+	async updateSandboxRemark(remark: string): Promise<boolean> {
+		return withLoadingState(
+			(loading) => (this.isUpdatingSandboxRemark = loading),
+			() =>
+				match(this.currentAgentId)
+					.with("claude-code", () =>
+						claudeCodeSandboxState.updateSandboxRemark(claudeCodeAgentState.sandboxId, remark),
+					)
+					.otherwise(() => false),
+		);
+	}
+
+	async updateSessionRemark(remark: string): Promise<boolean> {
+		return withLoadingState(
+			(loading) => (this.isUpdatingSessionRemark = loading),
+			async () => {
+				const isOK = await match(this.currentAgentId)
+					.with("claude-code", () => claudeCodeAgentState.updateSessionRemark(remark))
+					.otherwise(() => false);
+
+				if (isOK) {
+					chatState.title = remark;
+					await tabBarState.updateTabTitle(chatState.id, remark);
+					await window.electronAPI.broadcastService.broadcastToAll("thread-list-updated", {
+						threadId: chatState.id,
+					});
+				}
+
+				return isOK;
+			},
+		);
 	}
 }
 

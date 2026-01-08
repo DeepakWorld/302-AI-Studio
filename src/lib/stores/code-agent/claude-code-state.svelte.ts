@@ -166,15 +166,25 @@ class ClaudeCodeAgentState {
 	}
 
 	async handleThreadTitleUpdated({ title }: { title: string }) {
+		await this.updateSessionRemark(title);
+	}
+
+	async updateSessionRemark(remark: string): Promise<boolean> {
 		const { success } = await _updateSessionNote({
-			note: title,
+			note: remark,
 			sandbox_id: this.sandboxId,
 			session_id: this.currentSessionId,
 		});
 
-		if (!success) toast.error(m.error_update_session_note());
+		if (!success) {
+			toast.error(m.error_update_session_note());
+			return false;
+		} else {
+			toast.success(m.update_remark_success());
+		}
 
 		await updateClaudeCodeSandboxesByIpc();
+		return true;
 	}
 
 	private updateState(partial: Partial<CodeAgentMetadata>): void {

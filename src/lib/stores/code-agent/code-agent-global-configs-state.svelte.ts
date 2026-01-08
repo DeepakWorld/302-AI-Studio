@@ -17,7 +17,7 @@ export const persistedCodeAgentGlobalConfigsState = new PersistedState<CodeAgent
 
 class CodeAgentGlobalConfigsState {
 	apiKey = $derived(persistedCodeAgentGlobalConfigsState.current?.apiKey ?? "");
-	autoDeploy = $derived(persistedCodeAgentGlobalConfigsState.current.autoDeploy);
+	autoDeploy = $derived(persistedCodeAgentGlobalConfigsState.current?.autoDeploy ?? true);
 
 	constructor() {
 		$effect.root(() => {
