@@ -171,7 +171,7 @@
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-			{#each filteredSkills as item (item.name)}
+			{#each filteredSkills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
 				<SkillCard
 					skill={item}
 					isBuiltin={!!item.isBuiltin}

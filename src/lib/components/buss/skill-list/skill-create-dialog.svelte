@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createSkill } from "$lib/api/skills";
+	import { createSkill, updateSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
@@ -8,6 +8,7 @@
 	import { toast } from "svelte-sonner";
 	import SkillHistoryForm from "./skill-history-form.svelte";
 	import SkillManualForm from "./skill-manual-form.svelte";
+	import SkillUploadForm from "./skill-upload-form.svelte";
 
 	export type SkillCreateMethod = "manual" | "upload" | "github" | "history";
 
@@ -33,7 +34,6 @@
 	const defaultContent = `---
 name:
 description:
-license: Complete terms in LICENSE.txt
 ---
 `;
 	let manualFormData = $state({
@@ -44,6 +44,7 @@ license: Complete terms in LICENSE.txt
 
 	let manualFormRef = $state<SkillManualForm | undefined>();
 	let historyFormRef = $state<SkillHistoryForm | undefined>();
+	let uploadFormRef = $state<SkillUploadForm | undefined>();
 
 	const createOptions: CreateOption[] = [
 		{
@@ -81,6 +82,7 @@ license: Complete terms in LICENSE.txt
 			description: "",
 			content: defaultContent,
 		};
+		uploadFormRef?.reset();
 	}
 
 	function handleClose() {
@@ -103,6 +105,7 @@ license: Complete terms in LICENSE.txt
 	}
 
 	function handleBack() {
+		uploadFormRef?.reset();
 		currentView = "select";
 	}
 
@@ -131,6 +134,35 @@ license: Complete terms in LICENSE.txt
 				}
 			} catch (error) {
 				console.error("Failed to create skill:", error);
+				toast.error(m.skills_create_failed());
+			} finally {
+				isCreating = false;
+			}
+		} else if (currentView === "upload") {
+			if (!uploadFormRef?.validate()) return;
+
+			const { skillRootDir, formData } = uploadFormRef.getSkillData();
+
+			isCreating = true;
+			try {
+				// Write changed files to temp directory
+				await uploadFormRef.writeChangedFiles();
+
+				// Zip and upload
+				const result = await updateSkill({
+					name: formData.name,
+					dirPath: skillRootDir,
+				});
+
+				if (result.success) {
+					toast.success(m.skills_create_success());
+					onCreate?.(currentView, formData);
+					handleClose();
+				} else {
+					toast.error(result.message || m.skills_create_failed());
+				}
+			} catch (error) {
+				console.error("Failed to create skill from upload:", error);
 				toast.error(m.skills_create_failed());
 			} finally {
 				isCreating = false;
@@ -247,6 +279,9 @@ license: Complete terms in LICENSE.txt
 			{#if currentView === "manual"}
 				<!-- Manual Creation Form -->
 				<SkillManualForm bind:formData={manualFormData} bind:this={manualFormRef} />
+			{:else if currentView === "upload"}
+				<!-- Upload ZIP Form -->
+				<SkillUploadForm bind:this={uploadFormRef} />
 			{:else if currentView === "history"}
 				<!-- History Selection Form -->
 				<SkillHistoryForm bind:this={historyFormRef} />
