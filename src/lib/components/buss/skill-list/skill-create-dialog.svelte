@@ -132,18 +132,40 @@ description:
 
 			isCreating = true;
 			try {
-				const result = await createSkill({
-					name: manualFormData.name,
-					description: manualFormData.description,
-					content: manualFormData.content,
-				});
+				// 检查是否使用了文件树视图（有临时目录）
+				const manualRootPath = manualFormRef?.getManualRootPath?.();
 
-				if (result.success) {
-					toast.success(m.skills_create_success());
-					onCreate?.(currentView, { ...manualFormData });
-					handleClose();
+				if (manualRootPath) {
+					// 使用文件树视图，需要写入修改的文件并打包整个目录
+					await manualFormRef?.writeChangedFiles?.();
+
+					const result = await updateSkill({
+						name: manualFormData.name,
+						dirPath: manualRootPath,
+					});
+
+					if (result.success) {
+						toast.success(m.skills_create_success());
+						onCreate?.(currentView, { ...manualFormData });
+						handleClose();
+					} else {
+						toast.error(result.error?.message || result.message || m.skills_create_failed());
+					}
 				} else {
-					toast.error(result.error?.message || result.message || m.skills_create_failed());
+					// 默认视图，只创建 SKILL.md
+					const result = await createSkill({
+						name: manualFormData.name,
+						description: manualFormData.description,
+						content: manualFormData.content,
+					});
+
+					if (result.success) {
+						toast.success(m.skills_create_success());
+						onCreate?.(currentView, { ...manualFormData });
+						handleClose();
+					} else {
+						toast.error(result.error?.message || result.message || m.skills_create_failed());
+					}
 				}
 			} catch (error) {
 				console.error("Failed to create skill:", error);

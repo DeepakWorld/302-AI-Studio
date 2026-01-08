@@ -1108,5 +1108,17 @@
 	"skills_github_url_placeholder": "https://github.com/username/repo",
 	"skills_github_url_desc": "Repository should contain .md skill files",
 	"skills_github_url_required": "Please enter GitHub repository URL",
-	"create_skill_prompt": "Please refer to the user's current historical chat records and create a new SKILL according to the process provided by skill-creator. In addition, be sure to follow the following additional rules: 1. The created SKILL must be located in the ./.claude/skills directory in the current working directory, not anywhere else."
+	"create_skill_prompt": "Please refer to the user's current historical chat records and create a new SKILL according to the process provided by skill-creator. In addition, be sure to follow the following additional rules: 1. The created SKILL must be located in the ./.claude/skills directory in the current working directory, not anywhere else.",
+	"file_tree_new_file": "New File",
+	"file_tree_new_folder": "New Folder",
+	"file_tree_rename": "Rename",
+	"file_tree_delete": "Delete",
+	"file_tree_confirm_delete": "Are you sure you want to delete?",
+	"file_tree_confirm_delete_folder": "Are you sure you want to delete this folder and all its contents?",
+	"file_tree_new_file_title": "New File",
+	"file_tree_new_folder_title": "New Folder",
+	"file_tree_rename_title": "Rename",
+	"file_tree_name_placeholder": "Enter name",
+	"file_tree_name_required": "Name is required",
+	"file_tree_name_invalid": "Name contains invalid characters"
 }

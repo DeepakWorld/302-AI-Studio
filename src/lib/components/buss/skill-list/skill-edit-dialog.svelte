@@ -174,15 +174,15 @@
 			});
 
 			if (result.success) {
-				toast.success(m.skills_create_failed() || "Skill saved successfully");
+				toast.success(m.skills_create_success?.() || "Skill saved successfully");
 				onSave?.(skill, { ...formData });
 				handleClose();
 			} else {
-				toast.error(result.message || m.skills_create_failed() || "Failed to save skill");
+				toast.error(result.message || m.skills_load_failed?.() || "Failed to save skill");
 			}
 		} catch (error) {
 			console.error("Failed to save skill:", error);
-			toast.error(m.skills_create_failed() || "Failed to save skill");
+			toast.error(m.skills_load_failed?.() || "Failed to save skill");
 		} finally {
 			isSaving = false;
 		}

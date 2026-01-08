@@ -7,7 +7,7 @@ import {
 	type IpcMainInvokeEvent,
 } from "electron";
 import extract from "extract-zip";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "fs/promises";
 import { join } from "path";
 import { CONFIG, isMac, UNSUPPORTED_INJECTING_THEME } from "../../constants";
 import { getCustomUserAgentFragment } from "../../utils/user-agent";
@@ -350,6 +350,54 @@ export class AppService {
 			await writeFile(filePath, content, "utf-8");
 		} catch (error) {
 			console.error("Failed to write file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Create a directory
+	 */
+	async createDirectory(_event: IpcMainInvokeEvent, dirPath: string): Promise<void> {
+		try {
+			await mkdir(dirPath, { recursive: true });
+		} catch (error) {
+			console.error("Failed to create directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a file
+	 */
+	async deleteFile(_event: IpcMainInvokeEvent, filePath: string): Promise<void> {
+		try {
+			await rm(filePath, { force: true });
+		} catch (error) {
+			console.error("Failed to delete file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a directory recursively
+	 */
+	async deleteDirectory(_event: IpcMainInvokeEvent, dirPath: string): Promise<void> {
+		try {
+			await rm(dirPath, { recursive: true, force: true });
+		} catch (error) {
+			console.error("Failed to delete directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Rename a file or directory
+	 */
+	async renameFile(_event: IpcMainInvokeEvent, oldPath: string, newPath: string): Promise<void> {
+		try {
+			await rename(oldPath, newPath);
+		} catch (error) {
+			console.error("Failed to rename file:", error);
 			throw error;
 		}
 	}

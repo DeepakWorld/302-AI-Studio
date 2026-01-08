@@ -47,13 +47,13 @@
 	<Resizable.PaneGroup direction="horizontal" class="h-full w-full rounded-lg border">
 		<Resizable.Pane defaultSize={25} minSize={15} maxSize={40}>
 			<div class="h-full p-2">
-				<SkillFileTree {rootPath} onSelect={handleFileSelect} />
+				<SkillFileTree {rootPath} {readOnly} onSelect={handleFileSelect} />
 			</div>
 		</Resizable.Pane>
 		<Resizable.Handle />
 		<Resizable.Pane defaultSize={75}>
 			<div class="h-full border-l bg-background">
-				{#if fileContent}
+				{#if filePath}
 					<CodeMirrorEditor
 						value={fileContent}
 						{language}

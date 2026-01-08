@@ -6,8 +6,8 @@
 	import Textarea from "$lib/components/ui/textarea/textarea.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { Loader2 } from "@lucide/svelte";
-	import { SvelteMap } from "svelte/reactivity";
 	import { toast } from "svelte-sonner";
+	import { SvelteMap } from "svelte/reactivity";
 
 	export interface SkillFormData {
 		name: string;
@@ -103,6 +103,18 @@
 			manualRootPath = undefined;
 			manualSkillMdPath = undefined;
 			manualChangedFiles = new SvelteMap();
+		}
+	}
+
+	// 获取手动模式的根路径
+	export function getManualRootPath(): string | undefined {
+		return manualRootPath;
+	}
+
+	// 写入修改的文件到临时目录
+	export async function writeChangedFiles(): Promise<void> {
+		for (const [path, content] of manualChangedFiles) {
+			await window.electronAPI.appService.writeFile(path, content);
 		}
 	}
 
