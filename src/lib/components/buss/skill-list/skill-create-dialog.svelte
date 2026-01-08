@@ -332,7 +332,7 @@ description:
 					<ChevronLeft class="h-4 w-4" />
 					{m.skills_back()}
 				</Button>
-				<span class="text-foreground text-base font-semibold">{currentOption?.titleKey()}</span>
+				<span class="text-foreground text-base font-semibold">{m.skills_create_title()}</span>
 				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
 					<X class="h-4 w-4" />
 				</Button>
