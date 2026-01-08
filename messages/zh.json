@@ -1087,5 +1087,10 @@
 	"skills_create_success": "Skill 创建成功",
 	"skills_create_failed": "Skill 创建失败",
 	"skills_form_view_default": "默认",
-	"skills_form_view_tree": "文件树"
+	"skills_form_view_tree": "文件树",
+	"skills_confirm_delete_title": "确认删除",
+	"skills_confirm_delete_message": "确定要删除技能 \"{name}\" 吗？此操作无法撤销。",
+	"skills_deleting": "删除中...",
+	"skills_delete_success": "Skill 删除成功",
+	"skills_delete_failed": "Skill 删除失败"
 }

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { downloadSkill } from "$lib/api/skills";
+	import { deleteSkill } from "$lib/api/skills/base-apis";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import Button from "$lib/components/ui/button/button.svelte";
+	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { Plus, Search } from "@lucide/svelte";
@@ -43,8 +45,11 @@
 	let detailDialogOpen = $state(false);
 	let createDialogOpen = $state(false);
 	let editDialogOpen = $state(false);
+	let deleteDialogOpen = $state(false);
 	let selectedSkill = $state<Skill | null>(null);
 	let editingSkill = $state<Skill | null>(null);
+	let deletingSkill = $state<Skill | null>(null);
+	let isDeleting = $state(false);
 	let downloadingSkills = new SvelteSet<string>();
 
 	// Combine skills with source flag
@@ -101,7 +106,30 @@
 	}
 
 	function handleDelete(skill: Skill) {
-		console.log("Delete skill:", skill.name);
+		deletingSkill = skill;
+		deleteDialogOpen = true;
+	}
+
+	async function confirmDelete() {
+		if (!deletingSkill) return;
+
+		isDeleting = true;
+		const toastId = toast.loading(m.skills_deleting());
+
+		try {
+			await deleteSkill({ skill_list: [deletingSkill.name] });
+			toast.dismiss(toastId);
+			toast.success(m.skills_delete_success());
+			deleteDialogOpen = false;
+			deletingSkill = null;
+			onRefresh?.();
+		} catch (e) {
+			console.error("Failed to delete skill:", e);
+			toast.dismiss(toastId);
+			toast.error(m.skills_delete_failed());
+		} finally {
+			isDeleting = false;
+		}
 	}
 </script>
 
@@ -184,3 +212,23 @@
 
 <!-- Edit Dialog -->
 <SkillEditDialog bind:open={editDialogOpen} skill={editingSkill} onSave={() => onRefresh?.()} />
+
+<!-- Delete Confirmation Dialog -->
+<Dialog.Root bind:open={deleteDialogOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>{m.skills_confirm_delete_title()}</Dialog.Title>
+		</Dialog.Header>
+		<Dialog.Description>
+			{m.skills_confirm_delete_message({ name: deletingSkill?.name || "" })}
+		</Dialog.Description>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (deleteDialogOpen = false)} disabled={isDeleting}>
+				{m.text_button_cancel()}
+			</Button>
+			<Button variant="destructive" onclick={confirmDelete} disabled={isDeleting}>
+				{m.text_button_delete()}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

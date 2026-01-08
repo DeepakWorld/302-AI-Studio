@@ -1090,5 +1090,10 @@
 	"skills_create_success": "Skill created successfully",
 	"skills_create_failed": "Failed to create Skill",
 	"skills_form_view_default": "Default",
-	"skills_form_view_tree": "File Tree"
+	"skills_form_view_tree": "File Tree",
+	"skills_confirm_delete_title": "Confirm Delete",
+	"skills_confirm_delete_message": "Are you sure you want to delete skill \"{name}\"? This action cannot be undone.",
+	"skills_deleting": "Deleting...",
+	"skills_delete_success": "Skill deleted successfully",
+	"skills_delete_failed": "Failed to delete Skill"
 }
