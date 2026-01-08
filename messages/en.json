@@ -267,6 +267,8 @@
 	"text_collapse": "Collapse",
 	"text_expand": "Expand Text",
 	"text_new_exploration": "Start New Exploration",
+	"text_clear_screen": "Clear Screen",
+	"text_restore_history": "Restore History",
 	"text_feedback_like": "Like",
 	"text_feedback_dislike": "Dislike",
 	"text_read_aloud": "Read Aloud",

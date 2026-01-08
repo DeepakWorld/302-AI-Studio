@@ -365,6 +365,13 @@ class ChatState {
 		persistedChatParamsState.current.maxTokens = value;
 	}
 
+	get clearScreenMessageId(): string | undefined {
+		return persistedChatParamsState.current.clearScreenMessageId;
+	}
+	set clearScreenMessageId(value: string | undefined) {
+		persistedChatParamsState.current.clearScreenMessageId = value;
+	}
+
 	providerType = $derived<string | null>(
 		this.selectedModel
 			? (providerState.getProvider(this.selectedModel.providerId)?.apiType ?? null)
@@ -387,6 +394,36 @@ class ChatState {
 			this.loadingAttachmentIds.size === 0, // 确保没有附件正在加载
 	);
 	hasMessages = $derived(this.messages.length > 0);
+
+	/**
+	 * Messages visible to the user after applying clear screen filter.
+	 * Messages up to and including clearScreenMessageId are hidden.
+	 */
+	visibleMessages = $derived.by(() => {
+		const clearId = this.clearScreenMessageId;
+		if (!clearId) {
+			return this.messages;
+		}
+		const clearIndex = this.messages.findIndex((msg) => msg.id === clearId);
+		if (clearIndex === -1) {
+			return this.messages;
+		}
+		return this.messages.slice(clearIndex + 1);
+	});
+
+	/**
+	 * Whether clear screen is active (has hidden messages)
+	 */
+	hasClearScreen = $derived(
+		!!this.clearScreenMessageId &&
+			this.messages.findIndex((msg) => msg.id === this.clearScreenMessageId) !== -1,
+	);
+
+	/**
+	 * Whether there are visible messages (after applying clear screen filter)
+	 */
+	hasVisibleMessages = $derived(this.visibleMessages.length > 0);
+
 	canTogglePrivacy = $derived(!this.hasMessages);
 	canRegenerate = $derived(
 		(this.isReady || this.isError) &&
@@ -745,6 +782,25 @@ class ChatState {
 	clearMessages() {
 		this.messages = [];
 		persistedMessagesState.current = [];
+	}
+
+	/**
+	 * Clear screen by marking the last message as the clear point.
+	 * Messages up to and including this message will be hidden from view,
+	 * but preserved in history.
+	 */
+	clearScreen() {
+		const lastMessage = this.messages[this.messages.length - 1];
+		if (lastMessage) {
+			this.clearScreenMessageId = lastMessage.id;
+		}
+	}
+
+	/**
+	 * Restore all hidden messages by removing the clear screen marker.
+	 */
+	restoreClearScreen() {
+		this.clearScreenMessageId = undefined;
 	}
 
 	updateMessage(messageId: string, content: string) {

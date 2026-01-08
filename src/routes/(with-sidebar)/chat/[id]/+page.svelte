@@ -10,7 +10,7 @@
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { generateFilePreview } from "$lib/utils/file-preview";
 	import { setupPanelResize } from "$lib/utils/panel-resize";
-	import { MessageSquarePlus } from "@lucide/svelte";
+	import { Eraser, History, MessageSquarePlus } from "@lucide/svelte";
 	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
 	import type { AttachmentFile, Model, ThreadParmas } from "@shared/types";
 	import { onMount } from "svelte";
@@ -222,6 +222,14 @@
 	async function handleNewExploration() {
 		await tabBarState.handleNewTab(m.title_new_chat(), "chat");
 	}
+
+	function handleClearScreen() {
+		chatState.clearScreen();
+	}
+
+	function handleRestoreClearScreen() {
+		chatState.restoreClearScreen();
+	}
 </script>
 
 {#snippet ChatInputArea()}
@@ -231,10 +239,10 @@
 		onmouseenter={() => (isInputAreaHovered = true)}
 		onmouseleave={() => (isInputAreaHovered = false)}
 	>
-		<!-- New Exploration Button -->
+		<!-- New Exploration & Clear Screen Buttons -->
 		{#if isInputAreaHovered && !chatState.isStreaming}
 			<div
-				class="absolute top-0 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200"
+				class="absolute top-0 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center gap-2"
 			>
 				<button
 					type="button"
@@ -244,6 +252,30 @@
 					<MessageSquarePlus class="h-4 w-4" />
 					<span>{m.text_new_exploration()}</span>
 				</button>
+
+				{#if chatState.hasVisibleMessages}
+					<!-- Show clear screen button when there are visible messages -->
+					<button
+						type="button"
+						onclick={handleClearScreen}
+						class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-muted-foreground shadow-md backdrop-blur-sm transition-all hover:shadow-lg hover:text-foreground dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white"
+					>
+						<Eraser class="h-4 w-4" />
+						<span>{m.text_clear_screen()}</span>
+					</button>
+				{/if}
+
+				{#if chatState.hasClearScreen}
+					<!-- Show restore button when there are hidden messages -->
+					<button
+						type="button"
+						onclick={handleRestoreClearScreen}
+						class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-amber-600 shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-amber-600 dark:text-white dark:hover:bg-amber-700"
+					>
+						<History class="h-4 w-4" />
+						<span>{m.text_restore_history()}</span>
+					</button>
+				{/if}
 			</div>
 		{/if}
 
@@ -252,6 +284,7 @@
 {/snippet}
 
 {#if !chatState.hasMessages}
+	<!-- Initial state: no messages at all - show centered layout -->
 	<div class="flex h-full flex-col relative">
 		<PageHeader />
 		<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
@@ -272,7 +305,7 @@
 					<div class="flex h-full flex-col min-w-0">
 						<div class="flex-1 overflow-hidden relative">
 							<PageHeader />
-							<MessageList messages={chatState.messages} />
+							<MessageList messages={chatState.visibleMessages} />
 						</div>
 						{@render ChatInputArea()}
 					</div>
@@ -286,7 +319,7 @@
 			<div class="flex-1 flex flex-col h-full min-w-0">
 				<div class="flex-1 overflow-hidden relative">
 					<PageHeader />
-					<MessageList messages={chatState.messages} />
+					<MessageList messages={chatState.visibleMessages} />
 				</div>
 				{@render ChatInputArea()}
 			</div>
@@ -316,7 +349,7 @@
 					<div class="flex h-full flex-col min-w-0">
 						<div class="flex-1 overflow-hidden relative">
 							<PageHeader />
-							<MessageList messages={chatState.messages} />
+							<MessageList messages={chatState.visibleMessages} />
 						</div>
 						{@render ChatInputArea()}
 					</div>
@@ -330,7 +363,7 @@
 			<div class="flex-1 flex flex-col h-full min-w-0">
 				<div class="flex-1 overflow-hidden relative">
 					<PageHeader />
-					<MessageList messages={chatState.messages} />
+					<MessageList messages={chatState.visibleMessages} />
 				</div>
 				{@render ChatInputArea()}
 			</div>
@@ -356,7 +389,7 @@
 	<div class="flex h-full flex-col gap-y-4">
 		<div class="flex-1 overflow-hidden relative" data-layoutid="chat-message-list">
 			<PageHeader />
-			<MessageList messages={chatState.messages} />
+			<MessageList messages={chatState.visibleMessages} />
 
 			<!-- AgentPreviewPanel 需要始终挂载以监听状态，但当不在 Resizable 布局时隐藏 -->
 			{#if !htmlPreviewState.isVisible && !agentPreviewState.isVisible}

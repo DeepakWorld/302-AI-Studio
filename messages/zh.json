@@ -263,6 +263,8 @@
 	"text_collapse": "收起",
 	"text_expand": "展开文本",
 	"text_new_exploration": "开启新探索",
+	"text_clear_screen": "清屏",
+	"text_restore_history": "恢复历史",
 	"text_feedback_like": "点赞",
 	"text_feedback_dislike": "点踩",
 	"text_read_aloud": "朗读",
