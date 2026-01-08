@@ -61,6 +61,7 @@ export type RouterRequestBody = {
 	sandboxName?: string;
 	autoDeploy?: boolean;
 	skills?: Skill[];
+	isCreateSkillMode?: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1166,6 +1167,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		sessionId,
 		autoDeploy,
 		skills,
+		isCreateSkillMode,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
@@ -1180,6 +1182,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			threadId,
 			sessionId,
 			autoDeploy,
+			isCreateSkillMode,
 		}),
 	);
 
@@ -1219,8 +1222,9 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
-		enable_pre_deploy_check: autoDeploy ?? true,
-		available_skills: availableSkills,
+		enable_pre_deploy_check: autoDeploy,
+		available_skills: isCreateSkillMode ? [] : availableSkills,
+		...(isCreateSkillMode ? { action: "create_skill" } : {}),
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));

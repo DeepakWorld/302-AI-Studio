@@ -69,7 +69,7 @@ interface ClaudeCodeEvent {
 	uuid?: string;
 	// pre_deploy_check fields
 	success?: boolean;
-	find_ifile?: string;
+	find_file?: string;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[key: string]: any;
 }
@@ -416,7 +416,7 @@ class ClaudeCodeProcessor {
 		metadata.preDeploy = {
 			type: "pre_deploy_check",
 			success: data.success,
-			find_ifile: data.find_ifile,
+			find_file: data.find_file,
 		};
 
 		const metadataEvent = {

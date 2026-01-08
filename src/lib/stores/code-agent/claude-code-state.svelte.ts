@@ -284,8 +284,8 @@ class ClaudeCodeAgentState {
 
 		if (isInit) {
 			const skillsPineline = (skills: ListSkillsResponse) => {
-				const { user_skills, builtin_skills } = skills;
-				return [...user_skills, ...builtin_skills];
+				const { builtin_skills } = skills;
+				return [...builtin_skills];
 			};
 			this.updateSkills(skillsPineline(listSkillsResponse));
 		}

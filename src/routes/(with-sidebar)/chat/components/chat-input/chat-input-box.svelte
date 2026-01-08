@@ -34,7 +34,7 @@
 	// 输入法冷却期：compositionend 后的一段时间内仍然认为正在输入
 	// 用于解决 Mac 输入法按 Enter 确认时误触发发送消息的问题
 	let compositionEndTime = 0;
-	const COMPOSITION_COOLDOWN_MS = 150;
+	const COMPOSITION_COOLDOWN_MS = 100;
 
 	function isInCompositionCooldown(): boolean {
 		return Date.now() - compositionEndTime < COMPOSITION_COOLDOWN_MS;

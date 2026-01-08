@@ -166,6 +166,7 @@ class ChatState {
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
+	isCreateSkillMode = $state(false);
 
 	/**
 	 * Cancel any pending suggestions generation request.
@@ -1342,6 +1343,7 @@ export const chat = new Chat({
 
 				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 				skills: codeAgentState.skills,
+				isCreateSkillMode: chatState.isCreateSkillMode,
 			};
 		},
 	}),

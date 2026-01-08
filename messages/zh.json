@@ -1104,5 +1104,6 @@
 	"skills_github_url_label": "GitHub 仓库地址",
 	"skills_github_url_placeholder": "https://github.com/username/repo",
 	"skills_github_url_desc": "仓库应包含 .md 格式的 skill 文件",
-	"skills_github_url_required": "请输入 GitHub 仓库地址"
+	"skills_github_url_required": "请输入 GitHub 仓库地址",
+	"create_skill_prompt": "请参考用户当前历史聊天记录，依据 skill-creator 提供的流程创建一个新的SKILL，此外还务必额外遵循如下规则：1. 创建的SKILL必须位于当前工作目录中的./.claude/skills目录中，而非其他任意位置。"
 }

@@ -212,6 +212,11 @@ description:
 				);
 
 				if (result.success) {
+					// Trigger the summary message in the target thread
+					setTimeout(() => {
+						window.electronAPI.tabService.triggerCreateSkillSummary(threadId);
+					}, 1000);
+
 					handleClose();
 				} else {
 					toast.error(m.skills_history_navigate_failed());

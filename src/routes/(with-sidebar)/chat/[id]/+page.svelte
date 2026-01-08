@@ -120,6 +120,21 @@
 			},
 		);
 
+		// Listen for create skill summary event
+		const unsubCreateSkillSummary = window.electronAPI?.onTriggerCreateSkillSummary?.(
+			async ({ threadId }: { threadId: string }) => {
+				console.log("[Chat Page] Received create-skill-summary event:", { threadId });
+
+				// Only process if this is the target thread
+				if (threadId === chatState.id) {
+					chatState.isCreateSkillMode = true;
+					chatState.inputValue = `${m.create_skill_prompt()}`;
+					await chatState.sendMessage();
+					chatState.isCreateSkillMode = false;
+				}
+			},
+		);
+
 		// Listen for apply default model event from SSO login
 		const unsubApplyDefaultModel = window.electronAPI?.onApplyDefaultModel?.(
 			(data: { model: unknown }) => {
@@ -185,6 +200,7 @@
 			unsubTriggerSend?.();
 			unsubShowToast?.();
 			unsubSandboxCreated?.();
+			unsubCreateSkillSummary?.();
 			unsubApplyDefaultModel?.();
 		};
 	});

@@ -1107,5 +1107,6 @@
 	"skills_github_url_label": "GitHub Repository URL",
 	"skills_github_url_placeholder": "https://github.com/username/repo",
 	"skills_github_url_desc": "Repository should contain .md skill files",
-	"skills_github_url_required": "Please enter GitHub repository URL"
+	"skills_github_url_required": "Please enter GitHub repository URL",
+	"create_skill_prompt": "Please refer to the user's current historical chat records and create a new SKILL according to the process provided by skill-creator. In addition, be sure to follow the following additional rules: 1. The created SKILL must be located in the ./.claude/skills directory in the current working directory, not anywhere else."
 }

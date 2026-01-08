@@ -289,6 +289,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("tabService:handleGenerateTabTitle", (event, tabId, threadId) =>
 		tabService.handleGenerateTabTitle(event, tabId, threadId),
 	);
+	ipcMain.handle("tabService:triggerCreateSkillSummary", (event, threadId) =>
+		tabService.triggerCreateSkillSummary(event, threadId),
+	);
 
 	// aiApplicationService service registration
 	ipcMain.handle("aiApplicationService:getAiApplicationUrl", (event, applicationId) =>
@@ -517,6 +520,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("tabService:replaceTabContent");
 	ipcMain.removeHandler("tabService:handleClearTabMessages");
 	ipcMain.removeHandler("tabService:handleGenerateTabTitle");
+	ipcMain.removeHandler("tabService:triggerCreateSkillSummary");
 	ipcMain.removeHandler("aiApplicationService:getAiApplicationUrl");
 	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReloadIpc");
 	ipcMain.removeHandler("aiApplicationService:refreshAiApplications");

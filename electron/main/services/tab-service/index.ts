@@ -1178,6 +1178,40 @@ export class TabService {
 	}
 
 	/**
+	 * Trigger create skill summary in the chat
+	 */
+	async triggerCreateSkillSummary(_event: IpcMainInvokeEvent, threadId: string): Promise<boolean> {
+		console.log(`[triggerCreateSkillSummary] Triggering summary for thread ${threadId}`);
+
+		try {
+			// Find the tab with matching threadId
+			let targetView: WebContentsView | undefined;
+
+			for (const [tabId, tab] of this.tabMap.entries()) {
+				if (tab.threadId === threadId) {
+					targetView = this.tabViewMap.get(tabId);
+					break;
+				}
+			}
+
+			if (isUndefined(targetView) || targetView.webContents.isDestroyed()) {
+				console.warn(
+					`[triggerCreateSkillSummary] View not found or destroyed for thread ${threadId}`,
+				);
+				return false;
+			}
+
+			// Send a message to the tab
+			targetView.webContents.send("tab:create-skill-summary", { threadId });
+
+			return true;
+		} catch (error) {
+			console.error(`[triggerCreateSkillSummary] Failed to trigger summary:`, error);
+			return false;
+		}
+	}
+
+	/**
 	 * Notify sandbox created event to the tab associated with the given threadId
 	 */
 	notifySandboxCreated(threadId: string, sandboxId: string): void {
