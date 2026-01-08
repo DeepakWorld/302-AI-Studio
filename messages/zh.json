@@ -1099,5 +1099,9 @@
 	"skills_confirm_delete_message": "确定要删除技能 \"{name}\" 吗？此操作无法撤销。",
 	"skills_deleting": "删除中...",
 	"skills_delete_success": "Skill 删除成功",
-	"skills_delete_failed": "Skill 删除失败"
+	"skills_delete_failed": "Skill 删除失败",
+	"skills_github_url_label": "GitHub 仓库地址",
+	"skills_github_url_placeholder": "https://github.com/username/repo",
+	"skills_github_url_desc": "仓库应包含 .md 格式的 skill 文件",
+	"skills_github_url_required": "请输入 GitHub 仓库地址"
 }

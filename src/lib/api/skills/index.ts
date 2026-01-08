@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import type { ListSkillsRequest, ListSkillsResponse, SkillDetailsRequest } from "./base-apis";
-import { _createSkill, _editSkillDetails, _listSkills } from "./base-apis";
+import { _createSkill, _createSkillFromGitHub, _editSkillDetails, _listSkills } from "./base-apis";
 
 const { extractZipBlob, zipDirectory } = window.electronAPI.appService;
 
@@ -72,4 +72,8 @@ export async function updateSkill(data: UpdateSkillData) {
 	const zipFile = new File([zipBlob], `${name}.zip`, { type: "application/zip" });
 
 	return _createSkill(zipFile);
+}
+
+export async function createSkillFromGitHub(githubUrl: string) {
+	return _createSkillFromGitHub(githubUrl);
 }

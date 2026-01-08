@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { createSkill, updateSkill } from "$lib/api/skills";
+	import { createSkill, createSkillFromGitHub, updateSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
 	import { ChevronLeft, FileEdit, Link, MessageSquareText, Package, X } from "@lucide/svelte";
 	import type { Component } from "svelte";
 	import { toast } from "svelte-sonner";
+	import SkillGithubForm from "./skill-github-form.svelte";
 	import SkillHistoryForm from "./skill-history-form.svelte";
 	import SkillManualForm from "./skill-manual-form.svelte";
 	import SkillUploadForm from "./skill-upload-form.svelte";
@@ -45,6 +46,7 @@ description:
 	let manualFormRef = $state<SkillManualForm | undefined>();
 	let historyFormRef = $state<SkillHistoryForm | undefined>();
 	let uploadFormRef = $state<SkillUploadForm | undefined>();
+	let githubFormRef = $state<SkillGithubForm | undefined>();
 
 	const createOptions: CreateOption[] = [
 		{
@@ -83,6 +85,7 @@ description:
 			content: defaultContent,
 		};
 		uploadFormRef?.reset();
+		githubFormRef?.reset();
 	}
 
 	function handleClose() {
@@ -106,6 +109,7 @@ description:
 
 	function handleBack() {
 		uploadFormRef?.reset();
+		githubFormRef?.reset();
 		currentView = "select";
 	}
 
@@ -130,7 +134,7 @@ description:
 					onCreate?.(currentView, { ...manualFormData });
 					handleClose();
 				} else {
-					toast.error(result.message || m.skills_create_failed());
+					toast.error(result.error?.message || result.message || m.skills_create_failed());
 				}
 			} catch (error) {
 				console.error("Failed to create skill:", error);
@@ -159,7 +163,7 @@ description:
 					onCreate?.(currentView, formData);
 					handleClose();
 				} else {
-					toast.error(result.message || m.skills_create_failed());
+					toast.error(result.error?.message || result.message || m.skills_create_failed());
 				}
 			} catch (error) {
 				console.error("Failed to create skill from upload:", error);
@@ -206,6 +210,28 @@ description:
 			} catch (error) {
 				console.error("Failed to navigate to history thread:", error);
 				toast.error(m.skills_history_navigate_failed());
+			} finally {
+				isCreating = false;
+			}
+		} else if (currentView === "github") {
+			if (!githubFormRef?.validate()) return;
+
+			const githubUrl = githubFormRef.getGitHubUrl();
+
+			isCreating = true;
+			try {
+				const result = await createSkillFromGitHub(githubUrl);
+
+				if (result.success) {
+					toast.success(m.skills_create_success());
+					onCreate?.(currentView, { githubUrl });
+					handleClose();
+				} else {
+					toast.error(result.error?.message || result.message || m.skills_create_failed());
+				}
+			} catch (error) {
+				console.error("Failed to create skill from GitHub:", error);
+				toast.error(m.skills_create_failed());
 			} finally {
 				isCreating = false;
 			}
@@ -285,6 +311,9 @@ description:
 			{:else if currentView === "history"}
 				<!-- History Selection Form -->
 				<SkillHistoryForm bind:this={historyFormRef} />
+			{:else if currentView === "github"}
+				<!-- GitHub Import Form -->
+				<SkillGithubForm bind:this={githubFormRef} />
 			{:else}
 				<!-- Coming Soon Placeholder -->
 				<div class="flex flex-col items-center justify-center px-6 py-12">

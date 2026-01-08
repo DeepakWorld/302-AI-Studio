@@ -1102,5 +1102,9 @@
 	"skills_confirm_delete_message": "Are you sure you want to delete skill \"{name}\"? This action cannot be undone.",
 	"skills_deleting": "Deleting...",
 	"skills_delete_success": "Skill deleted successfully",
-	"skills_delete_failed": "Failed to delete Skill"
+	"skills_delete_failed": "Failed to delete Skill",
+	"skills_github_url_label": "GitHub Repository URL",
+	"skills_github_url_placeholder": "https://github.com/username/repo",
+	"skills_github_url_desc": "Repository should contain .md skill files",
+	"skills_github_url_required": "Please enter GitHub repository URL"
 }

@@ -102,6 +102,9 @@ export async function _editSkillDetails(request: SkillDetailsRequest): Promise<B
 export const createSkillResponseSchema = type({
 	success: "boolean",
 	message: "string?",
+	error: type({
+		message: "string",
+	}).optional(),
 });
 export type CreateSkillResponse = typeof createSkillResponseSchema.infer;
 
@@ -113,6 +116,7 @@ export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> 
 		const response = await testKy
 			.post("api/v1/claude-code/skills", {
 				body: formData,
+				timeout: 120000,
 			})
 			.json();
 
@@ -124,6 +128,45 @@ export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> 
 		return validated;
 	} catch (error) {
 		console.error("Failed to create skill:", error);
+		throw error;
+	}
+}
+
+export async function _createSkillFromGitHub(githubUrl: string): Promise<CreateSkillResponse> {
+	try {
+		const formData = new FormData();
+		formData.append("github_url", githubUrl);
+
+		const response = await testKy
+			.post("api/v1/claude-code/skills", {
+				body: formData,
+			})
+			.json();
+
+		const validated = createSkillResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate create skill from GitHub response:", validated.summary);
+			throw new Error("Invalid response format from create skill API");
+		}
+		return validated;
+	} catch (error) {
+		// Handle HTTP errors (ky throws on non-2xx responses)
+		if (error && typeof error === "object" && "response" in error) {
+			const httpError = error as { response: Response };
+			try {
+				const errorBody = await httpError.response.json();
+				if (errorBody && typeof errorBody === "object") {
+					return {
+						success: false,
+						error: errorBody.error,
+						message: errorBody.message,
+					};
+				}
+			} catch {
+				// Failed to parse error response JSON
+			}
+		}
+		console.error("Failed to create skill from GitHub:", error);
 		throw error;
 	}
 }
