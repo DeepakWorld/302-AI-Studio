@@ -1,6 +1,6 @@
 import { skill } from "@shared/types";
 import { type } from "arktype";
-import { testKy } from "../core/test-ky";
+import { _302AIKy } from "../core/_302ai-ky";
 
 export const listSkillsRequestSchema = type({
 	sandboxId: "string?",
@@ -19,8 +19,8 @@ export type ListSkillsResponse = typeof listSkillsResponseSchema.infer;
 export async function _listSkills(request: ListSkillsRequest): Promise<ListSkillsResponse> {
 	const { sandboxId, sessionId, projectPath } = request;
 	try {
-		const response = await testKy
-			.get("api/v1/claude-code/skills/list", {
+		const response = await _302AIKy
+			.get("302/claude-code/skills/list", {
 				searchParams: {
 					sandbox_id: sandboxId,
 					session_id: sessionId,
@@ -57,8 +57,8 @@ export async function checkSkillDetails(
 ): Promise<CheckSkillDetailsResponse> {
 	const { skillName, builtin } = request;
 	try {
-		const response = await testKy
-			.get("api/v1/claude-code/skills/detail", {
+		const response = await _302AIKy
+			.get("302/claude-code/skills/detail", {
 				searchParams: {
 					name: skillName,
 					mode: "view",
@@ -82,8 +82,8 @@ export async function checkSkillDetails(
 export async function _editSkillDetails(request: SkillDetailsRequest): Promise<Blob> {
 	const { skillName, builtin } = request;
 	try {
-		const response = await testKy
-			.get("api/v1/claude-code/skills/detail", {
+		const response = await _302AIKy
+			.get("302/claude-code/skills/detail", {
 				searchParams: {
 					name: skillName,
 					mode: "edit",
@@ -113,8 +113,8 @@ export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> 
 		const formData = new FormData();
 		formData.append("file", zipFile);
 
-		const response = await testKy
-			.post("api/v1/claude-code/skills", {
+		const response = await _302AIKy
+			.post("302/claude-code/skills", {
 				body: formData,
 				timeout: 120000,
 			})
@@ -137,8 +137,8 @@ export async function _createSkillFromGitHub(githubUrl: string): Promise<CreateS
 		const formData = new FormData();
 		formData.append("github_url", githubUrl);
 
-		const response = await testKy
-			.post("api/v1/claude-code/skills", {
+		const response = await _302AIKy
+			.post("302/claude-code/skills", {
 				body: formData,
 				timeout: 120000,
 			})
@@ -183,8 +183,8 @@ export type DeleteSkillResponse = typeof deleteSkillResponseSchema.infer;
 
 export async function deleteSkill(request: DeleteSkillRequest): Promise<DeleteSkillResponse> {
 	try {
-		const response = await testKy
-			.delete("api/v1/claude-code/skills", {
+		const response = await _302AIKy
+			.delete("302/claude-code/skills", {
 				json: request,
 			})
 			.json();
