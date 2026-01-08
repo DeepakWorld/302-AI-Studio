@@ -417,6 +417,58 @@ export class AppService {
 			throw error;
 		}
 	}
+
+	/**
+	 * Create a temporary directory for manual skill creation preview
+	 * @param skillName The skill name (used as subfolder name)
+	 * @returns Object containing root path and SKILL.md path
+	 */
+	async createSkillTempDir(
+		_event: IpcMainInvokeEvent,
+		skillName: string,
+	): Promise<{ rootPath: string; skillMdPath: string }> {
+		try {
+			const tempDir = app.getPath("temp");
+			const timestamp = Date.now();
+			const baseDirName = `skill-manual-${timestamp}`;
+			const basePath = join(tempDir, baseDirName);
+			const rootPath = join(basePath, skillName || "new-skill");
+			const skillMdPath = join(rootPath, "SKILL.md");
+
+			await mkdir(rootPath, { recursive: true });
+			// Create empty SKILL.md file
+			await writeFile(skillMdPath, "", "utf-8");
+
+			return { rootPath, skillMdPath };
+		} catch (error) {
+			console.error("Failed to create skill temp directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a temporary directory (with safety check)
+	 * @param dirPath Path to delete (must be within temp directory)
+	 */
+	async deleteTempDir(_event: IpcMainInvokeEvent, dirPath: string): Promise<void> {
+		try {
+			const tempDir = app.getPath("temp");
+			// Safety check: only delete if within temp directory
+			const normalizedPath = dirPath.replace(/\\/g, "/");
+			const normalizedTemp = tempDir.replace(/\\/g, "/");
+
+			if (!normalizedPath.startsWith(normalizedTemp)) {
+				throw new Error("Security: Can only delete directories within temp folder");
+			}
+
+			// Delete the base directory (parent of skill folder)
+			const basePath = join(dirPath, "..");
+			await rm(basePath, { recursive: true, force: true });
+		} catch (error) {
+			console.error("Failed to delete temp directory:", error);
+			// Don't throw - cleanup failures shouldn't block user
+		}
+	}
 }
 
 export const appService = new AppService();

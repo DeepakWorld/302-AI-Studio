@@ -140,6 +140,7 @@ export async function _createSkillFromGitHub(githubUrl: string): Promise<CreateS
 		const response = await testKy
 			.post("api/v1/claude-code/skills", {
 				body: formData,
+				timeout: 120000,
 			})
 			.json();
 

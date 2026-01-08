@@ -5,6 +5,8 @@
 	import { Label } from "$lib/components/ui/label";
 	import Textarea from "$lib/components/ui/textarea/textarea.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { Loader2 } from "@lucide/svelte";
+	import { SvelteMap } from "svelte/reactivity";
 	import { toast } from "svelte-sonner";
 
 	export interface SkillFormData {
@@ -19,6 +21,7 @@
 		readOnly?: boolean; // 是否只读模式
 		changedFiles?: Map<string, string>; // 已修改的文件内容
 		onFileChange?: (path: string, content: string) => void; // 文件内容变化回调
+		enableManualFileTree?: boolean; // 启用手动模式的文件树预览
 	}
 
 	let {
@@ -27,9 +30,89 @@
 		readOnly = true,
 		changedFiles,
 		onFileChange,
+		enableManualFileTree = false,
 	}: Props = $props();
 
 	let viewMode = $state<"default" | "tree">("default");
+
+	// 手动模式的临时目录状态
+	let manualRootPath = $state<string | undefined>(undefined);
+	let manualSkillMdPath = $state<string | undefined>(undefined);
+	let manualChangedFiles: SvelteMap<string, string> = new SvelteMap();
+	let isCreatingTempDir = $state(false);
+
+	// 有效的 rootPath（来自 prop 或手动模式）
+	const effectiveRootPath = $derived(rootPath || manualRootPath);
+	const effectiveChangedFiles = $derived(rootPath ? changedFiles : manualChangedFiles);
+
+	// 切换视图模式
+	async function handleViewModeChange(mode: "default" | "tree") {
+		if (mode === "tree" && !effectiveRootPath && enableManualFileTree) {
+			// 首次切换到文件树视图时创建临时目录
+			isCreatingTempDir = true;
+			try {
+				const skillName = formData.name.trim() || "new-skill";
+				const result = await window.electronAPI.appService.createSkillTempDir(skillName);
+				manualRootPath = result.rootPath;
+				manualSkillMdPath = result.skillMdPath;
+
+				// 初始化 changedFiles，写入当前内容
+				manualChangedFiles = new SvelteMap([[result.skillMdPath, formData.content]]);
+			} catch (error) {
+				console.error("Failed to create temp directory:", error);
+				toast.error(m.skills_create_temp_dir_failed());
+				return; // 保持在默认视图
+			} finally {
+				isCreatingTempDir = false;
+			}
+		}
+		viewMode = mode;
+	}
+
+	// 处理手动模式下的文件修改
+	function handleManualFileChange(path: string, content: string) {
+		manualChangedFiles.set(path, content);
+
+		// 如果修改的是 SKILL.md，同步回 formData
+		if (path === manualSkillMdPath) {
+			formData.content = content;
+		}
+
+		onFileChange?.(path, content);
+	}
+
+	// 同步 formData.content 到 manualChangedFiles
+	$effect(() => {
+		if (
+			manualSkillMdPath &&
+			!rootPath &&
+			formData.content !== manualChangedFiles.get(manualSkillMdPath)
+		) {
+			manualChangedFiles.set(manualSkillMdPath, formData.content);
+		}
+	});
+
+	// 清理临时目录
+	export async function cleanup(): Promise<void> {
+		if (manualRootPath) {
+			try {
+				await window.electronAPI.appService.deleteTempDir(manualRootPath);
+			} catch (error) {
+				console.error("Failed to cleanup temp directory:", error);
+			}
+			manualRootPath = undefined;
+			manualSkillMdPath = undefined;
+			manualChangedFiles = new SvelteMap();
+		}
+	}
+
+	// 重置状态
+	export function reset(): void {
+		viewMode = "default";
+		manualRootPath = undefined;
+		manualSkillMdPath = undefined;
+		manualChangedFiles = new SvelteMap();
+	}
 
 	// 解析 front matter
 	function parseFrontMatter(content: string): { data: Record<string, string>; body: string } {
@@ -174,7 +257,7 @@
 			<Label for="skill-content" class="text-sm font-medium">
 				{m.skills_form_content()} <span class="text-destructive">*</span>
 			</Label>
-			{#if rootPath}
+			{#if rootPath || enableManualFileTree}
 				<div class="flex rounded-md border">
 					<Button
 						variant="ghost"
@@ -182,7 +265,8 @@
 						class="h-7 rounded-r-none px-3 text-xs {viewMode === 'default'
 							? 'bg-violet-500 text-white hover:bg-violet-600 hover:text-white'
 							: ''}"
-						onclick={() => (viewMode = "default")}
+						onclick={() => handleViewModeChange("default")}
+						disabled={isCreatingTempDir}
 					>
 						{m.skills_form_view_default()}
 					</Button>
@@ -192,8 +276,12 @@
 						class="h-7 rounded-l-none px-3 text-xs {viewMode === 'tree'
 							? 'bg-violet-500 text-white hover:bg-violet-600 hover:text-white'
 							: ''}"
-						onclick={() => (viewMode = "tree")}
+						onclick={() => handleViewModeChange("tree")}
+						disabled={isCreatingTempDir}
 					>
+						{#if isCreatingTempDir}
+							<Loader2 class="mr-1 h-3 w-3 animate-spin" />
+						{/if}
 						{m.skills_form_view_tree()}
 					</Button>
 				</div>
@@ -208,9 +296,14 @@
 				class="min-h-[200px] max-h-[300px] w-full max-w-full resize-none overflow-y-auto overflow-x-hidden break-all font-mono text-sm"
 			/>
 			<p class="text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
-		{:else if rootPath}
+		{:else if effectiveRootPath}
 			<div class="h-[300px] overflow-hidden rounded-md">
-				<SkillFileExplorer {rootPath} {readOnly} {changedFiles} {onFileChange} />
+				<SkillFileExplorer
+					rootPath={effectiveRootPath}
+					readOnly={rootPath ? readOnly : false}
+					changedFiles={effectiveChangedFiles}
+					onFileChange={rootPath ? onFileChange : handleManualFileChange}
+				/>
 			</div>
 		{/if}
 	</div>

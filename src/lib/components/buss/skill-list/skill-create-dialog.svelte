@@ -36,6 +36,13 @@
 name:
 description:
 ---
+
+# Skill 标题
+
+描述这个 skill 的功能和使用场景...
+
+## 使用方法
+...
 `;
 	let manualFormData = $state({
 		name: "",
@@ -84,6 +91,8 @@ description:
 			description: "",
 			content: defaultContent,
 		};
+		// 清理手动创建模式的临时目录
+		manualFormRef?.cleanup?.();
 		uploadFormRef?.reset();
 		githubFormRef?.reset();
 	}
@@ -304,7 +313,11 @@ description:
 
 			{#if currentView === "manual"}
 				<!-- Manual Creation Form -->
-				<SkillManualForm bind:formData={manualFormData} bind:this={manualFormRef} />
+				<SkillManualForm
+					bind:formData={manualFormData}
+					bind:this={manualFormRef}
+					enableManualFileTree={true}
+				/>
 			{:else if currentView === "upload"}
 				<!-- Upload ZIP Form -->
 				<SkillUploadForm bind:this={uploadFormRef} />

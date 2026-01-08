@@ -323,6 +323,12 @@ export function registerIpcHandlers() {
 	ipcMain.handle("appService:zipDirectory", (event, dirPath, zipName) =>
 		appService.zipDirectory(event, dirPath, zipName),
 	);
+	ipcMain.handle("appService:createSkillTempDir", (event, skillName) =>
+		appService.createSkillTempDir(event, skillName),
+	);
+	ipcMain.handle("appService:deleteTempDir", (event, dirPath) =>
+		appService.deleteTempDir(event, dirPath),
+	);
 
 	// dataService service registration
 	ipcMain.handle("dataService:importLegacyJson", (event) => dataService.importLegacyJson(event));
@@ -525,6 +531,8 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("appService:readFile");
 	ipcMain.removeHandler("appService:writeFile");
 	ipcMain.removeHandler("appService:zipDirectory");
+	ipcMain.removeHandler("appService:createSkillTempDir");
+	ipcMain.removeHandler("appService:deleteTempDir");
 	ipcMain.removeHandler("dataService:importLegacyJson");
 	ipcMain.removeHandler("dataService:exportStorage");
 	ipcMain.removeHandler("dataService:importStorage");

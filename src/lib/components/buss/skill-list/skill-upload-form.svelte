@@ -238,7 +238,6 @@
 			</div>
 			<div class="text-center">
 				<p class="text-foreground text-sm font-medium">{m.skills_upload_dropzone()}</p>
-				<p class="text-muted-foreground mt-1 text-xs">ZIP</p>
 			</div>
 		</button>
 
