@@ -1124,5 +1124,6 @@
 	"file_tree_rename_title": "Rename",
 	"file_tree_name_placeholder": "Enter name",
 	"file_tree_name_required": "Name is required",
-	"file_tree_name_invalid": "Name contains invalid characters"
+	"file_tree_name_invalid": "Name contains invalid characters",
+	"label_session_remark": "Session Remark"
 }
