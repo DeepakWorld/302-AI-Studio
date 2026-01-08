@@ -150,7 +150,7 @@
 					<Input
 						type="text"
 						placeholder={m.skills_search_placeholder()}
-						class="pl-9"
+						class="border-border bg-transparent pl-9"
 						bind:value={searchQuery}
 					/>
 				</div>
@@ -170,7 +170,7 @@
 			<LdrsLoader type="dot-pulse" size={40} />
 		</div>
 	{:else}
-		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+		<div class="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
 			{#each filteredSkills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
 				<SkillCard
 					skill={item}

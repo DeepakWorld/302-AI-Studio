@@ -229,7 +229,7 @@
 		title={m.title_skills_management()}
 		open={codeAgentState.isSkillsPanelOpen}
 		onClose={handleSkillsPanelToggle}
-		class="h-[70vh] w-[80vw] flex flex-col"
+		class="h-[70vh] w-[80vw] max-w-5xl flex flex-col"
 	>
 		<div class="flex-1 overflow-y-auto min-h-0">
 			<SkillList
