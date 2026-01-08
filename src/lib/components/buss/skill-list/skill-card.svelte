@@ -71,11 +71,12 @@
 		>
 			<Zap class="h-5 w-5" />
 		</div>
-
 		<!-- Info Section -->
 		<div class="flex min-w-0 flex-1 flex-col gap-1">
 			<div class="flex items-center justify-between gap-2">
-				<h3 class="truncate font-semibold leading-tight text-foreground">{skill.name}</h3>
+				<h3 class="truncate font-semibold leading-tight text-foreground" title={skill.name}>
+					{skill.name}
+				</h3>
 				<!-- Menu Button -->
 				{#if showMenu}
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
