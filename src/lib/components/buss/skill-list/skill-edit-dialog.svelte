@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { editSkillDetails } from "$lib/api/skills";
+	import { editSkillDetails, updateSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
 	import { Loader2, X } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import { toast } from "svelte-sonner";
+	import { SvelteMap } from "svelte/reactivity";
 	import SkillManualForm from "./skill-manual-form.svelte";
 
 	interface Props {
@@ -28,7 +29,10 @@
 		content: "",
 	});
 
-	const { readFile, scanDirectory } = window.electronAPI.appService;
+	const { readFile, scanDirectory, writeFile } = window.electronAPI.appService;
+
+	// 记录修改过的文件
+	let changedFiles = $state<Map<string, string>>(new Map());
 
 	// 递归查找 SKILL.md 文件
 	function findSkillMd(node: { name: string; path: string; children?: unknown[] }): string | null {
@@ -57,6 +61,7 @@
 	});
 
 	let skillRootDir = $state("");
+	let skillMdFilePath = $state(""); // 记录 SKILL.md 的完整路径
 
 	async function loadSkillContent(skill: Skill) {
 		isLoading = true;
@@ -75,6 +80,7 @@
 			}
 
 			skillRootDir = getSkillRootDir(skillMdPath);
+			skillMdFilePath = skillMdPath; // 保存 SKILL.md 路径用于联动
 			const content = await readFile(skillMdPath);
 			const parsed = parseFrontMatter(content);
 
@@ -111,12 +117,29 @@
 		return { data, body };
 	}
 
+	// 处理文件内容变化
+	function handleFileChange(path: string, content: string) {
+		// 使用新 Map 触发响应式更新
+		const newMap = new SvelteMap(changedFiles);
+		newMap.set(path, content);
+		changedFiles = newMap;
+
+		// 如果编辑的是 SKILL.md，联动更新 formData.content
+		// 这样 skill-manual-form 中的 $effect 会自动解析 front matter 并更新 name/description
+		if (path === skillMdFilePath) {
+			formData.content = content;
+		}
+	}
+
 	function resetState() {
 		formData = { name: "", description: "", content: "" };
 		isLoading = false;
 		isSaving = false;
 		extractedPath = "";
 		skillRootDir = "";
+		skillMdFilePath = "";
+		changedFiles = new Map();
+		prevFormContent = "";
 	}
 
 	function handleClose() {
@@ -138,12 +161,28 @@
 
 		isSaving = true;
 		try {
-			onSave?.(skill, { ...formData });
-			toast.success(m.skills_create_success());
-			handleClose();
+			// 写入所有修改的文件到临时目录
+			for (const [path, content] of changedFiles) {
+				await writeFile(path, content);
+			}
+
+			// 调用 API 上传更新的 skill
+			// skillRootDir 是包含 SKILL.md 的目录，zip 名称使用 formData.name
+			const result = await updateSkill({
+				name: formData.name,
+				dirPath: skillRootDir,
+			});
+
+			if (result.success) {
+				toast.success(m.skills_create_failed() || "Skill saved successfully");
+				onSave?.(skill, { ...formData });
+				handleClose();
+			} else {
+				toast.error(result.message || m.skills_create_failed() || "Failed to save skill");
+			}
 		} catch (error) {
 			console.error("Failed to save skill:", error);
-			toast.error(m.skills_create_failed());
+			toast.error(m.skills_create_failed() || "Failed to save skill");
 		} finally {
 			isSaving = false;
 		}
@@ -154,6 +193,18 @@
 
 	// 内置 skill 不能保存
 	const isBuiltin = $derived(skill?.isBuiltin ?? false);
+
+	// 监听 formData.content 变化，同步更新 changedFiles（默认视图 → 文件树联动）
+	let prevFormContent = $state("");
+	$effect(() => {
+		if (skillMdFilePath && formData.content !== prevFormContent) {
+			// 使用新 Map 触发响应式更新
+			const newMap = new SvelteMap(changedFiles);
+			newMap.set(skillMdFilePath, formData.content);
+			changedFiles = newMap;
+			prevFormContent = formData.content;
+		}
+	});
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
@@ -174,7 +225,14 @@
 				<Loader2 class="text-primary h-8 w-8 animate-spin" />
 			</div>
 		{:else}
-			<SkillManualForm bind:formData bind:this={manualFormRef} rootPath={treeRootPath} />
+			<SkillManualForm
+				bind:formData
+				bind:this={manualFormRef}
+				rootPath={treeRootPath}
+				readOnly={isBuiltin}
+				{changedFiles}
+				onFileChange={handleFileChange}
+			/>
 		{/if}
 
 		<!-- Footer -->

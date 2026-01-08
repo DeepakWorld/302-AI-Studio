@@ -1088,5 +1088,7 @@
 	"skills_form_content_required": "Please enter Skill content",
 	"skills_creating": "Creating...",
 	"skills_create_success": "Skill created successfully",
-	"skills_create_failed": "Failed to create Skill"
+	"skills_create_failed": "Failed to create Skill",
+	"skills_form_view_default": "Default",
+	"skills_form_view_tree": "File Tree"
 }

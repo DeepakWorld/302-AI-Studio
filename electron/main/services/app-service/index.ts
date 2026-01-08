@@ -343,6 +343,70 @@ export class AppService {
 	}
 
 	/**
+	 * Write content to a file
+	 */
+	async writeFile(_event: IpcMainInvokeEvent, filePath: string, content: string): Promise<void> {
+		try {
+			await writeFile(filePath, content, "utf-8");
+		} catch (error) {
+			console.error("Failed to write file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Zip a directory and return the zip file as ArrayBuffer
+	 * @param dirPath The directory to zip
+	 * @param zipName The name for the zip file (without .zip extension)
+	 * @returns ArrayBuffer of the zip file
+	 */
+	async zipDirectory(
+		_event: IpcMainInvokeEvent,
+		dirPath: string,
+		zipName: string,
+	): Promise<ArrayBuffer> {
+		try {
+			const archiver = await import("archiver");
+			const { createWriteStream } = await import("fs");
+
+			const tempDir = app.getPath("temp");
+			const zipPath = join(tempDir, `${zipName}.zip`);
+
+			// Create a write stream for the zip file
+			const output = createWriteStream(zipPath);
+			const archive = archiver.default("zip", { zlib: { level: 9 } });
+
+			// Pipe archive data to the file
+			const archivePromise = new Promise<void>((resolve, reject) => {
+				output.on("close", () => resolve());
+				archive.on("error", (err) => reject(err));
+			});
+
+			archive.pipe(output);
+
+			// Add the directory contents under the zipName folder
+			archive.directory(dirPath, zipName);
+
+			await archive.finalize();
+			await archivePromise;
+
+			// Read the zip file as ArrayBuffer
+			const zipBuffer = await readFile(zipPath);
+
+			// Cleanup the temp zip file
+			await rm(zipPath, { force: true });
+
+			return (zipBuffer.buffer as ArrayBuffer).slice(
+				zipBuffer.byteOffset,
+				zipBuffer.byteOffset + zipBuffer.byteLength,
+			);
+		} catch (error) {
+			console.error("Failed to zip directory:", error);
+			throw error;
+		}
+	}
+
+	/**
 	 * Extract zip file to destination
 	 */
 	private async extractZip(zipPath: string, destPath: string): Promise<void> {

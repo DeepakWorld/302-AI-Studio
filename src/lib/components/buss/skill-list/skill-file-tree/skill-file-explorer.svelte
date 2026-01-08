@@ -6,16 +6,38 @@
 
 	interface Props {
 		rootPath: string;
+		readOnly?: boolean;
+		changedFiles?: Map<string, string>; // 已修改的文件内容
+		onFileChange?: (path: string, content: string) => void;
 	}
 
-	let { rootPath }: Props = $props();
+	let { rootPath, readOnly = true, changedFiles, onFileChange }: Props = $props();
 	let fileContent = $state("");
 	let filePath = $state("");
 
 	function handleFileSelect(file: { path: string; content: string }) {
-		fileContent = file.content;
+		// 优先使用 changedFiles 中的内容（支持从默认视图切换过来时显示已修改的内容）
+		const modifiedContent = changedFiles?.get(file.path);
+		fileContent = modifiedContent !== undefined ? modifiedContent : file.content;
 		filePath = file.path;
 	}
+
+	function handleContentChange(newContent: string) {
+		fileContent = newContent;
+		if (filePath && onFileChange) {
+			onFileChange(filePath, newContent);
+		}
+	}
+
+	// 监听 changedFiles 中当前选中文件的内容变化（form → 文件树联动）
+	$effect(() => {
+		if (filePath && changedFiles) {
+			const modifiedContent = changedFiles.get(filePath);
+			if (modifiedContent !== undefined && modifiedContent !== fileContent) {
+				fileContent = modifiedContent;
+			}
+		}
+	});
 
 	// Determine language from file extension
 	let language = $derived(filePath.split(".").pop() || "txt");
@@ -36,7 +58,8 @@
 						value={fileContent}
 						{language}
 						theme={mode.current === "dark" ? "dark" : "light"}
-						readOnly={true}
+						{readOnly}
+						onChange={handleContentChange}
 					/>
 				{:else}
 					<div class="flex h-full items-center justify-center text-muted-foreground">

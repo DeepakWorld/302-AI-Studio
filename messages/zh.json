@@ -1085,5 +1085,7 @@
 	"skills_form_content_required": "请输入 Skill 内容",
 	"skills_creating": "创建中...",
 	"skills_create_success": "Skill 创建成功",
-	"skills_create_failed": "Skill 创建失败"
+	"skills_create_failed": "Skill 创建失败",
+	"skills_form_view_default": "默认",
+	"skills_form_view_tree": "文件树"
 }

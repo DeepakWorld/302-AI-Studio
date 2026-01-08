@@ -30,13 +30,6 @@
 		onOpenChange?.(false);
 	}
 
-	function handleUse() {
-		if (skill && onUse) {
-			onUse(skill);
-			handleClose();
-		}
-	}
-
 	function handleEdit() {
 		if (skill && onEdit) {
 			onEdit(skill);
@@ -111,11 +104,6 @@
 				{#if onEdit}
 					<Button class="flex-1" onclick={handleEdit}>
 						{m.text_button_edit()}
-					</Button>
-				{/if}
-				{#if onUse}
-					<Button class="flex-1 " onclick={handleUse}>
-						{m.skills_use_this()}
 					</Button>
 				{/if}
 			</div>

@@ -23,6 +23,7 @@
 		showNewButton?: boolean;
 		onUse?: (skill: Skill) => void;
 		onRemove?: (skill: Skill) => void;
+		onRefresh?: () => void;
 	}
 
 	const {
@@ -35,6 +36,7 @@
 		showNewButton = true,
 		onUse,
 		onRemove,
+		onRefresh,
 	}: Props = $props();
 
 	let searchQuery = $state("");
@@ -178,7 +180,7 @@
 />
 
 <!-- Create Dialog -->
-<SkillCreateDialog bind:open={createDialogOpen} />
+<SkillCreateDialog bind:open={createDialogOpen} onCreate={() => onRefresh?.()} />
 
 <!-- Edit Dialog -->
-<SkillEditDialog bind:open={editDialogOpen} skill={editingSkill} />
+<SkillEditDialog bind:open={editDialogOpen} skill={editingSkill} onSave={() => onRefresh?.()} />

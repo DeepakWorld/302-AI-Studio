@@ -16,9 +16,18 @@
 	interface Props {
 		formData: SkillFormData;
 		rootPath?: string; // 文件树根路径，传入时显示切换按钮
+		readOnly?: boolean; // 是否只读模式
+		changedFiles?: Map<string, string>; // 已修改的文件内容
+		onFileChange?: (path: string, content: string) => void; // 文件内容变化回调
 	}
 
-	let { formData = $bindable(), rootPath }: Props = $props();
+	let {
+		formData = $bindable(),
+		rootPath,
+		readOnly = true,
+		changedFiles,
+		onFileChange,
+	}: Props = $props();
 
 	let viewMode = $state<"default" | "tree">("default");
 
@@ -175,7 +184,7 @@
 							: ''}"
 						onclick={() => (viewMode = "default")}
 					>
-						默认
+						{m.skills_form_view_default()}
 					</Button>
 					<Button
 						variant="ghost"
@@ -185,7 +194,7 @@
 							: ''}"
 						onclick={() => (viewMode = "tree")}
 					>
-						文件树
+						{m.skills_form_view_tree()}
 					</Button>
 				</div>
 			{/if}
@@ -201,7 +210,7 @@
 			<p class="text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
 		{:else if rootPath}
 			<div class="h-[300px] overflow-hidden rounded-md">
-				<SkillFileExplorer {rootPath} />
+				<SkillFileExplorer {rootPath} {readOnly} {changedFiles} {onFileChange} />
 			</div>
 		{/if}
 	</div>

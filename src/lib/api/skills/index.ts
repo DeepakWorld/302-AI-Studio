@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import type { ListSkillsRequest, ListSkillsResponse, SkillDetailsRequest } from "./base-apis";
 import { _createSkill, _editSkillDetails, _listSkills } from "./base-apis";
 
-const { extractZipBlob } = window.electronAPI.appService;
+const { extractZipBlob, zipDirectory } = window.electronAPI.appService;
 
 export async function editSkillDetails(request: SkillDetailsRequest) {
 	const blob = await _editSkillDetails(request);
@@ -49,6 +49,26 @@ export async function createSkill(data: CreateSkillData) {
 	folder.file("SKILL.md", content);
 
 	const zipBlob = await zip.generateAsync({ type: "blob" });
+	const zipFile = new File([zipBlob], `${name}.zip`, { type: "application/zip" });
+
+	return _createSkill(zipFile);
+}
+
+export interface UpdateSkillData {
+	name: string;
+	dirPath: string; // 包含修改后文件的目录路径
+}
+
+/**
+ * 更新 skill，将目录打包成 zip 并上传
+ * zip 文件名和内部文件夹名与 skill 名称一致
+ */
+export async function updateSkill(data: UpdateSkillData) {
+	const { name, dirPath } = data;
+
+	// 使用 electron 的 zipDirectory 打包目录
+	const zipArrayBuffer = await zipDirectory(dirPath, name);
+	const zipBlob = new Blob([zipArrayBuffer], { type: "application/zip" });
 	const zipFile = new File([zipBlob], `${name}.zip`, { type: "application/zip" });
 
 	return _createSkill(zipFile);
