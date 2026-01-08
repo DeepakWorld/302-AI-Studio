@@ -15,6 +15,8 @@ export const skill = type({
 	description: "string",
 	isBuiltin: "boolean?",
 	content: "string?",
+	/** Whether this skill should be forcefully included in prompts when enabled */
+	forceUse: "boolean?",
 });
 export type Skill = typeof skill.infer;
 

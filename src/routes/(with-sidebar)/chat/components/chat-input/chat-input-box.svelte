@@ -15,6 +15,7 @@
 	import { cn } from "$lib/utils";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { isMac } from "$lib/utils/platform";
+	import { X } from "@lucide/svelte";
 	import type { AttachmentFile, Model } from "@shared/types";
 	import { nanoid } from "nanoid";
 	import { onMount } from "svelte";
@@ -24,6 +25,9 @@
 	import ChatActions from "./chat-actions.svelte";
 	import SendMessageButton from "./code-agent/send-message-button.svelte";
 	import StreamingIndicator from "./streaming-indicator.svelte";
+
+	// Get skills that have forceUse=true
+	const forcedSkills = $derived(codeAgentState.skills.filter((s) => s.forceUse));
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 
@@ -295,6 +299,27 @@
 				disabled={codeAgentState.isDeleted}
 			/>
 		</div>
+
+		<!-- Forced Skills Display -->
+		{#if forcedSkills.length > 0}
+			<div class="flex flex-wrap items-center gap-1.5 py-1.5 border-t border-border/50">
+				<span class="text-xs text-muted-foreground shrink-0">{m.skills_active_label()}:</span>
+				{#each forcedSkills as skill (skill.name)}
+					<span
+						class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
+					>
+						{skill.name}
+						<button
+							type="button"
+							class="ml-0.5 rounded hover:bg-primary/20 p-0.5"
+							onclick={() => codeAgentState.handleSkillForceUseToggle(skill.name, false)}
+						>
+							<X class="h-3 w-3" />
+						</button>
+					</span>
+				{/each}
+			</div>
+		{/if}
 
 		<div class="mt-1.5 flex flex-row justify-between gap-2 min-w-0 overflow-hidden shrink-0">
 			<div class="flex items-center gap-2 shrink-0">

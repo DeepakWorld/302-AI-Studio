@@ -295,7 +295,9 @@ class ClaudeCodeAgentState {
 
 	handleSkillUse(skills: Skill[]): void {
 		const currentSkillNames = new Set(this.skills.map((s) => s.name));
-		const uniqueNewSkills = skills.filter((s) => !currentSkillNames.has(s.name));
+		const uniqueNewSkills = skills
+			.filter((s) => !currentSkillNames.has(s.name))
+			.map((s) => ({ ...s, forceUse: true })); // Default to forceUse=true when enabled
 		if (uniqueNewSkills.length > 0) {
 			this.updateSkills([...this.skills, ...uniqueNewSkills]);
 		}
@@ -305,6 +307,11 @@ class ClaudeCodeAgentState {
 		const skillNamesToRemove = new Set(skills.map((s) => s.name));
 		const filteredSkills = this.skills.filter((s) => !skillNamesToRemove.has(s.name));
 		this.updateSkills(filteredSkills);
+	}
+
+	handleSkillForceUseToggle(skillName: string, forceUse: boolean): void {
+		const updatedSkills = this.skills.map((s) => (s.name === skillName ? { ...s, forceUse } : s));
+		this.updateSkills(updatedSkills);
 	}
 }
 

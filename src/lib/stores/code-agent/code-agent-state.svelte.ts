@@ -213,6 +213,12 @@ class CodeAgentState {
 			claudeCodeAgentState.handleSkillRemove(skills);
 		}
 	}
+
+	handleSkillForceUseToggle(skillName: string, forceUse: boolean): void {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.handleSkillForceUseToggle(skillName, forceUse);
+		}
+	}
 }
 
 export const codeAgentState = new CodeAgentState();

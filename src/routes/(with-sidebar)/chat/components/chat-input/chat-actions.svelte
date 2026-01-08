@@ -239,6 +239,8 @@
 				usedSkills={codeAgentState.skills}
 				onUse={(skill) => codeAgentState.handleSkillsUse([skill])}
 				onRemove={(skill) => codeAgentState.handleSkillsRemove([skill])}
+				onForceUseToggle={(skill, forceUse) =>
+					codeAgentState.handleSkillForceUseToggle(skill.name, forceUse)}
 			/>
 		</div>
 	</Overlay>

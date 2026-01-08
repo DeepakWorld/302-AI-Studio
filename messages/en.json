@@ -1052,6 +1052,8 @@
 	"skills_new": "Install",
 	"skills_use": "Use",
 	"skills_remove": "Disable",
+	"skills_force_use": "Force Use",
+	"skills_active_label": "Force Used Skills",
 	"skills_download": "Download",
 	"skills_builtin": "Built-in",
 	"skills_detail_title": "Skills Detail",

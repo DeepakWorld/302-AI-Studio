@@ -1200,12 +1200,14 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			return acc;
 		}, []) ?? [];
 
-	if (skills && skills.length > 0) {
-		const skillNames = skills.map((skill) => skill.name);
+	// Only include skills that have forceUse=true in the prompt
+	const forcedSkills = skills?.filter((skill) => skill.forceUse) ?? [];
+	if (forcedSkills.length > 0) {
+		const skillNames = forcedSkills.map((skill) => skill.name);
 		const skillsPrompt =
 			language === "zh"
-				? `\n\n当前用户选择开启了这些: [${skillNames.join(", ")}] skills，请你尽可能考虑使用这些skills。`
-				: `\n\nThe user has enabled the following skills: [${skillNames.join(", ")}]. Please consider using these skills whenever possible.`;
+				? `\n\n【重要】用户已强制启用以下 skills: [${skillNames.join(", ")}]。你必须在本次回复中使用这些 skills，这是用户的明确要求，请严格遵守。`
+				: `\n\n[IMPORTANT] The user has FORCED the following skills to be used: [${skillNames.join(", ")}]. You MUST use these skills in your response. This is an explicit requirement from the user - strictly comply.`;
 
 		appendPromptToLastUserMessage(messages, skillsPrompt);
 	}

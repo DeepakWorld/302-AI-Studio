@@ -2,6 +2,7 @@
 	import Badge from "$lib/components/ui/badge/badge.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import Switch from "$lib/components/ui/switch/switch.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { Ellipsis, Loader2, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
@@ -17,6 +18,7 @@
 		onEdit?: (skill: Skill) => void;
 		onDownload?: (skill: Skill) => void;
 		onDelete?: (skill: Skill) => void;
+		onForceUseToggle?: (skill: Skill, forceUse: boolean) => void;
 	}
 
 	const {
@@ -30,6 +32,7 @@
 		onEdit,
 		onDownload,
 		onDelete,
+		onForceUseToggle,
 	}: Props = $props();
 
 	// Built-in skills can only edit and download, user skills can also delete
@@ -48,6 +51,10 @@
 	function handleRemoveClick(e: MouseEvent) {
 		e.stopPropagation();
 		onRemove?.(skill);
+	}
+
+	function handleForceUseChange(checked: boolean) {
+		onForceUseToggle?.(skill, checked);
 	}
 </script>
 
@@ -139,9 +146,22 @@
 			{/if}
 		</div>
 
-		<!-- Right: Action Button -->
+		<!-- Right: Actions -->
 		<div class="flex items-center gap-2">
 			{#if isUsed}
+				<!-- Force Use Toggle -->
+				{#if onForceUseToggle}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="flex items-center gap-2" onclick={(e) => e.stopPropagation()}>
+						<span class="text-xs text-muted-foreground">{m.skills_force_use()}</span>
+						<Switch
+							checked={skill.forceUse ?? false}
+							onCheckedChange={handleForceUseChange}
+							class="border-border"
+						/>
+					</div>
+				{/if}
 				{#if onRemove}
 					<Button
 						variant="ghost"

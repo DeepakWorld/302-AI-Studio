@@ -1049,6 +1049,8 @@
 	"skills_new": "安装",
 	"skills_use": "使用",
 	"skills_remove": "禁用",
+	"skills_force_use": "强制使用",
+	"skills_active_label": "强制使用的Skills",
 	"skills_download": "下载",
 	"skills_builtin": "内置",
 	"skills_detail_title": "Skills 详情",
