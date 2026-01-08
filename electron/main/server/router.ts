@@ -6,7 +6,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { serve } from "@hono/node-server";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { ChatMessage, McpServer } from "@shared/types";
+import type { ChatMessage, McpServer, Skill } from "@shared/types";
 import {
 	ToolLoopAgent as Agent,
 	convertToModelMessages,
@@ -27,6 +27,7 @@ import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
 import {
+	appendPromptToLastUserMessage,
 	convertAiSdkMessagesToOpenAiMessages,
 	createUIMessageStreamFromGenerator,
 	isStreamingSupported,
@@ -59,6 +60,7 @@ export type RouterRequestBody = {
 	mcpServers?: string[];
 	sandboxName?: string;
 	autoDeploy?: boolean;
+	skills?: Skill[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1159,9 +1161,11 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		model = "claude-sonnet-4-5-20250929",
 		apiKey,
 		messages,
+		language,
 		threadId,
 		sessionId,
 		autoDeploy,
+		skills,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
@@ -1185,6 +1189,24 @@ app.post("/chat/302ai-code-agent", async (c) => {
 	// Use createClaudeCodeFetch to get the transformed stream directly
 	const claudeCodeFetch = createClaudeCodeFetch(messageId);
 
+	const availableSkills =
+		skills?.reduce<string[]>((acc, skill) => {
+			if (!skill.isBuiltin) {
+				acc.push(skill.name);
+			}
+			return acc;
+		}, []) ?? [];
+
+	if (skills && skills.length > 0) {
+		const skillNames = skills.map((skill) => skill.name);
+		const skillsPrompt =
+			language === "zh"
+				? `\n\n当前用户选择开启了这些: [${skillNames.join(", ")}] skills，请你尽可能考虑使用这些skills。`
+				: `\n\nThe user has enabled the following skills: [${skillNames.join(", ")}]. Please consider using these skills whenever possible.`;
+
+		appendPromptToLastUserMessage(messages, skillsPrompt);
+	}
+
 	// Build request body for 302.AI Claude Code API
 	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
 	const lastAiSdkModelMessage = convertedMessages.at(-1);
@@ -1198,11 +1220,12 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		session_id: sessionId ?? "",
 		structured_output: true,
 		enable_pre_deploy_check: autoDeploy ?? true,
+		available_skills: availableSkills,
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));
 	console.log("[302ai-code-agent] Sending request to 302.AI...");
-	console.log("[302ai-code-agent] Request body:", JSON.stringify(requestBody).substring(0, 500));
+	console.log("[302ai-code-agent] Request body:", JSON.stringify(requestBody, null, 2));
 
 	// Create immediate start event for optimistic UI update
 	// Include messageMetadata with model and provider info so the UI shows correct icon/name

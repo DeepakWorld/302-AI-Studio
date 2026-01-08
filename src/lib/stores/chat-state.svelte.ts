@@ -1341,6 +1341,7 @@ export const chat = new Chat({
 				})(),
 
 				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
+				skills: codeAgentState.skills,
 			};
 		},
 	}),

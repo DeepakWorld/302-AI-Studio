@@ -344,3 +344,89 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
 		return [msg];
 	});
 }
+
+/**
+ * Appends a prompt string to the last user message in a list of messages.
+ * Handles both string content and array content (multi-modal/parts).
+ * Immutably updates the message object in the array.
+ *
+ * Supported message structures:
+ * 1. { role: 'user', parts: [{ type: 'text', text: '...' }] }
+ * 2. { role: 'user', content: [{ type: 'text', text: '...' }] }
+ * 3. { role: 'user', content: '...' }
+ *
+ * @param messages The list of messages (mutable array)
+ * @param prompt The prompt string to append
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function appendPromptToLastUserMessage(messages: any[], prompt: string): void {
+	// Find the last user message and append the prompt
+	for (let i = messages.length - 1; i >= 0; i--) {
+		if (messages[i].role === "user") {
+			const msg = messages[i];
+
+			// Handle 'parts' property (priority, common in newer AI SDK)
+			if (Array.isArray(msg.parts)) {
+				const newParts = [...msg.parts];
+				let lastTextPartIndex = -1;
+
+				// Find the last text part
+				for (let j = newParts.length - 1; j >= 0; j--) {
+					if (newParts[j].type === "text") {
+						lastTextPartIndex = j;
+						break;
+					}
+				}
+
+				if (lastTextPartIndex !== -1) {
+					// Create a new text part with appended prompt
+					newParts[lastTextPartIndex] = {
+						...newParts[lastTextPartIndex],
+						text: newParts[lastTextPartIndex].text + prompt,
+					};
+				} else {
+					newParts.push({ type: "text", text: prompt });
+				}
+
+				messages[i] = {
+					...msg,
+					parts: newParts,
+				};
+			}
+			// Handle 'content' property (fallback)
+			else {
+				const content = msg.content;
+				let newContent = content;
+
+				if (Array.isArray(content)) {
+					newContent = [...content];
+					let lastTextPartIndex = -1;
+
+					for (let j = newContent.length - 1; j >= 0; j--) {
+						if (newContent[j].type === "text") {
+							lastTextPartIndex = j;
+							break;
+						}
+					}
+
+					if (lastTextPartIndex !== -1) {
+						newContent[lastTextPartIndex] = {
+							...newContent[lastTextPartIndex],
+							text: newContent[lastTextPartIndex].text + prompt,
+						};
+					} else {
+						newContent.push({ type: "text", text: prompt });
+					}
+				} else if (typeof content === "string") {
+					newContent = content + prompt;
+				}
+
+				messages[i] = {
+					...msg,
+					content: newContent,
+				};
+			}
+			break;
+		}
+	}
+}
