@@ -323,6 +323,18 @@ export function registerIpcHandlers() {
 	ipcMain.handle("appService:writeFile", (event, filePath, content) =>
 		appService.writeFile(event, filePath, content),
 	);
+	ipcMain.handle("appService:createDirectory", (event, dirPath) =>
+		appService.createDirectory(event, dirPath),
+	);
+	ipcMain.handle("appService:deleteFile", (event, filePath) =>
+		appService.deleteFile(event, filePath),
+	);
+	ipcMain.handle("appService:deleteDirectory", (event, dirPath) =>
+		appService.deleteDirectory(event, dirPath),
+	);
+	ipcMain.handle("appService:renameFile", (event, oldPath, newPath) =>
+		appService.renameFile(event, oldPath, newPath),
+	);
 	ipcMain.handle("appService:zipDirectory", (event, dirPath, zipName) =>
 		appService.zipDirectory(event, dirPath, zipName),
 	);
@@ -534,6 +546,10 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("appService:scanDirectory");
 	ipcMain.removeHandler("appService:readFile");
 	ipcMain.removeHandler("appService:writeFile");
+	ipcMain.removeHandler("appService:createDirectory");
+	ipcMain.removeHandler("appService:deleteFile");
+	ipcMain.removeHandler("appService:deleteDirectory");
+	ipcMain.removeHandler("appService:renameFile");
 	ipcMain.removeHandler("appService:zipDirectory");
 	ipcMain.removeHandler("appService:createSkillTempDir");
 	ipcMain.removeHandler("appService:deleteTempDir");
