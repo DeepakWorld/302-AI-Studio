@@ -1,5 +1,6 @@
+import { updateSessionNote } from "$lib/api/sandbox-session";
 import { generateSuggestions } from "$lib/api/suggestions-generation";
-import { generateTitle } from "$lib/api/title-generation";
+import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages.js";
 import {
@@ -983,6 +984,15 @@ class ChatState {
 				messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
 			}
 
+			// 准备兜底配置：如果 provider 未配置，使用当前聊天模型
+			let fallbackConfig: FallbackModelConfig | undefined;
+			if (!provider && this.selectedModel && this.currentProvider) {
+				fallbackConfig = {
+					model: this.selectedModel,
+					provider: this.currentProvider,
+				};
+			}
+
 			const result = await generateTitle(
 				messagesToSend,
 				titleModel,
@@ -990,6 +1000,7 @@ class ChatState {
 				serverPort,
 				previousSummary,
 				isFirstGeneration,
+				fallbackConfig,
 			);
 
 			if (result) {
@@ -1002,6 +1013,27 @@ class ChatState {
 
 				// Broadcast update event to trigger sidebar refresh
 				await broadcastService.broadcastToAll("thread-list-updated", {});
+
+				// 如果是 code agent 类型，同步备注到 302.AI
+				if (codeAgentState.enabled) {
+					const sandboxId = claudeCodeAgentState.sandboxId;
+					const sessionId = claudeCodeAgentState.currentSessionId;
+					const provider302AI = providerState.getProvider("302AI");
+
+					if (sandboxId && sessionId && provider302AI) {
+						try {
+							await updateSessionNote(provider302AI, {
+								sandbox_id: sandboxId,
+								session_id: sessionId,
+								note: result.title,
+							});
+							console.log("[ChatState] Session note synced to 302.AI");
+						} catch (syncError) {
+							console.error("[ChatState] Failed to sync session note:", syncError);
+							// 不阻塞主流程，只记录错误
+						}
+					}
+				}
 
 				toast.success(m.toast_title_generation_success());
 			} else {
@@ -1547,12 +1579,20 @@ export const chat = new Chat({
 			currentTitle === "新会话";
 		const isFirstMessage = messages.length === 2; // User message + AI response
 
+		// 计算当前对话轮数（一轮 = 用户消息 + 助手回复）
+		const conversationRounds = Math.floor(messages.length / 2);
+		// 每隔多少轮更新一次标题（首次对话模式下）
+		const TITLE_UPDATE_INTERVAL = 5;
+
 		let shouldGenerateTitle = false;
 
 		if (titleTiming === "off") {
 			shouldGenerateTitle = false;
 		} else if (titleTiming === "firstTime") {
-			shouldGenerateTitle = isFirstMessage && isDefaultTitle;
+			// 首次生成 或 每隔 N 轮更新一次
+			shouldGenerateTitle =
+				(isFirstMessage && isDefaultTitle) ||
+				(conversationRounds > 1 && conversationRounds % TITLE_UPDATE_INTERVAL === 0);
 		} else if (titleTiming === "everyTime") {
 			shouldGenerateTitle = messages.length >= 2;
 		}
@@ -1579,6 +1619,15 @@ export const chat = new Chat({
 					messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
 				}
 
+				// 准备兜底配置：如果 302AI provider 未配置，使用当前聊天模型
+				let fallbackConfig: FallbackModelConfig | undefined;
+				if (!provider && chatState.selectedModel && chatState.currentProvider) {
+					fallbackConfig = {
+						model: chatState.selectedModel,
+						provider: chatState.currentProvider,
+					};
+				}
+
 				const result = await generateTitle(
 					messagesToSend,
 					titleModel,
@@ -1586,6 +1635,7 @@ export const chat = new Chat({
 					serverPort,
 					previousSummary,
 					isFirstMessage,
+					fallbackConfig,
 				);
 
 				if (result) {
