@@ -5,9 +5,8 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 
-	import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
-	import { SkillList } from "$lib/components/buss/skill-list";
+	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
@@ -28,10 +27,6 @@
 
 	let isMCPSelectorOpen = $state(false);
 	let addingMCP = $state(false);
-	let skillsData = $state<Omit<ListSkillsResponse, "success" | "project_skills">>({
-		builtin_skills: [],
-		user_skills: [],
-	});
 
 	function handleParametersClose() {
 		chatState.isParametersOpen = false;
@@ -69,16 +64,13 @@
 	}
 
 	function handleSkillsPanelToggle() {
-		codeAgentState.isSkillsPanelOpen = !codeAgentState.isSkillsPanelOpen;
-	}
-
-	$effect(() => {
-		if (codeAgentState.isSkillsPanelOpen) {
-			codeAgentState.getSkillList(false).then((data) => {
-				skillsData = data;
-			});
+		// Toggle between skills tab and preview tab in the agent preview panel
+		if (agentPreviewState.activeTab === "skills") {
+			agentPreviewState.setActiveTab("preview");
+		} else {
+			agentPreviewState.openSkillsTab();
 		}
-	});
+	}
 </script>
 
 {#snippet actionEnableThinking()}
@@ -207,10 +199,11 @@
 {/snippet}
 
 {#snippet actionEnableSkills()}
+	{@const hasForceUseSkills = codeAgentState.skills.some((s) => s.forceUse)}
 	<ButtonWithTooltip
 		class={cn(
 			"hover:!bg-chat-action-hover",
-			codeAgentState.skills.length > 0 &&
+			hasForceUseSkills &&
 				!codeAgentState.isLoadingSkills &&
 				"!bg-chat-action-active hover:!bg-chat-action-active",
 		)}
@@ -221,29 +214,9 @@
 		{#if codeAgentState.isLoadingSkills}
 			<LdrsLoader type="line-spinner" size={16} />
 		{:else}
-			<Zap class={cn(codeAgentState.skills.length > 0 && "!text-chat-action-active-fg")} />
+			<Zap class={cn(hasForceUseSkills && "!text-chat-action-active-fg")} />
 		{/if}
 	</ButtonWithTooltip>
-
-	<Overlay
-		title={m.title_skills_management()}
-		open={codeAgentState.isSkillsPanelOpen}
-		onClose={handleSkillsPanelToggle}
-		class="h-[70vh] w-[80vw] max-w-5xl flex flex-col"
-	>
-		<div class="flex-1 overflow-y-auto min-h-0 px-6 pb-6">
-			<SkillList
-				builtinSkills={skillsData.builtin_skills}
-				userSkills={skillsData.user_skills}
-				loading={codeAgentState.isLoadingSkills}
-				usedSkills={codeAgentState.skills}
-				onUse={(skill) => codeAgentState.handleSkillsUse([skill])}
-				onRemove={(skill) => codeAgentState.handleSkillsRemove([skill])}
-				onForceUseToggle={(skill, forceUse) =>
-					codeAgentState.handleSkillForceUseToggle(skill.name, forceUse)}
-			/>
-		</div>
-	</Overlay>
 {/snippet}
 
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">

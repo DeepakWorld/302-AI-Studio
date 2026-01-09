@@ -13,10 +13,28 @@
 	interface Props {
 		rootPath: string;
 		readOnly?: boolean;
+		defaultExpandAll?: boolean;
+		autoSelectPriority?: string[]; // File names to auto-select by priority
 		onSelect?: (file: { path: string; content: string }) => void;
 	}
 
-	let { rootPath, readOnly = false, onSelect }: Props = $props();
+	// Default priority for auto-selecting files
+	const DEFAULT_AUTO_SELECT_PRIORITY = [
+		"SKILL.md",
+		"skill.md",
+		"README.md",
+		"readme.md",
+		"index.md",
+		"INDEX.md",
+	];
+
+	let {
+		rootPath,
+		readOnly = false,
+		defaultExpandAll = false,
+		autoSelectPriority = DEFAULT_AUTO_SELECT_PRIORITY,
+		onSelect,
+	}: Props = $props();
 	let tree = $state<FileNode | null>(null);
 	let selectedPath = $state("");
 	let loading = $state(false);
@@ -45,11 +63,65 @@
 		renameFile,
 	} = window.electronAPI.appService;
 
+	// Collect all directory paths for expanding
+	function collectAllDirectoryPaths(node: FileNode, paths: string[] = []): string[] {
+		if (node.type === "directory") {
+			paths.push(node.path);
+			node.children?.forEach((child) => collectAllDirectoryPaths(child, paths));
+		}
+		return paths;
+	}
+
+	// Find file by priority from the file tree
+	function findFileByPriority(node: FileNode, priority: string[]): FileNode | null {
+		const allFiles: FileNode[] = [];
+
+		function collectFiles(n: FileNode) {
+			if (n.type === "file") {
+				allFiles.push(n);
+			}
+			n.children?.forEach(collectFiles);
+		}
+
+		collectFiles(node);
+
+		// Find first matching file by priority
+		for (const name of priority) {
+			const found = allFiles.find(
+				(f) => f.name.toLowerCase() === name.toLowerCase() || f.name === name,
+			);
+			if (found) return found;
+		}
+
+		return null;
+	}
+
+	let hasInitialized = false;
+
 	async function loadTree(path: string) {
 		if (!path) return;
 		loading = true;
 		try {
 			tree = await scanDirectory(path);
+
+			// Only run initialization once
+			if (tree && !hasInitialized) {
+				hasInitialized = true;
+
+				// Expand all directories if enabled
+				if (defaultExpandAll) {
+					const allDirs = collectAllDirectoryPaths(tree);
+					allDirs.forEach((dir) => expandedPaths.add(dir));
+				}
+
+				// Auto-select priority file
+				if (autoSelectPriority.length > 0) {
+					const priorityFile = findFileByPriority(tree, autoSelectPriority);
+					if (priorityFile) {
+						handleNodeSelect(priorityFile);
+					}
+				}
+			}
 		} catch (error) {
 			console.error("Failed to scan directory:", error);
 		} finally {

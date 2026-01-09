@@ -227,11 +227,14 @@ class SyncBus {
 	}
 }
 
+export type AgentPreviewTab = "preview" | "code" | "terminal" | "skills";
+
 export class AgentPreviewState {
 	isVisible = $state(false);
 	mode = $state<HtmlPreviewMode>("preview");
 	sandBoxId = $state<string | undefined>(undefined);
 	isDeploying = $state(false);
+	activeTab = $state<AgentPreviewTab>("preview");
 	private syncBus = new SyncBus(syncInstanceId);
 
 	// Use global preferencesSettings for isPinned
@@ -775,6 +778,16 @@ export class AgentPreviewState {
 	closePreview() {
 		this.isVisible = false;
 		this.mode = "preview";
+		this.activeTab = "preview";
+	}
+
+	setActiveTab(tab: AgentPreviewTab) {
+		this.activeTab = tab;
+	}
+
+	openSkillsTab() {
+		this.activeTab = "skills";
+		this.isVisible = true;
 	}
 
 	togglePreview() {}

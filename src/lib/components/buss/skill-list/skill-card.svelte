@@ -35,9 +35,10 @@
 		onForceUseToggle,
 	}: Props = $props();
 
-	// Built-in skills can only edit and download, user skills can also delete
+	// Built-in skills cannot be edited or deleted, only downloaded
+	const canEdit = $derived(!isBuiltin && !!onEdit);
 	const canDelete = $derived(!isBuiltin && !!onDelete);
-	const showMenu = $derived(!!onEdit || !!onDownload || canDelete);
+	const showMenu = $derived(canEdit || !!onDownload || canDelete);
 
 	function handleCardClick() {
 		onSelect?.(skill);
@@ -93,8 +94,8 @@
 								</Button>
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content align="end" class="w-32">
-								{#if onEdit}
-									<DropdownMenu.Item onclick={() => onEdit(skill)}>
+								{#if canEdit}
+									<DropdownMenu.Item onclick={() => onEdit?.(skill)}>
 										{m.text_button_edit()}
 									</DropdownMenu.Item>
 								{/if}

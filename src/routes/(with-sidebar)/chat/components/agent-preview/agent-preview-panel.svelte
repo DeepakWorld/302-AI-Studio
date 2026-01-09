@@ -5,11 +5,23 @@
 		uploadSandboxFile,
 		type SandboxFileInfo,
 	} from "$lib/api/sandbox-file";
+	import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 	import { deployHtmlTo302, validate302Provider } from "$lib/api/webserve-deploy";
 	import UnDeployedIcon from "$lib/assets/icons/code-agent/unDeployed.svg";
 	import CodeMirrorEditor from "$lib/components/buss/editor/codemirror-editor.svelte";
+	import SkillsPanelHeader from "$lib/components/buss/skill-list/skills-panel-header.svelte";
+	import SkillCreateGithubView from "$lib/components/buss/skill-list/views/skill-create-github-view.svelte";
+	import SkillCreateHistoryView from "$lib/components/buss/skill-list/views/skill-create-history-view.svelte";
+	import SkillCreateManualView from "$lib/components/buss/skill-list/views/skill-create-manual-view.svelte";
+	import SkillCreateSelectView from "$lib/components/buss/skill-list/views/skill-create-select-view.svelte";
+	import SkillCreateUploadView from "$lib/components/buss/skill-list/views/skill-create-upload-view.svelte";
+	import SkillDetailView from "$lib/components/buss/skill-list/views/skill-detail-view.svelte";
+	import SkillEditView from "$lib/components/buss/skill-list/views/skill-edit-view.svelte";
+	import SkillPreviewView from "$lib/components/buss/skill-list/views/skill-preview-view.svelte";
+	import SkillsListView from "$lib/components/buss/skill-list/views/skills-list-view.svelte";
 	import PreviewHeader, { type PreviewTab } from "$lib/components/chat/preview-header.svelte";
 	import PreviewPanel from "$lib/components/html-preview/preview-panel.svelte";
+	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
 
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as m from "$lib/paraglide/messages";
@@ -26,7 +38,7 @@
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { Check, Copy, Download, FileWarning, Loader2, Pencil, Save, X } from "@lucide/svelte";
-	import type { ModelProvider } from "@shared/types";
+	import type { ModelProvider, Skill } from "@shared/types";
 	import { onDestroy, untrack } from "svelte";
 	import { toast } from "svelte-sonner";
 	import {
@@ -34,6 +46,7 @@
 		DEVICE_MODE_MOBILE,
 		TAB_CODE,
 		TAB_PREVIEW,
+		TAB_SKILLS,
 		TAB_TERMINAL,
 		type DeviceMode,
 		type TabType,
@@ -151,8 +164,33 @@
 	}
 
 	// --- State ---
-	let activeTab = $state<TabType>(TAB_PREVIEW);
+	// Sync activeTab with agentPreviewState
+	let activeTab = $derived(agentPreviewState.activeTab as TabType);
 	let deviceMode = $state<DeviceMode>(DEVICE_MODE_DESKTOP);
+
+	// Skills data
+	let skillsData = $state<Omit<ListSkillsResponse, "success" | "project_skills">>({
+		builtin_skills: [],
+		user_skills: [],
+	});
+
+	const allSkills = $derived<Skill[]>([...skillsData.builtin_skills, ...skillsData.user_skills]);
+
+	function findSkill(skillName: string): Skill | undefined {
+		return allSkills.find((s) => s.name === skillName);
+	}
+
+	async function loadSkills() {
+		const data = await codeAgentState.getSkillList(false);
+		skillsData = data;
+	}
+
+	// Load skills when switching to skills tab
+	$effect(() => {
+		if (activeTab === TAB_SKILLS) {
+			loadSkills();
+		}
+	});
 
 	// Grouped Deployment State
 	let deployment = $state({
@@ -218,6 +256,7 @@
 		];
 		if (isAgentMode) {
 			t.push({ id: TAB_TERMINAL, label: m.label_tab_terminal() });
+			t.push({ id: TAB_SKILLS, label: "Skills" });
 		}
 		return t;
 	});
@@ -916,7 +955,7 @@
 				compactDeployButton={false}
 				isPinned={agentPreviewState.isPinned}
 				isStreaming={chatState.isStreaming}
-				onTabChange={(t) => (activeTab = t as TabType)}
+				onTabChange={(t) => agentPreviewState.setActiveTab(t as TabType)}
 				onDeviceModeChange={(d) => (deviceMode = d)}
 				onDeploy={isAgentMode ? handleDeploySandbox : handleDeploy}
 				onClose={() => agentPreviewState.closePreview()}
@@ -1190,6 +1229,64 @@
 									Sandbox not available
 								</div>
 							{/if}
+						{:else if activeTab === TAB_SKILLS && isAgentMode}
+							<!-- Skills Tab Content -->
+							<div class="flex h-full flex-col min-h-0 overflow-hidden">
+								<!-- Skills Panel Header -->
+								<SkillsPanelHeader
+									currentView={skillsPanelState.currentView}
+									viewStack={skillsPanelState.viewStack}
+									canGoBack={skillsPanelState.canGoBack}
+									isPinned={false}
+									showPinButton={false}
+									showCloseButton={false}
+									onBack={() => skillsPanelState.pop()}
+									onClose={() => {}}
+									onTogglePin={() => {}}
+									skillName={skillsPanelState.currentView.type === "detail" ||
+									skillsPanelState.currentView.type === "edit"
+										? skillsPanelState.currentView.skillName
+										: ""}
+								/>
+
+								<!-- Skills Content Area -->
+								<div class="flex-1 overflow-y-auto min-h-0">
+									{#if skillsPanelState.currentView.type === "list"}
+										<SkillsListView
+											userSkills={skillsData.user_skills}
+											builtinSkills={skillsData.builtin_skills}
+											loading={codeAgentState.isLoadingSkills}
+											onRefresh={loadSkills}
+										/>
+									{:else if skillsPanelState.currentView.type === "detail"}
+										<SkillDetailView
+											skillName={skillsPanelState.currentView.skillName}
+											skill={findSkill(skillsPanelState.currentView.skillName)}
+										/>
+									{:else if skillsPanelState.currentView.type === "preview"}
+										<SkillPreviewView
+											skillName={skillsPanelState.currentView.skillName}
+											skill={findSkill(skillsPanelState.currentView.skillName)}
+										/>
+									{:else if skillsPanelState.currentView.type === "edit"}
+										<SkillEditView
+											skillName={skillsPanelState.currentView.skillName}
+											skill={findSkill(skillsPanelState.currentView.skillName)}
+											onRefresh={loadSkills}
+										/>
+									{:else if skillsPanelState.currentView.type === "create-select"}
+										<SkillCreateSelectView />
+									{:else if skillsPanelState.currentView.type === "create-manual"}
+										<SkillCreateManualView onRefresh={loadSkills} />
+									{:else if skillsPanelState.currentView.type === "create-upload"}
+										<SkillCreateUploadView onRefresh={loadSkills} />
+									{:else if skillsPanelState.currentView.type === "create-github"}
+										<SkillCreateGithubView onRefresh={loadSkills} />
+									{:else if skillsPanelState.currentView.type === "create-history"}
+										<SkillCreateHistoryView />
+									{/if}
+								</div>
+							</div>
 						{/if}
 					</div>
 				{/if}

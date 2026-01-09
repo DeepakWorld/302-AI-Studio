@@ -7,11 +7,22 @@
 	interface Props {
 		rootPath: string;
 		readOnly?: boolean;
+		lineWrapping?: boolean;
+		defaultExpandAll?: boolean;
+		autoSelectPriority?: string[];
 		changedFiles?: Map<string, string>; // 已修改的文件内容
 		onFileChange?: (path: string, content: string) => void;
 	}
 
-	let { rootPath, readOnly = true, changedFiles, onFileChange }: Props = $props();
+	let {
+		rootPath,
+		readOnly = true,
+		lineWrapping = true,
+		defaultExpandAll = false,
+		autoSelectPriority,
+		changedFiles,
+		onFileChange,
+	}: Props = $props();
 	let fileContent = $state("");
 	let filePath = $state("");
 
@@ -47,7 +58,13 @@
 	<Resizable.PaneGroup direction="horizontal" class="h-full w-full rounded-lg border">
 		<Resizable.Pane defaultSize={25} minSize={15} maxSize={40}>
 			<div class="h-full p-2">
-				<SkillFileTree {rootPath} {readOnly} onSelect={handleFileSelect} />
+				<SkillFileTree
+					{rootPath}
+					{readOnly}
+					{defaultExpandAll}
+					{autoSelectPriority}
+					onSelect={handleFileSelect}
+				/>
 			</div>
 		</Resizable.Pane>
 		<Resizable.Handle />
@@ -59,6 +76,7 @@
 						{language}
 						theme={mode.current === "dark" ? "dark" : "light"}
 						{readOnly}
+						{lineWrapping}
 						onChange={handleContentChange}
 					/>
 				{:else}
