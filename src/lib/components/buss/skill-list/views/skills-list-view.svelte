@@ -44,8 +44,8 @@
 	let isSyncing = $state(false);
 	let downloadingSkills = new SvelteSet<string>();
 
-	// Combine skills with source flag
-	const allSkills = $derived<Skill[]>([...builtinSkills, ...userSkills]);
+	// Combine skills: user skills first, then builtin skills
+	const allSkills = $derived<Skill[]>([...userSkills, ...builtinSkills]);
 
 	const filteredSkills = $derived(
 		allSkills.filter(
