@@ -163,7 +163,7 @@
 			</div>
 
 			<div class="gap-settings-gap flex flex-col">
-				<Label class="text-label-fg">{m.label_remark()}</Label>
+				<Label class="text-label-fg">{m.label_session_remark()}</Label>
 				<div class="flex flex-row gap-2">
 					<Input
 						class="!bg-settings-item-bg dark:!bg-settings-item-bg h-10 rounded-[10px]"
