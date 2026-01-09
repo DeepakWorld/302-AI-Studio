@@ -76,7 +76,7 @@
 	type="file"
 	multiple
 	class="hidden"
-	accept="image/*,text/*,audio/*,video/*,.pdf,.json,.csv,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.md,.markdown"
+	accept="image/*,text/*,audio/*,video/*,.pdf,.json,.csv,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.md,.markdown,.zip"
 	onchange={handleFileSelect}
 />
 

@@ -270,10 +270,30 @@ export class CodeAgentService {
 		}
 	}
 
+	async updateClaudeCodeSandboxThinkingBudget(
+		_event: IpcMainInvokeEvent,
+		sandbox_id: string,
+		maxThinkingToken: number,
+	): Promise<{ isOK: boolean }> {
+		try {
+			const response = await updateClaudeCodeSandbox(
+				sandbox_id,
+				undefined,
+				undefined,
+				maxThinkingToken,
+			);
+			return { isOK: response.success };
+		} catch (error) {
+			console.error("Error updating Claude code sandbox thinking budget:", error);
+			return { isOK: false };
+		}
+	}
+
 	async createClaudeCodeSandboxByIpc(
 		_event: IpcMainInvokeEvent,
 		threadId: string,
 		sandboxName: string,
+		maxThinkingToken?: number,
 	): Promise<{ isOK: boolean; sandboxId: string }> {
 		try {
 			const targetThread = await storageService.getItemInternal("app-thread:" + threadId);
@@ -285,6 +305,7 @@ export class CodeAgentService {
 			const cfg: CreateClaudeCodeSandboxRequest = {
 				llm_model: llmModel,
 				sandbox_name: sandboxName,
+				max_thinking_token: maxThinkingToken,
 			};
 
 			const { createdResult, sandboxId } = await this._createClaudeCodeSandbox(threadId, cfg);

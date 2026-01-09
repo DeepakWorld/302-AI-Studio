@@ -5,7 +5,11 @@ import { type ListSkillsResponse } from "$lib/api/skills/base-apis";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import type { ChatMessage } from "$lib/types/chat";
-import { type CodeAgentMetadata, type Skill } from "@shared/storage/code-agent";
+import {
+	type CodeAgentMetadata,
+	type Skill,
+	type ThinkingBudgetType,
+} from "@shared/storage/code-agent";
 import { toast } from "svelte-sonner";
 import { agentPreviewState } from "../agent-preview-state.svelte";
 
@@ -21,7 +25,16 @@ const {
 	updateClaudeCodeSandboxesByIpc,
 	createClaudeCodeSandboxByIpc,
 	findClaudeCodeSandboxWithValidDisk,
+	updateClaudeCodeSandboxThinkingBudget,
 } = window.electronAPI.codeAgentService;
+
+const THINKING_BUDGET_MAP: Record<ThinkingBudgetType, number> = {
+	off: 0,
+	low: 2000,
+	medium: 4000,
+	high: 8000,
+	max: 16000,
+};
 
 const tab = window.tab ?? null;
 
@@ -35,7 +48,7 @@ const threadId =
 		: "shell";
 
 function getInitialData() {
-	const initialData = {
+	const initialData: CodeAgentMetadata = {
 		model: "claude-sonnet-4-5-20250929",
 		currentWorkspacePath: "",
 		workspacePaths: [],
@@ -44,6 +57,7 @@ function getInitialData() {
 		sandboxId: "",
 		sandboxRemark: "",
 		skills: [],
+		thinkingBudget: "off",
 	};
 	return initialData;
 }
@@ -63,11 +77,14 @@ class ClaudeCodeAgentState {
 	selectedSandboxId = $state<"auto" | string>("auto");
 	selectedSandboxRemark = $state("");
 
+	isUpdatingThinkingBudget = $state(false);
+
 	model = $derived(persistedClaudeCodeAgentState.current?.model ?? "");
 	currentSessionId = $derived(persistedClaudeCodeAgentState.current?.currentSessionId ?? "");
 	sandboxId = $derived(persistedClaudeCodeAgentState.current?.sandboxId ?? "");
 	sandboxRemark = $derived(persistedClaudeCodeAgentState.current?.sandboxRemark ?? "");
 	skills = $derived(persistedClaudeCodeAgentState.current?.skills ?? []);
+	thinkingBudget = $derived(persistedClaudeCodeAgentState.current?.thinkingBudget ?? "off");
 	agentMode = $derived.by(() => {
 		return this.selectedSessionId === "new" ? "new" : "existing";
 	});
@@ -214,6 +231,25 @@ class ClaudeCodeAgentState {
 		this.updateState({ skills });
 	}
 
+	async updateThinkingBudget(thinkingBudget: ThinkingBudgetType) {
+		this.updateState({ thinkingBudget });
+
+		if (this.sandboxId) {
+			this.isUpdatingThinkingBudget = true;
+			try {
+				const { isOK } = await updateClaudeCodeSandboxThinkingBudget(
+					this.sandboxId,
+					THINKING_BUDGET_MAP[thinkingBudget],
+				);
+				if (!isOK) {
+					// toast.error("Failed to update thinking budget");
+				}
+			} finally {
+				this.isUpdatingThinkingBudget = false;
+			}
+		}
+	}
+
 	async handleAgentModeExecute(): Promise<{
 		isOK: boolean;
 		sandboxInfo?: ClaudeCodeSandboxInfo;
@@ -231,6 +267,14 @@ class ClaudeCodeAgentState {
 				currentSessionId: this.selectedSessionId,
 			});
 
+			// Update sandbox thinking budget to match current setting
+			if (this.thinkingBudget !== "off") {
+				await updateClaudeCodeSandboxThinkingBudget(
+					this.selectedSandboxId,
+					THINKING_BUDGET_MAP[this.thinkingBudget],
+				);
+			}
+
 			return { isOK: true, sandboxInfo };
 		} else if (this.agentMode === "new") {
 			if (this.selectedSandboxId === "auto") {
@@ -245,6 +289,14 @@ class ClaudeCodeAgentState {
 					sandboxRemark: sandboxInfo?.sandboxRemark,
 				});
 
+				// Update sandbox thinking budget to match current setting
+				if (this.thinkingBudget !== "off") {
+					await updateClaudeCodeSandboxThinkingBudget(
+						sandboxInfo!.sandboxId,
+						THINKING_BUDGET_MAP[this.thinkingBudget],
+					);
+				}
+
 				return { isOK: true, sandboxInfo };
 			} else {
 				const { isOK, valid, sandboxInfo } = await checkClaudeCodeSandbox(this.selectedSandboxId);
@@ -258,6 +310,14 @@ class ClaudeCodeAgentState {
 					sandboxRemark: sandboxInfo?.sandboxRemark,
 				});
 
+				// Update sandbox thinking budget to match current setting
+				if (this.thinkingBudget !== "off") {
+					await updateClaudeCodeSandboxThinkingBudget(
+						this.selectedSandboxId,
+						THINKING_BUDGET_MAP[this.thinkingBudget],
+					);
+				}
+
 				return { isOK: true, sandboxInfo };
 			}
 		}
@@ -268,6 +328,7 @@ class ClaudeCodeAgentState {
 		const { isOK, sandboxId } = await createClaudeCodeSandboxByIpc(
 			threadId,
 			this.customSandboxName,
+			THINKING_BUDGET_MAP[this.thinkingBudget],
 		);
 		if (!isOK) {
 			toast.error(m.error_create_sandbox());
@@ -305,7 +366,9 @@ class ClaudeCodeAgentState {
 
 	handleSkillUse(skills: Skill[]): void {
 		const currentSkillNames = new Set(this.skills.map((s) => s.name));
-		const uniqueNewSkills = skills.filter((s) => !currentSkillNames.has(s.name));
+		const uniqueNewSkills = skills
+			.filter((s) => !currentSkillNames.has(s.name))
+			.map((s) => ({ ...s, forceUse: true })); // Default to forceUse=true when enabled
 		if (uniqueNewSkills.length > 0) {
 			this.updateSkills([...this.skills, ...uniqueNewSkills]);
 		}
@@ -315,6 +378,11 @@ class ClaudeCodeAgentState {
 		const skillNamesToRemove = new Set(skills.map((s) => s.name));
 		const filteredSkills = this.skills.filter((s) => !skillNamesToRemove.has(s.name));
 		this.updateSkills(filteredSkills);
+	}
+
+	handleSkillForceUseToggle(skillName: string, forceUse: boolean): void {
+		const updatedSkills = this.skills.map((s) => (s.name === skillName ? { ...s, forceUse } : s));
+		this.updateSkills(updatedSkills);
 	}
 }
 

@@ -26,6 +26,7 @@
 		onUse?: (skill: Skill) => void;
 		onRemove?: (skill: Skill) => void;
 		onRefresh?: () => void;
+		onForceUseToggle?: (skill: Skill, forceUse: boolean) => void;
 	}
 
 	const {
@@ -39,6 +40,7 @@
 		onUse,
 		onRemove,
 		onRefresh,
+		onForceUseToggle,
 	}: Props = $props();
 
 	let searchQuery = $state("");
@@ -150,7 +152,7 @@
 					<Input
 						type="text"
 						placeholder={m.skills_search_placeholder()}
-						class="pl-9"
+						class="border-border bg-transparent pl-9"
 						bind:value={searchQuery}
 					/>
 				</div>
@@ -170,12 +172,13 @@
 			<LdrsLoader type="dot-pulse" size={40} />
 		</div>
 	{:else}
-		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+		<div class="grid gap-4 grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">
 			{#each filteredSkills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
+				{@const usedSkill = usedSkills.find((s) => s.name === item.name)}
 				<SkillCard
-					skill={item}
+					skill={usedSkill ?? item}
 					isBuiltin={!!item.isBuiltin}
-					isUsed={usedSkills.some((s) => s.name === item.name)}
+					isUsed={!!usedSkill}
 					onSelect={handleSelectSkill}
 					{onUse}
 					{onRemove}
@@ -183,6 +186,7 @@
 					onDownload={handleDownload}
 					onDelete={handleDelete}
 					downloading={downloadingSkills.has(item.name)}
+					{onForceUseToggle}
 				/>
 			{/each}
 		</div>

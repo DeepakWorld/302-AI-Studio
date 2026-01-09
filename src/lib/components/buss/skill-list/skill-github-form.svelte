@@ -31,6 +31,7 @@
 			type="url"
 			placeholder={m.skills_github_url_placeholder()}
 			bind:value={githubUrl}
+			class="dark:border-[#3d3d3d]"
 		/>
 		<p class="text-muted-foreground text-xs">{m.skills_github_url_desc()}</p>
 	</div>

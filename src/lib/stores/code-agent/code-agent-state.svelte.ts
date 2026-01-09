@@ -11,6 +11,7 @@ import {
 	type CodeAgentSandboxStatus,
 	type CodeAgentType,
 	type Skill,
+	type ThinkingBudgetType,
 } from "@shared/storage/code-agent";
 import { match } from "ts-pattern";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
@@ -160,6 +161,18 @@ class CodeAgentState {
 			.otherwise(() => []);
 	}
 
+	get thinkingBudget(): string {
+		return match(this.currentAgentId)
+			.with("claude-code", () => claudeCodeAgentState.thinkingBudget)
+			.otherwise(() => "off");
+	}
+
+	get isUpdatingThinkingBudget(): boolean {
+		return match(this.currentAgentId)
+			.with("claude-code", () => claudeCodeAgentState.isUpdatingThinkingBudget)
+			.otherwise(() => false);
+	}
+
 	async getSkillList(isInit: boolean): Promise<ListSkillsResponse> {
 		return withLoadingState(
 			(loading) => (this.isLoadingSkills = loading),
@@ -187,6 +200,12 @@ class CodeAgentState {
 	updateSandboxModel(model: string): void {
 		if (this.currentAgentId === "claude-code") {
 			claudeCodeAgentState.updateSandboxModel(model);
+		}
+	}
+
+	updateThinkingBudget(thinkingBudget: ThinkingBudgetType): void {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.updateThinkingBudget(thinkingBudget);
 		}
 	}
 
@@ -233,6 +252,12 @@ class CodeAgentState {
 				return isOK;
 			},
 		);
+	}
+
+	handleSkillForceUseToggle(skillName: string, forceUse: boolean): void {
+		if (this.currentAgentId === "claude-code") {
+			claudeCodeAgentState.handleSkillForceUseToggle(skillName, forceUse);
+		}
 	}
 }
 

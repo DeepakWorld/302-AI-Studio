@@ -1,8 +1,11 @@
 <script lang="ts">
 	import Badge from "$lib/components/ui/badge/badge.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
+	import Checkbox from "$lib/components/ui/checkbox/checkbox.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import Switch from "$lib/components/ui/switch/switch.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { cn } from "$lib/utils";
 	import { Ellipsis, Loader2, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
@@ -11,12 +14,16 @@
 		isBuiltin: boolean;
 		isUsed?: boolean;
 		downloading?: boolean;
+		selectable?: boolean;
+		selected?: boolean;
 		onSelect?: (skill: Skill) => void;
+		onSelectionChange?: (skill: Skill, selected: boolean) => void;
 		onUse?: (skill: Skill) => void;
 		onRemove?: (skill: Skill) => void;
 		onEdit?: (skill: Skill) => void;
 		onDownload?: (skill: Skill) => void;
 		onDelete?: (skill: Skill) => void;
+		onForceUseToggle?: (skill: Skill, forceUse: boolean) => void;
 	}
 
 	const {
@@ -24,20 +31,30 @@
 		isBuiltin,
 		isUsed = false,
 		downloading = false,
+		selectable = false,
+		selected = false,
 		onSelect,
+		onSelectionChange,
 		onUse,
 		onRemove,
 		onEdit,
 		onDownload,
 		onDelete,
+		onForceUseToggle,
 	}: Props = $props();
 
-	// Built-in skills can only edit and download, user skills can also delete
+	// Built-in skills cannot be edited or deleted, only downloaded
+	const canEdit = $derived(!isBuiltin && !!onEdit);
 	const canDelete = $derived(!isBuiltin && !!onDelete);
-	const showMenu = $derived(!!onEdit || !!onDownload || canDelete);
+	const showMenu = $derived(canEdit || !!onDownload || canDelete);
 
 	function handleCardClick() {
+		// Always go to detail page when clicking the card
 		onSelect?.(skill);
+	}
+
+	function handleCheckboxChange(checked: boolean) {
+		onSelectionChange?.(skill, checked);
 	}
 
 	function handleUseClick(e: MouseEvent) {
@@ -49,93 +66,141 @@
 		e.stopPropagation();
 		onRemove?.(skill);
 	}
+
+	function handleForceUseChange(checked: boolean) {
+		onForceUseToggle?.(skill, checked);
+	}
 </script>
 
 <button
 	type="button"
-	class="hover:border-primary group relative flex w-full cursor-pointer flex-col gap-3 rounded-lg border p-4 text-left transition-all hover:shadow-md"
+	class={cn(
+		"group relative flex h-full w-full cursor-pointer flex-col rounded-xl border p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+		selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+	)}
 	onclick={handleCardClick}
 >
-	<!-- Header: Icon, Name, Badge -->
-	<div class="flex items-center gap-3">
-		<!-- Default Icon -->
-		<div class="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
+	<!-- Selection Checkbox -->
+	{#if selectable}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="absolute -top-2 -left-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow-sm border border-border"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<Checkbox checked={selected} onCheckedChange={handleCheckboxChange} class="h-4 w-4" />
+		</div>
+	{/if}
+
+	<!-- Header: Icon + Info + Menu -->
+	<div class="mb-4 flex items-start gap-3">
+		<!-- Icon Container -->
+		<div
+			class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+		>
 			<Zap class="h-5 w-5" />
 		</div>
-		<!-- Name and Badge -->
-		<div class="flex flex-col gap-1">
-			<span class="font-semibold">{skill.name}</span>
+		<!-- Info Section -->
+		<div class="flex min-w-0 flex-1 flex-col gap-1">
+			<div class="flex items-center justify-between gap-2">
+				<h3 class="truncate font-semibold leading-tight text-foreground" title={skill.name}>
+					{skill.name}
+				</h3>
+				<!-- Menu Button -->
+				{#if showMenu}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="shrink-0" onclick={(e) => e.stopPropagation()}>
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									class="h-7 w-7 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+								>
+									<Ellipsis class="h-4 w-4" />
+								</Button>
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="end" class="w-32">
+								{#if canEdit}
+									<DropdownMenu.Item onclick={() => onEdit?.(skill)}>
+										{m.text_button_edit()}
+									</DropdownMenu.Item>
+								{/if}
+								{#if onDownload}
+									<DropdownMenu.Item
+										disabled={downloading}
+										onclick={() => onDownload(skill)}
+										class={downloading ? "opacity-50" : ""}
+									>
+										{#if downloading}
+											<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+										{/if}
+										{m.skills_download()}
+									</DropdownMenu.Item>
+								{/if}
+								{#if canDelete}
+									<DropdownMenu.Item class="text-destructive" onclick={() => onDelete?.(skill)}>
+										{m.text_button_delete()}
+									</DropdownMenu.Item>
+								{/if}
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					</div>
+				{/if}
+			</div>
 			{#if isBuiltin}
-				<Badge variant="secondary" class="w-fit text-xs">
+				<Badge variant="secondary" class="w-fit px-1.5 py-0.5 text-[10px] font-medium">
 					{m.skills_builtin()}
 				</Badge>
 			{/if}
 		</div>
 	</div>
 
-	<!-- Description -->
-	<p class="text-muted-foreground line-clamp-2 text-sm">
-		{skill.description}
-	</p>
+	<!-- Body: Description -->
+	<div class="mb-4 flex-1">
+		<p class="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+			{skill.description}
+		</p>
+	</div>
 
-	<!-- Footer: Use Button + Menu -->
-	<div class="mt-auto flex items-center gap-2">
+	<!-- Footer: Status + Action -->
+	<div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 pt-3">
 		{#if isUsed}
+			<!-- Status Indicator -->
+			<div class="mr-auto text-xs font-medium">
+				<span class="flex items-center gap-1.5 text-primary">
+					<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"></span>
+					{m.text_label_model_enabled()}
+				</span>
+			</div>
+			<!-- Force Use Toggle -->
+			{#if onForceUseToggle}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="flex items-center gap-2" onclick={(e) => e.stopPropagation()}>
+					<span class="text-xs text-muted-foreground">{m.skills_force_use()}</span>
+					<Switch
+						checked={skill.forceUse ?? false}
+						onCheckedChange={handleForceUseChange}
+						class="border-border"
+					/>
+				</div>
+			{/if}
 			{#if onRemove}
-				<Button variant="destructive" class="flex-1" onclick={handleRemoveClick}>
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-8 px-3 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+					onclick={handleRemoveClick}
+				>
 					{m.skills_remove()}
 				</Button>
 			{/if}
 		{:else if onUse}
-			<Button
-				variant="default"
-				class="flex-1 bg-violet-500 hover:bg-violet-600"
-				onclick={handleUseClick}
-			>
+			<Button size="sm" class="h-8 px-4" onclick={handleUseClick}>
 				{m.skills_use()}
 			</Button>
-		{/if}
-		<!-- Menu Button -->
-		{#if showMenu}
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="ml-auto" onclick={(e) => e.stopPropagation()}>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							class="text-muted-foreground hover:text-foreground h-8 w-8"
-						>
-							<Ellipsis class="h-4 w-4" />
-						</Button>
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-32">
-						{#if onEdit}
-							<DropdownMenu.Item onclick={() => onEdit(skill)}
-								>{m.text_button_edit()}</DropdownMenu.Item
-							>
-						{/if}
-						{#if onDownload}
-							<DropdownMenu.Item
-								disabled={downloading}
-								onclick={() => onDownload(skill)}
-								class={downloading ? "opacity-50" : ""}
-							>
-								{#if downloading}
-									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-								{/if}
-								{m.skills_download()}
-							</DropdownMenu.Item>
-						{/if}
-						{#if canDelete}
-							<DropdownMenu.Item class="text-destructive" onclick={() => onDelete?.(skill)}>
-								{m.text_button_delete()}
-							</DropdownMenu.Item>
-						{/if}
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			</div>
 		{/if}
 	</div>
 </button>

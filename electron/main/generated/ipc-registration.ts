@@ -171,8 +171,15 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:updateClaudeCodeSandboxRemark", (event, sandbox_id, remark) =>
 		codeAgentService.updateClaudeCodeSandboxRemark(event, sandbox_id, remark),
 	);
-	ipcMain.handle("codeAgentService:createClaudeCodeSandboxByIpc", (event, threadId, sandboxName) =>
-		codeAgentService.createClaudeCodeSandboxByIpc(event, threadId, sandboxName),
+	ipcMain.handle(
+		"codeAgentService:updateClaudeCodeSandboxThinkingBudget",
+		(event, sandbox_id, maxThinkingToken) =>
+			codeAgentService.updateClaudeCodeSandboxThinkingBudget(event, sandbox_id, maxThinkingToken),
+	);
+	ipcMain.handle(
+		"codeAgentService:createClaudeCodeSandboxByIpc",
+		(event, threadId, sandboxName, maxThinkingToken) =>
+			codeAgentService.createClaudeCodeSandboxByIpc(event, threadId, sandboxName, maxThinkingToken),
 	);
 	ipcMain.handle("codeAgentService:deleteClaudeCodeSandboxByIpc", (event, sandbox_id) =>
 		codeAgentService.deleteClaudeCodeSandboxByIpc(event, sandbox_id),
@@ -313,13 +320,16 @@ export function registerIpcHandlers() {
 	ipcMain.handle("appService:restartApp", (event) => appService.restartApp(event));
 	ipcMain.handle("appService:resetAllData", (event) => appService.resetAllData(event));
 	ipcMain.handle("appService:clearChatHistory", (event) => appService.clearChatHistory(event));
-	ipcMain.handle("appService:extractZipBlob", (event, zipData) =>
-		appService.extractZipBlob(event, zipData),
+	ipcMain.handle("appService:extractZipBlob", (event, zipData, originalFileName) =>
+		appService.extractZipBlob(event, zipData, originalFileName),
 	);
 	ipcMain.handle("appService:scanDirectory", (event, dirPath) =>
 		appService.scanDirectory(event, dirPath),
 	);
 	ipcMain.handle("appService:readFile", (event, filePath) => appService.readFile(event, filePath));
+	ipcMain.handle("appService:readFileAsBuffer", (event, filePath) =>
+		appService.readFileAsBuffer(event, filePath),
+	);
 	ipcMain.handle("appService:writeFile", (event, filePath, content) =>
 		appService.writeFile(event, filePath, content),
 	);
@@ -500,6 +510,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSessions");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeCurrentSessionIdByThreadId");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxRemark");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxThinkingBudget");
 	ipcMain.removeHandler("codeAgentService:createClaudeCodeSandboxByIpc");
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSandboxByIpc");
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSession");
@@ -545,6 +556,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("appService:extractZipBlob");
 	ipcMain.removeHandler("appService:scanDirectory");
 	ipcMain.removeHandler("appService:readFile");
+	ipcMain.removeHandler("appService:readFileAsBuffer");
 	ipcMain.removeHandler("appService:writeFile");
 	ipcMain.removeHandler("appService:createDirectory");
 	ipcMain.removeHandler("appService:deleteFile");

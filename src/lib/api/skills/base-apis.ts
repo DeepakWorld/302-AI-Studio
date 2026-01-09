@@ -94,7 +94,22 @@ export async function _editSkillDetails(request: SkillDetailsRequest): Promise<B
 
 		return response;
 	} catch (error) {
-		console.error("Failed to check skill details:", error);
+		// Handle HTTP errors (ky throws on non-2xx responses)
+		if (error && typeof error === "object" && "response" in error) {
+			const httpError = error as { response: Response };
+			try {
+				const errorBody = await httpError.response.json();
+				if (errorBody && typeof errorBody === "object" && errorBody.error?.message) {
+					throw new Error(errorBody.error.message);
+				}
+			} catch (parseError) {
+				// If it's already our custom error, rethrow it
+				if (parseError instanceof Error && parseError.message !== "Unexpected token") {
+					throw parseError;
+				}
+			}
+		}
+		console.error("Failed to edit skill details:", error);
 		throw error;
 	}
 }
@@ -197,6 +212,50 @@ export async function deleteSkill(request: DeleteSkillRequest): Promise<DeleteSk
 		return validated;
 	} catch (error) {
 		console.error("Failed to delete skill:", error);
+		throw error;
+	}
+}
+
+// Sync Skills API
+export const syncSkillsRequestSchema = type({
+	sandbox_id: "string",
+	session_id: "string?",
+});
+export type SyncSkillsRequest = typeof syncSkillsRequestSchema.infer;
+
+export const syncSkillsResponseSchema = type({
+	success: "boolean",
+	result: type({
+		exit_code: "number",
+		stdout: "string",
+		stderr: "string",
+		error: "string",
+	}),
+});
+export type SyncSkillsResponse = typeof syncSkillsResponseSchema.infer;
+
+/**
+ * Sync skills from sandbox
+ * - If session_id is empty, updates sandbox built-in skills
+ * - If session_id is provided, uploads all skills from session's working directory/.claude/skills as custom skills
+ */
+export async function syncSkills(request: SyncSkillsRequest): Promise<SyncSkillsResponse> {
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/skills/sync", {
+				json: request,
+				timeout: 120000,
+			})
+			.json();
+
+		const validated = syncSkillsResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate sync skills response:", validated.summary);
+			throw new Error("Invalid response format from sync skills API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to sync skills:", error);
 		throw error;
 	}
 }

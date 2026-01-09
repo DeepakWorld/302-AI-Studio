@@ -19,6 +19,9 @@
  * - {"type":"text-start","id":"..."}
  * - {"type":"text-delta","id":"...","delta":"..."}
  * - {"type":"text-end","id":"..."}
+ * - {"type":"reasoning-start","id":"..."}
+ * - {"type":"reasoning-delta","id":"...","delta":"..."}
+ * - {"type":"reasoning-end","id":"..."}
  * - {"type":"tool-input-start","toolCallId":"...","toolName":"..."}
  * - {"type":"tool-input-delta","toolCallId":"...","inputTextDelta":"..."}
  * - {"type":"tool-input-available","toolCallId":"...","toolName":"...","input":{...}}
@@ -105,11 +108,12 @@ interface AnthropicEvent {
 }
 
 interface ContentBlockState {
-	type: "text" | "tool_use";
+	type: "text" | "tool_use" | "thinking";
 	id: string;
 	toolName?: string;
 	toolCallId?: string;
 	inputJsonParts: string[];
+	isThinking?: boolean;
 }
 
 /**
@@ -632,6 +636,34 @@ class ClaudeCodeProcessor {
 			return `data: ${JSON.stringify(textStartEvent)}`;
 		}
 
+		if (contentBlock.type === "thinking") {
+			const thinkingId = `reasoning-${this.textBlockCounter++}`;
+			this.contentBlocks.set(index, {
+				type: "thinking",
+				id: thinkingId,
+				inputJsonParts: [],
+			});
+
+			const reasoningStartEvent = {
+				type: "reasoning-start",
+				id: thinkingId,
+			};
+
+			// If there's initial thinking content
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			if ((contentBlock as any).thinking) {
+				const reasoningDeltaEvent = {
+					type: "reasoning-delta",
+					id: thinkingId,
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					delta: (contentBlock as any).thinking,
+				};
+				return `data: ${JSON.stringify(reasoningStartEvent)}\n\ndata: ${JSON.stringify(reasoningDeltaEvent)}`;
+			}
+
+			return `data: ${JSON.stringify(reasoningStartEvent)}`;
+		}
+
 		if (contentBlock.type === "tool_use") {
 			const toolCallId = contentBlock.id || `call_${Date.now()}`;
 			const toolName = contentBlock.name || "unknown";
@@ -675,6 +707,16 @@ class ClaudeCodeProcessor {
 			return `data: ${JSON.stringify(textDeltaEvent)}`;
 		}
 
+		if (delta.type === "thinking_delta" && delta.thinking) {
+			const textId = blockState?.id || `reasoning-${index}`;
+			const reasoningDeltaEvent = {
+				type: "reasoning-delta",
+				id: textId,
+				delta: delta.thinking,
+			};
+			return `data: ${JSON.stringify(reasoningDeltaEvent)}`;
+		}
+
 		if (delta.type === "input_json_delta" && delta.partial_json) {
 			if (blockState && blockState.type === "tool_use") {
 				// Accumulate JSON parts for later
@@ -705,6 +747,15 @@ class ClaudeCodeProcessor {
 			};
 			this.contentBlocks.delete(index);
 			return `data: ${JSON.stringify(textEndEvent)}`;
+		}
+
+		if (blockState.type === "thinking") {
+			const reasoningEndEvent = {
+				type: "reasoning-end",
+				id: blockState.id,
+			};
+			this.contentBlocks.delete(index);
+			return `data: ${JSON.stringify(reasoningEndEvent)}`;
 		}
 
 		if (blockState.type === "tool_use") {

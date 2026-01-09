@@ -1,11 +1,12 @@
 <script lang="ts">
+	import CodeMirrorEditor from "$lib/components/buss/editor/codemirror-editor.svelte";
 	import SkillFileExplorer from "$lib/components/buss/skill-list/skill-file-tree/skill-file-explorer.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { Label } from "$lib/components/ui/label";
-	import Textarea from "$lib/components/ui/textarea/textarea.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { Loader2 } from "@lucide/svelte";
+	import { mode } from "mode-watcher";
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 
@@ -22,6 +23,8 @@
 		changedFiles?: Map<string, string>; // 已修改的文件内容
 		onFileChange?: (path: string, content: string) => void; // 文件内容变化回调
 		enableManualFileTree?: boolean; // 启用手动模式的文件树预览
+		onRootPathChange?: (newRootPath: string) => void; // 根目录重命名回调（外部传入 rootPath 时使用）
+		onFileRename?: (oldPath: string, newPath: string) => void; // 文件/文件夹重命名回调
 	}
 
 	let {
@@ -31,6 +34,8 @@
 		changedFiles,
 		onFileChange,
 		enableManualFileTree = false,
+		onRootPathChange,
+		onFileRename,
 	}: Props = $props();
 
 	let viewMode = $state<"default" | "tree">("default");
@@ -81,6 +86,66 @@
 		onFileChange?.(path, content);
 	}
 
+	// 处理手动模式下的文件/文件夹重命名
+	function handleManualFileRename(oldPath: string, newPath: string) {
+		// 更新 changedFiles 中的路径（处理文件和文件夹重命名）
+		const newChangedFiles = new SvelteMap<string, string>();
+		for (const [path, content] of manualChangedFiles) {
+			if (path === oldPath) {
+				newChangedFiles.set(newPath, content);
+			} else if (path.startsWith(oldPath + "/") || path.startsWith(oldPath + "\\")) {
+				const newFilePath = path.replace(oldPath, newPath);
+				newChangedFiles.set(newFilePath, content);
+			} else {
+				newChangedFiles.set(path, content);
+			}
+		}
+		manualChangedFiles = newChangedFiles;
+
+		// 如果重命名的是 SKILL.md，更新 manualSkillMdPath
+		if (oldPath === manualSkillMdPath) {
+			manualSkillMdPath = newPath;
+		} else if (
+			manualSkillMdPath &&
+			(manualSkillMdPath.startsWith(oldPath + "/") || manualSkillMdPath.startsWith(oldPath + "\\"))
+		) {
+			manualSkillMdPath = manualSkillMdPath.replace(oldPath, newPath);
+		}
+
+		onFileRename?.(oldPath, newPath);
+	}
+
+	// 处理根目录重命名
+	function handleRootPathChange(newRootPath: string) {
+		// 手动模式：更新 manualRootPath 和 manualChangedFiles
+		if (!rootPath && manualRootPath) {
+			const oldRootPath = manualRootPath;
+
+			// 更新 manualChangedFiles 中所有文件的路径
+			const newChangedFiles = new SvelteMap<string, string>();
+			for (const [path, content] of manualChangedFiles) {
+				if (path.startsWith(oldRootPath)) {
+					const newPath = path.replace(oldRootPath, newRootPath);
+					newChangedFiles.set(newPath, content);
+				} else {
+					newChangedFiles.set(path, content);
+				}
+			}
+			manualChangedFiles = newChangedFiles;
+
+			// 更新 manualSkillMdPath（如果存在）
+			if (manualSkillMdPath && manualSkillMdPath.startsWith(oldRootPath)) {
+				manualSkillMdPath = manualSkillMdPath.replace(oldRootPath, newRootPath);
+			}
+
+			manualRootPath = newRootPath;
+		}
+		// 外部 rootPath 模式：通知父组件
+		else if (rootPath && onRootPathChange) {
+			onRootPathChange(newRootPath);
+		}
+	}
+
 	// 同步 formData.content 到 manualChangedFiles
 	$effect(() => {
 		if (
@@ -89,6 +154,35 @@
 			formData.content !== manualChangedFiles.get(manualSkillMdPath)
 		) {
 			manualChangedFiles.set(manualSkillMdPath, formData.content);
+		}
+	});
+
+	// 同步 formData.name 到临时目录名称
+	let isRenaming = $state(false);
+	$effect(() => {
+		const newName = formData.name.trim() || "new-skill";
+		// 只在手动模式且有临时目录时执行重命名
+		if (manualRootPath && !isRenaming) {
+			const currentDirName = manualRootPath.split(/[/\\]/).pop() || "";
+			if (newName !== currentDirName) {
+				// 捕获当前路径值
+				const oldRootPath = manualRootPath;
+				const parentPath = oldRootPath.substring(0, oldRootPath.length - currentDirName.length - 1);
+				const newRootPath = `${parentPath}/${newName}`;
+
+				isRenaming = true;
+				// 使用 setTimeout 避免在 effect 中直接执行异步操作
+				setTimeout(async () => {
+					try {
+						await window.electronAPI.appService.renameFile(oldRootPath, newRootPath);
+						handleRootPathChange(newRootPath);
+					} catch (error) {
+						console.error("Failed to rename directory:", error);
+					} finally {
+						isRenaming = false;
+					}
+				}, 0);
+			}
 		}
 	});
 
@@ -228,6 +322,10 @@
 			toast.warning(m.skills_form_name_required());
 			return false;
 		}
+		if (/\s/.test(formData.name)) {
+			toast.warning(m.skills_form_name_no_spaces());
+			return false;
+		}
 		if (!formData.description.trim()) {
 			toast.warning(m.skills_form_desc_required());
 			return false;
@@ -240,8 +338,8 @@
 	}
 </script>
 
-<div class="space-y-4 px-6 py-6">
-	<div class="space-y-2">
+<div class="flex h-full flex-col gap-4 px-6 py-6">
+	<div class="shrink-0 space-y-2">
 		<Label for="skill-name" class="text-sm font-medium">
 			{m.skills_form_name()} <span class="text-destructive">*</span>
 		</Label>
@@ -249,10 +347,11 @@
 			id="skill-name"
 			bind:value={formData.name}
 			placeholder={m.skills_form_name_placeholder()}
+			class="dark:border-[#3d3d3d]"
 		/>
 	</div>
 
-	<div class="space-y-2">
+	<div class="shrink-0 space-y-2">
 		<Label for="skill-desc" class="text-sm font-medium">
 			{m.skills_form_desc()} <span class="text-destructive">*</span>
 		</Label>
@@ -260,12 +359,13 @@
 			id="skill-desc"
 			bind:value={formData.description}
 			placeholder={m.skills_form_desc_placeholder()}
+			class="dark:border-[#3d3d3d]"
 		/>
 	</div>
 
-	<div class="space-y-2">
+	<div class="flex min-h-0 flex-1 flex-col space-y-2">
 		<!-- Label with toggle buttons -->
-		<div class="flex items-center justify-between">
+		<div class="flex shrink-0 items-center justify-between">
 			<Label for="skill-content" class="text-sm font-medium">
 				{m.skills_form_content()} <span class="text-destructive">*</span>
 			</Label>
@@ -302,19 +402,26 @@
 
 		<!-- Content area -->
 		{#if viewMode === "default"}
-			<Textarea
-				id="skill-content"
-				bind:value={formData.content}
-				class="min-h-[200px] max-h-[300px] w-full max-w-full resize-none overflow-y-auto overflow-x-hidden break-all font-mono text-sm"
-			/>
-			<p class="text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
+			<div class="min-h-0 flex-1 overflow-hidden rounded-md border">
+				<CodeMirrorEditor
+					value={formData.content}
+					language="md"
+					theme={mode.current === "dark" ? "dark" : "light"}
+					readOnly={false}
+					onChange={(value) => (formData.content = value)}
+				/>
+			</div>
+			<p class="shrink-0 text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
 		{:else if effectiveRootPath}
-			<div class="h-[300px] overflow-hidden rounded-md">
+			<div class="min-h-0 flex-1 overflow-hidden rounded-md">
 				<SkillFileExplorer
 					rootPath={effectiveRootPath}
 					readOnly={rootPath ? readOnly : false}
+					defaultExpandAll={true}
 					changedFiles={effectiveChangedFiles}
 					onFileChange={rootPath ? onFileChange : handleManualFileChange}
+					onRootPathChange={rootPath && onRootPathChange ? onRootPathChange : handleRootPathChange}
+					onFileRename={rootPath ? onFileRename : handleManualFileRename}
 				/>
 			</div>
 		{/if}

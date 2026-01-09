@@ -2,7 +2,7 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
-	import { ChevronLeft, Loader2, Zap } from "@lucide/svelte";
+	import { ChevronLeft, Loader2, X, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
 	interface Props {
@@ -49,17 +49,24 @@
 <Dialog.Root bind:open onOpenChange={(v) => onOpenChange?.(v)}>
 	<Dialog.Content class="min-w-md rounded-2xl p-0" showCloseButton={false}>
 		<!-- Header -->
-		<div class="flex items-center justify-between border-b px-4 py-3">
-			<Button
-				variant="ghost"
-				class="text-[14px] flex items-center text-center text-muted-foreground"
-				size="sm"
-				onclick={handleClose}
-			>
-				<ChevronLeft class="h-4 w-4" />
-				{m.skills_back()}
-			</Button>
+		<div class="grid grid-cols-[1fr_auto_1fr] items-center border-b px-4 py-3">
+			<div class="flex justify-start">
+				<Button
+					variant="ghost"
+					class="text-[14px] flex items-center text-center text-muted-foreground"
+					size="sm"
+					onclick={handleClose}
+				>
+					<ChevronLeft class="h-4 w-4" />
+					{m.skills_back()}
+				</Button>
+			</div>
 			<span class="text-foreground text-base font-semibold">{m.skills_detail_title()}</span>
+			<div class="flex justify-end">
+				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
+					<X class="h-4 w-4" />
+				</Button>
+			</div>
 		</div>
 
 		<!-- Content -->

@@ -8,7 +8,6 @@ export async function editSkillDetails(request: SkillDetailsRequest) {
 	const blob = await _editSkillDetails(request);
 	const arrayBuffer = await blob.arrayBuffer();
 	const path = await extractZipBlob(arrayBuffer);
-	console.log("path", path);
 	return path;
 }
 
@@ -61,13 +60,16 @@ export interface UpdateSkillData {
 
 /**
  * 更新 skill，将目录打包成 zip 并上传
- * zip 文件名和内部文件夹名与 skill 名称一致
+ * zip 文件名使用 skill 名称，内部文件夹名保持原样
  */
 export async function updateSkill(data: UpdateSkillData) {
 	const { name, dirPath } = data;
 
-	// 使用 electron 的 zipDirectory 打包目录
-	const zipArrayBuffer = await zipDirectory(dirPath, name);
+	// 获取原始文件夹名
+	const originalFolderName = dirPath.split(/[/\\]/).pop() || name;
+
+	// 使用 electron 的 zipDirectory 打包目录，保持原始文件夹名
+	const zipArrayBuffer = await zipDirectory(dirPath, originalFolderName);
 	const zipBlob = new Blob([zipArrayBuffer], { type: "application/zip" });
 	const zipFile = new File([zipBlob], `${name}.zip`, { type: "application/zip" });
 

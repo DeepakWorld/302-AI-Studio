@@ -15,8 +15,13 @@ export const skill = type({
 	description: "string",
 	isBuiltin: "boolean?",
 	content: "string?",
+	/** Whether this skill should be forcefully included in prompts when enabled */
+	forceUse: "boolean?",
 });
 export type Skill = typeof skill.infer;
+
+export const thinkingBudgetType = type("'off' | 'low' | 'medium' | 'high' | 'max'");
+export type ThinkingBudgetType = typeof thinkingBudgetType.infer;
 
 export const codeAgentMetadata = type({
 	model: "string",
@@ -33,6 +38,10 @@ export const codeAgentMetadata = type({
 	sandboxId: "string",
 	sandboxRemark: "string",
 	skills: skill.array(),
+	/**
+	 * thinking budget for claude code
+	 */
+	thinkingBudget: thinkingBudgetType,
 });
 export type CodeAgentMetadata = typeof codeAgentMetadata.infer;
 

@@ -29,15 +29,11 @@
 		if (selectedIndex === -1) return;
 
 		const item = itemElements[selectedIndex];
-		const container = containerElement;
-		if (!item || !container) return;
-
-		const containerRect = container.getBoundingClientRect();
-		const itemRect = item.getBoundingClientRect();
+		if (!item) return;
 
 		thumbStyle = {
-			left: `${itemRect.left - containerRect.left}px`,
-			width: `${itemRect.width}px`,
+			left: `${item.offsetLeft}px`,
+			width: `${item.offsetWidth}px`,
 		};
 	}
 
@@ -49,6 +45,13 @@
 
 	onMount(() => {
 		updateThumbPosition();
+		if (containerElement) {
+			const observer = new ResizeObserver(() => {
+				updateThumbPosition();
+			});
+			observer.observe(containerElement);
+			return () => observer.disconnect();
+		}
 	});
 
 	function handleSelect(key: string) {

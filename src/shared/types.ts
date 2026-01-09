@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Export necessary types and functions from @302ai/unstorage
-export type { StorageValue, StorageMeta } from "@302ai/unstorage";
 export { prefixStorage } from "@302ai/unstorage";
+export type { StorageMeta, StorageValue } from "@302ai/unstorage";
 export * from "./storage/ai-applications";
 export * from "./storage/code-agent";
 export * from "./storage/general-settings";
@@ -150,6 +150,8 @@ export interface ThreadParmas {
 	apiKeyHash?: string;
 	/** Incremental summary for title generation, stores context from previous conversations */
 	incrementalSummary?: string;
+	/** Message ID marking the clear screen point - messages up to and including this ID are hidden */
+	clearScreenMessageId?: string;
 }
 
 export interface ThreadData {

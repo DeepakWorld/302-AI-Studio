@@ -3,7 +3,7 @@
 	import { Input } from "$lib/components/ui/input";
 	import { m } from "$lib/paraglide/messages";
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
-	import { ChevronDown, MessageSquareText, Search } from "@lucide/svelte";
+	import { ChevronDown, Search } from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { SvelteSet } from "svelte/reactivity";
 
@@ -13,6 +13,7 @@
 	let selectedId = $state<string | null>(null);
 	let expandedSandboxes = $state<Set<string>>(new Set());
 	let searchQuery = $state("");
+	let hasInitialized = false;
 
 	// Filter groups based on search query
 	const filteredGroups = $derived.by(() => {
@@ -32,8 +33,13 @@
 			.filter((group) => group.items.length > 0);
 	});
 
-	// Initialize expanded state - default to collapsed
-	// expandedSandboxes starts as empty Set, so all groups are collapsed by default
+	// Initialize expanded state - default to all expanded
+	$effect(() => {
+		if (!hasInitialized && groupedSessions.groups.length > 0) {
+			hasInitialized = true;
+			expandedSandboxes = new SvelteSet(groupedSessions.groups.map((g) => g.groupKey));
+		}
+	});
 
 	function toggleSandbox(sandboxId: string) {
 		const newSet = new SvelteSet(expandedSandboxes);
@@ -70,30 +76,20 @@
 	}
 </script>
 
-<div class="flex flex-col items-center px-6 py-6">
-	<!-- Header with icon and description -->
-	<div
-		class="bg-primary/10 text-primary mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
-	>
-		<MessageSquareText class="h-8 w-8" />
-	</div>
-	<p class="text-muted-foreground mb-6 text-center text-sm">
-		{m.skills_history_select_title()}
-	</p>
-
+<div class="flex flex-col h-full px-6 py-6">
 	<!-- Search box -->
-	<div class="relative w-full mb-4">
+	<div class="relative w-full mb-4 shrink-0">
 		<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 		<Input
 			type="text"
 			placeholder={m.placeholder_input_search()}
 			bind:value={searchQuery}
-			class="pl-9 h-10 rounded-lg"
+			class="pl-9 h-10 rounded-lg dark:border-[#3d3d3d]"
 		/>
 	</div>
 
 	<!-- Grouped conversation list -->
-	<div class="flex w-full flex-col gap-1 max-h-[350px] overflow-y-auto">
+	<div class="flex w-full flex-col gap-1 flex-1 min-h-0 overflow-y-auto">
 		{#if filteredGroups.length === 0}
 			<div class="text-muted-foreground text-center text-sm py-8">
 				{searchQuery ? m.no_search_results() : m.no_sessions()}
@@ -134,7 +130,12 @@
 									>
 									{#if session.extra}
 										<span class="text-muted-foreground text-xs whitespace-nowrap">
-											{new Date(session.extra).toLocaleDateString()}
+											{new Date(session.extra).toLocaleString(undefined, {
+												month: "2-digit",
+												day: "2-digit",
+												hour: "2-digit",
+												minute: "2-digit",
+											})}
 										</span>
 									{/if}
 								</div>
