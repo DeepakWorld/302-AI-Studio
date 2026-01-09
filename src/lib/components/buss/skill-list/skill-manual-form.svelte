@@ -320,6 +320,7 @@
 				<SkillFileExplorer
 					rootPath={effectiveRootPath}
 					readOnly={rootPath ? readOnly : false}
+					defaultExpandAll={true}
 					changedFiles={effectiveChangedFiles}
 					onFileChange={rootPath ? onFileChange : handleManualFileChange}
 				/>
