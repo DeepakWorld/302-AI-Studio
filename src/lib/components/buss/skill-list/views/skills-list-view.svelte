@@ -59,6 +59,9 @@
 	let selectedSkills = new SvelteSet<string>();
 	const isSelectionMode = $derived(selectedSkills.size > 0);
 	const selectedSkillsList = $derived(filteredSkills.filter((s) => selectedSkills.has(s.name)));
+	const isAllSelected = $derived(
+		filteredSkills.length > 0 && selectedSkills.size === filteredSkills.length,
+	);
 	// Check if any selected skill can be deleted (non-builtin)
 	const canDeleteSelected = $derived(selectedSkillsList.some((s) => !s.isBuiltin));
 	// Check selected skills usage status
@@ -175,6 +178,20 @@
 
 	function clearSelection() {
 		selectedSkills.clear();
+	}
+
+	function selectAll() {
+		for (const skill of filteredSkills) {
+			selectedSkills.add(skill.name);
+		}
+	}
+
+	function toggleSelectAll() {
+		if (isAllSelected) {
+			clearSelection();
+		} else {
+			selectAll();
+		}
 	}
 
 	function handleBatchUse() {
@@ -353,12 +370,33 @@
 		<div
 			class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 rounded-xl bg-background/98 backdrop-blur-md border border-border/50 shadow-xl px-2 py-1.5 animate-in fade-in slide-in-from-bottom-4 duration-200"
 		>
-			<!-- Selected count badge -->
-			<div
-				class="flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg bg-primary/10 text-primary"
+			<!-- Select all checkbox + count -->
+			<button
+				type="button"
+				class="flex items-center gap-1.5 h-7 px-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/15 transition-colors cursor-pointer"
+				onclick={toggleSelectAll}
 			>
-				<span class="text-sm font-semibold tabular-nums">{selectedSkills.size}</span>
-			</div>
+				<div
+					class="w-4 h-4 rounded border-2 flex items-center justify-center transition-colors {isAllSelected
+						? 'bg-primary border-primary'
+						: 'border-primary/50'}"
+				>
+					{#if isAllSelected}
+						<svg class="w-3 h-3 text-primary-foreground" viewBox="0 0 24 24" fill="none">
+							<path
+								d="M5 12l5 5L20 7"
+								stroke="currentColor"
+								stroke-width="3"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
+					{/if}
+				</div>
+				<span class="text-sm font-semibold tabular-nums"
+					>{selectedSkills.size}/{filteredSkills.length}</span
+				>
+			</button>
 
 			<!-- Action buttons group -->
 			<div class="flex items-center gap-0.5 px-1">

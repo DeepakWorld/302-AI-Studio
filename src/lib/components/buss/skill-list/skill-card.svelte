@@ -87,13 +87,16 @@
 	{#if selectable}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="absolute top-3 left-3 z-10" onclick={(e) => e.stopPropagation()}>
-			<Checkbox checked={selected} onCheckedChange={handleCheckboxChange} />
+		<div
+			class="absolute -top-2 -left-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow-sm border border-border"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<Checkbox checked={selected} onCheckedChange={handleCheckboxChange} class="h-4 w-4" />
 		</div>
 	{/if}
 
 	<!-- Header: Icon + Info + Menu -->
-	<div class={cn("mb-4 flex items-start gap-3", selectable && "ml-6")}>
+	<div class="mb-4 flex items-start gap-3">
 		<!-- Icon Container -->
 		<div
 			class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
