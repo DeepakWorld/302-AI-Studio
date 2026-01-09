@@ -210,11 +210,25 @@
 	// 	console.log("sandBoxIdsandBoxId", sandBoxId);
 	// });
 
+	// Track previous vibe mode state for edge detection
+	let previousVibeEnabled = false;
+
 	// Close preview panel when code agent mode is disabled (but not in skills-only mode)
+	// Also auto-open preview panel when vibe mode is first enabled
 	$effect(() => {
-		if (!codeAgentState.enabled && !agentPreviewState.isSkillsOnlyMode) {
+		const currentEnabled = codeAgentState.enabled;
+
+		// Edge detection: vibe mode just turned ON
+		if (currentEnabled && !previousVibeEnabled) {
+			agentPreviewState.openSkillsOnlyMode();
+		}
+
+		// Edge detection: vibe mode just turned OFF
+		if (!currentEnabled && !agentPreviewState.isSkillsOnlyMode) {
 			agentPreviewState.closePreview();
 		}
+
+		previousVibeEnabled = currentEnabled;
 	});
 
 	async function handleNewExploration() {
