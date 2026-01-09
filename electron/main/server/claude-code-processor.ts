@@ -402,7 +402,7 @@ class ClaudeCodeProcessor {
 		// Send as message-metadata event for frontend to process
 		const metadataEvent = {
 			type: "message-metadata",
-			messageMetadata: resultMetadata,
+			metadata: resultMetadata,
 		};
 
 		return `data: ${JSON.stringify(metadataEvent)}`;

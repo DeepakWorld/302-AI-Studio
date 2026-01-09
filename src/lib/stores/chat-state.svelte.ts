@@ -620,7 +620,9 @@ class ChatState {
 				}
 
 				const { parts: attachmentParts, metadataList: attachmentMetadata } =
-					await convertAttachmentsToMessageParts(currentAttachments);
+					await convertAttachmentsToMessageParts(currentAttachments, {
+						enableZipSupport: codeAgentState.enabled,
+					});
 
 				const textParts = attachmentParts.filter(
 					(part): part is { type: "text"; text: string } => part.type === "text",
@@ -1138,7 +1140,9 @@ class ChatState {
 
 			// 3. convert attachments to message parts
 			const { parts: attachmentParts, metadataList: attachmentMetadata } =
-				await convertAttachmentsToMessageParts(userAttachments);
+				await convertAttachmentsToMessageParts(userAttachments, {
+					enableZipSupport: codeAgentState.enabled,
+				});
 
 			// 4. Separate text and file parts
 			const textParts = attachmentParts.filter(

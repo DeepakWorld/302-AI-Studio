@@ -109,7 +109,13 @@ export async function generateFilePreview(file: File): Promise<string | undefine
 		officeMimeTypes.includes(file.type) ||
 		officeExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
 
-	if (isOfficeFile) {
+	const isArchiveFile =
+		file.type.includes("zip") ||
+		file.type.includes("archive") ||
+		file.type.includes("compressed") ||
+		file.name.toLowerCase().endsWith(".zip");
+
+	if (isOfficeFile || isArchiveFile) {
 		return undefined;
 	}
 

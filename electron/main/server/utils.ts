@@ -315,7 +315,7 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
 					continue;
 				}
 
-				if (mediaType?.startsWith("image/")) {
+				if (mediaType?.startsWith("image/") || mediaType?.includes("zip")) {
 					parts.push({
 						type: "image_url",
 						image_url: {
