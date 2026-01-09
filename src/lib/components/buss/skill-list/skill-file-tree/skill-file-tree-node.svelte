@@ -78,8 +78,8 @@
 		<Collapsible.Root open={isOpen} onOpenChange={(open) => onToggleExpand?.(node.path, open)}>
 			<Collapsible.Trigger
 				class={cn(
-					"flex w-full items-center gap-1 rounded-sm px-2 py-1 hover:bg-accent hover:text-accent-foreground",
-					selectedPath === node.path && "bg-accent text-accent-foreground",
+					"flex w-full items-center gap-1 rounded-sm px-2 py-1 hover:bg-accent/50",
+					selectedPath === node.path && "bg-primary/20 text-primary",
 				)}
 				style="padding-left: {level * 12 + 8}px"
 			>
@@ -119,8 +119,8 @@
 				<Collapsible.Root open={isOpen} onOpenChange={(open) => onToggleExpand?.(node.path, open)}>
 					<Collapsible.Trigger
 						class={cn(
-							"flex w-full items-center gap-1 rounded-sm px-2 py-1 hover:bg-accent hover:text-accent-foreground",
-							selectedPath === node.path && "bg-accent text-accent-foreground",
+							"flex w-full items-center gap-1 rounded-sm px-2 py-1 hover:bg-accent/50",
+							selectedPath === node.path && "bg-primary/20 text-primary",
 						)}
 						style="padding-left: {level * 12 + 8}px"
 					>
@@ -182,8 +182,8 @@
 	<button
 		onclick={handleSelect}
 		class={cn(
-			"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent hover:text-accent-foreground",
-			selectedPath === node.path && "bg-accent text-accent-foreground",
+			"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent/50",
+			selectedPath === node.path && "bg-primary/20 text-primary",
 		)}
 		style="padding-left: {level * 12 + 28}px"
 	>
@@ -210,8 +210,8 @@
 			<button
 				onclick={handleSelect}
 				class={cn(
-					"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent hover:text-accent-foreground",
-					selectedPath === node.path && "bg-accent text-accent-foreground",
+					"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent/50",
+					selectedPath === node.path && "bg-primary/20 text-primary",
 				)}
 				style="padding-left: {level * 12 + 28}px"
 			>
