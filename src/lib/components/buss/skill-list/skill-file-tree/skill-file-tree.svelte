@@ -21,6 +21,8 @@
 		defaultExpandAll?: boolean;
 		autoSelectPriority?: string[]; // File names to auto-select by priority
 		onSelect?: (file: { path: string; content: string }) => void;
+		onRootPathChange?: (newRootPath: string) => void; // Notify when root directory is renamed
+		onFileRename?: (oldPath: string, newPath: string) => void; // Notify when file/folder is renamed
 	}
 
 	// Default priority for auto-selecting files
@@ -39,6 +41,8 @@
 		defaultExpandAll = false,
 		autoSelectPriority = DEFAULT_AUTO_SELECT_PRIORITY,
 		onSelect,
+		onRootPathChange,
+		onFileRename,
 	}: Props = $props();
 	let tree = $state<FileNode | null>(null);
 	let selectedPath = $state("");
@@ -193,8 +197,17 @@
 		try {
 			const parentPath = getParentPath(node.path);
 			const newPath = joinPath(parentPath, newName);
-			await renameFile(node.path, newPath);
-			await loadTree(rootPath);
+			const oldPath = node.path;
+			await renameFile(oldPath, newPath);
+
+			// Check if we're renaming the root directory
+			if (oldPath === rootPath) {
+				onRootPathChange?.(newPath);
+			} else {
+				// Notify about file/folder rename
+				onFileRename?.(oldPath, newPath);
+				await loadTree(rootPath);
+			}
 		} catch (error) {
 			console.error("Rename failed:", error);
 		}
