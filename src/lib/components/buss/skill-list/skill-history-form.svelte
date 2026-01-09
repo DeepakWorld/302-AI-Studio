@@ -78,7 +78,7 @@
 			type="text"
 			placeholder={m.placeholder_input_search()}
 			bind:value={searchQuery}
-			class="pl-9 h-10 rounded-lg"
+			class="pl-9 h-10 rounded-lg dark:border-[#3d3d3d]"
 		/>
 	</div>
 
