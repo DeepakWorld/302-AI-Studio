@@ -64,7 +64,7 @@
 						backgroundColor: isDark ? "#1b1f2711" : "#f5f5f5",
 					},
 					".cm-gutters": {
-						backgroundColor: bg,
+						backgroundColor: isDark ? "#161616" : "#fafafa",
 						color: isDark ? "#858585" : "#999999",
 						border: "none",
 					},
@@ -599,10 +599,16 @@
 		min-height: 100%;
 	}
 
-	.codemirror-container :global(.cm-gutters) {
-		background-color: hsl(var(--muted));
+	.codemirror-container :global(.cm-gutters),
+	.codemirror-container :global(.cm-gutters-before) {
+		background-color: #161616 !important;
 		color: hsl(var(--muted-foreground));
 		border-right: 1px solid hsl(var(--border));
+	}
+
+	:global(html:not(.dark)) .codemirror-container :global(.cm-gutters),
+	:global(html:not(.dark)) .codemirror-container :global(.cm-gutters-before) {
+		background-color: #fafafa !important;
 	}
 
 	.codemirror-container :global(.cm-activeLineGutter) {
