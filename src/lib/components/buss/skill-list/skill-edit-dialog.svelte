@@ -210,13 +210,16 @@
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
 	<Dialog.Content class="min-w-[700px] rounded-2xl p-0" showCloseButton={false}>
 		<!-- Header -->
-		<div class="flex items-center justify-between border-b px-4 py-3">
+		<div class="grid grid-cols-[1fr_auto_1fr] items-center border-b px-4 py-3">
+			<div></div>
 			<span class="text-foreground text-base font-semibold">
 				{m.text_button_edit()} - {skill?.name || ""}
 			</span>
-			<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
-				<X class="h-4 w-4" />
-			</Button>
+			<div class="flex justify-end">
+				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
+					<X class="h-4 w-4" />
+				</Button>
+			</div>
 		</div>
 
 		<!-- Content -->
