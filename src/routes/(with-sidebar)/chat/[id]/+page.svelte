@@ -210,18 +210,10 @@
 	// 	console.log("sandBoxIdsandBoxId", sandBoxId);
 	// });
 
+	// Close preview panel when code agent mode is disabled (but not in skills-only mode)
 	$effect(() => {
-		if (codeAgentState.enabled) {
-			// Open immediately, even if sandboxId is empty/loading
-			// But don't override skills-only mode
-			if (!agentPreviewState.isSkillsOnlyMode) {
-				agentPreviewState.openPreview(codeAgentState.sandboxId || "");
-			}
-		} else {
-			// Only close if not in skills-only mode
-			if (!agentPreviewState.isSkillsOnlyMode) {
-				agentPreviewState.closePreview();
-			}
+		if (!codeAgentState.enabled && !agentPreviewState.isSkillsOnlyMode) {
+			agentPreviewState.closePreview();
 		}
 	});
 
