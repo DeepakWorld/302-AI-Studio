@@ -3,7 +3,7 @@
 	import { Input } from "$lib/components/ui/input";
 	import { m } from "$lib/paraglide/messages";
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
-	import { ChevronDown, MessageSquareText, Search } from "@lucide/svelte";
+	import { ChevronDown, Search } from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { SvelteSet } from "svelte/reactivity";
 
@@ -70,17 +70,7 @@
 	}
 </script>
 
-<div class="flex flex-col items-center px-6 py-6">
-	<!-- Header with icon and description -->
-	<div
-		class="bg-primary/10 text-primary mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
-	>
-		<MessageSquareText class="h-8 w-8" />
-	</div>
-	<p class="text-muted-foreground mb-6 text-center text-sm">
-		{m.skills_history_select_title()}
-	</p>
-
+<div class="flex flex-col px-6 py-6">
 	<!-- Search box -->
 	<div class="relative w-full mb-4">
 		<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

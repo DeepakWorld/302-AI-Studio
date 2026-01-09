@@ -242,15 +242,15 @@
 		<!-- New Exploration & Clear Screen Buttons -->
 		{#if isInputAreaHovered && !chatState.isStreaming}
 			<div
-				class="absolute top-0 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center gap-2"
+				class="absolute top-0 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center gap-2 max-w-[calc(100vw-2rem)]"
 			>
 				<button
 					type="button"
 					onclick={handleNewExploration}
-					class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6]"
+					class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6] sm:px-4"
 				>
-					<MessageSquarePlus class="h-4 w-4" />
-					<span>{m.text_new_exploration()}</span>
+					<MessageSquarePlus class="h-4 w-4 shrink-0" />
+					<span class="whitespace-nowrap">{m.text_new_exploration()}</span>
 				</button>
 
 				{#if chatState.hasVisibleMessages}
@@ -258,10 +258,10 @@
 					<button
 						type="button"
 						onclick={handleClearScreen}
-						class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-muted-foreground shadow-md backdrop-blur-sm transition-all hover:shadow-lg hover:text-foreground dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white"
+						class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-muted-foreground shadow-md backdrop-blur-sm transition-all hover:shadow-lg hover:text-foreground dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white sm:px-4"
 					>
-						<Eraser class="h-4 w-4" />
-						<span>{m.text_clear_screen()}</span>
+						<Eraser class="h-4 w-4 shrink-0" />
+						<span class="whitespace-nowrap">{m.text_clear_screen()}</span>
 					</button>
 				{/if}
 
@@ -270,10 +270,10 @@
 					<button
 						type="button"
 						onclick={handleRestoreClearScreen}
-						class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-amber-600 shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-amber-600 dark:text-white dark:hover:bg-amber-700"
+						class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-amber-600 shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-amber-600 dark:text-white dark:hover:bg-amber-700 sm:px-4"
 					>
-						<History class="h-4 w-4" />
-						<span>{m.text_restore_history()}</span>
+						<History class="h-4 w-4 shrink-0" />
+						<span class="whitespace-nowrap">{m.text_restore_history()}</span>
 					</button>
 				{/if}
 			</div>

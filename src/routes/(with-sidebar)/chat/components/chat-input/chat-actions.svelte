@@ -231,7 +231,7 @@
 		onClose={handleSkillsPanelToggle}
 		class="h-[70vh] w-[80vw] max-w-5xl flex flex-col"
 	>
-		<div class="flex-1 overflow-y-auto min-h-0">
+		<div class="flex-1 overflow-y-auto min-h-0 px-6 pb-6">
 			<SkillList
 				builtinSkills={skillsData.builtin_skills}
 				userSkills={skillsData.user_skills}
