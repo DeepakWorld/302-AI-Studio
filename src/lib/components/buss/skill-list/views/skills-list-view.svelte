@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { downloadSkill } from "$lib/api/skills";
-	import { deleteSkill } from "$lib/api/skills/base-apis";
+	import { deleteSkill, syncSkills } from "$lib/api/skills/base-apis";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
-	import { Plus, Search } from "@lucide/svelte";
+	import { Plus, RefreshCw, Search } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import { toast } from "svelte-sonner";
 	import { SvelteSet } from "svelte/reactivity";
@@ -33,11 +34,14 @@
 	}: Props = $props();
 
 	const usedSkills = $derived(codeAgentState.skills);
+	const currentSandboxId = $derived(claudeCodeAgentState.sandboxId);
+	const currentSessionId = $derived(claudeCodeAgentState.currentSessionId);
 
 	let searchQuery = $state("");
 	let deleteDialogOpen = $state(false);
 	let deletingSkill = $state<Skill | null>(null);
 	let isDeleting = $state(false);
+	let isSyncing = $state(false);
 	let downloadingSkills = new SvelteSet<string>();
 
 	// Combine skills with source flag
@@ -128,6 +132,53 @@
 	function handleForceUseToggle(skill: Skill, forceUse: boolean) {
 		codeAgentState.handleSkillForceUseToggle(skill.name, forceUse);
 	}
+
+	async function handleSync() {
+		if (!currentSandboxId) {
+			toast.error(m.skills_sync_no_sandbox?.() ?? "No sandbox available for sync");
+			return;
+		}
+
+		isSyncing = true;
+		const toastId = toast.loading(m.skills_syncing?.() ?? "Syncing skills...");
+
+		try {
+			const response = await syncSkills({
+				sandbox_id: currentSandboxId,
+				session_id: currentSessionId || undefined,
+			});
+
+			toast.dismiss(toastId);
+
+			if (response.success && response.result.exit_code === 0) {
+				toast.success(m.skills_sync_success?.() ?? "Skills synced successfully");
+				onRefresh?.();
+			} else {
+				const errorMsg = response.result.stderr || response.result.error || "Sync failed";
+				toast.error(errorMsg);
+			}
+		} catch (e: unknown) {
+			console.error("Failed to sync skills:", e);
+			toast.dismiss(toastId);
+
+			// Try to extract error message from response
+			let errorMessage = m.skills_sync_failed?.() ?? "Failed to sync skills";
+			if (e && typeof e === "object" && "response" in e) {
+				try {
+					const httpError = e as { response: Response };
+					const errorBody = await httpError.response.json();
+					if (errorBody?.error?.message) {
+						errorMessage = errorBody.error.message;
+					}
+				} catch {
+					// Failed to parse error response
+				}
+			}
+			toast.error(errorMessage);
+		} finally {
+			isSyncing = false;
+		}
+	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -143,6 +194,12 @@
 					bind:value={searchQuery}
 				/>
 			</div>
+			{#if currentSandboxId}
+				<Button variant="outline" class="gap-2" onclick={handleSync} disabled={isSyncing}>
+					<RefreshCw class="h-4 w-4 {isSyncing ? 'animate-spin' : ''}" />
+					{m.skills_sync?.() ?? "Sync"}
+				</Button>
+			{/if}
 			<Button class="gap-2 bg-violet-500 hover:bg-violet-600" onclick={handleNew}>
 				<Plus class="h-4 w-4" />
 				{m.skills_new()}
