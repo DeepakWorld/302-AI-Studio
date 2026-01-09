@@ -20,7 +20,7 @@ import {
 } from "ai";
 import getPort from "get-port";
 import { Hono, type Context } from "hono";
-import { codeAgentService, ssoService } from "../services";
+import { codeAgentService, ssoService, tabService } from "../services";
 import { chatParametersService } from "../services/chat-parameters-service";
 import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
@@ -1171,6 +1171,11 @@ app.post("/chat/302ai-code-agent", async (c) => {
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
+
+	// Notify the frontend that sandbox is ready (triggers preview panel to open)
+	if (sandboxId) {
+		tabService.notifySandboxCreated(threadId, sandboxId);
+	}
 
 	console.log(
 		"[302ai-code-agent] Received request",
