@@ -1477,8 +1477,13 @@ export const chat = new Chat({
 			clearPendingResultMetadata();
 		}
 
+		console.log("onFinish: async ({ messages }) codeAgentEnabled", codeAgentEnabled);
+		console.log(
+			"onFinish: async ({ messages }) autoDeploy",
+			codeAgentGlobalConfigsState.autoDeploy,
+		);
 		emitter.emit(EventNames.CHAT_FINISHED, {
-			canDeploy: codeAgentEnabled,
+			canDeploy: codeAgentEnabled && codeAgentGlobalConfigsState.autoDeploy,
 			lastMessage: messages[messages.length - 1],
 		});
 

@@ -425,7 +425,7 @@ class ClaudeCodeProcessor {
 
 		const metadataEvent = {
 			type: "message-metadata",
-			messageMetadata: metadata,
+			metadata: metadata,
 		};
 
 		const metadataStr = `data: ${JSON.stringify(metadataEvent)}`;
