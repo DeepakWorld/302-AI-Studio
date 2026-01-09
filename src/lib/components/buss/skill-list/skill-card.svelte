@@ -137,48 +137,42 @@
 	</div>
 
 	<!-- Footer: Status + Action -->
-	<div class="flex items-center justify-between pt-3">
-		<!-- Left: Status Indicator -->
-		<div class="text-xs font-medium">
-			{#if isUsed}
+	<div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 pt-3">
+		{#if isUsed}
+			<!-- Status Indicator -->
+			<div class="mr-auto text-xs font-medium">
 				<span class="flex items-center gap-1.5 text-primary">
-					<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+					<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"></span>
 					{m.text_label_model_enabled()}
 				</span>
+			</div>
+			<!-- Force Use Toggle -->
+			{#if onForceUseToggle}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="flex items-center gap-2" onclick={(e) => e.stopPropagation()}>
+					<span class="text-xs text-muted-foreground">{m.skills_force_use()}</span>
+					<Switch
+						checked={skill.forceUse ?? false}
+						onCheckedChange={handleForceUseChange}
+						class="border-border"
+					/>
+				</div>
 			{/if}
-		</div>
-
-		<!-- Right: Actions -->
-		<div class="flex items-center gap-2">
-			{#if isUsed}
-				<!-- Force Use Toggle -->
-				{#if onForceUseToggle}
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="flex items-center gap-2" onclick={(e) => e.stopPropagation()}>
-						<span class="text-xs text-muted-foreground">{m.skills_force_use()}</span>
-						<Switch
-							checked={skill.forceUse ?? false}
-							onCheckedChange={handleForceUseChange}
-							class="border-border"
-						/>
-					</div>
-				{/if}
-				{#if onRemove}
-					<Button
-						variant="ghost"
-						size="sm"
-						class="h-8 px-3 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-						onclick={handleRemoveClick}
-					>
-						{m.skills_remove()}
-					</Button>
-				{/if}
-			{:else if onUse}
-				<Button size="sm" class="h-8 px-4" onclick={handleUseClick}>
-					{m.skills_use()}
+			{#if onRemove}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-8 px-3 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+					onclick={handleRemoveClick}
+				>
+					{m.skills_remove()}
 				</Button>
 			{/if}
-		</div>
+		{:else if onUse}
+			<Button size="sm" class="h-8 px-4" onclick={handleUseClick}>
+				{m.skills_use()}
+			</Button>
+		{/if}
 	</div>
 </button>

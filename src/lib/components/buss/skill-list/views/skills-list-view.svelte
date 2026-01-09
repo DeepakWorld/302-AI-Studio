@@ -18,10 +18,19 @@
 		userSkills: Skill[];
 		builtinSkills: Skill[];
 		loading?: boolean;
+		showUseButton?: boolean;
+		singleColumn?: boolean;
 		onRefresh?: () => void;
 	}
 
-	let { userSkills, builtinSkills, loading = false, onRefresh }: Props = $props();
+	let {
+		userSkills,
+		builtinSkills,
+		loading = false,
+		showUseButton = true,
+		singleColumn = false,
+		onRefresh,
+	}: Props = $props();
 
 	const usedSkills = $derived(codeAgentState.skills);
 
@@ -142,13 +151,17 @@
 	</div>
 
 	<!-- Skills Grid - Scrollable -->
-	<div class="flex-1 overflow-y-auto min-h-0 px-6 py-4">
+	<div class="flex-1 overflow-y-auto min-h-0 px-6 py-4 @container">
 		{#if loading}
 			<div class="flex h-48 items-center justify-center text-primary">
 				<LdrsLoader type="dot-pulse" size={40} />
 			</div>
 		{:else}
-			<div class="flex flex-col gap-4">
+			<div
+				class="grid gap-4 {singleColumn
+					? 'grid-cols-1'
+					: 'grid-cols-1 @md:grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4'}"
+			>
 				{#each filteredSkills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
 					{@const usedSkill = usedSkills.find((s) => s.name === item.name)}
 					<SkillCard
@@ -156,13 +169,13 @@
 						isBuiltin={!!item.isBuiltin}
 						isUsed={!!usedSkill}
 						onSelect={handleSelectSkill}
-						onUse={handleUse}
-						onRemove={handleRemove}
+						onUse={showUseButton ? handleUse : undefined}
+						onRemove={showUseButton ? handleRemove : undefined}
 						onEdit={handleEdit}
 						onDownload={handleDownload}
 						onDelete={handleDelete}
 						downloading={downloadingSkills.has(item.name)}
-						onForceUseToggle={handleForceUseToggle}
+						onForceUseToggle={showUseButton ? handleForceUseToggle : undefined}
 					/>
 				{/each}
 			</div>

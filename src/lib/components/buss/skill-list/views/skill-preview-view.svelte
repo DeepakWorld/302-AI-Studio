@@ -88,7 +88,7 @@
 		</div>
 	{:else}
 		<!-- 文件树预览 -->
-		<div class="flex-1 min-h-0">
+		<div class="flex-1 min-h-0 px-6 py-4">
 			{#if skillRootDir}
 				<SkillFileExplorer
 					rootPath={skillRootDir}
