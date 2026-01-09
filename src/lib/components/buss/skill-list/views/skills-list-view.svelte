@@ -9,7 +9,7 @@
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
-	import { Plus, RefreshCw, Search } from "@lucide/svelte";
+	import { Plus, RefreshCw, Search, Star, Trash2, X, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import { toast } from "svelte-sonner";
 	import { SvelteSet } from "svelte/reactivity";
@@ -53,6 +53,37 @@
 				item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				item.description.toLowerCase().includes(searchQuery.toLowerCase()),
 		),
+	);
+
+	// Multi-selection state (must be after filteredSkills)
+	let selectedSkills = new SvelteSet<string>();
+	const isSelectionMode = $derived(selectedSkills.size > 0);
+	const selectedSkillsList = $derived(filteredSkills.filter((s) => selectedSkills.has(s.name)));
+	// Check if any selected skill can be deleted (non-builtin)
+	const canDeleteSelected = $derived(selectedSkillsList.some((s) => !s.isBuiltin));
+	// Check selected skills usage status
+	const allSelectedUsed = $derived(
+		selectedSkillsList.length > 0 &&
+			selectedSkillsList.every((s) => usedSkills.some((u) => u.name === s.name)),
+	);
+	const anySelectedUsed = $derived(
+		selectedSkillsList.some((s) => usedSkills.some((u) => u.name === s.name)),
+	);
+	// Check selected skills force use status
+	const selectedUsedSkills = $derived(
+		selectedSkillsList.filter((s) => usedSkills.some((u) => u.name === s.name)),
+	);
+	const anySelectedForceUsed = $derived(
+		selectedUsedSkills.some((s) => {
+			const used = usedSkills.find((u) => u.name === s.name);
+			return used?.forceUse === true;
+		}),
+	);
+	const anySelectedNotForceUsed = $derived(
+		selectedUsedSkills.some((s) => {
+			const used = usedSkills.find((u) => u.name === s.name);
+			return used?.forceUse !== true;
+		}),
 	);
 
 	function handleSelectSkill(skill: Skill) {
@@ -133,6 +164,73 @@
 		codeAgentState.handleSkillForceUseToggle(skill.name, forceUse);
 	}
 
+	// Multi-selection handlers
+	function handleSelectionChange(skill: Skill, isSelected: boolean) {
+		if (isSelected) {
+			selectedSkills.add(skill.name);
+		} else {
+			selectedSkills.delete(skill.name);
+		}
+	}
+
+	function clearSelection() {
+		selectedSkills.clear();
+	}
+
+	function handleBatchUse() {
+		const skillsToUse = selectedSkillsList.filter(
+			(s) => !usedSkills.some((u) => u.name === s.name),
+		);
+		if (skillsToUse.length > 0) {
+			codeAgentState.handleSkillsUse(skillsToUse);
+		}
+		clearSelection();
+	}
+
+	function handleBatchRemove() {
+		const skillsToRemove = selectedSkillsList.filter((s) =>
+			usedSkills.some((u) => u.name === s.name),
+		);
+		if (skillsToRemove.length > 0) {
+			codeAgentState.handleSkillsRemove(skillsToRemove);
+		}
+		clearSelection();
+	}
+
+	async function handleBatchDelete() {
+		const skillsToDelete = selectedSkillsList.filter((s) => !s.isBuiltin);
+		if (skillsToDelete.length === 0) return;
+
+		isDeleting = true;
+		const toastId = toast.loading(m.skills_deleting());
+
+		try {
+			await deleteSkill({ skill_list: skillsToDelete.map((s) => s.name) });
+			toast.dismiss(toastId);
+			toast.success(m.skills_delete_success());
+			clearSelection();
+			onRefresh?.();
+		} catch (e) {
+			console.error("Failed to delete skills:", e);
+			toast.dismiss(toastId);
+			toast.error(m.skills_delete_failed());
+		} finally {
+			isDeleting = false;
+		}
+	}
+
+	function handleBatchForceUse(forceUse: boolean) {
+		// Only apply to skills that need to change
+		const skillsToUpdate = selectedUsedSkills.filter((s) => {
+			const used = usedSkills.find((u) => u.name === s.name);
+			return forceUse ? used?.forceUse !== true : used?.forceUse === true;
+		});
+		for (const skill of skillsToUpdate) {
+			codeAgentState.handleSkillForceUseToggle(skill.name, forceUse);
+		}
+		clearSelection();
+	}
+
 	async function handleSync() {
 		if (!currentSandboxId) {
 			toast.error(m.skills_sync_no_sandbox?.() ?? "No sandbox available for sync");
@@ -181,7 +279,7 @@
 	}
 </script>
 
-<div class="flex h-full flex-col">
+<div class="relative flex h-full flex-col">
 	<!-- Search and New Button - Fixed at top -->
 	<div class="shrink-0 border-b px-6 py-4">
 		<div class="flex items-center gap-3">
@@ -225,7 +323,10 @@
 						skill={usedSkill ?? item}
 						isBuiltin={!!item.isBuiltin}
 						isUsed={!!usedSkill}
+						selectable={true}
+						selected={selectedSkills.has(item.name)}
 						onSelect={handleSelectSkill}
+						onSelectionChange={handleSelectionChange}
 						onUse={showUseButton ? handleUse : undefined}
 						onRemove={showUseButton ? handleRemove : undefined}
 						onEdit={handleEdit}
@@ -246,6 +347,96 @@
 			{/if}
 		{/if}
 	</div>
+
+	<!-- Floating Action Bar for Multi-selection -->
+	{#if isSelectionMode}
+		<div
+			class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 rounded-xl bg-background/98 backdrop-blur-md border border-border/50 shadow-xl px-2 py-1.5 animate-in fade-in slide-in-from-bottom-4 duration-200"
+		>
+			<!-- Selected count badge -->
+			<div
+				class="flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg bg-primary/10 text-primary"
+			>
+				<span class="text-sm font-semibold tabular-nums">{selectedSkills.size}</span>
+			</div>
+
+			<!-- Action buttons group -->
+			<div class="flex items-center gap-0.5 px-1">
+				{#if showUseButton}
+					{#if !allSelectedUsed}
+						<Button
+							variant="ghost"
+							size="sm"
+							class="gap-1.5 h-7 px-2.5 text-xs font-medium rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+							onclick={handleBatchUse}
+						>
+							<Zap class="h-3.5 w-3.5" />
+							{m.skills_use()}
+						</Button>
+					{/if}
+					{#if anySelectedUsed}
+						<Button
+							variant="ghost"
+							size="sm"
+							class="gap-1.5 h-7 px-2.5 text-xs font-medium rounded-lg hover:bg-muted"
+							onclick={handleBatchRemove}
+						>
+							<X class="h-3.5 w-3.5" />
+							{m.skills_remove()}
+						</Button>
+						{#if anySelectedNotForceUsed}
+							<Button
+								variant="ghost"
+								size="sm"
+								class="gap-1.5 h-7 px-2.5 text-xs font-medium rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+								onclick={() => handleBatchForceUse(true)}
+							>
+								<Star class="h-3.5 w-3.5" />
+								{m.skills_force_use()}
+							</Button>
+						{/if}
+						{#if anySelectedForceUsed}
+							<Button
+								variant="ghost"
+								size="sm"
+								class="gap-1.5 h-7 px-2.5 text-xs font-medium rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+								onclick={() => handleBatchForceUse(false)}
+							>
+								<Star class="h-3.5 w-3.5 fill-current" />
+								{m.skills_unforce_use()}
+							</Button>
+						{/if}
+					{/if}
+				{/if}
+
+				{#if canDeleteSelected}
+					<Button
+						variant="ghost"
+						size="sm"
+						class="gap-1.5 h-7 px-2.5 text-xs font-medium rounded-lg text-destructive hover:bg-destructive/10"
+						onclick={handleBatchDelete}
+						disabled={isDeleting}
+					>
+						<Trash2 class="h-3.5 w-3.5" />
+						{m.text_button_delete()}
+					</Button>
+				{/if}
+			</div>
+
+			<!-- Separator -->
+			<div class="h-5 w-px bg-border/60"></div>
+
+			<!-- Close button -->
+			<Button
+				variant="ghost"
+				size="icon"
+				class="h-7 w-7 rounded-lg hover:bg-muted"
+				onclick={clearSelection}
+			>
+				<X class="h-4 w-4" />
+			</Button>
+		</div>
+	{/if}
 </div>
 
 <!-- Delete Confirmation Dialog -->

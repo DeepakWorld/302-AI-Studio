@@ -1,9 +1,11 @@
 <script lang="ts">
 	import Badge from "$lib/components/ui/badge/badge.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
+	import Checkbox from "$lib/components/ui/checkbox/checkbox.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import Switch from "$lib/components/ui/switch/switch.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { cn } from "$lib/utils";
 	import { Ellipsis, Loader2, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
@@ -12,7 +14,10 @@
 		isBuiltin: boolean;
 		isUsed?: boolean;
 		downloading?: boolean;
+		selectable?: boolean;
+		selected?: boolean;
 		onSelect?: (skill: Skill) => void;
+		onSelectionChange?: (skill: Skill, selected: boolean) => void;
 		onUse?: (skill: Skill) => void;
 		onRemove?: (skill: Skill) => void;
 		onEdit?: (skill: Skill) => void;
@@ -26,7 +31,10 @@
 		isBuiltin,
 		isUsed = false,
 		downloading = false,
+		selectable = false,
+		selected = false,
 		onSelect,
+		onSelectionChange,
 		onUse,
 		onRemove,
 		onEdit,
@@ -41,7 +49,15 @@
 	const showMenu = $derived(canEdit || !!onDownload || canDelete);
 
 	function handleCardClick() {
-		onSelect?.(skill);
+		if (selectable) {
+			onSelectionChange?.(skill, !selected);
+		} else {
+			onSelect?.(skill);
+		}
+	}
+
+	function handleCheckboxChange(checked: boolean) {
+		onSelectionChange?.(skill, checked);
 	}
 
 	function handleUseClick(e: MouseEvent) {
@@ -61,11 +77,23 @@
 
 <button
 	type="button"
-	class="group relative flex h-full w-full cursor-pointer flex-col rounded-xl border border-border p-5 text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+	class={cn(
+		"group relative flex h-full w-full cursor-pointer flex-col rounded-xl border p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+		selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+	)}
 	onclick={handleCardClick}
 >
+	<!-- Selection Checkbox -->
+	{#if selectable}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="absolute top-3 left-3 z-10" onclick={(e) => e.stopPropagation()}>
+			<Checkbox checked={selected} onCheckedChange={handleCheckboxChange} />
+		</div>
+	{/if}
+
 	<!-- Header: Icon + Info + Menu -->
-	<div class="mb-4 flex items-start gap-3">
+	<div class={cn("mb-4 flex items-start gap-3", selectable && "ml-6")}>
 		<!-- Icon Container -->
 		<div
 			class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
