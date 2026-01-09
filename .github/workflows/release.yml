@@ -67,11 +67,11 @@ jobs:
             arch: x64
           # - os: macos-latest
           #   arch: universal
-          # Linux - 8 cores for faster builds
-          - os: ubuntu-latest-8-cores
+          # Linux
+          - os: ubuntu-latest
             arch: x64
-          # Windows - 8 cores for faster builds
-          - os: windows-latest-8-cores
+          # Windows
+          - os: windows-latest
             arch: x64
 
     steps:
