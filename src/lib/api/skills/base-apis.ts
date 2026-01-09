@@ -94,7 +94,22 @@ export async function _editSkillDetails(request: SkillDetailsRequest): Promise<B
 
 		return response;
 	} catch (error) {
-		console.error("Failed to check skill details:", error);
+		// Handle HTTP errors (ky throws on non-2xx responses)
+		if (error && typeof error === "object" && "response" in error) {
+			const httpError = error as { response: Response };
+			try {
+				const errorBody = await httpError.response.json();
+				if (errorBody && typeof errorBody === "object" && errorBody.error?.message) {
+					throw new Error(errorBody.error.message);
+				}
+			} catch (parseError) {
+				// If it's already our custom error, rethrow it
+				if (parseError instanceof Error && parseError.message !== "Unexpected token") {
+					throw parseError;
+				}
+			}
+		}
+		console.error("Failed to edit skill details:", error);
 		throw error;
 	}
 }
