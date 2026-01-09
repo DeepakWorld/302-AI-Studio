@@ -13,6 +13,7 @@
 	let selectedId = $state<string | null>(null);
 	let expandedSandboxes = $state<Set<string>>(new Set());
 	let searchQuery = $state("");
+	let hasInitialized = false;
 
 	// Filter groups based on search query
 	const filteredGroups = $derived.by(() => {
@@ -32,8 +33,13 @@
 			.filter((group) => group.items.length > 0);
 	});
 
-	// Initialize expanded state - default to collapsed
-	// expandedSandboxes starts as empty Set, so all groups are collapsed by default
+	// Initialize expanded state - default to all expanded
+	$effect(() => {
+		if (!hasInitialized && groupedSessions.groups.length > 0) {
+			hasInitialized = true;
+			expandedSandboxes = new SvelteSet(groupedSessions.groups.map((g) => g.groupKey));
+		}
+	});
 
 	function toggleSandbox(sandboxId: string) {
 		const newSet = new SvelteSet(expandedSandboxes);
