@@ -213,9 +213,15 @@
 	$effect(() => {
 		if (codeAgentState.enabled) {
 			// Open immediately, even if sandboxId is empty/loading
-			agentPreviewState.openPreview(codeAgentState.sandboxId || "");
+			// But don't override skills-only mode
+			if (!agentPreviewState.isSkillsOnlyMode) {
+				agentPreviewState.openPreview(codeAgentState.sandboxId || "");
+			}
 		} else {
-			agentPreviewState.closePreview();
+			// Only close if not in skills-only mode
+			if (!agentPreviewState.isSkillsOnlyMode) {
+				agentPreviewState.closePreview();
+			}
 		}
 	});
 
@@ -283,8 +289,8 @@
 	</div>
 {/snippet}
 
-{#if !chatState.hasMessages}
-	<!-- Initial state: no messages at all - show centered layout -->
+{#if !chatState.hasMessages && !agentPreviewState.isVisible}
+	<!-- Initial state: no messages at all and no preview panel - show centered layout -->
 	<div class="flex h-full flex-col relative">
 		<PageHeader />
 		<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
@@ -296,6 +302,61 @@
 			</div>
 			{#if preferencesSettings.enableSupermarket}<AiApplicationItems />{/if}
 		</div>
+	</div>
+{:else if !chatState.hasMessages && agentPreviewState.isVisible}
+	<!-- Initial state with preview panel (skills-only mode) -->
+	<div class="flex h-full overflow-hidden relative">
+		{#if agentPreviewState.isPinned}
+			<Resizable.PaneGroup direction="horizontal" class="h-full">
+				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 320px;">
+					<div class="flex h-full flex-col relative">
+						<PageHeader />
+						<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
+							<div class="flex w-full flex-col items-center justify-center gap-chat-gap-y">
+								<span class="text-center text-chat-slogan" data-layoutid="chat-slogan"
+									>{m.app_slogan()}</span
+								>
+								<ChatInputBox />
+							</div>
+							{#if preferencesSettings.enableSupermarket}<AiApplicationItems />{/if}
+						</div>
+					</div>
+				</Resizable.Pane>
+				<Resizable.Handle withHandle class="mb-6" />
+				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0 pb-6">
+					<AgentPreviewPanel />
+				</Resizable.Pane>
+			</Resizable.PaneGroup>
+		{:else}
+			<div class="flex-1 flex flex-col h-full min-w-0 relative">
+				<PageHeader />
+				<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
+					<div class="flex w-full flex-col items-center justify-center gap-chat-gap-y">
+						<span class="text-center text-chat-slogan" data-layoutid="chat-slogan"
+							>{m.app_slogan()}</span
+						>
+						<ChatInputBox />
+					</div>
+					{#if preferencesSettings.enableSupermarket}<AiApplicationItems />{/if}
+				</div>
+			</div>
+			<div
+				class="absolute right-0 top-0 bottom-5 flex flex-col bg-background border-l border-border z-[50]"
+				style="width: 50%;"
+			>
+				<button
+					type="button"
+					aria-label="Resize panel"
+					class="bg-border focus-visible:ring-ring absolute -left-px top-0 bottom-0 flex w-px cursor-col-resize items-center justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:outline-hidden"
+					onmousedown={setupPanelResize}
+				>
+					<div class="bg-border z-10 flex h-4 w-3 items-center justify-center rounded-xs border">
+						<GripVerticalIcon class="size-2.5" />
+					</div>
+				</button>
+				<AgentPreviewPanel />
+			</div>
+		{/if}
 	</div>
 {:else if agentPreviewState.isVisible && !htmlPreviewState.isVisible}
 	<div class="flex h-full overflow-hidden relative">

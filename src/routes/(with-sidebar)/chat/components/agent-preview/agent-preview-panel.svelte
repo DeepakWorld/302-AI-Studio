@@ -248,8 +248,17 @@
 		return "";
 	});
 
+	// Skills-only mode: only show skills tab when no sandbox
+	const isSkillsOnlyMode = $derived(agentPreviewState.isSkillsOnlyMode);
+
 	// Tabs definition
 	let tabs: PreviewTab[] = $derived.by(() => {
+		// Skills-only mode OR no sandbox: only show skills tab
+		// This ensures that before starting a conversation (no sandbox), only skills tab is visible
+		if (isSkillsOnlyMode || !currentSandboxId) {
+			return [{ id: TAB_SKILLS, label: "Skills" }];
+		}
+
 		const t = [
 			{ id: "preview", label: m.label_tab_preview() },
 			{ id: "code", label: m.label_tab_file() },
@@ -262,6 +271,14 @@
 	});
 
 	// --- Effects & Logic ---
+
+	// 0. Auto-switch to skills tab when no sandbox
+	$effect(() => {
+		// When there's no sandbox, force skills tab to be selected
+		if (!currentSandboxId && activeTab !== TAB_SKILLS) {
+			agentPreviewState.setActiveTab(TAB_SKILLS);
+		}
+	});
 
 	// 1. State Restoration Logic
 	// Track the last restored session to prevent duplicate restores
@@ -1229,7 +1246,7 @@
 									Sandbox not available
 								</div>
 							{/if}
-						{:else if activeTab === TAB_SKILLS && isAgentMode}
+						{:else if activeTab === TAB_SKILLS && (isAgentMode || isSkillsOnlyMode || !currentSandboxId)}
 							<!-- Skills Tab Content -->
 							<div class="flex h-full flex-col min-h-0 overflow-hidden">
 								<!-- Skills Panel Header -->

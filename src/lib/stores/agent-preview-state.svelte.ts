@@ -235,6 +235,8 @@ export class AgentPreviewState {
 	sandBoxId = $state<string | undefined>(undefined);
 	isDeploying = $state(false);
 	activeTab = $state<AgentPreviewTab>("preview");
+	// Skills-only mode: when true, only shows skills tab (no sandbox required)
+	isSkillsOnlyMode = $state(false);
 	private syncBus = new SyncBus(syncInstanceId);
 
 	// Use global preferencesSettings for isPinned
@@ -779,6 +781,7 @@ export class AgentPreviewState {
 		this.isVisible = false;
 		this.mode = "preview";
 		this.activeTab = "preview";
+		this.isSkillsOnlyMode = false;
 	}
 
 	setActiveTab(tab: AgentPreviewTab) {
@@ -786,6 +789,16 @@ export class AgentPreviewState {
 	}
 
 	openSkillsTab() {
+		this.activeTab = "skills";
+		this.isVisible = true;
+	}
+
+	/**
+	 * Open in skills-only mode (no sandbox required)
+	 * This mode only shows the skills tab for managing skills
+	 */
+	openSkillsOnlyMode() {
+		this.isSkillsOnlyMode = true;
 		this.activeTab = "skills";
 		this.isVisible = true;
 	}

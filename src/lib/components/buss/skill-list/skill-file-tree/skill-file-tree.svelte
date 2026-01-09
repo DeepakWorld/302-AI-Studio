@@ -56,7 +56,7 @@
 	let nameDialogMode = $state<DialogMode>("create-file");
 	let nameDialogInitialValue = $state("");
 	let targetPath = $state("");
-	let targetNode = $state<FileNode | null>(null);
+	let _targetNode = $state<FileNode | null>(null);
 
 	// Delete confirmation dialog
 	let deleteDialogOpen = $state(false);
