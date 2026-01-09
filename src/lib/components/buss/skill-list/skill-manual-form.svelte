@@ -1,11 +1,12 @@
 <script lang="ts">
+	import CodeMirrorEditor from "$lib/components/buss/editor/codemirror-editor.svelte";
 	import SkillFileExplorer from "$lib/components/buss/skill-list/skill-file-tree/skill-file-explorer.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { Label } from "$lib/components/ui/label";
-	import Textarea from "$lib/components/ui/textarea/textarea.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { Loader2 } from "@lucide/svelte";
+	import { mode } from "mode-watcher";
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 
@@ -240,8 +241,8 @@
 	}
 </script>
 
-<div class="space-y-4 px-6 py-6">
-	<div class="space-y-2">
+<div class="flex h-full flex-col gap-4 px-6 py-6">
+	<div class="shrink-0 space-y-2">
 		<Label for="skill-name" class="text-sm font-medium">
 			{m.skills_form_name()} <span class="text-destructive">*</span>
 		</Label>
@@ -249,10 +250,11 @@
 			id="skill-name"
 			bind:value={formData.name}
 			placeholder={m.skills_form_name_placeholder()}
+			class="dark:border-[#3d3d3d]"
 		/>
 	</div>
 
-	<div class="space-y-2">
+	<div class="shrink-0 space-y-2">
 		<Label for="skill-desc" class="text-sm font-medium">
 			{m.skills_form_desc()} <span class="text-destructive">*</span>
 		</Label>
@@ -260,12 +262,13 @@
 			id="skill-desc"
 			bind:value={formData.description}
 			placeholder={m.skills_form_desc_placeholder()}
+			class="dark:border-[#3d3d3d]"
 		/>
 	</div>
 
-	<div class="space-y-2">
+	<div class="flex min-h-0 flex-1 flex-col space-y-2">
 		<!-- Label with toggle buttons -->
-		<div class="flex items-center justify-between">
+		<div class="flex shrink-0 items-center justify-between">
 			<Label for="skill-content" class="text-sm font-medium">
 				{m.skills_form_content()} <span class="text-destructive">*</span>
 			</Label>
@@ -302,14 +305,18 @@
 
 		<!-- Content area -->
 		{#if viewMode === "default"}
-			<Textarea
-				id="skill-content"
-				bind:value={formData.content}
-				class="min-h-[200px] max-h-[300px] w-full max-w-full resize-none overflow-y-auto overflow-x-hidden break-all font-mono text-sm"
-			/>
-			<p class="text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
+			<div class="min-h-0 flex-1 overflow-hidden rounded-md border">
+				<CodeMirrorEditor
+					value={formData.content}
+					language="md"
+					theme={mode.current === "dark" ? "dark" : "light"}
+					readOnly={false}
+					onChange={(value) => (formData.content = value)}
+				/>
+			</div>
+			<p class="shrink-0 text-muted-foreground text-xs">{m.skills_form_content_hint()}</p>
 		{:else if effectiveRootPath}
-			<div class="h-[300px] overflow-hidden rounded-md">
+			<div class="min-h-0 flex-1 overflow-hidden rounded-md">
 				<SkillFileExplorer
 					rootPath={effectiveRootPath}
 					readOnly={rootPath ? readOnly : false}

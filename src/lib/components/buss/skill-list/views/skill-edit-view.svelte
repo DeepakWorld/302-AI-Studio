@@ -180,7 +180,7 @@
 			<LdrsLoader type="dot-pulse" size={40} />
 		</div>
 	{:else}
-		<div class="flex-1 overflow-y-auto min-h-0">
+		<div class="flex-1 min-h-0">
 			<SkillManualForm
 				bind:formData
 				bind:this={manualFormRef}
@@ -191,7 +191,7 @@
 			/>
 		</div>
 
-		<div class="flex gap-3 border-t px-6 py-4">
+		<div class="shrink-0 flex gap-3 border-t px-6 py-4">
 			<Button variant="outline" class="flex-1" onclick={handleCancel} disabled={isSaving}>
 				{m.text_button_cancel()}
 			</Button>
