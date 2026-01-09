@@ -3,6 +3,7 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chat, chatState } from "$lib/stores/chat-state.svelte";
+	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
@@ -210,25 +211,19 @@
 	// 	console.log("sandBoxIdsandBoxId", sandBoxId);
 	// });
 
-	// Track previous vibe mode state for edge detection
-	let previousVibeEnabled = false;
-
 	// Close preview panel when code agent mode is disabled (but not in skills-only mode)
-	// Also auto-open preview panel when vibe mode is first enabled
 	$effect(() => {
-		const currentEnabled = codeAgentState.enabled;
-
-		// Edge detection: vibe mode just turned ON
-		if (currentEnabled && !previousVibeEnabled) {
-			agentPreviewState.openSkillsOnlyMode();
-		}
-
-		// Edge detection: vibe mode just turned OFF
-		if (!currentEnabled && !agentPreviewState.isSkillsOnlyMode) {
+		if (!codeAgentState.enabled && !agentPreviewState.isSkillsOnlyMode) {
 			agentPreviewState.closePreview();
 		}
+	});
 
-		previousVibeEnabled = currentEnabled;
+	// Auto-open preview panel when in code agent mode and sandbox is available
+	$effect(() => {
+		const sandboxId = claudeCodeAgentState.sandboxId;
+		if (codeAgentState.enabled && sandboxId && !agentPreviewState.isVisible) {
+			agentPreviewState.openPreview(sandboxId);
+		}
 	});
 
 	async function handleNewExploration() {
