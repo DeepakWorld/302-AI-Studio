@@ -497,7 +497,7 @@
 		isExportDialogOpen = true;
 	}}
 >
-	<div class="group flex flex-col gap-1" data-message-id={message.id}>
+	<div class="group flex flex-col" data-message-id={message.id}>
 		{@render messageHeader(message.metadata?.model || "gpt-4o")}
 
 		{#each messagePartsWithExtractedReasoning() as part, partIndex (partIndex)}
@@ -519,7 +519,10 @@
 				{/if}
 			{:else if part.type === "reasoning"}
 				{#if !preferencesSettings.autoHideReason}
-					<Collapsible bind:open={isReasoningExpanded} class="rounded-lg border bg-muted/30 p-3">
+					<Collapsible
+						bind:open={isReasoningExpanded}
+						class="mb-4 rounded-lg border bg-muted/30 p-3"
+					>
 						<CollapsibleTrigger
 							class="flex w-full items-center justify-between text-left transition-colors hover:bg-muted/20 rounded-md p-2"
 						>
@@ -578,7 +581,7 @@
 					<!-- MCP Tools - Keep original behavior with modal -->
 					<button
 						type="button"
-						class="my-2 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
+						class="mb-3 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
 						onclick={() => {
 							selectedToolPart = part;
 							isToolModalOpen = true;

@@ -63,6 +63,8 @@
 	}
 
 	function handleCodeAgentEnabled() {
+		codeAgentState.getSkillList(true);
+
 		// 过滤不兼容的 MCP 服务器（只保留 streamableHTTP 类型）
 		if (chatState.mcpServerIds.length > 0) {
 			const { compatibleIds, filteredNames } = mcpState.filterStreamableHTTPServers(

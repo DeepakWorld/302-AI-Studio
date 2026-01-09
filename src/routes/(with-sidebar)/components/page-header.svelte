@@ -14,14 +14,14 @@
 		await window.electronAPI.windowService.handleOpenSettingsWindow();
 	}
 
-	// Check if agent preview button should be shown
+	// Check if agent preview button (with full tabs) should be shown
 	const showAgentPreviewButton = $derived(
 		codeAgentState.enabled &&
 			codeAgentState.currentAgentId === "claude-code" &&
 			claudeCodeAgentState.sandboxId !== "",
 	);
 
-	// Handle agent preview toggle
+	// Handle agent preview toggle (full mode with sandbox)
 	function handleAgentPreviewToggle() {
 		if (agentPreviewState.isVisible) {
 			agentPreviewState.closePreview();
@@ -32,6 +32,15 @@
 			}
 		}
 	}
+
+	// Handle skills-only mode toggle (no sandbox required)
+	// function handleSkillsOnlyToggle() {
+	// 	if (agentPreviewState.isVisible && agentPreviewState.isSkillsOnlyMode) {
+	// 		agentPreviewState.closePreview();
+	// 	} else {
+	// 		agentPreviewState.openSkillsOnlyMode();
+	// 	}
+	// }
 </script>
 
 <div
@@ -46,20 +55,52 @@
 
 	<div class="flex flex-row items-center gap-2">
 		{#if showAgentPreviewButton}
+			<!-- Full agent preview mode (with sandbox) -->
 			<ButtonWithTooltip
 				class={cn(
 					"hover:!bg-icon-btn-hover",
-					agentPreviewState.isVisible && "!bg-icon-btn-active hover:!bg-icon-btn-active",
+					agentPreviewState.isVisible &&
+						!agentPreviewState.isSkillsOnlyMode &&
+						"!bg-icon-btn-active hover:!bg-icon-btn-active",
 				)}
 				tooltipSide="bottom"
-				tooltip={agentPreviewState.isVisible
+				tooltip={agentPreviewState.isVisible && !agentPreviewState.isSkillsOnlyMode
 					? m.tooltip_close_agent_preview()
 					: m.tooltip_open_agent_preview()}
 				onclick={handleAgentPreviewToggle}
 			>
-				<Server class={cn("size-5", agentPreviewState.isVisible && "!text-icon-btn-active-fg")} />
+				<Server
+					class={cn(
+						"size-5",
+						agentPreviewState.isVisible &&
+							!agentPreviewState.isSkillsOnlyMode &&
+							"!text-icon-btn-active-fg",
+					)}
+				/>
 			</ButtonWithTooltip>
 		{/if}
+
+		<!-- Skills management button (always visible) -->
+		<!-- <ButtonWithTooltip
+			class={cn(
+				"hover:!bg-icon-btn-hover",
+				agentPreviewState.isVisible &&
+					agentPreviewState.isSkillsOnlyMode &&
+					"!bg-icon-btn-active hover:!bg-icon-btn-active",
+			)}
+			tooltipSide="bottom"
+			tooltip={m.title_skills_management()}
+			onclick={handleSkillsOnlyToggle}
+		>
+			<BookOpen
+				class={cn(
+					"size-5",
+					agentPreviewState.isVisible &&
+						agentPreviewState.isSkillsOnlyMode &&
+						"!text-icon-btn-active-fg",
+				)}
+			/>
+		</ButtonWithTooltip> -->
 
 		<ButtonWithTooltip
 			class={cn(

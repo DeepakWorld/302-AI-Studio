@@ -1,93 +1,41 @@
-/**
- * Sandbox Deploy API Client
- * 302.AI 沙盒部署 API
- */
+import { type } from "arktype";
+import { _302AIKy } from "./core/_302ai-ky";
 
-import type { ModelProvider } from "@shared/types";
-import { getApiKeyByProvider } from "./utils";
-
-export interface DeploySandboxRequest {
-	sandbox_id: string;
-	session_id?: string;
-}
-
-export interface DeploySandboxResponse {
-	success: boolean;
-	status: string;
-	id: string;
-	url: string;
-	cover: string;
-}
-
-export interface DeploySandboxResult {
-	success: boolean;
-	data?: DeploySandboxResponse;
-	error?: string;
-}
+export const deploySandboxRequestSchema = type({
+	sandbox_id: "string",
+	session_id: "string?",
+});
+export type DeploySandboxRequest = typeof deploySandboxRequestSchema.infer;
+export const deploySandboxResponseSchema = type({
+	success: "boolean",
+	status: "string",
+	id: "string",
+	url: "string",
+	cover: "string",
+});
+export type DeploySandboxResponse = typeof deploySandboxResponseSchema.infer;
 
 /**
- * Deploy sandbox project to 302.AI hosting service
+ * Deploy sandbox project to 302.AI hosting service (New implementation)
  */
 export async function deploySandboxProject(
-	provider: ModelProvider,
 	request: DeploySandboxRequest,
-): Promise<DeploySandboxResult> {
+): Promise<DeploySandboxResponse> {
 	try {
-		// Use the base URL without /v1 suffix
-		const baseUrl = provider.baseUrl.replace(/\/v1\/?$/, "");
-		const endpoint = `${baseUrl}/302/claude-code/sandbox/deploy`;
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/deploy", {
+				json: request,
+			})
+			.json();
 
-		const response = await fetch(endpoint, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${getApiKeyByProvider(provider)}`,
-			},
-			body: JSON.stringify(request),
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
-
-			try {
-				const errorData = JSON.parse(errorText);
-				if (errorData.error) {
-					if (
-						typeof errorData.error === "object" &&
-						errorData.error !== null &&
-						errorData.error.message
-					) {
-						errorMessage = errorData.error.message;
-					} else if (typeof errorData.error === "string") {
-						errorMessage = errorData.error;
-					}
-				} else if (errorData.message) {
-					errorMessage = errorData.message;
-				}
-			} catch {
-				// If error response is not JSON, use the text as is
-				if (errorText) {
-					errorMessage = errorText;
-				}
-			}
-
-			return {
-				success: false,
-				error: errorMessage,
-			};
+		const validated = deploySandboxResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate deploy sandbox response:", validated.summary);
+			throw new Error("Invalid response format from deploy sandbox API");
 		}
-
-		const data = await response.json();
-
-		return {
-			success: true,
-			data: data,
-		};
+		return validated;
 	} catch (error) {
-		return {
-			success: false,
-			error: error instanceof Error ? error.message : "Failed to deploy sandbox project",
-		};
+		console.error("Failed to deploy sandbox project:", error);
+		throw error;
 	}
 }

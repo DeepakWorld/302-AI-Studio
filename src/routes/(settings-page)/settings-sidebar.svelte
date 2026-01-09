@@ -40,6 +40,11 @@
 			path: "/settings/mcp-settings",
 			labelKey: m.text_button_settings_mcp(),
 		},
+		{
+			name: "skill-settings",
+			path: "/settings/skill-settings",
+			labelKey: m.text_button_settings_skills(),
+		},
 		// {
 		// 	name: "plugins",
 		// 	path: "/settings/plugins",

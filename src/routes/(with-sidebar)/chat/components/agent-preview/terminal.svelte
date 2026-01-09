@@ -3,7 +3,10 @@
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { Loader2 } from "@lucide/svelte";
+	import { onMount } from "svelte";
 	import { DEFAULT_WORKSPACE_PATH } from "./constants";
+
+	const { onShortcutAction } = window.electronAPI.shortcut;
 
 	interface Props {
 		sandboxId: string;
@@ -119,6 +122,21 @@
 		if (!cmd || isExecuting) return;
 
 		if (!sandboxId || !sessionId) {
+			return;
+		}
+
+		// Handle clear command locally - don't send to server
+		if (cmd === "clear") {
+			agentPreviewState.updateState(sandboxId, sessionId, () => ({
+				terminalHistory: [],
+			}));
+			commandInput = "";
+			cursorPosition = 0;
+			// Add to history
+			if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
+				commandHistory = [...commandHistory.slice(-49), cmd];
+			}
+			historyIndex = -1;
 			return;
 		}
 
@@ -292,6 +310,17 @@
 	function formatCwdForDisplay(cwd: string): string {
 		return cwd;
 	}
+
+	// Listen for sendMessage shortcut action (Enter key is captured by Electron before-input-event)
+	onMount(() => {
+		const unsub = onShortcutAction((action) => {
+			// Only handle sendMessage when terminal input has focus
+			if (action.action === "sendMessage" && inputRef === document.activeElement) {
+				executeCommand();
+			}
+		});
+		return () => unsub();
+	});
 </script>
 
 <div

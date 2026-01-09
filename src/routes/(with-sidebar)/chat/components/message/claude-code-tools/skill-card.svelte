@@ -8,9 +8,9 @@
 </script>
 
 <script lang="ts">
+	import { CopyButton } from "$lib/components/buss/copy-button";
 	import { MarkdownRenderer } from "$lib/components/buss/markdown";
 	import StaticCodeBlock from "$lib/components/buss/markdown/static-code-block.svelte";
-	import { CopyButton } from "$lib/components/buss/copy-button";
 	import {
 		Dialog,
 		DialogContent,
@@ -100,7 +100,7 @@
 <!-- Card Button -->
 <button
 	type="button"
-	class="my-2 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
+	class="mb-3 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
 	onclick={() => {
 		isModalOpen = true;
 	}}

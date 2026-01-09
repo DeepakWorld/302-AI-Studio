@@ -94,6 +94,7 @@ type CliOptions = {
 	noTag: boolean;
 	push: boolean;
 	skipAppInfo: boolean;
+	skipQuality: boolean;
 };
 
 const ROOT = path.resolve(process.cwd());
@@ -133,10 +134,10 @@ function parseArgs(argv: string[]): { command: ReleaseCommand; options: CliOptio
 		die(
 			[
 				"Usage:",
-				'  pnpm tsx scripts/release.ts patch|minor|major [--bump N] [--from <version>] [--notes "..."] [--push]',
-				'  pnpm tsx scripts/release.ts to --to <version> [--notes "..."] [--push]',
-				'  pnpm tsx scripts/release.ts beta [--bump N] [--notes "..."] [--push]',
-				'  pnpm tsx scripts/release.ts stable [--notes "..."] [--push]',
+				'  pnpm tsx scripts/release.ts patch|minor|major [--bump N] [--from <version>] [--notes "..."] [--push] [--skip-quality]',
+				'  pnpm tsx scripts/release.ts to --to <version> [--notes "..."] [--push] [--skip-quality]',
+				'  pnpm tsx scripts/release.ts beta [--bump N] [--notes "..."] [--push] [--skip-quality]',
+				'  pnpm tsx scripts/release.ts stable [--notes "..."] [--push] [--skip-quality]',
 				"  pnpm tsx scripts/release.ts  (interactive)",
 				"",
 				"Commands:",
@@ -167,6 +168,7 @@ function parseArgs(argv: string[]): { command: ReleaseCommand; options: CliOptio
 				"  --no-tag               Do not create a git tag",
 				"  --push                 Push commit + tags to origin",
 				"  --skip-app-info        Do not sync src/lib/app-info.ts",
+				"  --skip-quality         Skip running quality checks (pnpm quality) before release",
 			].join("\n"),
 		);
 	}
@@ -182,6 +184,7 @@ function parseArgs(argv: string[]): { command: ReleaseCommand; options: CliOptio
 		noTag: false,
 		push: false,
 		skipAppInfo: false,
+		skipQuality: false,
 	};
 
 	for (let i = 0; i < rest.length; i++) {
@@ -201,6 +204,7 @@ function parseArgs(argv: string[]): { command: ReleaseCommand; options: CliOptio
 		else if (a === "--no-tag") options.noTag = true;
 		else if (a === "--push") options.push = true;
 		else if (a === "--skip-app-info") options.skipAppInfo = true;
+		else if (a === "--skip-quality") options.skipQuality = true;
 		else die(`Unknown option: ${a}`);
 	}
 
@@ -224,6 +228,25 @@ function ensureCleanGit(allowDirty: boolean) {
 			["Working tree is not clean.", "Commit/stash your changes or rerun with --allow-dirty."].join(
 				"\n",
 			),
+		);
+	}
+}
+
+function runQualityChecks(skipQuality: boolean) {
+	if (skipQuality) {
+		console.log("⏭️  Skipping quality checks (--skip-quality)");
+		return;
+	}
+	console.log("🔍 Running quality checks (pnpm quality)...");
+	try {
+		run("pnpm", ["quality"], { stdio: "inherit" });
+		console.log("✅ Quality checks passed\n");
+	} catch {
+		die(
+			[
+				"❌ Quality checks failed.",
+				"Fix the issues and try again, or rerun with --skip-quality to bypass.",
+			].join("\n"),
 		);
 	}
 }
@@ -406,6 +429,11 @@ async function promptInteractive(
 		default: preset.push,
 	});
 
+	options.skipQuality = await confirm({
+		message: "Skip quality checks (pnpm quality)?",
+		default: preset.skipQuality,
+	});
+
 	options.dryRun = await confirm({
 		message: "Dry-run (no file writes / no git operations)?",
 		default: preset.dryRun,
@@ -531,6 +559,9 @@ async function main() {
 			return;
 		}
 	}
+
+	// Run quality checks before making any changes
+	runQualityChecks(finalOptions.skipQuality);
 
 	const filesToAdd: string[] = [];
 

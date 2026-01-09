@@ -22,6 +22,50 @@ export interface GenerateTitleResult {
 	summary: string;
 }
 
+export interface FallbackModelConfig {
+	model: Model;
+	provider: ModelProvider | undefined;
+}
+
+// 兜底模型配置
+const FALLBACK_MODEL_ID = "gpt-4o-mini";
+const FALLBACK_RETRY_DELAY = 500;
+
+async function generateTitleRequest(
+	messages: ChatMessage[],
+	modelId: string,
+	provider: ModelProvider | undefined,
+	serverPort: number,
+	previousSummary?: string,
+	isFirstGeneration?: boolean,
+): Promise<GenerateTitleResult> {
+	const response = await fetch(`http://localhost:${serverPort}/generate-title`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			messages,
+			model: modelId,
+			apiKey: provider?.apiKey,
+			baseUrl: provider?.baseUrl,
+			providerType: provider?.apiType || "openai",
+			previousSummary,
+			isFirstGeneration,
+		} satisfies GenerateTitleRequest),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to generate title: ${response.statusText}`);
+	}
+
+	const data: GenerateTitleResponse = await response.json();
+	return {
+		title: sanitizeGeneratedTitle(data.title),
+		summary: data.summary || "",
+	};
+}
+
 export async function generateTitle(
 	messages: ChatMessage[],
 	model: Model,
@@ -29,38 +73,62 @@ export async function generateTitle(
 	serverPort?: number,
 	previousSummary?: string,
 	isFirstGeneration?: boolean,
+	fallbackConfig?: FallbackModelConfig,
 ): Promise<GenerateTitleResult | null> {
 	const port = serverPort ?? 8089;
 
 	try {
-		const response = await fetch(`http://localhost:${port}/generate-title`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				messages,
-				model: model.id,
-				apiKey: provider?.apiKey,
-				baseUrl: provider?.baseUrl,
-				providerType: provider?.apiType || "openai",
-				previousSummary,
-				isFirstGeneration,
-			} satisfies GenerateTitleRequest),
-		});
+		// 首次尝试使用配置的模型
+		return await generateTitleRequest(
+			messages,
+			model.id,
+			provider,
+			port,
+			previousSummary,
+			isFirstGeneration,
+		);
+	} catch (error) {
+		console.error("Title generation failed with configured model:", error);
 
-		if (!response.ok) {
-			throw new Error(`Failed to generate title: ${response.statusText}`);
+		// 等待 500ms 后重试
+		console.log(`Retrying title generation after ${FALLBACK_RETRY_DELAY}ms...`);
+		await new Promise((resolve) => setTimeout(resolve, FALLBACK_RETRY_DELAY));
+
+		// 确定兜底使用的模型和 provider
+		let fallbackModelId: string;
+		let fallbackProvider: ModelProvider | undefined;
+
+		if (fallbackConfig) {
+			// 使用传入的兜底配置（当前聊天模型）
+			fallbackModelId = fallbackConfig.model.id;
+			fallbackProvider = fallbackConfig.provider;
+			console.log(`Using chat model as fallback: ${fallbackModelId}`);
+		} else {
+			// 使用硬编码的 gpt-4o-mini
+			fallbackModelId = FALLBACK_MODEL_ID;
+			fallbackProvider = provider;
+			console.log(`Using default fallback model: ${fallbackModelId}`);
 		}
 
-		const data: GenerateTitleResponse = await response.json();
-		return {
-			title: sanitizeGeneratedTitle(data.title),
-			summary: data.summary || "",
-		};
-	} catch (error) {
-		console.error("Title generation failed, using fallback:", error);
-		return null;
+		// 如果兜底模型和原模型相同，直接返回 null
+		if (fallbackModelId === model.id && fallbackProvider?.id === provider?.id) {
+			console.error("Fallback model is same as original, giving up");
+			return null;
+		}
+
+		try {
+			return await generateTitleRequest(
+				messages,
+				fallbackModelId,
+				fallbackProvider,
+				port,
+				previousSummary,
+				isFirstGeneration,
+			);
+		} catch (fallbackError) {
+			console.error("Title generation failed with fallback model:", fallbackError);
+			return null;
+		}
 	}
 }
 

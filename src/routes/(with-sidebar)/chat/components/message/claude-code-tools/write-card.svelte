@@ -144,7 +144,7 @@
 <!-- Card Button -->
 <button
 	type="button"
-	class="my-2 block w-full rounded-[10px] border-0 bg-white px-3.5 py-3 text-left dark:bg-[#1A1A1A] {part.state ===
+	class="mb-3 block w-full rounded-[10px] border-0 bg-white px-3.5 py-3 text-left dark:bg-[#1A1A1A] {part.state ===
 	'output-available'
 		? 'cursor-pointer'
 		: 'cursor-default'}"

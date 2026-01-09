@@ -7,8 +7,13 @@ export const DEFAULT_WORKSPACE_PATH = "/home/user/workspace";
 export const TAB_PREVIEW = "preview";
 export const TAB_CODE = "code";
 export const TAB_TERMINAL = "terminal";
+export const TAB_SKILLS = "skills";
 
-export type TabType = typeof TAB_PREVIEW | typeof TAB_CODE | typeof TAB_TERMINAL;
+export type TabType =
+	| typeof TAB_PREVIEW
+	| typeof TAB_CODE
+	| typeof TAB_TERMINAL
+	| typeof TAB_SKILLS;
 
 export const DEVICE_MODE_DESKTOP = "desktop";
 export const DEVICE_MODE_MOBILE = "mobile";

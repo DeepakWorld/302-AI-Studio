@@ -6,7 +6,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { serve } from "@hono/node-server";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { ChatMessage, McpServer } from "@shared/types";
+import type { ChatMessage, McpServer, Skill } from "@shared/types";
 import {
 	ToolLoopAgent as Agent,
 	convertToModelMessages,
@@ -20,13 +20,14 @@ import {
 } from "ai";
 import getPort from "get-port";
 import { Hono, type Context } from "hono";
-import { codeAgentService, ssoService } from "../services";
+import { codeAgentService, ssoService, tabService } from "../services";
 import { chatParametersService } from "../services/chat-parameters-service";
 import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
 import {
+	appendPromptToLastUserMessage,
 	convertAiSdkMessagesToOpenAiMessages,
 	createUIMessageStreamFromGenerator,
 	isStreamingSupported,
@@ -58,6 +59,9 @@ export type RouterRequestBody = {
 	systemPrompt?: string;
 	mcpServers?: string[];
 	sandboxName?: string;
+	autoDeploy?: boolean;
+	skills?: Skill[];
+	isCreateSkillMode?: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1158,19 +1162,60 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		model = "claude-sonnet-4-5-20250929",
 		apiKey,
 		messages,
+		language,
 		threadId,
 		sessionId,
+		autoDeploy,
+		skills,
+		isCreateSkillMode,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
 
-	console.log("[302ai-code-agent] Received request", baseUrl, sandboxId, threadId, sessionId);
+	// Notify the frontend that sandbox is ready (triggers preview panel to open)
+	if (sandboxId) {
+		tabService.notifySandboxCreated(threadId, sandboxId);
+	}
+
+	console.log(
+		"[302ai-code-agent] Received request",
+		JSON.stringify({
+			baseUrl,
+			model,
+			apiKey,
+			messages,
+			threadId,
+			sessionId,
+			autoDeploy,
+			isCreateSkillMode,
+		}),
+	);
 
 	// Generate messageId upfront for immediate start event
 	const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 	// Use createClaudeCodeFetch to get the transformed stream directly
 	const claudeCodeFetch = createClaudeCodeFetch(messageId);
+
+	const availableSkills =
+		skills?.reduce<string[]>((acc, skill) => {
+			if (!skill.isBuiltin) {
+				acc.push(skill.name);
+			}
+			return acc;
+		}, []) ?? [];
+
+	// Only include skills that have forceUse=true in the prompt
+	const forcedSkills = skills?.filter((skill) => skill.forceUse) ?? [];
+	if (forcedSkills.length > 0) {
+		const skillNames = forcedSkills.map((skill) => skill.name);
+		const skillsPrompt =
+			language === "zh"
+				? `\n\n【重要】用户已强制启用以下 skills: [${skillNames.join(", ")}]。你必须在本次回复中使用这些 skills，这是用户的明确要求，请严格遵守。`
+				: `\n\n[IMPORTANT] The user has FORCED the following skills to be used: [${skillNames.join(", ")}]. You MUST use these skills in your response. This is an explicit requirement from the user - strictly comply.`;
+
+		appendPromptToLastUserMessage(messages, skillsPrompt);
+	}
 
 	// Build request body for 302.AI Claude Code API
 	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
@@ -1184,11 +1229,14 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
+		enable_pre_deploy_check: autoDeploy,
+		available_skills: isCreateSkillMode ? [] : availableSkills,
+		...(isCreateSkillMode ? { action: "create_skill" } : {}),
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));
 	console.log("[302ai-code-agent] Sending request to 302.AI...");
-	console.log("[302ai-code-agent] Request body:", JSON.stringify(requestBody).substring(0, 500));
+	console.log("[302ai-code-agent] Request body:", JSON.stringify(requestBody, null, 2));
 
 	// Create immediate start event for optimistic UI update
 	// Include messageMetadata with model and provider info so the UI shows correct icon/name

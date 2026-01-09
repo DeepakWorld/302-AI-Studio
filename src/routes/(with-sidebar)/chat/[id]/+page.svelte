@@ -3,6 +3,7 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chat, chatState } from "$lib/stores/chat-state.svelte";
+	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
@@ -10,7 +11,7 @@
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { generateFilePreview } from "$lib/utils/file-preview";
 	import { setupPanelResize } from "$lib/utils/panel-resize";
-	import { MessageSquarePlus } from "@lucide/svelte";
+	import { Eraser, History, MessageSquarePlus } from "@lucide/svelte";
 	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
 	import type { AttachmentFile, Model, ThreadParmas } from "@shared/types";
 	import { onMount } from "svelte";
@@ -120,6 +121,21 @@
 			},
 		);
 
+		// Listen for create skill summary event
+		const unsubCreateSkillSummary = window.electronAPI?.onTriggerCreateSkillSummary?.(
+			async ({ threadId }: { threadId: string }) => {
+				console.log("[Chat Page] Received create-skill-summary event:", { threadId });
+
+				// Only process if this is the target thread
+				if (threadId === chatState.id) {
+					chatState.isCreateSkillMode = true;
+					chatState.inputValue = `${m.create_skill_prompt()}`;
+					await chatState.sendMessage();
+					chatState.isCreateSkillMode = false;
+				}
+			},
+		);
+
 		// Listen for apply default model event from SSO login
 		const unsubApplyDefaultModel = window.electronAPI?.onApplyDefaultModel?.(
 			(data: { model: unknown }) => {
@@ -185,6 +201,7 @@
 			unsubTriggerSend?.();
 			unsubShowToast?.();
 			unsubSandboxCreated?.();
+			unsubCreateSkillSummary?.();
 			unsubApplyDefaultModel?.();
 		};
 	});
@@ -194,17 +211,36 @@
 	// 	console.log("sandBoxIdsandBoxId", sandBoxId);
 	// });
 
+	// Close preview panel when code agent mode is disabled (but not in skills-only mode)
 	$effect(() => {
-		if (codeAgentState.enabled) {
-			// Open immediately, even if sandboxId is empty/loading
-			agentPreviewState.openPreview(codeAgentState.sandboxId || "");
-		} else {
+		if (!codeAgentState.enabled && !agentPreviewState.isSkillsOnlyMode) {
 			agentPreviewState.closePreview();
 		}
 	});
 
+	// Track previous sandboxId for edge detection
+	let previousSandboxId = "";
+
+	// Auto-open preview panel when sandbox is first created (edge trigger)
+	$effect(() => {
+		const sandboxId = claudeCodeAgentState.sandboxId;
+		// Only open when sandboxId changes from empty to non-empty
+		if (codeAgentState.enabled && sandboxId && !previousSandboxId) {
+			agentPreviewState.openPreview(sandboxId);
+		}
+		previousSandboxId = sandboxId;
+	});
+
 	async function handleNewExploration() {
 		await tabBarState.handleNewTab(m.title_new_chat(), "chat");
+	}
+
+	function handleClearScreen() {
+		chatState.clearScreen();
+	}
+
+	function handleRestoreClearScreen() {
+		chatState.restoreClearScreen();
 	}
 </script>
 
@@ -215,19 +251,43 @@
 		onmouseenter={() => (isInputAreaHovered = true)}
 		onmouseleave={() => (isInputAreaHovered = false)}
 	>
-		<!-- New Exploration Button -->
+		<!-- New Exploration & Clear Screen Buttons -->
 		{#if isInputAreaHovered && !chatState.isStreaming}
 			<div
-				class="absolute top-0 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200"
+				class="absolute top-0 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center gap-2 max-w-[calc(100vw-2rem)]"
 			>
 				<button
 					type="button"
 					onclick={handleNewExploration}
-					class="flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6]"
+					class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6] sm:px-4"
 				>
-					<MessageSquarePlus class="h-4 w-4" />
-					<span>{m.text_new_exploration()}</span>
+					<MessageSquarePlus class="h-4 w-4 shrink-0" />
+					<span class="whitespace-nowrap">{m.text_new_exploration()}</span>
 				</button>
+
+				{#if chatState.hasVisibleMessages}
+					<!-- Show clear screen button when there are visible messages -->
+					<button
+						type="button"
+						onclick={handleClearScreen}
+						class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-muted-foreground shadow-md backdrop-blur-sm transition-all hover:shadow-lg hover:text-foreground dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white sm:px-4"
+					>
+						<Eraser class="h-4 w-4 shrink-0" />
+						<span class="whitespace-nowrap">{m.text_clear_screen()}</span>
+					</button>
+				{/if}
+
+				{#if chatState.hasClearScreen}
+					<!-- Show restore button when there are hidden messages -->
+					<button
+						type="button"
+						onclick={handleRestoreClearScreen}
+						class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-amber-600 shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-amber-600 dark:text-white dark:hover:bg-amber-700 sm:px-4"
+					>
+						<History class="h-4 w-4 shrink-0" />
+						<span class="whitespace-nowrap">{m.text_restore_history()}</span>
+					</button>
+				{/if}
 			</div>
 		{/if}
 
@@ -235,7 +295,8 @@
 	</div>
 {/snippet}
 
-{#if !chatState.hasMessages}
+{#if !chatState.hasMessages && !agentPreviewState.isVisible}
+	<!-- Initial state: no messages at all and no preview panel - show centered layout -->
 	<div class="flex h-full flex-col relative">
 		<PageHeader />
 		<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
@@ -248,6 +309,61 @@
 			{#if preferencesSettings.enableSupermarket}<AiApplicationItems />{/if}
 		</div>
 	</div>
+{:else if !chatState.hasMessages && agentPreviewState.isVisible}
+	<!-- Initial state with preview panel (skills-only mode) -->
+	<div class="flex h-full overflow-hidden relative">
+		{#if agentPreviewState.isPinned}
+			<Resizable.PaneGroup direction="horizontal" class="h-full">
+				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 320px;">
+					<div class="flex h-full flex-col relative">
+						<PageHeader />
+						<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
+							<div class="flex w-full flex-col items-center justify-center gap-chat-gap-y">
+								<span class="text-center text-chat-slogan" data-layoutid="chat-slogan"
+									>{m.app_slogan()}</span
+								>
+								<ChatInputBox />
+							</div>
+							{#if preferencesSettings.enableSupermarket}<AiApplicationItems />{/if}
+						</div>
+					</div>
+				</Resizable.Pane>
+				<Resizable.Handle withHandle class="mb-6" />
+				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0 pb-6">
+					<AgentPreviewPanel />
+				</Resizable.Pane>
+			</Resizable.PaneGroup>
+		{:else}
+			<div class="flex-1 flex flex-col h-full min-w-0 relative">
+				<PageHeader />
+				<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
+					<div class="flex w-full flex-col items-center justify-center gap-chat-gap-y">
+						<span class="text-center text-chat-slogan" data-layoutid="chat-slogan"
+							>{m.app_slogan()}</span
+						>
+						<ChatInputBox />
+					</div>
+					{#if preferencesSettings.enableSupermarket}<AiApplicationItems />{/if}
+				</div>
+			</div>
+			<div
+				class="absolute right-0 top-0 bottom-5 flex flex-col bg-background border-l border-border z-[50]"
+				style="width: 50%;"
+			>
+				<button
+					type="button"
+					aria-label="Resize panel"
+					class="bg-border focus-visible:ring-ring absolute -left-px top-0 bottom-0 flex w-px cursor-col-resize items-center justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:outline-hidden"
+					onmousedown={setupPanelResize}
+				>
+					<div class="bg-border z-10 flex h-4 w-3 items-center justify-center rounded-xs border">
+						<GripVerticalIcon class="size-2.5" />
+					</div>
+				</button>
+				<AgentPreviewPanel />
+			</div>
+		{/if}
+	</div>
 {:else if agentPreviewState.isVisible && !htmlPreviewState.isVisible}
 	<div class="flex h-full overflow-hidden relative">
 		{#if agentPreviewState.isPinned}
@@ -256,7 +372,7 @@
 					<div class="flex h-full flex-col min-w-0">
 						<div class="flex-1 overflow-hidden relative">
 							<PageHeader />
-							<MessageList messages={chatState.messages} />
+							<MessageList messages={chatState.visibleMessages} />
 						</div>
 						{@render ChatInputArea()}
 					</div>
@@ -270,7 +386,7 @@
 			<div class="flex-1 flex flex-col h-full min-w-0">
 				<div class="flex-1 overflow-hidden relative">
 					<PageHeader />
-					<MessageList messages={chatState.messages} />
+					<MessageList messages={chatState.visibleMessages} />
 				</div>
 				{@render ChatInputArea()}
 			</div>
@@ -300,7 +416,7 @@
 					<div class="flex h-full flex-col min-w-0">
 						<div class="flex-1 overflow-hidden relative">
 							<PageHeader />
-							<MessageList messages={chatState.messages} />
+							<MessageList messages={chatState.visibleMessages} />
 						</div>
 						{@render ChatInputArea()}
 					</div>
@@ -314,7 +430,7 @@
 			<div class="flex-1 flex flex-col h-full min-w-0">
 				<div class="flex-1 overflow-hidden relative">
 					<PageHeader />
-					<MessageList messages={chatState.messages} />
+					<MessageList messages={chatState.visibleMessages} />
 				</div>
 				{@render ChatInputArea()}
 			</div>
@@ -340,7 +456,7 @@
 	<div class="flex h-full flex-col gap-y-4">
 		<div class="flex-1 overflow-hidden relative" data-layoutid="chat-message-list">
 			<PageHeader />
-			<MessageList messages={chatState.messages} />
+			<MessageList messages={chatState.visibleMessages} />
 
 			<!-- AgentPreviewPanel 需要始终挂载以监听状态，但当不在 Resizable 布局时隐藏 -->
 			{#if !htmlPreviewState.isVisible && !agentPreviewState.isVisible}

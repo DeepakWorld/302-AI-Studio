@@ -105,6 +105,11 @@ if (process.contextIsolated) {
 				ipcRenderer.on("broadcast-event", listener);
 				return () => ipcRenderer.removeListener("broadcast-event", listener);
 			},
+			onTriggerCreateSkillSummary: (callback: (data: { threadId: string }) => void) => {
+				const listener = (_: unknown, data: { threadId: string }) => callback(data);
+				ipcRenderer.on("tab:create-skill-summary", listener);
+				return () => ipcRenderer.removeListener("tab:create-skill-summary", listener);
+			},
 			onSidebarStateChanged: (callback: (data: { open: boolean }) => void) => {
 				const listener = (_: unknown, eventData: BroadcastEventData) => {
 					if (eventData.broadcastEvent === "sidebar-state-changed") {

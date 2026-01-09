@@ -171,8 +171,15 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:updateClaudeCodeSandboxRemark", (event, sandbox_id, remark) =>
 		codeAgentService.updateClaudeCodeSandboxRemark(event, sandbox_id, remark),
 	);
-	ipcMain.handle("codeAgentService:createClaudeCodeSandboxByIpc", (event, threadId, sandboxName) =>
-		codeAgentService.createClaudeCodeSandboxByIpc(event, threadId, sandboxName),
+	ipcMain.handle(
+		"codeAgentService:updateClaudeCodeSandboxThinkingBudget",
+		(event, sandbox_id, maxThinkingToken) =>
+			codeAgentService.updateClaudeCodeSandboxThinkingBudget(event, sandbox_id, maxThinkingToken),
+	);
+	ipcMain.handle(
+		"codeAgentService:createClaudeCodeSandboxByIpc",
+		(event, threadId, sandboxName, maxThinkingToken) =>
+			codeAgentService.createClaudeCodeSandboxByIpc(event, threadId, sandboxName, maxThinkingToken),
 	);
 	ipcMain.handle("codeAgentService:deleteClaudeCodeSandboxByIpc", (event, sandbox_id) =>
 		codeAgentService.deleteClaudeCodeSandboxByIpc(event, sandbox_id),
@@ -185,6 +192,9 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos) =>
 		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos),
+	);
+	ipcMain.handle("codeAgentService:getThreadIdBySessionId", (event, sandboxId, sessionId) =>
+		codeAgentService.getThreadIdBySessionId(event, sandboxId, sessionId),
 	);
 
 	// ghostWindowService service registration
@@ -215,6 +225,9 @@ export function registerIpcHandlers() {
 		"windowService:handleMoveTabIntoExistingWindow",
 		(event, triggerTabId, windowId, insertIndex) =>
 			windowService.handleMoveTabIntoExistingWindow(event, triggerTabId, windowId, insertIndex),
+	);
+	ipcMain.handle("windowService:navigateToThread", (event, threadId, sourceWindowId) =>
+		windowService.navigateToThread(event, threadId, sourceWindowId),
 	);
 
 	// shortcutService service registration
@@ -283,6 +296,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("tabService:handleGenerateTabTitle", (event, tabId, threadId) =>
 		tabService.handleGenerateTabTitle(event, tabId, threadId),
 	);
+	ipcMain.handle("tabService:triggerCreateSkillSummary", (event, threadId) =>
+		tabService.triggerCreateSkillSummary(event, threadId),
+	);
 
 	// aiApplicationService service registration
 	ipcMain.handle("aiApplicationService:getAiApplicationUrl", (event, applicationId) =>
@@ -291,13 +307,53 @@ export function registerIpcHandlers() {
 	ipcMain.handle("aiApplicationService:handleAiApplicationReloadIpc", (event, tabId) =>
 		aiApplicationService.handleAiApplicationReloadIpc(event, tabId),
 	);
+	ipcMain.handle("aiApplicationService:refreshAiApplications", (event) =>
+		aiApplicationService.refreshAiApplications(event),
+	);
 
 	// appService service registration
+	ipcMain.handle("appService:getUserAgentFragment", (event) =>
+		appService.getUserAgentFragment(event),
+	);
 	ipcMain.handle("appService:getTheme", (event) => appService.getTheme(event));
 	ipcMain.handle("appService:setTheme", (event, theme) => appService.setTheme(event, theme));
 	ipcMain.handle("appService:restartApp", (event) => appService.restartApp(event));
 	ipcMain.handle("appService:resetAllData", (event) => appService.resetAllData(event));
 	ipcMain.handle("appService:clearChatHistory", (event) => appService.clearChatHistory(event));
+	ipcMain.handle("appService:extractZipBlob", (event, zipData, originalFileName) =>
+		appService.extractZipBlob(event, zipData, originalFileName),
+	);
+	ipcMain.handle("appService:scanDirectory", (event, dirPath) =>
+		appService.scanDirectory(event, dirPath),
+	);
+	ipcMain.handle("appService:readFile", (event, filePath) => appService.readFile(event, filePath));
+	ipcMain.handle("appService:readFileAsBuffer", (event, filePath) =>
+		appService.readFileAsBuffer(event, filePath),
+	);
+	ipcMain.handle("appService:writeFile", (event, filePath, content) =>
+		appService.writeFile(event, filePath, content),
+	);
+	ipcMain.handle("appService:createDirectory", (event, dirPath) =>
+		appService.createDirectory(event, dirPath),
+	);
+	ipcMain.handle("appService:deleteFile", (event, filePath) =>
+		appService.deleteFile(event, filePath),
+	);
+	ipcMain.handle("appService:deleteDirectory", (event, dirPath) =>
+		appService.deleteDirectory(event, dirPath),
+	);
+	ipcMain.handle("appService:renameFile", (event, oldPath, newPath) =>
+		appService.renameFile(event, oldPath, newPath),
+	);
+	ipcMain.handle("appService:zipDirectory", (event, dirPath, zipName) =>
+		appService.zipDirectory(event, dirPath, zipName),
+	);
+	ipcMain.handle("appService:createSkillTempDir", (event, skillName) =>
+		appService.createSkillTempDir(event, skillName),
+	);
+	ipcMain.handle("appService:deleteTempDir", (event, dirPath) =>
+		appService.deleteTempDir(event, dirPath),
+	);
 
 	// dataService service registration
 	ipcMain.handle("dataService:importLegacyJson", (event) => dataService.importLegacyJson(event));
@@ -341,6 +397,9 @@ export function registerIpcHandlers() {
 	// providerService service registration
 	ipcMain.handle("providerService:handle302AIProviderChange", (event, apiKey) =>
 		providerService.handle302AIProviderChange(event, apiKey),
+	);
+	ipcMain.handle("providerService:get302AIApiKey", (event) =>
+		providerService.get302AIApiKey(event),
 	);
 
 	// ssoService service registration
@@ -451,11 +510,13 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSessions");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeCurrentSessionIdByThreadId");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxRemark");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxThinkingBudget");
 	ipcMain.removeHandler("codeAgentService:createClaudeCodeSandboxByIpc");
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSandboxByIpc");
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSession");
 	ipcMain.removeHandler("codeAgentService:findClaudeCodeSandboxWithValidDisk");
 	ipcMain.removeHandler("codeAgentService:addClaudeCodeSandboxMCP");
+	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
 	ipcMain.removeHandler("ghostWindowService:startTracking");
 	ipcMain.removeHandler("ghostWindowService:stopTracking");
 	ipcMain.removeHandler("ghostWindowService:updateInsertIndex");
@@ -464,6 +525,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("windowService:handleDropAtPointer");
 	ipcMain.removeHandler("windowService:handleSplitShellWindow");
 	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
+	ipcMain.removeHandler("windowService:navigateToThread");
 	ipcMain.removeHandler("shortcutService:init");
 	ipcMain.removeHandler("shortcutService:updateShortcuts");
 	ipcMain.removeHandler("shortcutService:getConflicts");
@@ -481,13 +543,28 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("tabService:replaceTabContent");
 	ipcMain.removeHandler("tabService:handleClearTabMessages");
 	ipcMain.removeHandler("tabService:handleGenerateTabTitle");
+	ipcMain.removeHandler("tabService:triggerCreateSkillSummary");
 	ipcMain.removeHandler("aiApplicationService:getAiApplicationUrl");
 	ipcMain.removeHandler("aiApplicationService:handleAiApplicationReloadIpc");
+	ipcMain.removeHandler("aiApplicationService:refreshAiApplications");
+	ipcMain.removeHandler("appService:getUserAgentFragment");
 	ipcMain.removeHandler("appService:getTheme");
 	ipcMain.removeHandler("appService:setTheme");
 	ipcMain.removeHandler("appService:restartApp");
 	ipcMain.removeHandler("appService:resetAllData");
 	ipcMain.removeHandler("appService:clearChatHistory");
+	ipcMain.removeHandler("appService:extractZipBlob");
+	ipcMain.removeHandler("appService:scanDirectory");
+	ipcMain.removeHandler("appService:readFile");
+	ipcMain.removeHandler("appService:readFileAsBuffer");
+	ipcMain.removeHandler("appService:writeFile");
+	ipcMain.removeHandler("appService:createDirectory");
+	ipcMain.removeHandler("appService:deleteFile");
+	ipcMain.removeHandler("appService:deleteDirectory");
+	ipcMain.removeHandler("appService:renameFile");
+	ipcMain.removeHandler("appService:zipDirectory");
+	ipcMain.removeHandler("appService:createSkillTempDir");
+	ipcMain.removeHandler("appService:deleteTempDir");
 	ipcMain.removeHandler("dataService:importLegacyJson");
 	ipcMain.removeHandler("dataService:exportStorage");
 	ipcMain.removeHandler("dataService:importStorage");
@@ -502,6 +579,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
 	ipcMain.removeHandler("providerService:handle302AIProviderChange");
+	ipcMain.removeHandler("providerService:get302AIApiKey");
 	ipcMain.removeHandler("ssoService:openSsoLogin");
 	ipcMain.removeHandler("ssoService:waitForSsoCallback");
 	ipcMain.removeHandler("ssoService:cancelSsoLogin");

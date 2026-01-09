@@ -1,4 +1,4 @@
-import type { Theme } from "@shared/types";
+import type { FileNode, Theme } from "@shared/types";
 import {
 	app,
 	BrowserWindow,
@@ -6,10 +6,18 @@ import {
 	WebContentsView,
 	type IpcMainInvokeEvent,
 } from "electron";
+import extract from "extract-zip";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "fs/promises";
+import { join, resolve } from "path";
 import { CONFIG, isMac, UNSUPPORTED_INJECTING_THEME } from "../../constants";
+import { getCustomUserAgentFragment } from "../../utils/user-agent";
 import { themeStorage } from "../storage-service/theme-storage";
 
 export class AppService {
+	async getUserAgentFragment(_event: IpcMainInvokeEvent): Promise<string> {
+		return getCustomUserAgentFragment();
+	}
+
 	async initFromStorage() {
 		const state = await themeStorage.getThemeState();
 		console.log(`state = ${JSON.stringify(state)}, ${typeof state}`);
@@ -239,6 +247,349 @@ export class AppService {
 		} catch (error) {
 			console.error("Failed to clear chat history:", error);
 			throw error;
+		}
+	}
+
+	/**
+	 * Extract a zip file from ArrayBuffer to a temporary directory
+	 * @param zipData - The zip file data as ArrayBuffer
+	 * @param originalFileName - Optional original file name for better identification
+	 * @returns The path to the extracted directory
+	 */
+	async extractZipBlob(
+		_event: IpcMainInvokeEvent,
+		zipData: ArrayBuffer,
+		originalFileName?: string,
+	): Promise<string> {
+		try {
+			const tempDir = app.getPath("temp");
+			const timestamp = Date.now();
+
+			// Sanitize original file name if provided
+			const baseName = originalFileName
+				? originalFileName.replace(/\.zip$/i, "").replace(/[<>:"/\\|?*]/g, "_")
+				: `skill-download-${timestamp}`;
+
+			const zipFileName = `${baseName}.zip`;
+			const zipPath = join(tempDir, zipFileName);
+			const extractPath = join(tempDir, baseName);
+
+			console.log(`[extractZipBlob] zipPath: ${zipPath}, extractPath: ${extractPath}`);
+
+			// Write zip file
+			await writeFile(zipPath, Buffer.from(zipData));
+			console.log(`[extractZipBlob] ZIP file written, size: ${zipData.byteLength} bytes`);
+
+			// Clean existing directory before extraction to avoid stale files
+			try {
+				await rm(extractPath, { recursive: true, force: true });
+				console.log(`[extractZipBlob] Cleaned existing directory`);
+			} catch {
+				// Directory might not exist, ignore error
+			}
+
+			// Create extract directory
+			await mkdir(extractPath, { recursive: true });
+
+			// Extract
+			await this.extractZip(zipPath, extractPath);
+			console.log(`[extractZipBlob] Extraction completed`);
+
+			// Verify extraction by listing files
+			const extractedFiles = await readdir(extractPath);
+			console.log(`[extractZipBlob] Extracted files: ${extractedFiles.join(", ")}`);
+
+			if (extractedFiles.length === 0) {
+				console.warn(`[extractZipBlob] Warning: No files extracted to ${extractPath}`);
+			}
+
+			// Cleanup zip file
+			await rm(zipPath, { force: true });
+
+			return extractPath;
+		} catch (error) {
+			console.error("Failed to extract zip blob:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Recursively scan a directory and return a file tree structure
+	 */
+	async scanDirectory(_event: IpcMainInvokeEvent, dirPath: string): Promise<FileNode> {
+		try {
+			const stats = await stat(dirPath);
+			const name = dirPath.split(/[/\\]/).pop() || "";
+
+			if (!stats.isDirectory()) {
+				return {
+					name,
+					path: dirPath,
+					type: "file",
+				};
+			}
+
+			const children: FileNode[] = [];
+			const entries = await readdir(dirPath);
+
+			for (const entry of entries) {
+				// Skip hidden files/folders (optional, but usually good practice)
+				if (entry.startsWith(".")) continue;
+
+				const fullPath = join(dirPath, entry);
+				const childNode = await this.scanDirectory(_event, fullPath);
+				children.push(childNode);
+			}
+
+			// Sort: directories first, then files, both alphabetically
+			children.sort((a, b) => {
+				if (a.type === b.type) {
+					return a.name.localeCompare(b.name);
+				}
+				return a.type === "directory" ? -1 : 1;
+			});
+
+			return {
+				name,
+				path: dirPath,
+				type: "directory",
+				children,
+			};
+		} catch (error) {
+			console.error("Failed to scan directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Read file content as text
+	 */
+	async readFile(_event: IpcMainInvokeEvent, filePath: string): Promise<string> {
+		try {
+			return await readFile(filePath, "utf-8");
+		} catch (error) {
+			console.error("Failed to read file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Read file content as ArrayBuffer (for binary files like PDF)
+	 */
+	async readFileAsBuffer(_event: IpcMainInvokeEvent, filePath: string): Promise<ArrayBuffer> {
+		try {
+			const buffer = await readFile(filePath);
+			return buffer.buffer.slice(
+				buffer.byteOffset,
+				buffer.byteOffset + buffer.byteLength,
+			) as ArrayBuffer;
+		} catch (error) {
+			console.error("Failed to read file as buffer:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Write content to a file
+	 */
+	async writeFile(_event: IpcMainInvokeEvent, filePath: string, content: string): Promise<void> {
+		try {
+			await writeFile(filePath, content, "utf-8");
+		} catch (error) {
+			console.error("Failed to write file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Create a directory
+	 */
+	async createDirectory(_event: IpcMainInvokeEvent, dirPath: string): Promise<void> {
+		try {
+			await mkdir(dirPath, { recursive: true });
+		} catch (error) {
+			console.error("Failed to create directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a file
+	 */
+	async deleteFile(_event: IpcMainInvokeEvent, filePath: string): Promise<void> {
+		try {
+			await rm(filePath, { force: true });
+		} catch (error) {
+			console.error("Failed to delete file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a directory recursively
+	 */
+	async deleteDirectory(_event: IpcMainInvokeEvent, dirPath: string): Promise<void> {
+		try {
+			await rm(dirPath, { recursive: true, force: true });
+		} catch (error) {
+			console.error("Failed to delete directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Rename a file or directory
+	 */
+	async renameFile(_event: IpcMainInvokeEvent, oldPath: string, newPath: string): Promise<void> {
+		try {
+			// Check if source file/directory exists before renaming
+			try {
+				await stat(oldPath);
+			} catch {
+				throw new Error(`Source file does not exist: ${oldPath}`);
+			}
+			await rename(oldPath, newPath);
+		} catch (error) {
+			console.error("Failed to rename file:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Zip a directory and return the zip file as ArrayBuffer
+	 * @param dirPath The directory to zip
+	 * @param zipName The name for the zip file (without .zip extension)
+	 * @returns ArrayBuffer of the zip file
+	 */
+	async zipDirectory(
+		_event: IpcMainInvokeEvent,
+		dirPath: string,
+		zipName: string,
+	): Promise<ArrayBuffer> {
+		try {
+			const archiver = await import("archiver");
+			const { createWriteStream } = await import("fs");
+
+			const tempDir = app.getPath("temp");
+			const zipPath = join(tempDir, `${zipName}.zip`);
+
+			// Create a write stream for the zip file
+			const output = createWriteStream(zipPath);
+			const archive = archiver.default("zip", { zlib: { level: 9 } });
+
+			// Pipe archive data to the file
+			const archivePromise = new Promise<void>((resolve, reject) => {
+				output.on("close", () => resolve());
+				archive.on("error", (err) => reject(err));
+			});
+
+			archive.pipe(output);
+
+			// Add the directory contents under the zipName folder
+			archive.directory(dirPath, zipName);
+
+			await archive.finalize();
+			await archivePromise;
+
+			// Read the zip file as ArrayBuffer
+			const zipBuffer = await readFile(zipPath);
+
+			// Cleanup the temp zip file
+			await rm(zipPath, { force: true });
+
+			return (zipBuffer.buffer as ArrayBuffer).slice(
+				zipBuffer.byteOffset,
+				zipBuffer.byteOffset + zipBuffer.byteLength,
+			);
+		} catch (error) {
+			console.error("Failed to zip directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Extract zip file to destination
+	 */
+	private async extractZip(zipPath: string, destPath: string): Promise<void> {
+		try {
+			// extract-zip requires absolute paths
+			const absoluteDestPath = resolve(destPath);
+			console.log(`[extractZip] Extracting to: ${absoluteDestPath}`);
+			await extract(zipPath, { dir: absoluteDestPath });
+		} catch (error) {
+			console.error("Failed to extract zip:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Create a temporary directory for manual skill creation preview
+	 * @param skillName The skill name (used as subfolder name)
+	 * @returns Object containing root path and SKILL.md path
+	 */
+	async createSkillTempDir(
+		_event: IpcMainInvokeEvent,
+		skillName: string,
+	): Promise<{ rootPath: string; skillMdPath: string }> {
+		try {
+			const tempDir = app.getPath("temp");
+			const timestamp = Date.now();
+			const baseDirName = `skill-manual-${timestamp}`;
+			const basePath = join(tempDir, baseDirName);
+			const rootPath = join(basePath, skillName || "new-skill");
+			const skillMdPath = join(rootPath, "SKILL.md");
+
+			console.log(`[createSkillTempDir] Creating directory: ${rootPath}`);
+			await mkdir(rootPath, { recursive: true });
+
+			// Verify directory was created
+			const dirExists = await stat(rootPath)
+				.then(() => true)
+				.catch(() => false);
+			console.log(`[createSkillTempDir] Directory exists after mkdir: ${dirExists}`);
+
+			// Create empty SKILL.md file
+			console.log(`[createSkillTempDir] Creating SKILL.md: ${skillMdPath}`);
+			await writeFile(skillMdPath, "", "utf-8");
+
+			// Verify file was created
+			const fileExists = await stat(skillMdPath)
+				.then(() => true)
+				.catch(() => false);
+			console.log(`[createSkillTempDir] SKILL.md exists after writeFile: ${fileExists}`);
+
+			// List directory contents
+			const contents = await readdir(rootPath);
+			console.log(`[createSkillTempDir] Directory contents: ${contents.join(", ")}`);
+
+			return { rootPath, skillMdPath };
+		} catch (error) {
+			console.error("Failed to create skill temp directory:", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a temporary directory (with safety check)
+	 * @param dirPath Path to delete (must be within temp directory)
+	 */
+	async deleteTempDir(_event: IpcMainInvokeEvent, dirPath: string): Promise<void> {
+		try {
+			const tempDir = app.getPath("temp");
+			// Safety check: only delete if within temp directory
+			const normalizedPath = dirPath.replace(/\\/g, "/");
+			const normalizedTemp = tempDir.replace(/\\/g, "/");
+
+			if (!normalizedPath.startsWith(normalizedTemp)) {
+				throw new Error("Security: Can only delete directories within temp folder");
+			}
+
+			// Delete the base directory (parent of skill folder)
+			const basePath = join(dirPath, "..");
+			await rm(basePath, { recursive: true, force: true });
+		} catch (error) {
+			console.error("Failed to delete temp directory:", error);
+			// Don't throw - cleanup failures shouldn't block user
 		}
 	}
 }

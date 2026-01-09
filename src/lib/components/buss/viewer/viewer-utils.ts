@@ -1,5 +1,6 @@
 import {
 	File,
+	FileArchive,
 	FileCode,
 	FileImage,
 	FileSpreadsheet,
@@ -11,7 +12,15 @@ import {
 import type { AttachmentFile } from "@shared/types";
 import type { Component } from "svelte";
 
-export type ViewerType = "image" | "audio" | "video" | "code" | "document" | "text" | "unknown";
+export type ViewerType =
+	| "image"
+	| "audio"
+	| "video"
+	| "code"
+	| "document"
+	| "text"
+	| "archive"
+	| "unknown";
 
 export function formatFileSize(bytes: number): string {
 	if (bytes < 1024) return `${bytes}B`;
@@ -113,6 +122,15 @@ export function getViewerType(attachment: AttachmentFile): ViewerType {
 	}
 
 	if (
+		type.includes("zip") ||
+		type.includes("archive") ||
+		type.includes("compressed") ||
+		name.endsWith(".zip")
+	) {
+		return "archive";
+	}
+
+	if (
 		type.startsWith("text/") ||
 		name.endsWith(".txt") ||
 		name.endsWith(".md") ||
@@ -158,6 +176,8 @@ export function getFileIcon(attachment: AttachmentFile): Component<IconProps, ob
 		}
 		case "text":
 			return FileText;
+		case "archive":
+			return FileArchive;
 		case "unknown":
 		default:
 			return File;

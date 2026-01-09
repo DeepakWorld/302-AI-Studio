@@ -4,6 +4,8 @@
  */
 
 import type { ModelProvider } from "@shared/types";
+import { type } from "arktype";
+import { _302AIKy } from "./core/_302ai-ky";
 import { getApiKeyByProvider } from "./utils";
 
 export interface UpdateSessionNoteRequest {
@@ -19,6 +21,49 @@ export interface UpdateSessionNoteRequest {
 	 * 对话id
 	 */
 	session_id: string;
+}
+
+export const updateSessionNoteRequestSchema = type({
+	note: "string",
+	sandbox_id: "string",
+	session_id: "string",
+});
+export type _UpdateSessionNoteRequest = typeof updateSessionNoteRequestSchema.infer;
+
+export const updateSessionNoteResponseSchema = type({
+	message: "string",
+	note: "string",
+	sandbox_id: "string",
+	session_id: "string",
+	success: "boolean",
+});
+export type _UpdateSessionNoteResponse = typeof updateSessionNoteResponseSchema.infer;
+
+/**
+ * Add or modify conversation note (New implementation)
+ * 添加/修改对话备注
+ */
+export async function _updateSessionNote(
+	request: _UpdateSessionNoteRequest,
+): Promise<_UpdateSessionNoteResponse> {
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/session", {
+				json: request,
+			})
+			.json();
+
+		const validated = updateSessionNoteResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate update session note response:", validated.summary);
+			throw new Error("Invalid response format from update session note API");
+		}
+
+		return validated;
+	} catch (error) {
+		console.error("Failed to update session note:", error);
+		throw error;
+	}
 }
 
 export interface UpdateSessionNoteResponse {

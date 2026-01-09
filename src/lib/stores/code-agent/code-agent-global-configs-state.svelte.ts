@@ -5,6 +5,7 @@ import { persistedProviderState } from "../provider-state.svelte";
 function getInitialData() {
 	const initialData = {
 		apiKey: "",
+		autoDeploy: true,
 	};
 	return initialData;
 }
@@ -16,6 +17,7 @@ export const persistedCodeAgentGlobalConfigsState = new PersistedState<CodeAgent
 
 class CodeAgentGlobalConfigsState {
 	apiKey = $derived(persistedCodeAgentGlobalConfigsState.current?.apiKey ?? "");
+	autoDeploy = $derived(persistedCodeAgentGlobalConfigsState.current?.autoDeploy ?? true);
 
 	constructor() {
 		$effect.root(() => {
@@ -52,6 +54,10 @@ class CodeAgentGlobalConfigsState {
 
 	resetApiKey() {
 		this.#updateState({ apiKey: this.getDefaultApiKey() });
+	}
+
+	toggleAutoDeploy() {
+		this.#updateState({ autoDeploy: !this.autoDeploy });
 	}
 }
 

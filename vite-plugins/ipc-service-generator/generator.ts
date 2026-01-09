@@ -41,6 +41,9 @@ export class IpcStructureGenerator {
 			"Promise",
 			"IpcMainInvokeEvent",
 			"Electron.IpcMainInvokeEvent",
+			"ArrayBuffer",
+			"Blob",
+			"Uint8Array",
 		]);
 
 		this.methods.forEach((method) => {
@@ -147,6 +150,9 @@ export class IpcStructureGenerator {
 			"undefined",
 			"null",
 			"object",
+			"ArrayBuffer",
+			"Blob",
+			"Uint8Array",
 		]);
 
 		const builtInGenerics = new Set([

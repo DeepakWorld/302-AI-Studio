@@ -1,16 +1,29 @@
 <script lang="ts">
+	import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
+	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { McpServerSelector } from "$lib/components/buss/mcp-server-selector";
 	import { Overlay } from "$lib/components/buss/overlay";
+	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
+	import { SkillList } from "$lib/components/buss/skill-list";
+	import { buttonVariants } from "$lib/components/ui/button";
+	import { Label } from "$lib/components/ui/label";
+	import * as Popover from "$lib/components/ui/popover";
+	import {
+		Tooltip,
+		TooltipContent,
+		TooltipProvider,
+		TooltipTrigger,
+	} from "$lib/components/ui/tooltip";
 	import { m } from "$lib/paraglide/messages.js";
+	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
-
-	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { Bot, Globe, Lightbulb, Settings2 } from "@lucide/svelte";
+	import { Bot, Globe, Lightbulb, Settings2, Zap } from "@lucide/svelte";
+	import type { ThinkingBudgetType } from "@shared/types";
 	import { AttachmentUploader } from "../attachment";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
@@ -26,6 +39,20 @@
 
 	let isMCPSelectorOpen = $state(false);
 	let addingMCP = $state(false);
+
+	let isThinkingBudgetOpen = $state(false);
+	let skillsData = $state<Omit<ListSkillsResponse, "success" | "project_skills">>({
+		builtin_skills: [],
+		user_skills: [],
+	});
+
+	const thinkingBudgetOptions = $derived([
+		{ key: "off", label: m.settings_off() },
+		{ key: "low", label: m.thinking_strength_low() },
+		{ key: "medium", label: m.thinking_strength_medium() },
+		{ key: "high", label: m.thinking_strength_high() },
+		{ key: "max", label: m.thinking_strength_max() },
+	]);
 
 	function handleParametersClose() {
 		chatState.isParametersOpen = false;
@@ -60,6 +87,15 @@
 
 	function handleCodeAgentPanelClose() {
 		codeAgentState.isCodeAgentPanelOpen = false;
+	}
+
+	function handleSkillsPanelToggle() {
+		// Toggle between skills tab and preview tab in the agent preview panel
+		if (agentPreviewState.activeTab === "skills") {
+			agentPreviewState.setActiveTab("preview");
+		} else {
+			agentPreviewState.openSkillsTab();
+		}
 	}
 </script>
 
@@ -188,19 +224,123 @@
 	</Overlay>
 {/snippet}
 
+{#snippet actionEnableSkills()}
+	{@const hasForceUseSkills = codeAgentState.skills.some((s) => s.forceUse)}
+	<ButtonWithTooltip
+		class={cn(
+			"hover:!bg-chat-action-hover",
+			hasForceUseSkills &&
+				!codeAgentState.isLoadingSkills &&
+				"!bg-chat-action-active hover:!bg-chat-action-active",
+		)}
+		tooltip={m.title_skills()}
+		onclick={handleSkillsPanelToggle}
+		disabled={codeAgentState.isLoadingSkills}
+	>
+		{#if codeAgentState.isLoadingSkills}
+			<LdrsLoader type="line-spinner" size={16} />
+		{:else}
+			<Zap class={cn(hasForceUseSkills && "!text-chat-action-active-fg")} />
+		{/if}
+	</ButtonWithTooltip>
+
+	<Overlay
+		title={m.title_skills_management()}
+		open={codeAgentState.isSkillsPanelOpen}
+		onClose={handleSkillsPanelToggle}
+		class="h-[70vh] w-[80vw] max-w-5xl flex flex-col"
+	>
+		<div class="flex-1 overflow-y-auto min-h-0 px-6 pb-6">
+			<SkillList
+				builtinSkills={skillsData.builtin_skills}
+				userSkills={skillsData.user_skills}
+				loading={codeAgentState.isLoadingSkills}
+				usedSkills={codeAgentState.skills}
+				onUse={(skill) => codeAgentState.handleSkillsUse([skill])}
+				onRemove={(skill) => codeAgentState.handleSkillsRemove([skill])}
+				onForceUseToggle={(skill, forceUse) =>
+					codeAgentState.handleSkillForceUseToggle(skill.name, forceUse)}
+			/>
+		</div>
+	</Overlay>
+{/snippet}
+
+{#snippet actionEnabledAgentThinking()}
+	<Popover.Root bind:open={isThinkingBudgetOpen}>
+		<TooltipProvider delayDuration={500}>
+			<Tooltip ignoreNonKeyboardFocus={true}>
+				<TooltipTrigger>
+					{#snippet child({ props: tooltipProps })}
+						<Popover.Trigger>
+							{#snippet child({ props: popoverProps })}
+								<button
+									{...tooltipProps}
+									{...popoverProps}
+									class={cn(
+										buttonVariants({ variant: "ghost", size: "icon" }),
+										"group rounded-[10px]",
+										"hover:!bg-chat-action-hover",
+										codeAgentState.thinkingBudget !== "off" &&
+											"!bg-chat-action-active hover:!bg-chat-action-active",
+									)}
+									disabled={disabled || codeAgentState.isUpdatingThinkingBudget}
+								>
+									{#if codeAgentState.isUpdatingThinkingBudget}
+										<LdrsLoader type="line-spinner" size={16} />
+									{:else}
+										<Lightbulb
+											class={cn(
+												codeAgentState.thinkingBudget !== "off" && "!text-chat-action-active-fg",
+											)}
+										/>
+									{/if}
+								</button>
+							{/snippet}
+						</Popover.Trigger>
+					{/snippet}
+				</TooltipTrigger>
+				<TooltipContent
+					side="top"
+					class="bg-overlay text-overlay-foreground rounded-[10px] border px-2.5 py-1.5 text-sm/6"
+					arrowClasses="hidden"
+					sideOffset={5}
+				>
+					{actionDisabled ? m.title_unsupport_action() : m.title_thinking()}
+				</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
+
+		<Popover.Content class="w-[400px] p-4" align="center" side="bottom" sideOffset={10}>
+			<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2">
+					<Label class="text-label-fg">{m.title_thinking_strength()}</Label>
+					<div class="text-muted-foreground text-xs">{m.description_thinking_strength()}</div>
+				</div>
+				<SegButton
+					options={thinkingBudgetOptions}
+					selectedKey={codeAgentState.thinkingBudget}
+					onSelect={(key) => codeAgentState.updateThinkingBudget(key as ThinkingBudgetType)}
+					disabled={codeAgentState.isUpdatingThinkingBudget}
+				/>
+			</div>
+		</Popover.Content>
+	</Popover.Root>
+{/snippet}
+
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
 	{@render actionUploadAttachment()}
 
-	{#if !codeAgentState.enabled}
-		{#if chatState.providerType === "302ai"}
-			{@render actionEnableOnlineSearch()}
-			{@render actionEnableThinking()}
-		{/if}
+	{#if !codeAgentState.enabled && chatState.providerType === "302ai"}
+		{@render actionEnableOnlineSearch()}
+		{@render actionEnableThinking()}
 	{/if}
 
 	{@render actionEnableMCP()}
 
-	{#if !codeAgentState.enabled}
+	{#if codeAgentState.enabled}
+		{@render actionEnableSkills()}
+		{@render actionEnabledAgentThinking()}
+	{:else}
 		{@render actionSetParameters()}
 	{/if}
 

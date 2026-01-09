@@ -8,6 +8,7 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+nul
 
 # OS
 .DS_Store
@@ -36,3 +37,6 @@ dist
 plugins/external
 .aider*
 .ace-tool/
+
+# Temporary files
+temp

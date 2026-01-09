@@ -40,6 +40,7 @@ declare global {
 				callback: (data: { type: string; message: string; threadId?: string }) => void,
 			) => () => void;
 			onTriggerSendMessage: (callback: (data: { threadId: string }) => void) => () => void;
+			onTriggerCreateSkillSummary: (callback: (data: { threadId: string }) => void) => () => void;
 			onSidebarStateChanged: (callback: (data: { open: boolean }) => void) => () => void;
 			onApplyDefaultModel: (callback: (data: { model: unknown }) => void) => () => void;
 			onModelsDeleted: (
