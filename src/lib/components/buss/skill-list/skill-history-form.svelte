@@ -76,9 +76,9 @@
 	}
 </script>
 
-<div class="flex flex-col px-6 py-6">
+<div class="flex flex-col h-full px-6 py-6">
 	<!-- Search box -->
-	<div class="relative w-full mb-4">
+	<div class="relative w-full mb-4 shrink-0">
 		<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 		<Input
 			type="text"
@@ -89,7 +89,7 @@
 	</div>
 
 	<!-- Grouped conversation list -->
-	<div class="flex w-full flex-col gap-1 max-h-[350px] overflow-y-auto">
+	<div class="flex w-full flex-col gap-1 flex-1 min-h-0 overflow-y-auto">
 		{#if filteredGroups.length === 0}
 			<div class="text-muted-foreground text-center text-sm py-8">
 				{searchQuery ? m.no_search_results() : m.no_sessions()}
