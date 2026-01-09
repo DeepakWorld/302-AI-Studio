@@ -131,6 +131,56 @@
 		}
 	}
 
+	// 处理文件/文件夹重命名
+	function handleFileRename(oldPath: string, newPath: string) {
+		// 更新 changedFiles 中的路径
+		const newMap = new SvelteMap<string, string>();
+		for (const [path, content] of changedFiles) {
+			if (path === oldPath) {
+				newMap.set(newPath, content);
+			} else if (path.startsWith(oldPath + "/") || path.startsWith(oldPath + "\\")) {
+				// 处理文件夹重命名时，更新其下所有文件的路径
+				const newFilePath = path.replace(oldPath, newPath);
+				newMap.set(newFilePath, content);
+			} else {
+				newMap.set(path, content);
+			}
+		}
+		changedFiles = newMap;
+
+		// 如果重命名的是 SKILL.md，更新 skillMdFilePath
+		if (oldPath === skillMdFilePath) {
+			skillMdFilePath = newPath;
+		} else if (
+			skillMdFilePath.startsWith(oldPath + "/") ||
+			skillMdFilePath.startsWith(oldPath + "\\")
+		) {
+			skillMdFilePath = skillMdFilePath.replace(oldPath, newPath);
+		}
+	}
+
+	// 处理根目录重命名（从文件树触发）
+	const handleRootPathChange = (newRootPath: string) => {
+		const oldRootPath = skillRootDir;
+
+		// Update skillMdFilePath
+		if (skillMdFilePath) {
+			const newSkillMdPath = skillMdFilePath.replace(oldRootPath, newRootPath);
+			// Update changedFiles paths
+			const newMap = new SvelteMap<string, string>();
+			for (const [path, content] of changedFiles) {
+				const newPath = path.startsWith(oldRootPath)
+					? path.replace(oldRootPath, newRootPath)
+					: path;
+				newMap.set(newPath, content);
+			}
+			changedFiles = newMap;
+			skillMdFilePath = newSkillMdPath;
+		}
+
+		skillRootDir = newRootPath;
+	};
+
 	function resetState() {
 		formData = { name: "", description: "", content: "" };
 		isLoading = false;
@@ -235,6 +285,8 @@
 				readOnly={isBuiltin}
 				{changedFiles}
 				onFileChange={handleFileChange}
+				onRootPathChange={handleRootPathChange}
+				onFileRename={handleFileRename}
 			/>
 		{/if}
 

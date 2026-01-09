@@ -169,16 +169,32 @@
 					<Pencil class="mr-2 h-4 w-4" />
 					{m.file_tree_rename()}
 				</ContextMenu.Item>
-				<ContextMenu.Item onclick={handleDelete} class="text-destructive focus:text-destructive">
-					<Trash2 class="mr-2 h-4 w-4" />
-					{m.file_tree_delete()}
-				</ContextMenu.Item>
+				{#if level > 0}
+					<ContextMenu.Item onclick={handleDelete} class="text-destructive focus:text-destructive">
+						<Trash2 class="mr-2 h-4 w-4" />
+						{m.file_tree_delete()}
+					</ContextMenu.Item>
+				{/if}
 			</ContextMenu.Content>
 		</ContextMenu.Root>
 	{/if}
 {:else if readOnly}
 	<button
 		onclick={handleSelect}
+		class={cn(
+			"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent hover:text-accent-foreground",
+			selectedPath === node.path && "bg-accent text-accent-foreground",
+		)}
+		style="padding-left: {level * 12 + 28}px"
+	>
+		<File class="size-4 shrink-0 text-muted-foreground" />
+		<span class="truncate text-sm">{node.name}</span>
+	</button>
+{:else if level === 1 && node.name === "SKILL.md"}
+	<!-- SKILL.md at root level - no context menu, stop propagation to prevent parent folder menu -->
+	<button
+		onclick={handleSelect}
+		oncontextmenu={(e) => e.stopPropagation()}
 		class={cn(
 			"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent hover:text-accent-foreground",
 			selectedPath === node.path && "bg-accent text-accent-foreground",

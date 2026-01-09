@@ -16,6 +16,8 @@
 		defaultExpandAll?: boolean;
 		autoSelectPriority?: string[]; // File names to auto-select by priority
 		onSelect?: (file: { path: string; content: string }) => void;
+		onRootPathChange?: (newRootPath: string) => void; // 根目录重命名时通知父组件
+		onFileRename?: (oldPath: string, newPath: string) => void; // 文件/文件夹重命名时通知父组件
 	}
 
 	// Default priority for auto-selecting files
@@ -34,6 +36,8 @@
 		defaultExpandAll = false,
 		autoSelectPriority = DEFAULT_AUTO_SELECT_PRIORITY,
 		onSelect,
+		onRootPathChange,
+		onFileRename,
 	}: Props = $props();
 	let tree = $state<FileNode | null>(null);
 	let selectedPath = $state("");
@@ -99,7 +103,10 @@
 	let hasInitialized = false;
 
 	async function loadTree(path: string) {
-		if (!path) return;
+		if (!path) {
+			tree = null;
+			return;
+		}
 		loading = true;
 		try {
 			tree = await scanDirectory(path);
@@ -124,6 +131,8 @@
 			}
 		} catch (error) {
 			console.error("Failed to scan directory:", error);
+			// Reset tree on error (directory might not exist)
+			tree = null;
 		} finally {
 			loading = false;
 		}
@@ -204,11 +213,22 @@
 				const parentPath = getParentPath(targetNode.path);
 				const newPath = joinPath(parentPath, name);
 				await renameFile(targetNode.path, newPath);
+
+				// 如果重命名的是根目录，只通知 onRootPathChange，不调用 onFileRename
+				if (targetNode.path === rootPath) {
+					onRootPathChange?.(newPath);
+					return; // 父组件会更新 rootPath，触发重新加载
+				}
+
+				// 非根目录的重命名，通知父组件
+				onFileRename?.(targetNode.path, newPath);
 			}
 			// Refresh tree
 			await loadTree(rootPath);
 		} catch (error) {
 			console.error("File operation failed:", error);
+			// Refresh tree on error to sync with actual file system state
+			await loadTree(rootPath);
 		}
 	}
 

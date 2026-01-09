@@ -8,7 +8,7 @@ import {
 } from "electron";
 import extract from "extract-zip";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "fs/promises";
-import { join } from "path";
+import { join, resolve } from "path";
 import { CONFIG, isMac, UNSUPPORTED_INJECTING_THEME } from "../../constants";
 import { getCustomUserAgentFragment } from "../../utils/user-agent";
 import { themeStorage } from "../storage-service/theme-storage";
@@ -274,14 +274,34 @@ export class AppService {
 			const zipPath = join(tempDir, zipFileName);
 			const extractPath = join(tempDir, baseName);
 
+			console.log(`[extractZipBlob] zipPath: ${zipPath}, extractPath: ${extractPath}`);
+
 			// Write zip file
 			await writeFile(zipPath, Buffer.from(zipData));
+			console.log(`[extractZipBlob] ZIP file written, size: ${zipData.byteLength} bytes`);
+
+			// Clean existing directory before extraction to avoid stale files
+			try {
+				await rm(extractPath, { recursive: true, force: true });
+				console.log(`[extractZipBlob] Cleaned existing directory`);
+			} catch {
+				// Directory might not exist, ignore error
+			}
 
 			// Create extract directory
 			await mkdir(extractPath, { recursive: true });
 
 			// Extract
 			await this.extractZip(zipPath, extractPath);
+			console.log(`[extractZipBlob] Extraction completed`);
+
+			// Verify extraction by listing files
+			const extractedFiles = await readdir(extractPath);
+			console.log(`[extractZipBlob] Extracted files: ${extractedFiles.join(", ")}`);
+
+			if (extractedFiles.length === 0) {
+				console.warn(`[extractZipBlob] Warning: No files extracted to ${extractPath}`);
+			}
 
 			// Cleanup zip file
 			await rm(zipPath, { force: true });
@@ -406,6 +426,12 @@ export class AppService {
 	 */
 	async renameFile(_event: IpcMainInvokeEvent, oldPath: string, newPath: string): Promise<void> {
 		try {
+			// Check if source file/directory exists before renaming
+			try {
+				await stat(oldPath);
+			} catch {
+				throw new Error(`Source file does not exist: ${oldPath}`);
+			}
 			await rename(oldPath, newPath);
 		} catch (error) {
 			console.error("Failed to rename file:", error);
@@ -470,7 +496,10 @@ export class AppService {
 	 */
 	private async extractZip(zipPath: string, destPath: string): Promise<void> {
 		try {
-			await extract(zipPath, { dir: destPath });
+			// extract-zip requires absolute paths
+			const absoluteDestPath = resolve(destPath);
+			console.log(`[extractZip] Extracting to: ${absoluteDestPath}`);
+			await extract(zipPath, { dir: absoluteDestPath });
 		} catch (error) {
 			console.error("Failed to extract zip:", error);
 			throw error;
@@ -494,9 +523,28 @@ export class AppService {
 			const rootPath = join(basePath, skillName || "new-skill");
 			const skillMdPath = join(rootPath, "SKILL.md");
 
+			console.log(`[createSkillTempDir] Creating directory: ${rootPath}`);
 			await mkdir(rootPath, { recursive: true });
+
+			// Verify directory was created
+			const dirExists = await stat(rootPath)
+				.then(() => true)
+				.catch(() => false);
+			console.log(`[createSkillTempDir] Directory exists after mkdir: ${dirExists}`);
+
 			// Create empty SKILL.md file
+			console.log(`[createSkillTempDir] Creating SKILL.md: ${skillMdPath}`);
 			await writeFile(skillMdPath, "", "utf-8");
+
+			// Verify file was created
+			const fileExists = await stat(skillMdPath)
+				.then(() => true)
+				.catch(() => false);
+			console.log(`[createSkillTempDir] SKILL.md exists after writeFile: ${fileExists}`);
+
+			// List directory contents
+			const contents = await readdir(rootPath);
+			console.log(`[createSkillTempDir] Directory contents: ${contents.join(", ")}`);
 
 			return { rootPath, skillMdPath };
 		} catch (error) {

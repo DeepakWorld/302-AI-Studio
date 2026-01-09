@@ -23,6 +23,8 @@
 		changedFiles?: Map<string, string>; // 已修改的文件内容
 		onFileChange?: (path: string, content: string) => void; // 文件内容变化回调
 		enableManualFileTree?: boolean; // 启用手动模式的文件树预览
+		onRootPathChange?: (newRootPath: string) => void; // 根目录重命名回调（外部传入 rootPath 时使用）
+		onFileRename?: (oldPath: string, newPath: string) => void; // 文件/文件夹重命名回调
 	}
 
 	let {
@@ -32,6 +34,8 @@
 		changedFiles,
 		onFileChange,
 		enableManualFileTree = false,
+		onRootPathChange,
+		onFileRename,
 	}: Props = $props();
 
 	let viewMode = $state<"default" | "tree">("default");
@@ -80,6 +84,66 @@
 		}
 
 		onFileChange?.(path, content);
+	}
+
+	// 处理手动模式下的文件/文件夹重命名
+	function handleManualFileRename(oldPath: string, newPath: string) {
+		// 更新 changedFiles 中的路径（处理文件和文件夹重命名）
+		const newChangedFiles = new SvelteMap<string, string>();
+		for (const [path, content] of manualChangedFiles) {
+			if (path === oldPath) {
+				newChangedFiles.set(newPath, content);
+			} else if (path.startsWith(oldPath + "/") || path.startsWith(oldPath + "\\")) {
+				const newFilePath = path.replace(oldPath, newPath);
+				newChangedFiles.set(newFilePath, content);
+			} else {
+				newChangedFiles.set(path, content);
+			}
+		}
+		manualChangedFiles = newChangedFiles;
+
+		// 如果重命名的是 SKILL.md，更新 manualSkillMdPath
+		if (oldPath === manualSkillMdPath) {
+			manualSkillMdPath = newPath;
+		} else if (
+			manualSkillMdPath &&
+			(manualSkillMdPath.startsWith(oldPath + "/") || manualSkillMdPath.startsWith(oldPath + "\\"))
+		) {
+			manualSkillMdPath = manualSkillMdPath.replace(oldPath, newPath);
+		}
+
+		onFileRename?.(oldPath, newPath);
+	}
+
+	// 处理根目录重命名
+	function handleRootPathChange(newRootPath: string) {
+		// 手动模式：更新 manualRootPath 和 manualChangedFiles
+		if (!rootPath && manualRootPath) {
+			const oldRootPath = manualRootPath;
+
+			// 更新 manualChangedFiles 中所有文件的路径
+			const newChangedFiles = new SvelteMap<string, string>();
+			for (const [path, content] of manualChangedFiles) {
+				if (path.startsWith(oldRootPath)) {
+					const newPath = path.replace(oldRootPath, newRootPath);
+					newChangedFiles.set(newPath, content);
+				} else {
+					newChangedFiles.set(path, content);
+				}
+			}
+			manualChangedFiles = newChangedFiles;
+
+			// 更新 manualSkillMdPath（如果存在）
+			if (manualSkillMdPath && manualSkillMdPath.startsWith(oldRootPath)) {
+				manualSkillMdPath = manualSkillMdPath.replace(oldRootPath, newRootPath);
+			}
+
+			manualRootPath = newRootPath;
+		}
+		// 外部 rootPath 模式：通知父组件
+		else if (rootPath && onRootPathChange) {
+			onRootPathChange(newRootPath);
+		}
 	}
 
 	// 同步 formData.content 到 manualChangedFiles
@@ -323,6 +387,8 @@
 					defaultExpandAll={true}
 					changedFiles={effectiveChangedFiles}
 					onFileChange={rootPath ? onFileChange : handleManualFileChange}
+					onRootPathChange={rootPath && onRootPathChange ? onRootPathChange : handleRootPathChange}
+					onFileRename={rootPath ? onFileRename : handleManualFileRename}
 				/>
 			</div>
 		{/if}

@@ -12,6 +12,8 @@
 		autoSelectPriority?: string[];
 		changedFiles?: Map<string, string>; // 已修改的文件内容
 		onFileChange?: (path: string, content: string) => void;
+		onRootPathChange?: (newRootPath: string) => void; // 根目录重命名时通知父组件
+		onFileRename?: (oldPath: string, newPath: string) => void; // 文件/文件夹重命名时通知父组件
 	}
 
 	let {
@@ -22,6 +24,8 @@
 		autoSelectPriority,
 		changedFiles,
 		onFileChange,
+		onRootPathChange,
+		onFileRename,
 	}: Props = $props();
 	let fileContent = $state("");
 	let filePath = $state("");
@@ -64,6 +68,8 @@
 					{defaultExpandAll}
 					{autoSelectPriority}
 					onSelect={handleFileSelect}
+					{onRootPathChange}
+					{onFileRename}
 				/>
 			</div>
 		</Resizable.Pane>

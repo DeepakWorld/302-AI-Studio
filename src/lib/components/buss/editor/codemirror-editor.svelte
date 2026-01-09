@@ -42,19 +42,19 @@
 		try {
 			const theme = highlighter.getTheme(themeName);
 			const bg = theme.bg || (isDark ? "#121212" : "#ffffff");
-			const fg = theme.fg || (isDark ? "#dbd7caee" : "#393a34");
+			const _fg = theme.fg || (isDark ? "#dbd7caee" : "#393a34");
 
 			return EditorView.theme(
 				{
 					"&": {
 						backgroundColor: bg,
-						color: fg,
+						color: _fg,
 					},
 					".cm-content": {
-						caretColor: fg,
+						caretColor: _fg,
 					},
 					".cm-cursor, .cm-dropCursor": {
-						borderLeftColor: fg,
+						borderLeftColor: _fg,
 					},
 					"&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
 						{
@@ -300,7 +300,7 @@
 
 			// Add default markdown styling if not covered by theme
 			const isDark = themeName.includes("dark");
-			const fg = theme.fg || (isDark ? "#dbd7caee" : "#393a34");
+			const _fg = theme.fg || (isDark ? "#dbd7caee" : "#393a34");
 			const accentColor = colorMap.get("keyword") || (isDark ? "#4EC9B0" : "#0070C1");
 			const stringColor = colorMap.get("string") || (isDark ? "#CE9178" : "#A31515");
 			const commentColor = colorMap.get("comment") || (isDark ? "#6A9955" : "#008000");

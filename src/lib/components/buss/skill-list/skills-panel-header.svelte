@@ -20,14 +20,10 @@
 	}
 
 	let {
-		currentView,
 		viewStack,
-		canGoBack,
 		isPinned,
-		onBack,
 		onClose,
 		onTogglePin,
-		skillName = "",
 		showPinButton = true,
 		showCloseButton = true,
 	}: Props = $props();
