@@ -374,6 +374,22 @@ export class AppService {
 	}
 
 	/**
+	 * Read file content as ArrayBuffer (for binary files like PDF)
+	 */
+	async readFileAsBuffer(_event: IpcMainInvokeEvent, filePath: string): Promise<ArrayBuffer> {
+		try {
+			const buffer = await readFile(filePath);
+			return buffer.buffer.slice(
+				buffer.byteOffset,
+				buffer.byteOffset + buffer.byteLength,
+			) as ArrayBuffer;
+		} catch (error) {
+			console.error("Failed to read file as buffer:", error);
+			throw error;
+		}
+	}
+
+	/**
 	 * Write content to a file
 	 */
 	async writeFile(_event: IpcMainInvokeEvent, filePath: string, content: string): Promise<void> {

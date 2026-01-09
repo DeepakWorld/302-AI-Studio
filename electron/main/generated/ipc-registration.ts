@@ -327,6 +327,9 @@ export function registerIpcHandlers() {
 		appService.scanDirectory(event, dirPath),
 	);
 	ipcMain.handle("appService:readFile", (event, filePath) => appService.readFile(event, filePath));
+	ipcMain.handle("appService:readFileAsBuffer", (event, filePath) =>
+		appService.readFileAsBuffer(event, filePath),
+	);
 	ipcMain.handle("appService:writeFile", (event, filePath, content) =>
 		appService.writeFile(event, filePath, content),
 	);
@@ -553,6 +556,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("appService:extractZipBlob");
 	ipcMain.removeHandler("appService:scanDirectory");
 	ipcMain.removeHandler("appService:readFile");
+	ipcMain.removeHandler("appService:readFileAsBuffer");
 	ipcMain.removeHandler("appService:writeFile");
 	ipcMain.removeHandler("appService:createDirectory");
 	ipcMain.removeHandler("appService:deleteFile");
