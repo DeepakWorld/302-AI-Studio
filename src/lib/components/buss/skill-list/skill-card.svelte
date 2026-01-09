@@ -49,11 +49,8 @@
 	const showMenu = $derived(canEdit || !!onDownload || canDelete);
 
 	function handleCardClick() {
-		if (selectable) {
-			onSelectionChange?.(skill, !selected);
-		} else {
-			onSelect?.(skill);
-		}
+		// Always go to detail page when clicking the card
+		onSelect?.(skill);
 	}
 
 	function handleCheckboxChange(checked: boolean) {
