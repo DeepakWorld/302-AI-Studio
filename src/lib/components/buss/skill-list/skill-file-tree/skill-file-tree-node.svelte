@@ -28,8 +28,8 @@
 		expandedPaths?: SvelteSet<string>;
 		readOnly?: boolean;
 		onSelect?: (node: FileNode) => void;
-		onCreateFile?: (parentPath: string) => void;
-		onCreateFolder?: (parentPath: string) => void;
+		onCreateFileConfirm?: (parentPath: string, fileName: string) => void;
+		onCreateFolderConfirm?: (parentPath: string, folderName: string) => void;
 		onRenameConfirm?: (node: FileNode, newName: string) => void;
 		onDelete?: (node: FileNode) => void;
 		onToggleExpand?: (path: string, expanded: boolean) => void;
@@ -42,21 +42,25 @@
 		expandedPaths,
 		readOnly = false,
 		onSelect,
-		onCreateFile,
-		onCreateFolder,
+		onCreateFileConfirm,
+		onCreateFolderConfirm,
 		onRenameConfirm,
 		onDelete,
 		onToggleExpand,
 	}: Props = $props();
 
 	let isOpen = $derived(expandedPaths?.has(node.path) ?? false);
-	let isEditing = $state(false);
-	let editValue = $state("");
-	let inputRef = $state<HTMLInputElement | null>(null);
+
+	// Unified popover state
+	type PopoverMode = "none" | "rename" | "create-file" | "create-folder";
+	let popoverMode = $state<PopoverMode>("none");
+	let popoverValue = $state("");
+	let popoverInputRef = $state<HTMLInputElement | null>(null);
+	let isPopoverOpen = $derived(popoverMode !== "none");
 
 	function handleSelect(e: MouseEvent) {
 		e.stopPropagation();
-		if (isEditing) return;
+		if (isPopoverOpen) return;
 		if (node.type === "directory") {
 			onToggleExpand?.(node.path, !isOpen);
 		} else {
@@ -64,43 +68,85 @@
 		}
 	}
 
-	function handleCreateFile() {
-		onCreateFile?.(node.path);
+	async function handleCreateFile() {
+		popoverValue = "";
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		popoverMode = "create-file";
+		await tick();
+		popoverInputRef?.focus();
 	}
 
-	function handleCreateFolder() {
-		onCreateFolder?.(node.path);
+	async function handleCreateFolder() {
+		popoverValue = "";
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		popoverMode = "create-folder";
+		await tick();
+		popoverInputRef?.focus();
 	}
 
 	async function handleRename() {
-		editValue = node.name;
-		// 延迟打开 popover，等待 context menu 完全关闭
+		popoverValue = node.name;
 		await new Promise((resolve) => setTimeout(resolve, 100));
-		isEditing = true;
+		popoverMode = "rename";
 		await tick();
-		inputRef?.focus();
-		inputRef?.select();
+		popoverInputRef?.focus();
+		popoverInputRef?.select();
 	}
 
 	function handleDelete() {
 		onDelete?.(node);
 	}
 
-	function confirmRename() {
-		const trimmed = editValue.trim();
-		if (trimmed && trimmed !== node.name) {
-			onRenameConfirm?.(node, trimmed);
-		}
-		isEditing = false;
+	function closePopover() {
+		popoverMode = "none";
+		popoverValue = "";
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
+	function confirmPopover() {
+		const trimmed = popoverValue.trim();
+		if (!trimmed) {
+			closePopover();
+			return;
+		}
+
+		if (popoverMode === "rename") {
+			if (trimmed !== node.name) {
+				onRenameConfirm?.(node, trimmed);
+			}
+		} else if (popoverMode === "create-file") {
+			onCreateFileConfirm?.(node.path, trimmed);
+		} else if (popoverMode === "create-folder") {
+			onCreateFolderConfirm?.(node.path, trimmed);
+		}
+		closePopover();
+	}
+
+	function handlePopoverKeydown(e: KeyboardEvent) {
 		if (e.key === "Enter") {
 			e.preventDefault();
-			confirmRename();
+			confirmPopover();
 		} else if (e.key === "Escape") {
 			e.preventDefault();
-			isEditing = false;
+			closePopover();
+		}
+	}
+
+	function getPopoverTitle(): string {
+		switch (popoverMode) {
+			case "rename":
+				return m.file_tree_rename_title();
+			case "create-file":
+				return m.file_tree_new_file();
+			case "create-folder":
+				return m.file_tree_new_folder();
+			default:
+				return "";
+		}
+	}
+
+	function handlePopoverOpenChange(open: boolean) {
+		if (!open) {
+			closePopover();
 		}
 	}
 </script>
@@ -135,8 +181,8 @@
 							{expandedPaths}
 							{readOnly}
 							{onSelect}
-							{onCreateFile}
-							{onCreateFolder}
+							{onCreateFileConfirm}
+							{onCreateFolderConfirm}
 							{onRenameConfirm}
 							{onDelete}
 							{onToggleExpand}
@@ -148,7 +194,7 @@
 	{:else}
 		<ContextMenu.Root>
 			<ContextMenu.Trigger class="w-full">
-				<Popover.Root bind:open={isEditing}>
+				<Popover.Root open={isPopoverOpen} onOpenChange={handlePopoverOpenChange}>
 					<Popover.Trigger onclick={(e) => e.preventDefault()}>
 						{#snippet child({ props })}
 							<Collapsible.Root
@@ -186,8 +232,8 @@
 												{expandedPaths}
 												{readOnly}
 												{onSelect}
-												{onCreateFile}
-												{onCreateFolder}
+												{onCreateFileConfirm}
+												{onCreateFolderConfirm}
 												{onRenameConfirm}
 												{onDelete}
 												{onToggleExpand}
@@ -200,19 +246,20 @@
 					</Popover.Trigger>
 					<Popover.Content class="w-64 p-3" align="start" side="bottom">
 						<div class="flex flex-col gap-3">
-							<span class="text-xs text-muted-foreground">{m.file_tree_rename_title()}</span>
+							<span class="text-xs text-muted-foreground">{getPopoverTitle()}</span>
 							<Input
-								bind:ref={inputRef}
-								bind:value={editValue}
+								bind:ref={popoverInputRef}
+								bind:value={popoverValue}
+								placeholder={popoverMode !== "rename" ? m.file_tree_name_placeholder() : ""}
 								class="h-8 dark:border-[#3d3d3d]"
-								onkeydown={handleKeydown}
+								onkeydown={handlePopoverKeydown}
 							/>
 							<div class="flex justify-end gap-2">
-								<Button variant="ghost" size="sm" onclick={() => (isEditing = false)}>
+								<Button variant="ghost" size="sm" onclick={closePopover}>
 									{m.common_cancel()}
 								</Button>
-								<Button size="sm" onclick={confirmRename}>
-									{m.text_button_save()}
+								<Button size="sm" onclick={confirmPopover}>
+									{popoverMode === "rename" ? m.text_button_save() : m.text_button_confirm()}
 								</Button>
 							</div>
 						</div>
@@ -271,7 +318,7 @@
 {:else}
 	<ContextMenu.Root>
 		<ContextMenu.Trigger class="w-full">
-			<Popover.Root bind:open={isEditing}>
+			<Popover.Root open={isPopoverOpen} onOpenChange={handlePopoverOpenChange}>
 				<Popover.Trigger onclick={(e) => e.preventDefault()}>
 					{#snippet child({ props })}
 						<button
@@ -290,18 +337,18 @@
 				</Popover.Trigger>
 				<Popover.Content class="w-64 p-3" align="start" side="bottom">
 					<div class="flex flex-col gap-3">
-						<span class="text-xs text-muted-foreground">{m.file_tree_rename_title()}</span>
+						<span class="text-xs text-muted-foreground">{getPopoverTitle()}</span>
 						<Input
-							bind:ref={inputRef}
-							bind:value={editValue}
+							bind:ref={popoverInputRef}
+							bind:value={popoverValue}
 							class="h-8 dark:border-[#3d3d3d]"
-							onkeydown={handleKeydown}
+							onkeydown={handlePopoverKeydown}
 						/>
 						<div class="flex justify-end gap-2">
-							<Button variant="ghost" size="sm" onclick={() => (isEditing = false)}>
+							<Button variant="ghost" size="sm" onclick={closePopover}>
 								{m.common_cancel()}
 							</Button>
-							<Button size="sm" onclick={confirmRename}>
+							<Button size="sm" onclick={confirmPopover}>
 								{m.text_button_save()}
 							</Button>
 						</div>

@@ -145,22 +145,32 @@
 		}
 	}
 
-	function handleCreateFile(parentPath: string) {
-		targetPath = parentPath;
-		nameDialogMode = "create-file";
-		nameDialogInitialValue = "";
-		nameDialogOpen = true;
-		// Ensure parent folder is expanded
-		expandedPaths.add(parentPath);
+	async function handleCreateFileConfirm(parentPath: string, fileName: string) {
+		try {
+			const filePath = joinPath(parentPath, fileName);
+			await writeFile(filePath, "");
+			// Ensure parent folder is expanded after creation
+			expandedPaths.add(parentPath);
+			// Auto-select the new file
+			await loadTree(rootPath);
+			selectedPath = filePath;
+			onSelect?.({ path: filePath, content: "" });
+		} catch (error) {
+			console.error("Create file failed:", error);
+		}
 	}
 
-	function handleCreateFolder(parentPath: string) {
-		targetPath = parentPath;
-		nameDialogMode = "create-folder";
-		nameDialogInitialValue = "";
-		nameDialogOpen = true;
-		// Ensure parent folder is expanded
-		expandedPaths.add(parentPath);
+	async function handleCreateFolderConfirm(parentPath: string, folderName: string) {
+		try {
+			const folderPath = joinPath(parentPath, folderName);
+			await createDirectory(folderPath);
+			// Ensure parent folder is expanded after creation
+			expandedPaths.add(parentPath);
+			// Refresh tree
+			await loadTree(rootPath);
+		} catch (error) {
+			console.error("Create folder failed:", error);
+		}
 	}
 
 	async function handleRenameConfirm(node: FileNode, newName: string) {
@@ -255,8 +265,8 @@
 					{expandedPaths}
 					{readOnly}
 					onSelect={handleNodeSelect}
-					onCreateFile={handleCreateFile}
-					onCreateFolder={handleCreateFolder}
+					onCreateFileConfirm={handleCreateFileConfirm}
+					onCreateFolderConfirm={handleCreateFolderConfirm}
 					onRenameConfirm={handleRenameConfirm}
 					onDelete={handleDelete}
 					onToggleExpand={handleToggleExpand}
