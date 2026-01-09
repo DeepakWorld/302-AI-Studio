@@ -79,10 +79,6 @@
 		// 从预览跳转到编辑时，替换当前视图而不是压栈
 		skillsPanelState.replace({ type: "edit", skillName });
 	}
-
-	function handleBack() {
-		skillsPanelState.pop();
-	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -103,16 +99,13 @@
 			{/if}
 		</div>
 
-		<!-- Footer -->
-		<div class="flex gap-3 border-t px-6 py-4">
-			<Button variant="outline" class="flex-1" onclick={handleBack}>
-				{m.skills_back()}
-			</Button>
-			{#if !isBuiltin}
+		{#if !isBuiltin}
+			<!-- Footer - only show edit button for non-builtin skills -->
+			<div class="flex gap-3 border-t px-6 py-4">
 				<Button class="flex-1 bg-violet-500 hover:bg-violet-600" onclick={handleEdit}>
 					{m.text_button_edit()}
 				</Button>
-			{/if}
-		</div>
+			</div>
+		{/if}
 	{/if}
 </div>
