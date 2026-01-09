@@ -51,15 +51,15 @@
 		<!-- Header -->
 		<div class="grid grid-cols-[1fr_auto_1fr] items-center border-b px-4 py-3">
 			<div class="flex justify-start">
-			<Button
-				variant="ghost"
-				class="text-[14px] flex items-center text-center text-muted-foreground"
-				size="sm"
-				onclick={handleClose}
-			>
-				<ChevronLeft class="h-4 w-4" />
-				{m.skills_back()}
-			</Button>
+				<Button
+					variant="ghost"
+					class="text-[14px] flex items-center text-center text-muted-foreground"
+					size="sm"
+					onclick={handleClose}
+				>
+					<ChevronLeft class="h-4 w-4" />
+					{m.skills_back()}
+				</Button>
 			</div>
 			<span class="text-foreground text-base font-semibold">{m.skills_detail_title()}</span>
 			<div class="flex justify-end">
