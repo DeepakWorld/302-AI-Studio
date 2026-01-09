@@ -90,7 +90,7 @@
 
 		try {
 			const arrayBuffer = await file.arrayBuffer();
-			extractedPath = await extractZipBlob(arrayBuffer);
+			extractedPath = await extractZipBlob(arrayBuffer, file.name);
 
 			// Scan and find ALL SKILL.md files
 			const tree = await scanDirectory(extractedPath);

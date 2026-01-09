@@ -252,16 +252,27 @@ export class AppService {
 
 	/**
 	 * Extract a zip file from ArrayBuffer to a temporary directory
+	 * @param zipData - The zip file data as ArrayBuffer
+	 * @param originalFileName - Optional original file name for better identification
 	 * @returns The path to the extracted directory
 	 */
-	async extractZipBlob(_event: IpcMainInvokeEvent, zipData: ArrayBuffer): Promise<string> {
+	async extractZipBlob(
+		_event: IpcMainInvokeEvent,
+		zipData: ArrayBuffer,
+		originalFileName?: string,
+	): Promise<string> {
 		try {
 			const tempDir = app.getPath("temp");
 			const timestamp = Date.now();
-			const zipFileName = `skill-download-${timestamp}.zip`;
+
+			// Sanitize original file name if provided
+			const baseName = originalFileName
+				? originalFileName.replace(/\.zip$/i, "").replace(/[<>:"/\\|?*]/g, "_")
+				: `skill-download-${timestamp}`;
+
+			const zipFileName = `${baseName}.zip`;
 			const zipPath = join(tempDir, zipFileName);
-			const extractDirName = `skill-extract-${timestamp}`;
-			const extractPath = join(tempDir, extractDirName);
+			const extractPath = join(tempDir, baseName);
 
 			// Write zip file
 			await writeFile(zipPath, Buffer.from(zipData));

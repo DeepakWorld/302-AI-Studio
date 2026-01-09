@@ -313,8 +313,8 @@ export function registerIpcHandlers() {
 	ipcMain.handle("appService:restartApp", (event) => appService.restartApp(event));
 	ipcMain.handle("appService:resetAllData", (event) => appService.resetAllData(event));
 	ipcMain.handle("appService:clearChatHistory", (event) => appService.clearChatHistory(event));
-	ipcMain.handle("appService:extractZipBlob", (event, zipData) =>
-		appService.extractZipBlob(event, zipData),
+	ipcMain.handle("appService:extractZipBlob", (event, zipData, originalFileName) =>
+		appService.extractZipBlob(event, zipData, originalFileName),
 	);
 	ipcMain.handle("appService:scanDirectory", (event, dirPath) =>
 		appService.scanDirectory(event, dirPath),
