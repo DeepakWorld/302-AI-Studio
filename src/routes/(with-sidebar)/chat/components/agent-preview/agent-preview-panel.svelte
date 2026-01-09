@@ -1042,12 +1042,12 @@
 									<SessionDeleted />
 								{:else}
 									<div
-										class="flex h-full flex-col items-center justify-start pt-20 text-muted-foreground"
+										class="flex h-full flex-col items-center justify-center text-muted-foreground"
 									>
 										<img src={UnDeployedIcon} alt="Un deployed" class="h-40 w-40" />
 										<p class="text-sm font-medium">{m.empty_agent_preview_title()}</p>
 										<Button
-											class=" flex rounded-xs items-center gap-1.5 mt-3.5   bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+											class=" flex rounded-xs items-center gap-1.5 mt-3.5 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 											onclick={handleDeploySandbox}
 											disabled={agentPreviewState.isDeploying || chatState.isStreaming}
 										>

@@ -80,7 +80,7 @@
 	});
 </script>
 
-<div class="my-2 rounded-[10px] bg-white px-3.5 py-3 dark:bg-[#1A1A1A]">
+<div class="mb-3 rounded-[10px] bg-white px-3.5 py-3 dark:bg-[#1A1A1A]">
 	<!-- Header -->
 	<div class="flex w-full items-center justify-between gap-x-4 mb-3">
 		<!-- Left: Tool Icon and Name -->
