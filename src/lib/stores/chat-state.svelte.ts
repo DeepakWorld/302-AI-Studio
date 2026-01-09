@@ -1,5 +1,6 @@
+import { updateSessionNote } from "$lib/api/sandbox-session";
 import { generateSuggestions } from "$lib/api/suggestions-generation";
-import { generateTitle } from "$lib/api/title-generation";
+import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages.js";
 import {
@@ -22,13 +23,12 @@ import { hashApiKey } from "@shared/utils/hash";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 
-import { updateSessionNote } from "$lib/api/sandbox-session";
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 
+import { emitter, EventNames } from "$lib/event/emitter";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
-import { agentPreviewState } from "./agent-preview-state.svelte";
-import { codeAgentState } from "./code-agent";
+import { codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -161,8 +161,36 @@ class ChatState {
 	private retryInProgress = $state(false);
 	private hydrateCheckInterval: ReturnType<typeof setInterval> | null = null;
 
+	// AbortController for canceling pending suggestions generation
+	private suggestionsAbortController: AbortController | null = null;
+
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
+	isParametersOpen = $state(false);
+	isCreateSkillMode = $state(false);
+
+	/**
+	 * Cancel any pending suggestions generation request.
+	 * Should be called before sending a new message to avoid race conditions.
+	 */
+	cancelPendingSuggestions() {
+		if (this.suggestionsAbortController) {
+			this.suggestionsAbortController.abort();
+			this.suggestionsAbortController = null;
+			console.log("[Suggestions] Cancelled pending suggestions generation");
+		}
+	}
+
+	/**
+	 * Create a new AbortController for suggestions generation.
+	 * Returns the AbortSignal to be passed to the fetch request.
+	 */
+	createSuggestionsAbortController(): AbortSignal {
+		// Cancel any existing pending request first
+		this.cancelPendingSuggestions();
+		this.suggestionsAbortController = new AbortController();
+		return this.suggestionsAbortController.signal;
+	}
 
 	constructor() {
 		// Watch for PersistedState hydration and sync messages to chat
@@ -338,6 +366,13 @@ class ChatState {
 		persistedChatParamsState.current.maxTokens = value;
 	}
 
+	get clearScreenMessageId(): string | undefined {
+		return persistedChatParamsState.current.clearScreenMessageId;
+	}
+	set clearScreenMessageId(value: string | undefined) {
+		persistedChatParamsState.current.clearScreenMessageId = value;
+	}
+
 	providerType = $derived<string | null>(
 		this.selectedModel
 			? (providerState.getProvider(this.selectedModel.providerId)?.apiType ?? null)
@@ -360,6 +395,36 @@ class ChatState {
 			this.loadingAttachmentIds.size === 0, // 确保没有附件正在加载
 	);
 	hasMessages = $derived(this.messages.length > 0);
+
+	/**
+	 * Messages visible to the user after applying clear screen filter.
+	 * Messages up to and including clearScreenMessageId are hidden.
+	 */
+	visibleMessages = $derived.by(() => {
+		const clearId = this.clearScreenMessageId;
+		if (!clearId) {
+			return this.messages;
+		}
+		const clearIndex = this.messages.findIndex((msg) => msg.id === clearId);
+		if (clearIndex === -1) {
+			return this.messages;
+		}
+		return this.messages.slice(clearIndex + 1);
+	});
+
+	/**
+	 * Whether clear screen is active (has hidden messages)
+	 */
+	hasClearScreen = $derived(
+		!!this.clearScreenMessageId &&
+			this.messages.findIndex((msg) => msg.id === this.clearScreenMessageId) !== -1,
+	);
+
+	/**
+	 * Whether there are visible messages (after applying clear screen filter)
+	 */
+	hasVisibleMessages = $derived(this.visibleMessages.length > 0);
+
 	canTogglePrivacy = $derived(!this.hasMessages);
 	canRegenerate = $derived(
 		(this.isReady || this.isError) &&
@@ -488,6 +553,9 @@ class ChatState {
 
 	sendMessage = async () => {
 		if (this.sendMessageEnabled) {
+			// Cancel any pending suggestions generation to avoid race conditions
+			this.cancelPendingSuggestions();
+
 			try {
 				const currentModel = this.selectedModel!;
 				const currentAttachments = [...this.attachments];
@@ -552,7 +620,9 @@ class ChatState {
 				}
 
 				const { parts: attachmentParts, metadataList: attachmentMetadata } =
-					await convertAttachmentsToMessageParts(currentAttachments);
+					await convertAttachmentsToMessageParts(currentAttachments, {
+						enableZipSupport: codeAgentState.enabled,
+					});
 
 				const textParts = attachmentParts.filter(
 					(part): part is { type: "text"; text: string } => part.type === "text",
@@ -579,8 +649,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -594,8 +663,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -616,8 +684,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -627,8 +694,7 @@ class ChatState {
 						{
 							body: {
 								model: currentModel.id,
-								apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-									?.apiKey,
+								apiKey: this.getApiKey(currentModel.providerId),
 							},
 						},
 					);
@@ -650,6 +716,9 @@ class ChatState {
 			console.warn("Cannot regenerate: chat is not ready or no model selected");
 			return;
 		}
+
+		// Cancel any pending suggestions generation to avoid race conditions
+		this.cancelPendingSuggestions();
 
 		const currentModel = this.selectedModel!;
 
@@ -700,8 +769,7 @@ class ChatState {
 				...(regenerateMessageId && { messageId: regenerateMessageId }),
 				body: {
 					model: currentModel.id,
-					apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-						?.apiKey,
+					apiKey: this.getApiKey(currentModel.providerId),
 				},
 			});
 		} catch (error) {
@@ -717,6 +785,25 @@ class ChatState {
 	clearMessages() {
 		this.messages = [];
 		persistedMessagesState.current = [];
+	}
+
+	/**
+	 * Clear screen by marking the last message as the clear point.
+	 * Messages up to and including this message will be hidden from view,
+	 * but preserved in history.
+	 */
+	clearScreen() {
+		const lastMessage = this.messages[this.messages.length - 1];
+		if (lastMessage) {
+			this.clearScreenMessageId = lastMessage.id;
+		}
+	}
+
+	/**
+	 * Restore all hidden messages by removing the clear screen marker.
+	 */
+	restoreClearScreen() {
+		this.clearScreenMessageId = undefined;
 	}
 
 	updateMessage(messageId: string, content: string) {
@@ -853,8 +940,7 @@ class ChatState {
 			await chat.sendMessage(undefined, {
 				body: {
 					model: currentModel.id,
-					apiKey: persistedProviderState.current.find((p) => p.id === currentModel.providerId)
-						?.apiKey,
+					apiKey: this.getApiKey(currentModel.providerId),
 				},
 			});
 		} catch (error) {
@@ -900,6 +986,15 @@ class ChatState {
 				messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
 			}
 
+			// 准备兜底配置：如果 provider 未配置，使用当前聊天模型
+			let fallbackConfig: FallbackModelConfig | undefined;
+			if (!provider && this.selectedModel && this.currentProvider) {
+				fallbackConfig = {
+					model: this.selectedModel,
+					provider: this.currentProvider,
+				};
+			}
+
 			const result = await generateTitle(
 				messagesToSend,
 				titleModel,
@@ -907,6 +1002,7 @@ class ChatState {
 				serverPort,
 				previousSummary,
 				isFirstGeneration,
+				fallbackConfig,
 			);
 
 			if (result) {
@@ -920,6 +1016,27 @@ class ChatState {
 				// Broadcast update event to trigger sidebar refresh
 				await broadcastService.broadcastToAll("thread-list-updated", {});
 
+				// 如果是 code agent 类型，同步备注到 302.AI
+				if (codeAgentState.enabled) {
+					const sandboxId = claudeCodeAgentState.sandboxId;
+					const sessionId = claudeCodeAgentState.currentSessionId;
+					const provider302AI = providerState.getProvider("302AI");
+
+					if (sandboxId && sessionId && provider302AI) {
+						try {
+							await updateSessionNote(provider302AI, {
+								sandbox_id: sandboxId,
+								session_id: sessionId,
+								note: result.title,
+							});
+							console.log("[ChatState] Session note synced to 302.AI");
+						} catch (syncError) {
+							console.error("[ChatState] Failed to sync session note:", syncError);
+							// 不阻塞主流程，只记录错误
+						}
+					}
+				}
+
 				toast.success(m.toast_title_generation_success());
 			} else {
 				toast.error(m.toast_title_generation_failed());
@@ -928,6 +1045,19 @@ class ChatState {
 			console.error("Failed to generate title manually:", error);
 			toast.error(m.toast_title_generation_failed());
 		}
+	}
+
+	/**
+	 * Get the API key for a specific provider
+	 */
+	getApiKey(providerId: string): string | undefined {
+		// const codeAgentEnabled = codeAgentState.enabled;
+		// if (codeAgentEnabled) {
+		// 	return codeAgentGlobalConfigsState.apiKey;
+		// }
+
+		const apiKey = persistedProviderState.current.find((p) => p.id === providerId)?.apiKey;
+		return apiKey;
 	}
 
 	/**
@@ -1010,7 +1140,9 @@ class ChatState {
 
 			// 3. convert attachments to message parts
 			const { parts: attachmentParts, metadataList: attachmentMetadata } =
-				await convertAttachmentsToMessageParts(userAttachments);
+				await convertAttachmentsToMessageParts(userAttachments, {
+					enableZipSupport: codeAgentState.enabled,
+				});
 
 			// 4. Separate text and file parts
 			const textParts = attachmentParts.filter(
@@ -1300,6 +1432,10 @@ export const chat = new Chat({
 
 					return result.content;
 				})(),
+
+				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
+				skills: codeAgentState.skills,
+				isCreateSkillMode: chatState.isCreateSkillMode,
 			};
 		},
 	}),
@@ -1333,6 +1469,35 @@ export const chat = new Chat({
 			messages = updatedMessages;
 		}
 
+		// Save systemPrompt to the last assistant message
+		const lastAssistantMessage = [...messages].reverse().find((msg) => msg.role === "assistant");
+		if (lastAssistantMessage && chatParameters.systemPromptContent) {
+			const resolvedSystemPrompt = resolvePrompt(chatParameters.systemPromptContent, {
+				modelId: chatState.selectedModel?.id ?? "",
+				language: generalSettings.language,
+				cachedMap: chatParameters.systemPromptMap,
+				variables: chatParameters.systemPromptVariables,
+			});
+
+			const updatedMessages = messages.map((msg) => {
+				if (msg.id === lastAssistantMessage.id) {
+					return {
+						...msg,
+						metadata: {
+							...msg.metadata,
+							systemPromptContent: resolvedSystemPrompt.content,
+							systemPromptVariables: [...chatParameters.systemPromptVariables],
+							systemPromptMap: { ...chatParameters.systemPromptMap },
+						},
+					};
+				}
+				return msg;
+			});
+
+			chat.messages = updatedMessages;
+			messages = updatedMessages;
+		}
+
 		const codeAgentEnabled = codeAgentState.enabled;
 		console.log("onFinish: async ({ messages }) pendingResultMetadata", pendingResultMetadata);
 		if (codeAgentEnabled && pendingResultMetadata) {
@@ -1348,58 +1513,15 @@ export const chat = new Chat({
 			clearPendingResultMetadata();
 		}
 
-		// Parse deploy sandbox info from the last message
-		let isDeploy = false;
-		let deployInfo: {
-			success: boolean;
-			status: string;
-			id: string;
-			url: string;
-			cover: string;
-		} | null = null;
-
-		if (codeAgentEnabled) {
-			const lastMessage = messages[messages.length - 1];
-			if (lastMessage && lastMessage.role === "assistant") {
-				// Extract text content from the message parts
-				const textContent = lastMessage.parts
-					.filter((part): part is { type: "text"; text: string } => part.type === "text")
-					.map((part) => part.text)
-					.join("\n");
-
-				// Check if deploy was successful
-				if (textContent.includes("**deploy sandbox successfully**")) {
-					isDeploy = true;
-
-					// Extract the Python dict-like structure after the success message
-					// Pattern matches: {'success': True, 'status': '...', 'id': '...', 'url': '...', 'cover': '...'}
-					const deployInfoRegex =
-						/\{[^{}]*'success'\s*:\s*(True|False)[^{}]*'status'\s*:\s*'([^']*)'[^{}]*'id'\s*:\s*'([^']*)'[^{}]*'url'\s*:\s*'([^']*)'[^{}]*'cover'\s*:\s*'([^']*)'\s*\}/;
-					const match = textContent.match(deployInfoRegex);
-
-					if (match) {
-						deployInfo = {
-							success: match[1] === "True",
-							status: match[2],
-							id: match[3],
-							url: match[4],
-							cover: match[5],
-						};
-						console.log("[ChatState] Parsed deploy info:", deployInfo);
-					}
-				}
-			}
-		}
-
-		if (isDeploy && deployInfo) {
-			await agentPreviewState.setDeploymentInfo(
-				claudeCodeAgentState.sandboxId,
-				claudeCodeAgentState.currentSessionId,
-				deployInfo.url,
-				deployInfo.id,
-			);
-			console.log("[ChatState] Deploy detected:", { isDeploy, deployInfo });
-		}
+		console.log("onFinish: async ({ messages }) codeAgentEnabled", codeAgentEnabled);
+		console.log(
+			"onFinish: async ({ messages }) autoDeploy",
+			codeAgentGlobalConfigsState.autoDeploy,
+		);
+		emitter.emit(EventNames.CHAT_FINISHED, {
+			canDeploy: codeAgentEnabled && codeAgentGlobalConfigsState.autoDeploy,
+			lastMessage: messages[messages.length - 1],
+		});
 
 		persistedMessagesState.current = messages;
 
@@ -1466,12 +1588,20 @@ export const chat = new Chat({
 			currentTitle === "新会话";
 		const isFirstMessage = messages.length === 2; // User message + AI response
 
+		// 计算当前对话轮数（一轮 = 用户消息 + 助手回复）
+		const conversationRounds = Math.floor(messages.length / 2);
+		// 每隔多少轮更新一次标题（首次对话模式下）
+		const TITLE_UPDATE_INTERVAL = 5;
+
 		let shouldGenerateTitle = false;
 
 		if (titleTiming === "off") {
 			shouldGenerateTitle = false;
 		} else if (titleTiming === "firstTime") {
-			shouldGenerateTitle = isFirstMessage && isDefaultTitle;
+			// 首次生成 或 每隔 N 轮更新一次
+			shouldGenerateTitle =
+				(isFirstMessage && isDefaultTitle) ||
+				(conversationRounds > 1 && conversationRounds % TITLE_UPDATE_INTERVAL === 0);
 		} else if (titleTiming === "everyTime") {
 			shouldGenerateTitle = messages.length >= 2;
 		}
@@ -1498,6 +1628,15 @@ export const chat = new Chat({
 					messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
 				}
 
+				// 准备兜底配置：如果 302AI provider 未配置，使用当前聊天模型
+				let fallbackConfig: FallbackModelConfig | undefined;
+				if (!provider && chatState.selectedModel && chatState.currentProvider) {
+					fallbackConfig = {
+						model: chatState.selectedModel,
+						provider: chatState.currentProvider,
+					};
+				}
+
 				const result = await generateTitle(
 					messagesToSend,
 					titleModel,
@@ -1505,18 +1644,14 @@ export const chat = new Chat({
 					serverPort,
 					previousSummary,
 					isFirstMessage,
+					fallbackConfig,
 				);
 
 				if (result) {
 					persistedChatParamsState.current.title = result.title;
 					persistedChatParamsState.current.incrementalSummary = result.summary;
-					if (codeAgentEnabled && provider) {
-						updateSessionNote(provider, {
-							note: result.title,
-							sandbox_id: claudeCodeAgentState.sandboxId,
-							session_id: claudeCodeAgentState.currentSessionId,
-						});
-					}
+
+					emitter.emit(EventNames.THREAD_TITLE_UPDATED, { title: result.title });
 
 					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
 				}
@@ -1560,6 +1695,11 @@ export const chat = new Chat({
 			const lastMessage = messages[messages.length - 1];
 			if (lastMessage && lastMessage.role === "assistant") {
 				const serverPort = window.app?.serverPort ?? 8089;
+				const targetMessageId = lastMessage.id;
+
+				// Create AbortController for this suggestions generation
+				// This will be cancelled if user sends a new message
+				const abortSignal = chatState.createSuggestionsAbortController();
 
 				// Don't await - let this run in the background
 				generateSuggestions(
@@ -1569,14 +1709,28 @@ export const chat = new Chat({
 					generalSettings.language,
 					preferencesSettings.suggestionsCount,
 					serverPort,
+					abortSignal,
 				)
 					.then((suggestions) => {
+						// Check if request was aborted (user sent a new message)
+						if (abortSignal.aborted) {
+							console.log("[Suggestions] Skipped: request was aborted");
+							return;
+						}
+
+						// Check if a new stream is in progress - don't update chat.messages
+						// to avoid breaking the ongoing stream
+						if (chatState.isStreaming || chatState.isSubmitted) {
+							console.log("[Suggestions] Skipped: new stream in progress");
+							return;
+						}
+
 						if (suggestions && suggestions.length > 0) {
 							console.log("[Suggestions] Adding to message:", suggestions);
 
 							// Find the message again (it might have changed)
 							const currentMessages = persistedMessagesState.current;
-							const messageIndex = currentMessages.findIndex((m) => m.id === lastMessage.id);
+							const messageIndex = currentMessages.findIndex((m) => m.id === targetMessageId);
 
 							if (messageIndex !== -1) {
 								// Check if suggestions already exist
@@ -1603,15 +1757,28 @@ export const chat = new Chat({
 									const updatedMessages = [...currentMessages];
 									updatedMessages[messageIndex] = updatedMessage;
 
-									// Update both the persisted state and chat.messages to trigger reactivity
+									// Update persisted state first
 									persistedMessagesState.current = updatedMessages;
-									chat.messages = updatedMessages;
-									console.log("[Suggestions] Successfully added to message");
+
+									// Only update chat.messages if not streaming/submitted
+									// This is a double-check since state could have changed during updates
+									if (!chatState.isStreaming && !chatState.isSubmitted) {
+										chat.messages = updatedMessages;
+										console.log("[Suggestions] Successfully added to message");
+									} else {
+										console.log(
+											"[Suggestions] Saved to persisted state, skipped chat.messages update due to active stream",
+										);
+									}
 								}
 							}
 						}
 					})
 					.catch((error) => {
+						// AbortError is expected when user sends a new message, don't log as error
+						if (error instanceof Error && error.name === "AbortError") {
+							return;
+						}
 						console.error("[Suggestions] Failed to generate:", error);
 					});
 			}

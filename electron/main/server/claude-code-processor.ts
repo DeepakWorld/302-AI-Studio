@@ -19,6 +19,9 @@
  * - {"type":"text-start","id":"..."}
  * - {"type":"text-delta","id":"...","delta":"..."}
  * - {"type":"text-end","id":"..."}
+ * - {"type":"reasoning-start","id":"..."}
+ * - {"type":"reasoning-delta","id":"...","delta":"..."}
+ * - {"type":"reasoning-end","id":"..."}
  * - {"type":"tool-input-start","toolCallId":"...","toolName":"..."}
  * - {"type":"tool-input-delta","toolCallId":"...","inputTextDelta":"..."}
  * - {"type":"tool-input-available","toolCallId":"...","toolName":"...","input":{...}}
@@ -40,6 +43,7 @@ interface ClaudeCodeEvent {
 		model?: string;
 		content: Array<{
 			type: string;
+			text?: string;
 			// For tool_result
 			tool_use_id?: string;
 			content?: string | Array<{ type: string; text?: string }>;
@@ -66,6 +70,9 @@ interface ClaudeCodeEvent {
 	session_id?: string;
 	total_cost_usd?: number;
 	uuid?: string;
+	// pre_deploy_check fields
+	success?: boolean;
+	find_file?: string;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	[key: string]: any;
 }
@@ -101,11 +108,12 @@ interface AnthropicEvent {
 }
 
 interface ContentBlockState {
-	type: "text" | "tool_use";
+	type: "text" | "tool_use" | "thinking";
 	id: string;
 	toolName?: string;
 	toolCallId?: string;
 	inputJsonParts: string[];
+	isThinking?: boolean;
 }
 
 /**
@@ -148,6 +156,11 @@ class ClaudeCodeProcessor {
 	private pendingFinishEvent: string | null = null;
 	// Track if we're in OpenAI streaming mode (for /deploy command)
 	private openaiTextId: string | null = null;
+	// Track the last skill tool call ID to associate synthetic messages with it
+	private lastSkillToolCallId: string | null = null;
+	// Store result metadata to merge with pre_deploy_check
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private resultMetadata: any = null;
 
 	constructor(preGeneratedMessageId?: string) {
 		if (preGeneratedMessageId) {
@@ -221,6 +234,11 @@ class ClaudeCodeProcessor {
 			return null;
 		}
 
+		// Handle pre_deploy_check event
+		if (data.type === "pre_deploy_check") {
+			return this.handlePreDeployCheck(data);
+		}
+
 		// Handle error payload from upstream (e.g., sandbox deployment failures)
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		if ((data as any).error) {
@@ -242,6 +260,11 @@ class ClaudeCodeProcessor {
 		// These contain tool_use content that needs tool-input-start and tool-input-available
 		if (data.type === "assistant" && data.message?.content) {
 			return this.handleAssistantMessage(data);
+		}
+
+		// Handle synthetic user messages (used for skill content)
+		if (data.type === "user" && data.isSynthetic && data.message?.content) {
+			return this.handleSyntheticMessage(data);
 		}
 
 		// Handle tool result events from user messages
@@ -373,16 +396,41 @@ class ClaudeCodeProcessor {
 			uuid: data.uuid,
 		};
 
+		// Store result metadata for later merging with pre_deploy_check
+		this.resultMetadata = resultMetadata;
+
 		// Send as message-metadata event for frontend to process
 		const metadataEvent = {
 			type: "message-metadata",
 			metadata: resultMetadata,
 		};
 
+		return `data: ${JSON.stringify(metadataEvent)}`;
+	}
+
+	/**
+	 * Handle pre_deploy_check event from 302.AI Claude Code
+	 * This event typically follows the result event in deployment scenarios.
+	 */
+	private handlePreDeployCheck(data: ClaudeCodeEvent): string | null {
+		// Merge with stored result metadata if available
+		const metadata = this.resultMetadata ? { ...this.resultMetadata } : {};
+
+		// Add preDeploy field
+		metadata.preDeploy = {
+			type: "pre_deploy_check",
+			success: data.success,
+			find_file: data.find_file,
+		};
+
+		const metadataEvent = {
+			type: "message-metadata",
+			metadata: metadata,
+		};
+
 		const metadataStr = `data: ${JSON.stringify(metadataEvent)}`;
 
-		// If there's a pending finish event, send metadata first, then finish
-		// This ensures onFinish callback receives the metadata
+		// Flush pending finish event if present
 		if (this.pendingFinishEvent) {
 			const result = `${metadataStr}\n\n${this.pendingFinishEvent}`;
 			this.pendingFinishEvent = null;
@@ -465,11 +513,54 @@ class ClaudeCodeProcessor {
 					output: resultContent,
 				};
 
+				// If this is a skill tool, track it to associate with synthetic messages
+				if (typeof resultContent === "string" && resultContent.startsWith("Launching skill:")) {
+					this.lastSkillToolCallId = content.tool_use_id;
+				} else if (
+					typeof resultContent === "object" &&
+					resultContent !== null &&
+					"commandName" in resultContent
+				) {
+					// 302.AI might return an object for skill result
+					this.lastSkillToolCallId = content.tool_use_id;
+				} else {
+					this.lastSkillToolCallId = null;
+				}
+
 				results.push(`data: ${JSON.stringify(toolOutputEvent)}`);
 			}
 		}
 
 		return results.length > 0 ? results.join("\n\n") : null;
+	}
+
+	/**
+	 * Handle synthetic user messages that contain skill content.
+	 * Associate the content with the last skill tool call.
+	 */
+	private handleSyntheticMessage(data: ClaudeCodeEvent): string | null {
+		if (!this.lastSkillToolCallId || !data.message?.content) {
+			return null;
+		}
+
+		const textParts = data.message.content
+			.filter((c) => c.type === "text" && c.text)
+			.map((c) => c.text)
+			.join("\n");
+
+		if (!textParts) return null;
+
+		// Emit an updated tool-output-available event with the full content
+		const toolOutputEvent = {
+			type: "tool-output-available",
+			toolCallId: this.lastSkillToolCallId,
+			output: textParts,
+		};
+
+		// Reset last skill tool call ID after association
+		this.lastSkillToolCallId = null;
+
+		return `data: ${JSON.stringify(toolOutputEvent)}`;
 	}
 
 	private transformAnthropicEvent(event: AnthropicEvent): string | null {
@@ -545,6 +636,34 @@ class ClaudeCodeProcessor {
 			return `data: ${JSON.stringify(textStartEvent)}`;
 		}
 
+		if (contentBlock.type === "thinking") {
+			const thinkingId = `reasoning-${this.textBlockCounter++}`;
+			this.contentBlocks.set(index, {
+				type: "thinking",
+				id: thinkingId,
+				inputJsonParts: [],
+			});
+
+			const reasoningStartEvent = {
+				type: "reasoning-start",
+				id: thinkingId,
+			};
+
+			// If there's initial thinking content
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			if ((contentBlock as any).thinking) {
+				const reasoningDeltaEvent = {
+					type: "reasoning-delta",
+					id: thinkingId,
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					delta: (contentBlock as any).thinking,
+				};
+				return `data: ${JSON.stringify(reasoningStartEvent)}\n\ndata: ${JSON.stringify(reasoningDeltaEvent)}`;
+			}
+
+			return `data: ${JSON.stringify(reasoningStartEvent)}`;
+		}
+
 		if (contentBlock.type === "tool_use") {
 			const toolCallId = contentBlock.id || `call_${Date.now()}`;
 			const toolName = contentBlock.name || "unknown";
@@ -588,6 +707,16 @@ class ClaudeCodeProcessor {
 			return `data: ${JSON.stringify(textDeltaEvent)}`;
 		}
 
+		if (delta.type === "thinking_delta" && delta.thinking) {
+			const textId = blockState?.id || `reasoning-${index}`;
+			const reasoningDeltaEvent = {
+				type: "reasoning-delta",
+				id: textId,
+				delta: delta.thinking,
+			};
+			return `data: ${JSON.stringify(reasoningDeltaEvent)}`;
+		}
+
 		if (delta.type === "input_json_delta" && delta.partial_json) {
 			if (blockState && blockState.type === "tool_use") {
 				// Accumulate JSON parts for later
@@ -618,6 +747,15 @@ class ClaudeCodeProcessor {
 			};
 			this.contentBlocks.delete(index);
 			return `data: ${JSON.stringify(textEndEvent)}`;
+		}
+
+		if (blockState.type === "thinking") {
+			const reasoningEndEvent = {
+				type: "reasoning-end",
+				id: blockState.id,
+			};
+			this.contentBlocks.delete(index);
+			return `data: ${JSON.stringify(reasoningEndEvent)}`;
 		}
 
 		if (blockState.type === "tool_use") {

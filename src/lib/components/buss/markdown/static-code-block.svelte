@@ -7,7 +7,7 @@
 	import { ChevronDown } from "@lucide/svelte";
 	import { onMount } from "svelte";
 	import type { ShikiHighlighter } from "./highlighter";
-	import { ensureHighlighter } from "./highlighter";
+	import { ensureHighlighter, ensureLanguageLoaded } from "./highlighter";
 
 	interface Props {
 		code: string;
@@ -59,6 +59,7 @@
 			dart: "Dart",
 			vue: "Vue",
 			svelte: "Svelte",
+			diff: "Diff",
 		};
 
 		return languageNames[lang.toLowerCase()] || lang.charAt(0).toUpperCase() + lang.slice(1);
@@ -77,6 +78,9 @@
 		const lang = props.language?.toLowerCase().trim() || "plaintext";
 		resolvedLanguage = lang;
 
+		// Ensure language is loaded
+		await ensureLanguageLoaded(resolvedLanguage);
+
 		let theme = persistedThemeState.current.shouldUseDarkColors ? "vitesse-dark" : "vitesse-light";
 		if (props.theme?.trim()) {
 			try {
@@ -88,10 +92,23 @@
 		}
 		resolvedTheme = theme;
 
-		highlightedHtml = highlighter.codeToHtml(props.code, {
-			lang: resolvedLanguage as never,
-			theme: resolvedTheme,
-		});
+		try {
+			highlightedHtml = highlighter.codeToHtml(props.code, {
+				lang: resolvedLanguage as never,
+				theme: resolvedTheme,
+			});
+		} catch (e) {
+			console.warn("Failed to highlight code:", e);
+			// Fallback to plaintext if highlighting fails
+			try {
+				highlightedHtml = highlighter.codeToHtml(props.code, {
+					lang: "plaintext",
+					theme: resolvedTheme,
+				});
+			} catch {
+				highlightedHtml = ""; // Last resort
+			}
+		}
 	};
 
 	onMount(async () => {

@@ -84,12 +84,38 @@
 		(part.state === "output-available" && part.output) ||
 			(part.state === "output-error" && part.errorText),
 	);
+
+	const outputContent = $derived.by(() => {
+		if (part.state === "output-available" && part.output) {
+			if (typeof part.output === "string") {
+				return part.output;
+			}
+			return formatJson(part.output);
+		}
+		return "";
+	});
+
+	const outputLanguage = $derived.by(() => {
+		if (part.toolName === "Read") {
+			const input = part.input as { file_path?: string } | undefined;
+			const filePath = input?.file_path || "";
+			const ext = filePath.split(".").pop()?.toLowerCase();
+			return ext || "plaintext";
+		}
+		if (part.toolName === "Bash" || part.toolName === "BashOutput") {
+			return "bash";
+		}
+		if (typeof part.output === "string") {
+			return "plaintext";
+		}
+		return "json";
+	});
 </script>
 
 <!-- Card Button -->
 <button
 	type="button"
-	class="my-2 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
+	class="mb-3 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
 	onclick={() => {
 		isModalOpen = true;
 	}}
@@ -162,8 +188,8 @@
 							class="h-full [&_.shiki]:overflow-y-auto [&_.shiki]:overflow-x-hidden [&_.shiki]:text-xs [&_.shiki_code]:whitespace-pre-wrap [&_.shiki_code]:break-all"
 						>
 							<StaticCodeBlock
-								code={formatJson(part.output)}
-								language="json"
+								code={outputContent}
+								language={outputLanguage}
 								canCollapse={false}
 								title={m.tool_call_result()}
 								showCollapseButton={false}

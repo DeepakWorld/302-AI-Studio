@@ -511,6 +511,61 @@ export class TabService {
 		view.webContents.focus();
 	}
 
+	/**
+	 * Create a tab for an existing thread (internal method for window-service)
+	 * @returns Tab ID if successful, null otherwise
+	 */
+	async createTabForExistingThread(
+		targetWindow: BrowserWindow,
+		threadId: string,
+		title: string = "Chat",
+		type: TabType = "chat",
+		active: boolean = true,
+	): Promise<{ tabId: string | null }> {
+		const windowId = targetWindow.id.toString();
+
+		const { getHref } = getTabConfig(type);
+		const newTabId = nanoid();
+		const newTab: Tab = {
+			id: newTabId,
+			title,
+			href: getHref(newTabId),
+			type,
+			active,
+			threadId,
+		};
+
+		const view = await this.newWebContentsView(targetWindow.id, newTab);
+		this.attachViewToWindow(targetWindow, view);
+		this.switchActiveTab(targetWindow, newTab.id);
+
+		this.tabMap.set(newTab.id, newTab);
+
+		const windowViews = this.windowTabView.get(targetWindow.id) || [];
+		if (!windowViews.includes(view)) {
+			windowViews.push(view);
+			this.windowTabView.set(targetWindow.id, windowViews);
+		}
+
+		this.scheduleWindowResize(targetWindow);
+
+		// Add new tab to storage
+		const finalTabState = await tabStorage.getItemInternal("tab-bar-state");
+		if (!isNull(finalTabState)) {
+			const currentTabs = finalTabState[windowId]?.tabs || [];
+			const updatedTabs = active
+				? [...currentTabs.map((t) => ({ ...t, active: false })), newTab]
+				: [...currentTabs, newTab];
+			finalTabState[windowId] = { tabs: updatedTabs };
+			await tabStorage.setItemInternal("tab-bar-state", finalTabState);
+			console.log(
+				`[TabService] Created tab ${newTabId} for thread ${threadId} in window ${windowId}`,
+			);
+		}
+
+		return { tabId: newTabId };
+	}
+
 	// ******************************* IPC Methods ******************************* //
 	async handleNewTabWithThread(
 		event: IpcMainInvokeEvent,
@@ -1118,6 +1173,40 @@ export class TabService {
 			return true;
 		} catch (error) {
 			console.error(`[handleGenerateTabTitle] Failed to generate title:`, error);
+			return false;
+		}
+	}
+
+	/**
+	 * Trigger create skill summary in the chat
+	 */
+	async triggerCreateSkillSummary(_event: IpcMainInvokeEvent, threadId: string): Promise<boolean> {
+		console.log(`[triggerCreateSkillSummary] Triggering summary for thread ${threadId}`);
+
+		try {
+			// Find the tab with matching threadId
+			let targetView: WebContentsView | undefined;
+
+			for (const [tabId, tab] of this.tabMap.entries()) {
+				if (tab.threadId === threadId) {
+					targetView = this.tabViewMap.get(tabId);
+					break;
+				}
+			}
+
+			if (isUndefined(targetView) || targetView.webContents.isDestroyed()) {
+				console.warn(
+					`[triggerCreateSkillSummary] View not found or destroyed for thread ${threadId}`,
+				);
+				return false;
+			}
+
+			// Send a message to the tab
+			targetView.webContents.send("tab:create-skill-summary", { threadId });
+
+			return true;
+		} catch (error) {
+			console.error(`[triggerCreateSkillSummary] Failed to trigger summary:`, error);
 			return false;
 		}
 	}

@@ -38,13 +38,24 @@
 	});
 
 	const content = $derived.by((): string => {
-		const input = part.input as { content?: string; new_string?: string } | undefined;
+		const input = part.input as
+			| { content?: string; new_string?: string; old_string?: string }
+			| undefined;
+
+		if (isEdit && input?.old_string && input?.new_string) {
+			const oldLines = input.old_string.split("\n");
+			const newLines = input.new_string.split("\n");
+			return [...oldLines.map((l) => `- ${l}`), ...newLines.map((l) => `+ ${l}`)].join("\n");
+		}
+
 		// For Write tool, use 'content'; for Edit tool, use 'new_string'
 		return input?.content ?? input?.new_string ?? "";
 	});
 
 	// Guess language from file extension
 	const language = $derived.by((): string | null => {
+		if (isEdit) return "diff";
+
 		const ext = filePath.split(".").pop()?.toLowerCase();
 		const langMap: Record<string, string> = {
 			ts: "typescript",
@@ -133,7 +144,7 @@
 <!-- Card Button -->
 <button
 	type="button"
-	class="my-2 block w-full rounded-[10px] border-0 bg-white px-3.5 py-3 text-left dark:bg-[#1A1A1A] {part.state ===
+	class="mb-3 block w-full rounded-[10px] border-0 bg-white px-3.5 py-3 text-left dark:bg-[#1A1A1A] {part.state ===
 	'output-available'
 		? 'cursor-pointer'
 		: 'cursor-default'}"
@@ -173,7 +184,7 @@
 
 <!-- Modal Dialog -->
 <Dialog bind:open={isModalOpen}>
-	<DialogContent class="max-h-[80vh] min-w-[60vw] flex flex-col">
+	<DialogContent data-tool-card-dialog class="h-[80vh] w-[60vw] flex flex-col">
 		<DialogHeader class="shrink-0">
 			<DialogTitle class="flex items-center gap-2">
 				<FilePenLine class="h-5 w-5" />
@@ -191,7 +202,9 @@
 					</p>
 				</div>
 			{:else if content}
-				<div class="[&_.shiki]:max-h-[50vh] [&_.shiki]:overflow-auto [&_.shiki]:text-xs">
+				<div
+					class="h-full [&_.shiki]:overflow-y-auto [&_.shiki]:overflow-x-hidden [&_.shiki]:text-xs [&_.shiki_code]:whitespace-pre-wrap [&_.shiki_code]:break-all"
+				>
 					<StaticCodeBlock
 						code={content}
 						{language}

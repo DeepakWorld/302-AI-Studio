@@ -16,6 +16,7 @@
 	import { ChevronDown } from "@lucide/svelte";
 	import type { AttachmentFile } from "@shared/types";
 	import { toast } from "svelte-sonner";
+	import ExportDialog from "./export-dialog.svelte";
 	import MessageActions from "./message-actions.svelte";
 	import MessageAttachment from "./message-attachment.svelte";
 	import MessageContextMenu from "./message-context-menu.svelte";
@@ -24,6 +25,7 @@
 	let { message }: Props = $props();
 	let selectedAttachment = $state<AttachmentFile | null>(null);
 	let isEditDialogOpen = $state(false);
+	let isExportDialogOpen = $state(false);
 	let editContent = $state("");
 	let isExpanded = $state(false);
 	let _messageContentElement: HTMLDivElement | null = $state(null);
@@ -221,7 +223,14 @@
 	</div>
 {/snippet}
 
-<MessageContextMenu onCopy={handleCopyMessage} onEdit={handleEditClick} onDelete={handleDelete}>
+<MessageContextMenu
+	onCopy={handleCopyMessage}
+	onEdit={handleEditClick}
+	onDelete={handleDelete}
+	onExport={() => {
+		isExportDialogOpen = true;
+	}}
+>
 	<div class="group flex flex-col items-end gap-2" data-message-id={message.id}>
 		{#if attachments.length > 0}
 			<div class="flex max-w-[80%] flex-wrap gap-2">
@@ -299,6 +308,15 @@
 	onConfirm={handleEditConfirm}
 	onRegenerate={handleRegenerate}
 	onContentChange={handleContentChange}
+/>
+
+<!-- Export Dialog -->
+<ExportDialog
+	bind:open={isExportDialogOpen}
+	startFromMessageId={message.id}
+	onOpenChange={(open) => {
+		isExportDialogOpen = open;
+	}}
 />
 
 <!-- Viewer Panel Modal -->

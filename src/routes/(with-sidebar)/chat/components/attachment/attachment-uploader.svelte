@@ -34,24 +34,31 @@
 
 		for (const file of filesToAdd) {
 			const filePath = (file as File & { path?: string }).path || file.name;
-
 			const attachmentId = nanoid();
 
-			chatState.setAttachmentLoading(attachmentId, true);
-			const preview = await generateFilePreview(file);
-
+			// 立即创建附件对象并添加到列表（preview 暂时为 undefined）
 			const attachment: AttachmentFile = {
 				id: attachmentId,
 				name: file.name,
 				type: file.type,
 				size: file.size,
 				file: file,
-				preview: preview,
+				preview: undefined, // 预览稍后异步生成
 				filePath,
 			};
+
+			// 立即添加附件到状态，用户可以立即看到
 			chatState.addAttachment(attachment);
-			// chatState.updateAttachment(attachmentId, { preview });
-			chatState.setAttachmentLoading(attachmentId, false);
+			// 标记为加载中
+			chatState.setAttachmentLoading(attachmentId, true);
+
+			// 异步生成预览（不阻塞 UI）
+			generateFilePreview(file).then((preview) => {
+				// 更新附件的预览
+				chatState.updateAttachment(attachmentId, { preview });
+				// 标记加载完成
+				chatState.setAttachmentLoading(attachmentId, false);
+			});
 		}
 
 		target.value = "";
@@ -69,7 +76,7 @@
 	type="file"
 	multiple
 	class="hidden"
-	accept="image/*,text/*,audio/*,video/*,.pdf,.json,.csv,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.md,.markdown"
+	accept="image/*,text/*,audio/*,video/*,.pdf,.json,.csv,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.md,.markdown,.zip"
 	onchange={handleFileSelect}
 />
 

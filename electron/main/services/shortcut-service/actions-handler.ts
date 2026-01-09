@@ -1,6 +1,7 @@
 import type { ShortcutContext } from "@shared/types/shortcut";
 import { BrowserWindow } from "electron";
 import { isNull } from "es-toolkit";
+import { aiApplicationService } from "../ai-application-service";
 import { tabService } from "../tab-service";
 import { windowService } from "../window-service";
 
@@ -34,6 +35,9 @@ export class ShortcutActionsHandler {
 
 		try {
 			switch (action) {
+				case "sendMessage":
+					await this.handleSendMessage(windowId, ctx);
+					break;
 				case "newTab":
 					await this.handleNewTab(windowId);
 					break;
@@ -70,11 +74,17 @@ export class ShortcutActionsHandler {
 				case "toggleSidebar":
 					await this.handleToggleSidebar(windowId);
 					break;
+				case "toggleSidebarRight":
+					await this.handleToggleSidebarRight(windowId);
+					break;
 				case "toggleModelPanel":
 					await this.handleToggleModelPanel(windowId);
 					break;
 				case "toggleIncognitoMode":
 					await this.handleToggleIncognitoMode(windowId);
+					break;
+				case "toggleChatParametersPanel":
+					await this.handleToggleChatParametersPanel(windowId);
 					break;
 
 				case "newChat":
@@ -107,6 +117,16 @@ export class ShortcutActionsHandler {
 			}
 		} catch (error) {
 			console.error(`Error handling shortcut action ${action}:`, error);
+		}
+	}
+
+	private async handleSendMessage(windowId: number, ctx: ShortcutContext): Promise<void> {
+		const activeView = this.getActiveTabWebContents(windowId);
+		if (activeView && !activeView.isDestroyed()) {
+			activeView.send("shortcut:action", {
+				action: "sendMessage",
+				ctx,
+			});
 		}
 	}
 
@@ -197,6 +217,25 @@ export class ShortcutActionsHandler {
 		}
 	}
 
+	private async handleToggleSidebarRight(windowId: number): Promise<void> {
+		const activeTabId = tabService.getActiveTabId(windowId);
+		if (!activeTabId) {
+			console.log(`[ActionsHandler] No active tab found`);
+			return;
+		}
+
+		const view = tabService.getTabView(activeTabId);
+
+		if (view && !view.webContents.isDestroyed()) {
+			view.webContents.send("shortcut:action", {
+				action: "toggleSidebarRight",
+				ctx: { windowId },
+			});
+		} else {
+			console.log(`[ActionsHandler] Cannot send - view is null or destroyed`);
+		}
+	}
+
 	private async handleToggleModelPanel(windowId: number): Promise<void> {
 		const activeView = this.getActiveTabWebContents(windowId);
 		if (activeView && !activeView.isDestroyed()) {
@@ -254,6 +293,12 @@ export class ShortcutActionsHandler {
 				action: "regenerateResponse",
 				ctx,
 			});
+		} else {
+			// For tool view
+			console.log(
+				"[ShortcutActionsHandler] handleRegenerateResponse - activeView is null or destroyed",
+			);
+			await aiApplicationService.handleAiApplicationReload(windowId);
 		}
 	}
 
@@ -293,6 +338,16 @@ export class ShortcutActionsHandler {
 			activeView.send("shortcut:action", {
 				action: "search",
 				ctx,
+			});
+		}
+	}
+
+	private async handleToggleChatParametersPanel(windowId: number): Promise<void> {
+		const activeView = this.getActiveTabWebContents(windowId);
+		if (activeView && !activeView.isDestroyed()) {
+			activeView.send("shortcut:action", {
+				action: "toggleChatParametersPanel",
+				ctx: { windowId },
 			});
 		}
 	}

@@ -10,6 +10,18 @@ export const CodeAgentConfigMetadata = type({
 	isDeleted: "boolean",
 });
 export type CodeAgentConfigMetadata = typeof CodeAgentConfigMetadata.infer;
+export const skill = type({
+	name: "string",
+	description: "string",
+	isBuiltin: "boolean?",
+	content: "string?",
+	/** Whether this skill should be forcefully included in prompts when enabled */
+	forceUse: "boolean?",
+});
+export type Skill = typeof skill.infer;
+
+export const thinkingBudgetType = type("'off' | 'low' | 'medium' | 'high' | 'max'");
+export type ThinkingBudgetType = typeof thinkingBudgetType.infer;
 
 export const codeAgentMetadata = type({
 	model: "string",
@@ -25,6 +37,11 @@ export const codeAgentMetadata = type({
 	currentSessionId: "string",
 	sandboxId: "string",
 	sandboxRemark: "string",
+	skills: skill.array(),
+	/**
+	 * thinking budget for claude code
+	 */
+	thinkingBudget: thinkingBudgetType,
 });
 export type CodeAgentMetadata = typeof codeAgentMetadata.infer;
 
@@ -79,3 +96,9 @@ export const createClaudeCodeSandboxResponse = type({
 	},
 });
 export type CreateClaudeCodeSandboxResponse = typeof createClaudeCodeSandboxResponse.infer;
+
+export const codeAgentGlobalConfigs = type({
+	apiKey: "string",
+	autoDeploy: "boolean",
+});
+export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;

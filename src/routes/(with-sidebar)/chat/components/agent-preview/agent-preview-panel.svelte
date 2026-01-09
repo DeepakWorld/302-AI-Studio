@@ -5,11 +5,23 @@
 		uploadSandboxFile,
 		type SandboxFileInfo,
 	} from "$lib/api/sandbox-file";
+	import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 	import { deployHtmlTo302, validate302Provider } from "$lib/api/webserve-deploy";
 	import UnDeployedIcon from "$lib/assets/icons/code-agent/unDeployed.svg";
 	import CodeMirrorEditor from "$lib/components/buss/editor/codemirror-editor.svelte";
+	import SkillsPanelHeader from "$lib/components/buss/skill-list/skills-panel-header.svelte";
+	import SkillCreateGithubView from "$lib/components/buss/skill-list/views/skill-create-github-view.svelte";
+	import SkillCreateHistoryView from "$lib/components/buss/skill-list/views/skill-create-history-view.svelte";
+	import SkillCreateManualView from "$lib/components/buss/skill-list/views/skill-create-manual-view.svelte";
+	import SkillCreateSelectView from "$lib/components/buss/skill-list/views/skill-create-select-view.svelte";
+	import SkillCreateUploadView from "$lib/components/buss/skill-list/views/skill-create-upload-view.svelte";
+	import SkillDetailView from "$lib/components/buss/skill-list/views/skill-detail-view.svelte";
+	import SkillEditView from "$lib/components/buss/skill-list/views/skill-edit-view.svelte";
+	import SkillPreviewView from "$lib/components/buss/skill-list/views/skill-preview-view.svelte";
+	import SkillsListView from "$lib/components/buss/skill-list/views/skills-list-view.svelte";
 	import PreviewHeader, { type PreviewTab } from "$lib/components/chat/preview-header.svelte";
 	import PreviewPanel from "$lib/components/html-preview/preview-panel.svelte";
+	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
 
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as m from "$lib/paraglide/messages";
@@ -26,7 +38,7 @@
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { Check, Copy, Download, FileWarning, Loader2, Pencil, Save, X } from "@lucide/svelte";
-	import type { ModelProvider } from "@shared/types";
+	import type { ModelProvider, Skill } from "@shared/types";
 	import { onDestroy, untrack } from "svelte";
 	import { toast } from "svelte-sonner";
 	import {
@@ -34,6 +46,7 @@
 		DEVICE_MODE_MOBILE,
 		TAB_CODE,
 		TAB_PREVIEW,
+		TAB_SKILLS,
 		TAB_TERMINAL,
 		type DeviceMode,
 		type TabType,
@@ -151,12 +164,36 @@
 	}
 
 	// --- State ---
-	let activeTab = $state<TabType>(TAB_PREVIEW);
+	// Sync activeTab with agentPreviewState
+	let activeTab = $derived(agentPreviewState.activeTab as TabType);
 	let deviceMode = $state<DeviceMode>(DEVICE_MODE_DESKTOP);
+
+	// Skills data
+	let skillsData = $state<Omit<ListSkillsResponse, "success" | "project_skills">>({
+		builtin_skills: [],
+		user_skills: [],
+	});
+
+	const allSkills = $derived<Skill[]>([...skillsData.builtin_skills, ...skillsData.user_skills]);
+
+	function findSkill(skillName: string): Skill | undefined {
+		return allSkills.find((s) => s.name === skillName);
+	}
+
+	async function loadSkills() {
+		const data = await codeAgentState.getSkillList(false);
+		skillsData = data;
+	}
+
+	// Load skills when switching to skills tab
+	$effect(() => {
+		if (activeTab === TAB_SKILLS) {
+			loadSkills();
+		}
+	});
 
 	// Grouped Deployment State
 	let deployment = $state({
-		isDeploying: false,
 		url: null as string | null,
 		deploymentId: null as string | null,
 	});
@@ -211,19 +248,37 @@
 		return "";
 	});
 
+	// Skills-only mode: only show skills tab when no sandbox
+	const isSkillsOnlyMode = $derived(agentPreviewState.isSkillsOnlyMode);
+
 	// Tabs definition
 	let tabs: PreviewTab[] = $derived.by(() => {
+		// Skills-only mode OR no sandbox: only show skills tab
+		// This ensures that before starting a conversation (no sandbox), only skills tab is visible
+		if (isSkillsOnlyMode || !currentSandboxId) {
+			return [{ id: TAB_SKILLS, label: "Skills" }];
+		}
+
 		const t = [
 			{ id: "preview", label: m.label_tab_preview() },
 			{ id: "code", label: m.label_tab_file() },
 		];
 		if (isAgentMode) {
 			t.push({ id: TAB_TERMINAL, label: m.label_tab_terminal() });
+			t.push({ id: TAB_SKILLS, label: "Skills" });
 		}
 		return t;
 	});
 
 	// --- Effects & Logic ---
+
+	// 0. Auto-switch to skills tab when no sandbox
+	$effect(() => {
+		// When there's no sandbox, force skills tab to be selected
+		if (!currentSandboxId && activeTab !== TAB_SKILLS) {
+			agentPreviewState.setActiveTab(TAB_SKILLS);
+		}
+	});
 
 	// 1. State Restoration Logic
 	// Track the last restored session to prevent duplicate restores
@@ -601,7 +656,7 @@
 	// 提取通用的 Deploy 验证逻辑
 	function validateDeployPreconditions() {
 		const validation = validate302Provider(persistedProviderState.current);
-		if (!validation.valid || !validation.provider) {
+		if (!validation.valid) {
 			const errorMsg =
 				validation.error === "toast_deploy_no_302_provider"
 					? m.toast_deploy_no_302_provider()
@@ -623,7 +678,7 @@
 		const provider = validateDeployPreconditions();
 		if (!provider) return;
 
-		deployment.isDeploying = true;
+		agentPreviewState.isDeploying = true;
 		try {
 			const result = await deployAction(provider);
 
@@ -652,7 +707,7 @@
 				rawMessage.length > 300 ? rawMessage.slice(0, 300) + "..." : rawMessage;
 			toast.error(`${m.toast_deploy_failed()}: ${truncatedMessage}`);
 		} finally {
-			deployment.isDeploying = false;
+			agentPreviewState.isDeploying = false;
 		}
 	}
 
@@ -817,6 +872,59 @@
 		}
 	};
 
+	const handleCopyImage = async () => {
+		if (!fileViewer.previewUrl || fileViewer.previewType !== "image") return;
+
+		try {
+			const response = await fetch(fileViewer.previewUrl);
+			const blob = await response.blob();
+
+			// Convert to PNG if needed (clipboard API requires PNG for images)
+			let pngBlob = blob;
+			if (blob.type !== "image/png") {
+				const img = new Image();
+				const canvas = document.createElement("canvas");
+				const ctx = canvas.getContext("2d");
+
+				await new Promise<void>((resolve, reject) => {
+					img.onload = () => {
+						canvas.width = img.width;
+						canvas.height = img.height;
+						ctx?.drawImage(img, 0, 0);
+						resolve();
+					};
+					img.onerror = reject;
+					img.src = fileViewer.previewUrl!;
+				});
+
+				pngBlob = await new Promise<Blob>((resolve, reject) => {
+					canvas.toBlob((b) => {
+						if (b) resolve(b);
+						else reject(new Error("Failed to convert to PNG"));
+					}, "image/png");
+				});
+			}
+
+			await navigator.clipboard.write([
+				new ClipboardItem({
+					"image/png": pngBlob,
+				}),
+			]);
+
+			toast.success(m.toast_copied_success());
+
+			isCopied = true;
+			if (copyTimeoutId) {
+				clearTimeout(copyTimeoutId);
+			}
+			copyTimeoutId = setTimeout(() => {
+				isCopied = false;
+			}, 2000);
+		} catch (_e) {
+			toast.error(m.toast_copied_failed());
+		}
+	};
+
 	const handleDownloadFile = () => {
 		if (!fileViewer.selectedFile) return;
 
@@ -859,12 +967,12 @@
 				{activeTab}
 				{tabs}
 				{deviceMode}
-				isDeploying={deployment.isDeploying}
+				isDeploying={agentPreviewState.isDeploying}
 				deployedUrl={isAgentMode ? deployment.url : null}
 				compactDeployButton={false}
 				isPinned={agentPreviewState.isPinned}
 				isStreaming={chatState.isStreaming}
-				onTabChange={(t) => (activeTab = t as TabType)}
+				onTabChange={(t) => agentPreviewState.setActiveTab(t as TabType)}
 				onDeviceModeChange={(d) => (deviceMode = d)}
 				onDeploy={isAgentMode ? handleDeploySandbox : handleDeploy}
 				onClose={() => agentPreviewState.closePreview()}
@@ -904,9 +1012,12 @@
 					<div class="flex-1 flex flex-col min-w-[140px] min-h-0">
 						{#if activeTab === TAB_PREVIEW}
 							{#if isAgentMode}
-								{#if isRestoringState}
-									<div class="flex h-full items-center justify-center">
+								{#if isRestoringState || agentPreviewState.isDeploying}
+									<div class="flex h-full flex-col gap-2 items-center justify-center">
 										<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+										{#if agentPreviewState.isDeploying}
+											<span class="text-sm text-muted-foreground">{m.text_deploying()}...</span>
+										{/if}
 									</div>
 								{:else if deployment.url}
 									<div class="flex-1 overflow-auto bg-muted/30 min-h-0">
@@ -931,16 +1042,16 @@
 									<SessionDeleted />
 								{:else}
 									<div
-										class="flex h-full flex-col items-center justify-start pt-20 text-muted-foreground"
+										class="flex h-full flex-col items-center justify-center text-muted-foreground"
 									>
 										<img src={UnDeployedIcon} alt="Un deployed" class="h-40 w-40" />
 										<p class="text-sm font-medium">{m.empty_agent_preview_title()}</p>
 										<Button
-											class=" flex rounded-xs items-center gap-1.5 mt-3.5   bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+											class=" flex rounded-xs items-center gap-1.5 mt-3.5 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
 											onclick={handleDeploySandbox}
-											disabled={deployment.isDeploying || chatState.isStreaming}
+											disabled={agentPreviewState.isDeploying || chatState.isStreaming}
 										>
-											{#if deployment.isDeploying}
+											{#if agentPreviewState.isDeploying}
 												<Loader2 class="h-4 w-4 animate-spin" />
 												{m.text_deploying()}
 											{:else}
@@ -964,10 +1075,21 @@
 									<!-- Toolbar for file operations -->
 									{#if !fileViewer.isLoading}
 										<div
-											class="flex items-center justify-end gap-2 border-b border-border bg-background px-3 py-2"
+											class="flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-2 min-w-0"
 										>
-											{#if isEditing}
-												<div class="flex items-center gap-2">
+											<!-- 左侧：文件路径 -->
+											<div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+												<span
+													class="text-xs text-muted-foreground truncate"
+													title={fileViewer.selectedFile?.path}
+												>
+													{fileViewer.selectedFile?.path}
+												</span>
+											</div>
+
+											<!-- 右侧：操作按钮 -->
+											<div class="flex items-center gap-2 shrink-0">
+												{#if isEditing}
 													<button
 														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
 														onclick={handleCancelEdit}
@@ -988,47 +1110,50 @@
 															<Save class="h-4 w-4 flex-shrink-0" strokeWidth={1.25} />
 														{/if}
 													</button>
-												</div>
-											{:else}
-												<!-- Copy button - only for text files -->
-												{#if fileViewer.previewType === "text"}
-													<button
-														class="relative rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer h-6 w-6"
-														onclick={handleCopyContent}
-														title={m.title_copy()}
-													>
-														<Check
-															class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
-																? 'scale-100 opacity-100'
-																: 'scale-0 opacity-0'}"
-															strokeWidth={1.25}
-														/>
-														<Copy
-															class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
-																? 'scale-0 opacity-0'
-																: 'scale-100 opacity-100'}"
-															strokeWidth={1.25}
-														/>
-													</button>
-												{/if}
-												<!-- Download button - for all file types -->
-												<button
-													class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-													onclick={handleDownloadFile}
-													title={m.label_file_tree_download()}
-												>
-													<Download class="h-4 w-4" strokeWidth={1.25} />
-												</button>
-												<!-- Edit button - only for text files -->
-												{#if fileViewer.previewType === "text"}
+												{:else}
+													<!-- Copy button - for text and image files -->
+													{#if fileViewer.previewType === "text" || fileViewer.previewType === "image"}
+														<button
+															class="relative rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer h-6 w-6"
+															onclick={fileViewer.previewType === "image"
+																? handleCopyImage
+																: handleCopyContent}
+															title={m.title_copy()}
+														>
+															<Check
+																class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
+																	? 'scale-100 opacity-100'
+																	: 'scale-0 opacity-0'}"
+																strokeWidth={1.25}
+															/>
+															<Copy
+																class="absolute inset-0 m-auto h-4 w-4 transition-all duration-200 ease-in-out {isCopied
+																	? 'scale-0 opacity-0'
+																	: 'scale-100 opacity-100'}"
+																strokeWidth={1.25}
+															/>
+														</button>
+													{/if}
+													<!-- Download button - for all file types -->
 													<button
 														class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-														onclick={handleStartEdit}
+														onclick={handleDownloadFile}
+														title={m.label_file_tree_download()}
 													>
-														<Pencil class="h-4 w-4" strokeWidth={1.25} />
+														<Download class="h-4 w-4" strokeWidth={1.25} />
 													</button>
+													<!-- Edit button - only for text files -->
+													{#if fileViewer.previewType === "text"}
+														<button
+															class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+															onclick={handleStartEdit}
+															title={m.title_button_edit()}
+														>
+															<Pencil class="h-4 w-4" strokeWidth={1.25} />
+														</button>
+													{/if}
 												{/if}
-											{/if}
+											</div>
 										</div>
 									{/if}
 
@@ -1121,6 +1246,64 @@
 									Sandbox not available
 								</div>
 							{/if}
+						{:else if activeTab === TAB_SKILLS && (isAgentMode || isSkillsOnlyMode || !currentSandboxId)}
+							<!-- Skills Tab Content -->
+							<div class="flex h-full flex-col min-h-0 overflow-hidden">
+								<!-- Skills Panel Header -->
+								<SkillsPanelHeader
+									currentView={skillsPanelState.currentView}
+									viewStack={skillsPanelState.viewStack}
+									canGoBack={skillsPanelState.canGoBack}
+									isPinned={false}
+									showPinButton={false}
+									showCloseButton={false}
+									onBack={() => skillsPanelState.pop()}
+									onClose={() => {}}
+									onTogglePin={() => {}}
+									skillName={skillsPanelState.currentView.type === "detail" ||
+									skillsPanelState.currentView.type === "edit"
+										? skillsPanelState.currentView.skillName
+										: ""}
+								/>
+
+								<!-- Skills Content Area -->
+								<div class="flex-1 overflow-y-auto min-h-0">
+									{#if skillsPanelState.currentView.type === "list"}
+										<SkillsListView
+											userSkills={skillsData.user_skills}
+											builtinSkills={skillsData.builtin_skills}
+											loading={codeAgentState.isLoadingSkills}
+											onRefresh={loadSkills}
+										/>
+									{:else if skillsPanelState.currentView.type === "detail"}
+										<SkillDetailView
+											skillName={skillsPanelState.currentView.skillName}
+											skill={findSkill(skillsPanelState.currentView.skillName)}
+										/>
+									{:else if skillsPanelState.currentView.type === "preview"}
+										<SkillPreviewView
+											skillName={skillsPanelState.currentView.skillName}
+											skill={findSkill(skillsPanelState.currentView.skillName)}
+										/>
+									{:else if skillsPanelState.currentView.type === "edit"}
+										<SkillEditView
+											skillName={skillsPanelState.currentView.skillName}
+											skill={findSkill(skillsPanelState.currentView.skillName)}
+											onRefresh={loadSkills}
+										/>
+									{:else if skillsPanelState.currentView.type === "create-select"}
+										<SkillCreateSelectView />
+									{:else if skillsPanelState.currentView.type === "create-manual"}
+										<SkillCreateManualView onRefresh={loadSkills} />
+									{:else if skillsPanelState.currentView.type === "create-upload"}
+										<SkillCreateUploadView onRefresh={loadSkills} />
+									{:else if skillsPanelState.currentView.type === "create-github"}
+										<SkillCreateGithubView onRefresh={loadSkills} />
+									{:else if skillsPanelState.currentView.type === "create-history"}
+										<SkillCreateHistoryView />
+									{/if}
+								</div>
+							</div>
 						{/if}
 					</div>
 				{/if}

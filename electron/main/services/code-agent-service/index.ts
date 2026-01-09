@@ -148,6 +148,7 @@ export class CodeAgentService {
 	}
 
 	// ******************************* IPC Methods ******************************* //
+
 	async updateClaudeCodeSandboxModel(
 		_event: IpcMainInvokeEvent,
 		threadId: string,
@@ -269,10 +270,30 @@ export class CodeAgentService {
 		}
 	}
 
+	async updateClaudeCodeSandboxThinkingBudget(
+		_event: IpcMainInvokeEvent,
+		sandbox_id: string,
+		maxThinkingToken: number,
+	): Promise<{ isOK: boolean }> {
+		try {
+			const response = await updateClaudeCodeSandbox(
+				sandbox_id,
+				undefined,
+				undefined,
+				maxThinkingToken,
+			);
+			return { isOK: response.success };
+		} catch (error) {
+			console.error("Error updating Claude code sandbox thinking budget:", error);
+			return { isOK: false };
+		}
+	}
+
 	async createClaudeCodeSandboxByIpc(
 		_event: IpcMainInvokeEvent,
 		threadId: string,
 		sandboxName: string,
+		maxThinkingToken?: number,
 	): Promise<{ isOK: boolean; sandboxId: string }> {
 		try {
 			const targetThread = await storageService.getItemInternal("app-thread:" + threadId);
@@ -284,6 +305,7 @@ export class CodeAgentService {
 			const cfg: CreateClaudeCodeSandboxRequest = {
 				llm_model: llmModel,
 				sandbox_name: sandboxName,
+				max_thinking_token: maxThinkingToken,
 			};
 
 			const { createdResult, sandboxId } = await this._createClaudeCodeSandbox(threadId, cfg);
@@ -396,6 +418,29 @@ export class CodeAgentService {
 		} catch (error) {
 			console.error("Error adding Claude code sandbox MCP:", error);
 			return { isOK: false };
+		}
+	}
+
+	async getThreadIdBySessionId(
+		_event: IpcMainInvokeEvent,
+		sandboxId: string,
+		sessionId: string,
+	): Promise<{ isOK: boolean; threadId: string }> {
+		try {
+			const keys = await claudeCodeStorage.getKeysInternal();
+			for (const key of keys) {
+				if (key.startsWith("claude-code-agent-state-")) {
+					const threadId = key.replace("claude-code-agent-state-", "").replace(".json", "");
+					const state = await claudeCodeStorage.getItemInternal(key);
+					if (state && state.sandboxId === sandboxId && state.currentSessionId === sessionId) {
+						return { isOK: true, threadId };
+					}
+				}
+			}
+			return { isOK: false, threadId: "" };
+		} catch (error) {
+			console.error("Error finding thread by session:", error);
+			return { isOK: false, threadId: "" };
 		}
 	}
 }

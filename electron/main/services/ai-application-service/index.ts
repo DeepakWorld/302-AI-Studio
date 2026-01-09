@@ -36,42 +36,46 @@ export class AiApplicationService {
 	private async initAiApplications(language?: LanguageCode): Promise<void> {
 		broadcastService.broadcastChannelToAll("ai-applications:loading", true);
 
-		const lang = language ?? (await generalSettingsService.getLanguage());
-		const langMap: Record<LanguageCode, "cn" | "en" | "jp"> = {
-			zh: "cn",
-			en: "en",
-			// ja: "jp",
-		};
-		const collectedMap = new Map<number, boolean>();
-		const [aiApplications, existingAiApplications] = await Promise.all([
-			fetch302AIToolList(langMap[lang]),
-			aiApplicationStorage.getAiApplications(),
-		]);
-		existingAiApplications.forEach((app) => {
-			collectedMap.set(app.toolId, app.collected);
-		});
+		try {
+			const lang = language ?? (await generalSettingsService.getLanguage());
+			const langMap: Record<LanguageCode, "cn" | "en" | "jp"> = {
+				zh: "cn",
+				en: "en",
+				// ja: "jp",
+			};
+			const collectedMap = new Map<number, boolean>();
+			const [aiApplications, existingAiApplications] = await Promise.all([
+				fetch302AIToolList(langMap[lang]),
+				aiApplicationStorage.getAiApplications(),
+			]);
+			existingAiApplications.forEach((app) => {
+				collectedMap.set(app.toolId, app.collected);
+			});
 
-		const aiApplicationState = aiApplications.map(
-			({ tool_id, tool_name, tool_description, category_name, category_id }) => {
-				return {
-					id: nanoid(),
-					toolId: tool_id,
-					name: tool_name,
-					description: tool_description,
-					category: category_name,
-					categoryId: category_id,
-					collected: collectedMap.get(tool_id) ?? false,
-					createdAt: new Date().toISOString(),
-				};
-			},
-		);
+			const aiApplicationState = aiApplications.map(
+				({ tool_id, tool_name, tool_description, category_name, category_id }) => {
+					return {
+						id: nanoid(),
+						toolId: tool_id,
+						name: tool_name,
+						description: tool_description,
+						category: category_name,
+						categoryId: category_id,
+						collected: collectedMap.get(tool_id) ?? false,
+						createdAt: new Date().toISOString(),
+					};
+				},
+			);
 
-		this.aiApplicationList = aiApplicationState;
-		await this.updateAiApplicationUrlMap(aiApplicationState, lang);
+			this.aiApplicationList = aiApplicationState;
+			await this.updateAiApplicationUrlMap(aiApplicationState, lang);
 
-		await aiApplicationStorage.setAiApplications(aiApplicationState);
-
-		broadcastService.broadcastChannelToAll("ai-applications:loading", false);
+			await aiApplicationStorage.setAiApplications(aiApplicationState);
+		} catch (error) {
+			console.error("Failed to init ai applications:", error);
+		} finally {
+			broadcastService.broadcastChannelToAll("ai-applications:loading", false);
+		}
 	}
 
 	private async updateAiApplicationUrlMap(
@@ -118,6 +122,16 @@ export class AiApplicationService {
 		broadcastService.broadcastChannelToAll("ai-applications:loading", false);
 	}
 
+	async handleAiApplicationReload(windowId: number): Promise<void> {
+		const tabId = tabService.getActiveTabId(windowId);
+		if (isUndefined(tabId)) return;
+
+		const tabView = tabService.getTabView(tabId);
+		if (isUndefined(tabView)) return;
+
+		tabView.webContents.reload();
+	}
+
 	// ******************************* IPC Methods ******************************* //
 	async getAiApplicationUrl(
 		_event: IpcMainInvokeEvent,
@@ -136,11 +150,15 @@ export class AiApplicationService {
 		};
 	}
 
-	async handleAiApplicationReload(_event: IpcMainInvokeEvent, tabId: string): Promise<void> {
+	async handleAiApplicationReloadIpc(_event: IpcMainInvokeEvent, tabId: string): Promise<void> {
 		const tabView = tabService.getTabView(tabId);
 		if (isUndefined(tabView)) return;
 
 		tabView.webContents.reload();
+	}
+
+	async refreshAiApplications(_event: IpcMainInvokeEvent): Promise<void> {
+		await this.initAiApplications();
 	}
 }
 

@@ -24,6 +24,15 @@ function isMediaFile(attachment: AttachmentFile): boolean {
 	return mediaTypes.some((type) => attachment.type.startsWith(type));
 }
 
+function isZipFile(attachment: AttachmentFile): boolean {
+	const { type, name } = attachment;
+	return (
+		type === "application/zip" ||
+		type === "application/x-zip-compressed" ||
+		name.toLowerCase().endsWith(".zip")
+	);
+}
+
 function isPdfFile(attachment: AttachmentFile): boolean {
 	const { type, name } = attachment;
 	return type === "application/pdf" || name.toLowerCase().endsWith(".pdf");
@@ -238,7 +247,7 @@ export function createAttachmentMetadata(
 export async function convertAttachmentToMessagePart(
 	attachment: AttachmentFile,
 ): Promise<{ part: MessagePart; textContent?: string; preview?: string }> {
-	if (isMediaFile(attachment)) {
+	if (isMediaFile(attachment) || isZipFile(attachment)) {
 		let url: string;
 
 		if (attachment.preview) {
@@ -253,7 +262,7 @@ export async function convertAttachmentToMessagePart(
 					url = await fileToDataURL(attachment.file);
 				}
 			} else {
-				// For audio/video, use original (no compression)
+				// For audio/video/zip, use original (no compression)
 				url = await fileToDataURL(attachment.file);
 			}
 		}
@@ -261,7 +270,9 @@ export async function convertAttachmentToMessagePart(
 		return {
 			part: {
 				type: "file",
-				mediaType: attachment.type,
+				mediaType:
+					attachment.type ||
+					(attachment.name.endsWith(".zip") ? "application/zip" : "application/octet-stream"),
 				filename: attachment.name,
 				url,
 			},
@@ -375,6 +386,8 @@ export async function convertAttachmentToMessagePart(
 
 export async function convertAttachmentsToMessageParts(
 	attachments: AttachmentFile[],
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	options: { enableZipSupport?: boolean } = {},
 ): Promise<{ parts: MessagePart[]; metadataList: AttachmentMetadata[] }> {
 	const parts: MessagePart[] = [];
 	const metadataList: AttachmentMetadata[] = [];

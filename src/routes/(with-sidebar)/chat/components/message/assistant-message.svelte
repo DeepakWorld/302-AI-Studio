@@ -11,6 +11,10 @@
 <script lang="ts">
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader/index.js";
+	import {
+		copyImageToClipboard,
+		downloadImage,
+	} from "$lib/components/buss/markdown/download-utils";
 	import { MarkdownRenderer } from "$lib/components/buss/markdown/index.js";
 	import { ModelIcon } from "$lib/components/buss/model-icon/index.js";
 	import {
@@ -30,6 +34,7 @@
 	import {
 		ChevronDown,
 		Lightbulb,
+		MessageSquareShare,
 		Server,
 		ThumbsDown,
 		ThumbsUp,
@@ -42,19 +47,17 @@
 	import {
 		ClaudeCodeToolCard,
 		McpToolCard,
+		SkillCard,
 		TodoWriteCard,
 		WriteCard,
+		extractMcpToolInfo,
 		extractToolNameFromType,
 		isClaudeCodeTool,
 		isClaudeCodeToolType,
 		isMcpToolType,
-		extractMcpToolInfo,
 	} from "./claude-code-tools";
-	import {
-		downloadImage,
-		copyImageToClipboard,
-	} from "$lib/components/buss/markdown/download-utils";
 	import AgentTaskResult from "./code-agent/agent-task-result.svelte";
+	import ExportDialog from "./export-dialog.svelte";
 	import MessageActions from "./message-actions.svelte";
 	import MessageContextMenu from "./message-context-menu.svelte";
 	import ToolCallModal from "./tool-call-modal.svelte";
@@ -65,6 +68,7 @@
 	let isReasoningExpanded = $state(!preferencesSettings.autoCollapseThink);
 	let selectedToolPart = $state<DynamicToolUIPart | null>(null);
 	let isToolModalOpen = $state(false);
+	let isExportDialogOpen = $state(false);
 	let isReading = $state(false);
 	let _currentUtterance: SpeechSynthesisUtterance | null = null;
 	let _isUserCancelled = $state(false);
@@ -434,6 +438,17 @@
 				</ButtonWithTooltip>
 			{/if}
 
+			<ButtonWithTooltip
+				tooltipSide="bottom"
+				class="text-muted-foreground hover:!bg-chat-action-hover"
+				tooltip={m.export_button()}
+				onclick={() => {
+					isExportDialogOpen = true;
+				}}
+			>
+				<MessageSquareShare />
+			</ButtonWithTooltip>
+
 			{#if codeAgentState.inCodeAgentMode && message.metadata?.result}
 				<AgentTaskResult result={message.metadata.result} />
 			{/if}
@@ -478,8 +493,11 @@
 	onCreateBranch={handleCreateBranch}
 	onDelete={handleDelete}
 	onDownloadImage={handleDownloadImage}
+	onExport={() => {
+		isExportDialogOpen = true;
+	}}
 >
-	<div class="group flex flex-col gap-1" data-message-id={message.id}>
+	<div class="group flex flex-col" data-message-id={message.id}>
 		{@render messageHeader(message.metadata?.model || "gpt-4o")}
 
 		{#each messagePartsWithExtractedReasoning() as part, partIndex (partIndex)}
@@ -501,7 +519,10 @@
 				{/if}
 			{:else if part.type === "reasoning"}
 				{#if !preferencesSettings.autoHideReason}
-					<Collapsible bind:open={isReasoningExpanded} class="rounded-lg border bg-muted/30 p-3">
+					<Collapsible
+						bind:open={isReasoningExpanded}
+						class="mb-4 rounded-lg border bg-muted/30 p-3"
+					>
 						<CollapsibleTrigger
 							class="flex w-full items-center justify-between text-left transition-colors hover:bg-muted/20 rounded-md p-2"
 						>
@@ -551,6 +572,8 @@
 						<TodoWriteCard {part} messageId={message.id} />
 					{:else if part.toolName === "Write" || part.toolName === "Edit"}
 						<WriteCard {part} messageId={message.id} messagePartIndex={partIndex} />
+					{:else if part.toolName === "Skill"}
+						<SkillCard {part} messageId={message.id} />
 					{:else}
 						<ClaudeCodeToolCard {part} messageId={message.id} />
 					{/if}
@@ -558,7 +581,7 @@
 					<!-- MCP Tools - Keep original behavior with modal -->
 					<button
 						type="button"
-						class="my-2 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
+						class="mb-3 block w-full cursor-pointer rounded-[10px] border-0 bg-white px-3.5 py-3 text-left hover:bg-[#F9F9F9] dark:bg-[#1A1A1A] dark:hover:bg-[#2D2D2D]"
 						onclick={() => {
 							selectedToolPart = part;
 							isToolModalOpen = true;
@@ -615,6 +638,8 @@
 					<TodoWriteCard part={toolPart} messageId={message.id} />
 				{:else if toolName === "Write" || toolName === "Edit"}
 					<WriteCard part={toolPart} messageId={message.id} messagePartIndex={partIndex} />
+				{:else if toolName === "Skill"}
+					<SkillCard part={toolPart} messageId={message.id} />
 				{:else}
 					<ClaudeCodeToolCard part={toolPart} messageId={message.id} />
 				{/if}
@@ -662,6 +687,15 @@
 				}}
 			/>
 		{/if}
+
+		<!-- Export Dialog -->
+		<ExportDialog
+			bind:open={isExportDialogOpen}
+			startFromMessageId={message.id}
+			onOpenChange={(open) => {
+				isExportDialogOpen = open;
+			}}
+		/>
 
 		{@render messageFooter()}
 

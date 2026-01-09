@@ -5,10 +5,11 @@
 	import { html } from "@codemirror/lang-html";
 	import { javascript } from "@codemirror/lang-javascript";
 	import { json } from "@codemirror/lang-json";
-	import { markdown } from "@codemirror/lang-markdown";
+	import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 	import { python } from "@codemirror/lang-python";
 	import { xml } from "@codemirror/lang-xml";
 	import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+	import { languages } from "@codemirror/language-data";
 	import { Compartment, EditorState, type Extension } from "@codemirror/state";
 	import { tags } from "@lezer/highlight";
 	import { basicSetup, EditorView } from "codemirror";
@@ -21,8 +22,7 @@
 		theme?: "light" | "dark";
 		readOnly?: boolean;
 		fontSize?: number;
-		// lineNumbers?: boolean;
-		// wordWrap?: boolean;
+		lineWrapping?: boolean;
 		onChange?: (value: string) => void;
 		onMount?: (view: EditorView) => void;
 	}
@@ -42,19 +42,19 @@
 		try {
 			const theme = highlighter.getTheme(themeName);
 			const bg = theme.bg || (isDark ? "#121212" : "#ffffff");
-			const fg = theme.fg || (isDark ? "#dbd7caee" : "#393a34");
+			const _fg = theme.fg || (isDark ? "#dbd7caee" : "#393a34");
 
 			return EditorView.theme(
 				{
 					"&": {
 						backgroundColor: bg,
-						color: fg,
+						color: _fg,
 					},
 					".cm-content": {
-						caretColor: fg,
+						caretColor: _fg,
 					},
 					".cm-cursor, .cm-dropCursor": {
-						borderLeftColor: fg,
+						borderLeftColor: _fg,
 					},
 					"&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
 						{
@@ -64,7 +64,7 @@
 						backgroundColor: isDark ? "#1b1f2711" : "#f5f5f5",
 					},
 					".cm-gutters": {
-						backgroundColor: bg,
+						backgroundColor: isDark ? "#161616" : "#fafafa",
 						color: isDark ? "#858585" : "#999999",
 						border: "none",
 					},
@@ -191,6 +191,92 @@
 
 				// Meta/Punctuation
 				[["punctuation", "meta.brace", "punctuation.definition"], tags.punctuation],
+
+				// Markdown-specific tags
+				// Headings (all levels)
+				[
+					[
+						"markup.heading",
+						"entity.name.section",
+						"heading",
+						"markup.heading.1",
+						"markup.heading.2",
+						"markup.heading.3",
+						"markup.heading.4",
+						"markup.heading.5",
+						"markup.heading.6",
+					],
+					tags.heading,
+					"bold",
+				],
+
+				// Bold/Strong
+				[["markup.bold", "strong", "punctuation.definition.bold"], tags.strong, "bold"],
+
+				// Italic/Emphasis
+				[["markup.italic", "emphasis", "punctuation.definition.italic"], tags.emphasis, "italic"],
+
+				// Links and URLs
+				[
+					["markup.underline.link", "string.other.link", "meta.link", "meta.link.inline"],
+					tags.link,
+				],
+				[["markup.underline.link.image", "meta.image"], tags.link],
+
+				// Inline code
+				[
+					["markup.inline.raw", "markup.raw", "markup.raw.inline", "markup.raw.inline.markdown"],
+					tags.monospace,
+				],
+
+				// Code blocks
+				[
+					["markup.fenced_code.block", "markup.raw.block", "markup.raw.block.markdown"],
+					tags.monospace,
+				],
+
+				// Quote/Blockquote
+				[
+					["markup.quote", "punctuation.definition.quote", "markup.quote.markdown"],
+					tags.quote,
+					"italic",
+				],
+
+				// List markers
+				[
+					[
+						"markup.list",
+						"punctuation.definition.list",
+						"beginning.punctuation",
+						"markup.list.unnumbered",
+						"markup.list.numbered",
+					],
+					tags.list,
+				],
+
+				// Strikethrough
+				[["markup.strikethrough", "punctuation.definition.strikethrough"], tags.strikethrough],
+
+				// Code block info string (language identifier)
+				[
+					["fenced_code.block.language", "markup.fenced_code.block.language", "entity.name.label"],
+					tags.labelName,
+				],
+
+				// Horizontal rules / separators
+				[["meta.separator", "punctuation.definition.thematic-break"], tags.contentSeparator],
+
+				// Escape characters
+				[["constant.character.escape", "punctuation.definition.constant"], tags.escape],
+
+				// Meta/frontmatter
+				[
+					["meta.embedded", "meta.separator.front-matter", "punctuation.definition.front-matter"],
+					tags.meta,
+				],
+
+				// Definition/reference links
+				[["constant.other.reference.link", "meta.link.reference"], tags.labelName],
 			];
 
 			scopeToTag.forEach(([scopes, tag, fontStyle]) => {
@@ -209,6 +295,92 @@
 						styleRules.push(rule);
 						break; // Found a color for this tag, no need to check other scopes
 					}
+				}
+			});
+
+			// Add default markdown styling if not covered by theme
+			const isDark = themeName.includes("dark");
+			const _fg = theme.fg || (isDark ? "#dbd7caee" : "#393a34");
+			const accentColor = colorMap.get("keyword") || (isDark ? "#4EC9B0" : "#0070C1");
+			const stringColor = colorMap.get("string") || (isDark ? "#CE9178" : "#A31515");
+			const commentColor = colorMap.get("comment") || (isDark ? "#6A9955" : "#008000");
+			const typeColor = colorMap.get("entity.name.type") || (isDark ? "#4FC1FF" : "#267F99");
+			const numberColor = colorMap.get("constant.numeric") || (isDark ? "#B5CEA8" : "#098658");
+			const metaColor = isDark ? "#808080" : "#999999";
+
+			// Default markdown fallback styles - comprehensive coverage
+			const markdownDefaults: Array<{
+				tag: (typeof tags)[keyof typeof tags];
+				color?: string;
+				fontStyle?: string;
+				fontWeight?: string;
+			}> = [
+				// Headings (all levels)
+				{ tag: tags.heading, color: accentColor, fontWeight: "bold" },
+				{ tag: tags.heading1, color: accentColor, fontWeight: "bold" },
+				{ tag: tags.heading2, color: accentColor, fontWeight: "bold" },
+				{ tag: tags.heading3, color: accentColor, fontWeight: "bold" },
+				{ tag: tags.heading4, color: accentColor, fontWeight: "bold" },
+				{ tag: tags.heading5, color: accentColor, fontWeight: "bold" },
+				{ tag: tags.heading6, color: accentColor, fontWeight: "bold" },
+
+				// Text formatting
+				{ tag: tags.strong, fontWeight: "bold" },
+				{ tag: tags.emphasis, fontStyle: "italic" },
+				{
+					tag: tags.strikethrough,
+					textDecoration: "line-through",
+				} as (typeof markdownDefaults)[0],
+
+				// Links and URLs
+				{
+					tag: tags.link,
+					color: stringColor,
+					textDecoration: "underline",
+				} as (typeof markdownDefaults)[0],
+				{ tag: tags.url, color: stringColor },
+
+				// Code elements
+				{ tag: tags.monospace, color: commentColor },
+
+				// Quote/Blockquote
+				{ tag: tags.quote, color: commentColor, fontStyle: "italic" },
+
+				// Lists
+				{ tag: tags.list, color: accentColor },
+
+				// Separators (horizontal rules)
+				{ tag: tags.contentSeparator, color: metaColor },
+
+				// Labels (code block language, link labels)
+				{ tag: tags.labelName, color: typeColor },
+
+				// Meta information (frontmatter, etc.)
+				{ tag: tags.meta, color: metaColor },
+				{ tag: tags.documentMeta, color: metaColor },
+
+				// Processing instructions (HTML in markdown)
+				{ tag: tags.processingInstruction, color: metaColor },
+
+				// Special content
+				{ tag: tags.escape, color: numberColor },
+				{ tag: tags.character, color: numberColor },
+				{ tag: tags.inserted, color: commentColor },
+				{ tag: tags.deleted, color: stringColor },
+				{ tag: tags.changed, color: accentColor },
+
+				// Definition lists
+				{ tag: tags.definition(tags.name), color: accentColor },
+
+				// Images (similar to links)
+				{ tag: tags.atom, color: stringColor },
+			];
+
+			// Add markdown defaults only if not already defined
+			const existingTags = new Set(styleRules.map((r) => r.tag));
+			markdownDefaults.forEach((rule) => {
+				if (!existingTags.has(rule.tag) && (rule.color || rule.fontStyle || rule.fontWeight)) {
+					styleRules.push(rule as (typeof styleRules)[0]);
 				}
 			});
 
@@ -243,7 +415,10 @@
 				return json();
 			case "markdown":
 			case "md":
-				return markdown();
+				return markdown({
+					base: markdownLanguage,
+					codeLanguages: languages,
+				});
 			case "python":
 			case "py":
 				return python();
@@ -265,7 +440,8 @@
 		const extensions: Extension[] = [
 			basicSetup,
 			languageCompartment.of(getLanguageExtension(props.language)),
-			EditorView.lineWrapping,
+			// Only add line wrapping if enabled (defaults to true for backwards compatibility)
+			...(props.lineWrapping !== false ? [EditorView.lineWrapping] : []),
 			EditorView.updateListener.of((update) => {
 				if (update.docChanged) {
 					const newValue = update.state.doc.toString();
@@ -416,16 +592,23 @@
 	.codemirror-container :global(.cm-scroller) {
 		overflow: auto !important;
 		max-height: 100%;
+		height: 100%;
 	}
 
 	.codemirror-container :global(.cm-content) {
-		min-height: 0;
+		min-height: 100%;
 	}
 
-	.codemirror-container :global(.cm-gutters) {
-		background-color: hsl(var(--muted));
+	.codemirror-container :global(.cm-gutters),
+	.codemirror-container :global(.cm-gutters-before) {
+		background-color: #161616 !important;
 		color: hsl(var(--muted-foreground));
 		border-right: 1px solid hsl(var(--border));
+	}
+
+	:global(html:not(.dark)) .codemirror-container :global(.cm-gutters),
+	:global(html:not(.dark)) .codemirror-container :global(.cm-gutters-before) {
+		background-color: #fafafa !important;
 	}
 
 	.codemirror-container :global(.cm-activeLineGutter) {

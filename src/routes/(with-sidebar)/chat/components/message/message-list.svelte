@@ -8,7 +8,7 @@
 	import type { ChatMessage } from "$lib/types/chat";
 	import { cn } from "$lib/utils";
 	import { ArrowDown, ArrowUp } from "@lucide/svelte";
-	import { snapdom } from "@zumer/snapdom";
+	import { domToPng } from "modern-screenshot";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
 	import AssistantMessage from "./assistant-message.svelte";
@@ -151,6 +151,12 @@
 	onMount(() => {
 		const handleScreenshot = async (data: { threadId: string }) => {
 			if (data.threadId === chatState.id && messageListContainer) {
+				// 检查是否有消息（使用内存中的实时数据）
+				if (messages.length === 0) {
+					toast.warning(m.screenshot_no_messages());
+					return;
+				}
+
 				const loadingToast = toast.loading(m.screenshot_generating());
 
 				// 使用 try-finally 确保清理
@@ -160,36 +166,43 @@
 					// 获取当前主题的暗黑模式状态
 					const isDarkMode = persistedThemeState.current.shouldUseDarkColors;
 
-					// 1. 提前准备所有元素
+					// 1. 临时禁用页面滚动
+					const originalOverflow = document.body.style.overflow;
+					document.body.style.overflow = "hidden";
+
+					// 2. 提前准备所有元素
 					wrapper = createScreenshotWrapper();
 					const contentContainer = createContentContainer();
 					const messageContent = prepareMessageContent(messageListContainer);
 					const watermark = create302Watermark(isDarkMode);
 					const scrollbarStyles = injectScrollbarStyles(isDarkMode);
 
-					// 2. 插入 DOM
+					// 3. 插入 DOM
 					contentContainer.appendChild(messageContent);
 					wrapper.appendChild(contentContainer);
 					wrapper.appendChild(watermark);
 					wrapper.appendChild(scrollbarStyles);
 					document.body.appendChild(wrapper);
 
-					// 3. 等待样式计算完成
+					// 4. 等待样式计算完成
 					await new Promise((resolve) => {
 						requestAnimationFrame(() => {
 							requestAnimationFrame(resolve);
 						});
 					});
 
-					// 4. 执行截图
+					// 5. 执行截图
 					const options = getScreenshotOptions(isDarkMode);
-					const result = await snapdom(wrapper, options);
+					const dataUrl = await domToPng(wrapper, options);
 
-					// 5. 下载
-					await result.download({
-						format: "png",
-						filename: chatState.title,
-					});
+					// 6. 恢复页面滚动
+					document.body.style.overflow = originalOverflow;
+
+					// 7. 下载
+					const link = document.createElement("a");
+					link.download = `${chatState.title}.png`;
+					link.href = dataUrl;
+					link.click();
 
 					toast.success(m.screenshot_success(), { id: loadingToast });
 				} catch (error) {

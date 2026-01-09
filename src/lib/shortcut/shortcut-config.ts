@@ -2,8 +2,6 @@ import type { ShortcutAction } from "@shared/config/default-shortcuts";
 
 export type { ShortcutAction };
 
-export type ShortcutActionWithoutSendMessage = Exclude<ShortcutAction, "send-message">;
-
 export type ShortcutScope = "global" | "app";
 export interface ShortcutOption {
 	id: string;
@@ -11,10 +9,8 @@ export interface ShortcutOption {
 	keys: string[];
 }
 
-export const SHORTCUT_MODES: Record<
-	ShortcutActionWithoutSendMessage,
-	"preset" | "record" | "display"
-> = {
+export const SHORTCUT_MODES: Record<ShortcutAction, "preset" | "record" | "display"> = {
+	sendMessage: "record",
 	newChat: "record",
 	clearMessages: "record",
 	closeCurrentTab: "display",
@@ -22,6 +18,8 @@ export const SHORTCUT_MODES: Record<
 	deleteCurrentThread: "record",
 	openSettings: "display",
 	toggleSidebar: "display",
+	toggleSidebarRight: "display",
+	toggleChatParametersPanel: "record",
 	stopGeneration: "record",
 	newTab: "display",
 	regenerateResponse: "record",
@@ -45,7 +43,8 @@ export const SHORTCUT_MODES: Record<
 	switchToTab9: "display",
 };
 
-export const SHORTCUT_OPTIONS: Record<ShortcutActionWithoutSendMessage, ShortcutOption[]> = {
+export const SHORTCUT_OPTIONS: Record<ShortcutAction, ShortcutOption[]> = {
+	sendMessage: [],
 	newChat: [],
 	clearMessages: [],
 	closeCurrentTab: [],
@@ -53,6 +52,8 @@ export const SHORTCUT_OPTIONS: Record<ShortcutActionWithoutSendMessage, Shortcut
 	deleteCurrentThread: [],
 	openSettings: [],
 	toggleSidebar: [],
+	toggleSidebarRight: [],
+	toggleChatParametersPanel: [],
 
 	stopGeneration: [],
 	newTab: [],

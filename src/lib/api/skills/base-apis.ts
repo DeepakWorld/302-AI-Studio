@@ -1,0 +1,261 @@
+import { skill } from "@shared/types";
+import { type } from "arktype";
+import { _302AIKy } from "../core/_302ai-ky";
+
+export const listSkillsRequestSchema = type({
+	sandboxId: "string?",
+	sessionId: "string?",
+	projectPath: "string?",
+});
+export type ListSkillsRequest = typeof listSkillsRequestSchema.infer;
+export const listSkillsResponseSchema = type({
+	success: "boolean",
+	user_skills: skill.array(),
+	builtin_skills: skill.array(),
+	project_skills: skill.array(),
+});
+export type ListSkillsResponse = typeof listSkillsResponseSchema.infer;
+
+export async function _listSkills(request: ListSkillsRequest): Promise<ListSkillsResponse> {
+	const { sandboxId, sessionId, projectPath } = request;
+	try {
+		const response = await _302AIKy
+			.get("302/claude-code/skills/list", {
+				searchParams: {
+					sandbox_id: sandboxId,
+					session_id: sessionId,
+					project_path: projectPath,
+				},
+			})
+			.json();
+
+		const validated = listSkillsResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate list skills response:", validated.summary);
+			throw new Error("Invalid response format from list skills API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to list skills:", error);
+		throw error;
+	}
+}
+
+export const skillDetailsRequestSchema = type({
+	skillName: "string",
+	builtin: "boolean?",
+});
+export type SkillDetailsRequest = typeof skillDetailsRequestSchema.infer;
+export const checkSkillDetailsResponseSchema = type({
+	success: "boolean",
+	skill: skill,
+});
+export type CheckSkillDetailsResponse = typeof checkSkillDetailsResponseSchema.infer;
+
+export async function checkSkillDetails(
+	request: SkillDetailsRequest,
+): Promise<CheckSkillDetailsResponse> {
+	const { skillName, builtin } = request;
+	try {
+		const response = await _302AIKy
+			.get("302/claude-code/skills/detail", {
+				searchParams: {
+					name: skillName,
+					mode: "view",
+					builtin,
+				},
+			})
+			.json();
+
+		const validated = checkSkillDetailsResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate check skill details response:", validated.summary);
+			throw new Error("Invalid response format from check skill details API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to check skill details:", error);
+		throw error;
+	}
+}
+
+export async function _editSkillDetails(request: SkillDetailsRequest): Promise<Blob> {
+	const { skillName, builtin } = request;
+	try {
+		const response = await _302AIKy
+			.get("302/claude-code/skills/detail", {
+				searchParams: {
+					name: skillName,
+					mode: "edit",
+					builtin: builtin ?? false,
+				},
+			})
+			.blob();
+
+		return response;
+	} catch (error) {
+		// Handle HTTP errors (ky throws on non-2xx responses)
+		if (error && typeof error === "object" && "response" in error) {
+			const httpError = error as { response: Response };
+			try {
+				const errorBody = await httpError.response.json();
+				if (errorBody && typeof errorBody === "object" && errorBody.error?.message) {
+					throw new Error(errorBody.error.message);
+				}
+			} catch (parseError) {
+				// If it's already our custom error, rethrow it
+				if (parseError instanceof Error && parseError.message !== "Unexpected token") {
+					throw parseError;
+				}
+			}
+		}
+		console.error("Failed to edit skill details:", error);
+		throw error;
+	}
+}
+
+export const createSkillResponseSchema = type({
+	success: "boolean",
+	message: "string?",
+	error: type({
+		message: "string",
+	}).optional(),
+});
+export type CreateSkillResponse = typeof createSkillResponseSchema.infer;
+
+export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> {
+	try {
+		const formData = new FormData();
+		formData.append("file", zipFile);
+
+		const response = await _302AIKy
+			.post("302/claude-code/skills", {
+				body: formData,
+				timeout: 120000,
+			})
+			.json();
+
+		const validated = createSkillResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate create skill response:", validated.summary);
+			throw new Error("Invalid response format from create skill API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to create skill:", error);
+		throw error;
+	}
+}
+
+export async function _createSkillFromGitHub(githubUrl: string): Promise<CreateSkillResponse> {
+	try {
+		const formData = new FormData();
+		formData.append("github_url", githubUrl);
+
+		const response = await _302AIKy
+			.post("302/claude-code/skills", {
+				body: formData,
+				timeout: 120000,
+			})
+			.json();
+
+		const validated = createSkillResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate create skill from GitHub response:", validated.summary);
+			throw new Error("Invalid response format from create skill API");
+		}
+		return validated;
+	} catch (error) {
+		// Handle HTTP errors (ky throws on non-2xx responses)
+		if (error && typeof error === "object" && "response" in error) {
+			const httpError = error as { response: Response };
+			try {
+				const errorBody = await httpError.response.json();
+				if (errorBody && typeof errorBody === "object") {
+					return {
+						success: false,
+						error: errorBody.error,
+						message: errorBody.message,
+					};
+				}
+			} catch {
+				// Failed to parse error response JSON
+			}
+		}
+		console.error("Failed to create skill from GitHub:", error);
+		throw error;
+	}
+}
+
+export const deleteSkillRequestSchema = type({
+	skill_list: "string[]",
+});
+export type DeleteSkillRequest = typeof deleteSkillRequestSchema.infer;
+export const deleteSkillResponseSchema = type({
+	success: "boolean",
+});
+export type DeleteSkillResponse = typeof deleteSkillResponseSchema.infer;
+
+export async function deleteSkill(request: DeleteSkillRequest): Promise<DeleteSkillResponse> {
+	try {
+		const response = await _302AIKy
+			.delete("302/claude-code/skills", {
+				json: request,
+			})
+			.json();
+
+		const validated = deleteSkillResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate delete skill response:", validated.summary);
+			throw new Error("Invalid response format from delete skill API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to delete skill:", error);
+		throw error;
+	}
+}
+
+// Sync Skills API
+export const syncSkillsRequestSchema = type({
+	sandbox_id: "string",
+	session_id: "string?",
+});
+export type SyncSkillsRequest = typeof syncSkillsRequestSchema.infer;
+
+export const syncSkillsResponseSchema = type({
+	success: "boolean",
+	result: type({
+		exit_code: "number",
+		stdout: "string",
+		stderr: "string",
+		error: "string",
+	}),
+});
+export type SyncSkillsResponse = typeof syncSkillsResponseSchema.infer;
+
+/**
+ * Sync skills from sandbox
+ * - If session_id is empty, updates sandbox built-in skills
+ * - If session_id is provided, uploads all skills from session's working directory/.claude/skills as custom skills
+ */
+export async function syncSkills(request: SyncSkillsRequest): Promise<SyncSkillsResponse> {
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/skills/sync", {
+				json: request,
+				timeout: 120000,
+			})
+			.json();
+
+		const validated = syncSkillsResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate sync skills response:", validated.summary);
+			throw new Error("Invalid response format from sync skills API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to sync skills:", error);
+		throw error;
+	}
+}

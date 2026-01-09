@@ -89,6 +89,32 @@
 			isRerunning = false;
 		}
 	}
+
+	const outputContent = $derived.by(() => {
+		if (part.state === "output-available" && part.output) {
+			if (typeof part.output === "string") {
+				return part.output;
+			}
+			return formatJson(part.output);
+		}
+		return "";
+	});
+
+	const outputLanguage = $derived.by(() => {
+		if (part.toolName === "Read") {
+			const input = part.input as { file_path?: string } | undefined;
+			const filePath = input?.file_path || "";
+			const ext = filePath.split(".").pop()?.toLowerCase();
+			return ext || "plaintext";
+		}
+		if (part.toolName === "Bash" || part.toolName === "BashOutput") {
+			return "bash";
+		}
+		if (typeof part.output === "string") {
+			return "plaintext";
+		}
+		return "json";
+	});
 </script>
 
 <Dialog {open} {onOpenChange}>
@@ -144,8 +170,8 @@
 					<div class="h-[400px] overflow-hidden">
 						<StaticCodeBlock
 							canCollapse={false}
-							code={formatJson(part.output)}
-							language="json"
+							code={outputContent}
+							language={outputLanguage}
 							title={m.tool_call_result()}
 							showCollapseButton={false}
 						/>

@@ -27,6 +27,7 @@ import { ghostWindowService } from "../ghost-window-service";
 import { shortcutService } from "../shortcut-service";
 import { generalSettingsStorage } from "../storage-service/general-settings-storage";
 import { tabStorage } from "../storage-service/tab-storage";
+import { threadStorage } from "../storage-service/thread-storage";
 import { tabService } from "../tab-service";
 
 export class WindowService {
@@ -772,6 +773,102 @@ export class WindowService {
 		this.settingsWindow.addListener("closed", () => {
 			this.settingsWindow = null;
 		});
+	}
+
+	async navigateToThread(
+		_event: IpcMainInvokeEvent,
+		threadId: string,
+		sourceWindowId?: string,
+	): Promise<{
+		success: boolean;
+		windowId: string | null;
+		tabId: string | null;
+		action: "activated" | "created" | "failed";
+	}> {
+		// 1. 查找所有窗口中是否有该 thread 的 tab
+		const tabState = await tabStorage.getItemInternal("tab-bar-state");
+		if (tabState) {
+			for (const [windowId, windowData] of Object.entries(tabState)) {
+				const existingTab = windowData.tabs.find((t) => t.threadId === threadId);
+				if (existingTab) {
+					// 找到已存在的 tab，focus 到该窗口并激活
+					const numericWindowId = parseInt(windowId, 10);
+					const targetWindow = BrowserWindow.fromId(numericWindowId);
+
+					if (targetWindow && !targetWindow.isDestroyed()) {
+						if (targetWindow.isMinimized()) targetWindow.restore();
+						if (!targetWindow.isVisible()) targetWindow.show();
+						targetWindow.focus();
+
+						// 激活该 tab
+						tabService.focusTabInWindow(targetWindow, existingTab.id);
+
+						// 更新 storage 中的 active 状态
+						const updatedTabs = windowData.tabs.map((t) => ({
+							...t,
+							active: t.id === existingTab.id,
+						}));
+						tabState[windowId] = { tabs: updatedTabs };
+						await tabStorage.setItemInternal("tab-bar-state", tabState);
+
+						return {
+							success: true,
+							windowId,
+							tabId: existingTab.id,
+							action: "activated",
+						};
+					}
+				}
+			}
+		}
+
+		// 2. 没有找到已存在的 tab，需要创建新 tab
+		// 确定目标窗口：优先使用 sourceWindowId，否则使用 main window
+		let targetWindow: BrowserWindow | null = null;
+
+		if (sourceWindowId) {
+			const numericId = parseInt(sourceWindowId, 10);
+			if (!isNaN(numericId)) {
+				targetWindow = BrowserWindow.fromId(numericId);
+			}
+		}
+
+		if (!targetWindow || targetWindow.isDestroyed()) {
+			targetWindow = this.getMainWindow();
+		}
+
+		if (!targetWindow || targetWindow.isDestroyed()) {
+			return { success: false, windowId: null, tabId: null, action: "failed" };
+		}
+
+		// Focus 目标窗口
+		if (targetWindow.isMinimized()) targetWindow.restore();
+		if (!targetWindow.isVisible()) targetWindow.show();
+		targetWindow.focus();
+
+		const targetWindowId = targetWindow.id.toString();
+
+		// 获取 thread 数据
+		const threadData = await threadStorage.getThread(threadId);
+		if (!threadData) {
+			return { success: false, windowId: targetWindowId, tabId: null, action: "failed" };
+		}
+
+		// 创建新 tab
+		const result = await tabService.createTabForExistingThread(
+			targetWindow,
+			threadId,
+			threadData.thread.title,
+			"chat",
+			true,
+		);
+
+		return {
+			success: true,
+			windowId: targetWindowId,
+			tabId: result?.tabId || null,
+			action: "created",
+		};
 	}
 }
 

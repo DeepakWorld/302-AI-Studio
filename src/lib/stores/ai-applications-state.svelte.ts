@@ -26,6 +26,9 @@ class AiApplicationsState {
 	constructor() {
 		onAiApplicationsLoading((loading) => {
 			this.#isLoading = loading;
+			if (!loading) {
+				persistedAiApplicationState.refresh();
+			}
 		});
 	}
 
