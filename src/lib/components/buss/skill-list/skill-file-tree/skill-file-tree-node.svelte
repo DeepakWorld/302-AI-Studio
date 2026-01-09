@@ -194,21 +194,19 @@
 	{:else}
 		<ContextMenu.Root>
 			<ContextMenu.Trigger class="w-full">
-				<Popover.Root open={isPopoverOpen} onOpenChange={handlePopoverOpenChange}>
-					<Popover.Trigger onclick={(e) => e.preventDefault()}>
-						{#snippet child({ props })}
-							<Collapsible.Root
-								open={isOpen}
-								onOpenChange={(open) => onToggleExpand?.(node.path, open)}
-							>
+				<Collapsible.Root open={isOpen} onOpenChange={(open) => onToggleExpand?.(node.path, open)}>
+					<Popover.Root open={isPopoverOpen} onOpenChange={handlePopoverOpenChange}>
+						<Popover.Trigger onclick={(e) => e.preventDefault()}>
+							{#snippet child({ props })}
 								<Collapsible.Trigger
-									{...props}
 									class={cn(
 										"flex w-full items-center gap-1 rounded-sm px-2 py-1 hover:bg-accent/50",
 										selectedPath === node.path && "bg-primary/20 text-primary",
 									)}
 									style="padding-left: {level * 12 + 8}px"
 								>
+									<!-- Invisible anchor for popover positioning -->
+									<span {...props} class="absolute h-0 w-0"></span>
 									<ChevronRight
 										class={cn(
 											"size-4 shrink-0 transition-transform duration-200",
@@ -222,49 +220,49 @@
 									{/if}
 									<span class="truncate text-sm">{node.name}</span>
 								</Collapsible.Trigger>
-								<Collapsible.Content>
-									{#if node.children}
-										{#each node.children as child (child.path)}
-											<SkillFileTreeNode
-												node={child}
-												level={level + 1}
-												{selectedPath}
-												{expandedPaths}
-												{readOnly}
-												{onSelect}
-												{onCreateFileConfirm}
-												{onCreateFolderConfirm}
-												{onRenameConfirm}
-												{onDelete}
-												{onToggleExpand}
-											/>
-										{/each}
-									{/if}
-								</Collapsible.Content>
-							</Collapsible.Root>
-						{/snippet}
-					</Popover.Trigger>
-					<Popover.Content class="w-64 p-3" align="start" side="bottom">
-						<div class="flex flex-col gap-3">
-							<span class="text-xs text-muted-foreground">{getPopoverTitle()}</span>
-							<Input
-								bind:ref={popoverInputRef}
-								bind:value={popoverValue}
-								placeholder={popoverMode !== "rename" ? m.file_tree_name_placeholder() : ""}
-								class="h-8 dark:border-[#3d3d3d]"
-								onkeydown={handlePopoverKeydown}
-							/>
-							<div class="flex justify-end gap-2">
-								<Button variant="ghost" size="sm" onclick={closePopover}>
-									{m.common_cancel()}
-								</Button>
-								<Button size="sm" onclick={confirmPopover}>
-									{popoverMode === "rename" ? m.text_button_save() : m.text_button_confirm()}
-								</Button>
+							{/snippet}
+						</Popover.Trigger>
+						<Popover.Content class="w-64 p-3" align="start" side="bottom">
+							<div class="flex flex-col gap-3">
+								<span class="text-xs text-muted-foreground">{getPopoverTitle()}</span>
+								<Input
+									bind:ref={popoverInputRef}
+									bind:value={popoverValue}
+									placeholder={popoverMode !== "rename" ? m.file_tree_name_placeholder() : ""}
+									class="h-8 dark:border-[#3d3d3d]"
+									onkeydown={handlePopoverKeydown}
+								/>
+								<div class="flex justify-end gap-2">
+									<Button variant="ghost" size="sm" onclick={closePopover}>
+										{m.common_cancel()}
+									</Button>
+									<Button size="sm" onclick={confirmPopover}>
+										{popoverMode === "rename" ? m.text_button_save() : m.text_button_confirm()}
+									</Button>
+								</div>
 							</div>
-						</div>
-					</Popover.Content>
-				</Popover.Root>
+						</Popover.Content>
+					</Popover.Root>
+					<Collapsible.Content>
+						{#if node.children}
+							{#each node.children as child (child.path)}
+								<SkillFileTreeNode
+									node={child}
+									level={level + 1}
+									{selectedPath}
+									{expandedPaths}
+									{readOnly}
+									{onSelect}
+									{onCreateFileConfirm}
+									{onCreateFolderConfirm}
+									{onRenameConfirm}
+									{onDelete}
+									{onToggleExpand}
+								/>
+							{/each}
+						{/if}
+					</Collapsible.Content>
+				</Collapsible.Root>
 			</ContextMenu.Trigger>
 			<ContextMenu.Content class="w-48">
 				<ContextMenu.Item onclick={handleCreateFile}>
@@ -322,7 +320,6 @@
 				<Popover.Trigger onclick={(e) => e.preventDefault()}>
 					{#snippet child({ props })}
 						<button
-							{...props}
 							onclick={handleSelect}
 							class={cn(
 								"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent/50",
@@ -330,6 +327,8 @@
 							)}
 							style="padding-left: {level * 12 + 28}px"
 						>
+							<!-- Invisible anchor for popover positioning -->
+							<span {...props} class="absolute h-0 w-0"></span>
 							<File class="size-4 shrink-0 text-muted-foreground" />
 							<span class="truncate text-sm">{node.name}</span>
 						</button>
