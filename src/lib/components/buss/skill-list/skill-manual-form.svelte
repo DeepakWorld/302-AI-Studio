@@ -322,6 +322,10 @@
 			toast.warning(m.skills_form_name_required());
 			return false;
 		}
+		if (/\s/.test(formData.name)) {
+			toast.warning(m.skills_form_name_no_spaces());
+			return false;
+		}
 		if (!formData.description.trim()) {
 			toast.warning(m.skills_form_desc_required());
 			return false;

@@ -1102,6 +1102,8 @@
 	"skills_form_content": "Skill Content (Markdown)",
 	"skills_form_content_hint": "Skill files are in Markdown format, defining Claude's expertise and behavior",
 	"skills_form_name_required": "Please enter a Skill name",
+	"skills_form_name_no_spaces": "Skill name cannot contain spaces, use hyphens instead",
+	"skills_form_name_hint": "Use hyphens instead of spaces",
 	"skills_form_desc_required": "Please enter a description",
 	"skills_form_content_required": "Please enter Skill content",
 	"skills_creating": "Creating...",

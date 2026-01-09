@@ -1099,6 +1099,8 @@
 	"skills_form_content": "Skill 内容 (Markdown)",
 	"skills_form_content_hint": "Skill 文件是 Markdown 格式，定义了 Claude 的专业知识和行为",
 	"skills_form_name_required": "请输入 Skill 名称",
+	"skills_form_name_no_spaces": "Skill 名称不能包含空格",
+	"skills_form_name_hint": "请使用连字符代替空格，例如：Nano-Banana-Pro-Image-Generation",
 	"skills_form_desc_required": "请输入描述",
 	"skills_form_content_required": "请输入 Skill 内容",
 	"skills_creating": "创建中...",
