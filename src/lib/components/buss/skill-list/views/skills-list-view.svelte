@@ -160,7 +160,7 @@
 			<div
 				class="grid gap-4 {singleColumn
 					? 'grid-cols-1'
-					: 'grid-cols-1 @md:grid-cols-2 @xl:grid-cols-3 @3xl:grid-cols-4'}"
+					: 'grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3'}"
 			>
 				{#each filteredSkills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
 					{@const usedSkill = usedSkills.find((s) => s.name === item.name)}
