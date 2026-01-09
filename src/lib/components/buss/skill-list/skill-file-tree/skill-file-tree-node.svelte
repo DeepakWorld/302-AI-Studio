@@ -149,12 +149,12 @@
 		<ContextMenu.Root>
 			<ContextMenu.Trigger class="w-full">
 				<Popover.Root bind:open={isEditing}>
-					<Collapsible.Root
-						open={isOpen}
-						onOpenChange={(open) => onToggleExpand?.(node.path, open)}
-					>
-						<Popover.Trigger>
-							{#snippet child({ props })}
+					<Popover.Trigger onclick={(e) => e.preventDefault()}>
+						{#snippet child({ props })}
+							<Collapsible.Root
+								open={isOpen}
+								onOpenChange={(open) => onToggleExpand?.(node.path, open)}
+							>
 								<Collapsible.Trigger
 									{...props}
 									class={cn(
@@ -176,28 +176,28 @@
 									{/if}
 									<span class="truncate text-sm">{node.name}</span>
 								</Collapsible.Trigger>
-							{/snippet}
-						</Popover.Trigger>
-						<Collapsible.Content>
-							{#if node.children}
-								{#each node.children as child (child.path)}
-									<SkillFileTreeNode
-										node={child}
-										level={level + 1}
-										{selectedPath}
-										{expandedPaths}
-										{readOnly}
-										{onSelect}
-										{onCreateFile}
-										{onCreateFolder}
-										{onRenameConfirm}
-										{onDelete}
-										{onToggleExpand}
-									/>
-								{/each}
-							{/if}
-						</Collapsible.Content>
-					</Collapsible.Root>
+								<Collapsible.Content>
+									{#if node.children}
+										{#each node.children as child (child.path)}
+											<SkillFileTreeNode
+												node={child}
+												level={level + 1}
+												{selectedPath}
+												{expandedPaths}
+												{readOnly}
+												{onSelect}
+												{onCreateFile}
+												{onCreateFolder}
+												{onRenameConfirm}
+												{onDelete}
+												{onToggleExpand}
+											/>
+										{/each}
+									{/if}
+								</Collapsible.Content>
+							</Collapsible.Root>
+						{/snippet}
+					</Popover.Trigger>
 					<Popover.Content class="w-64 p-3" align="start" side="bottom">
 						<div class="flex flex-col gap-3">
 							<span class="text-xs text-muted-foreground">{m.file_tree_rename_title()}</span>
@@ -228,12 +228,12 @@
 					<FolderPlus class="mr-2 h-4 w-4" />
 					{m.file_tree_new_folder()}
 				</ContextMenu.Item>
-				<ContextMenu.Separator />
-				<ContextMenu.Item onclick={handleRename}>
-					<Pencil class="mr-2 h-4 w-4" />
-					{m.file_tree_rename()}
-				</ContextMenu.Item>
 				{#if level > 0}
+					<ContextMenu.Separator />
+					<ContextMenu.Item onclick={handleRename}>
+						<Pencil class="mr-2 h-4 w-4" />
+						{m.file_tree_rename()}
+					</ContextMenu.Item>
 					<ContextMenu.Item onclick={handleDelete} class="text-destructive focus:text-destructive">
 						<Trash2 class="mr-2 h-4 w-4" />
 						{m.file_tree_delete()}
@@ -272,7 +272,7 @@
 	<ContextMenu.Root>
 		<ContextMenu.Trigger class="w-full">
 			<Popover.Root bind:open={isEditing}>
-				<Popover.Trigger>
+				<Popover.Trigger onclick={(e) => e.preventDefault()}>
 					{#snippet child({ props })}
 						<button
 							{...props}

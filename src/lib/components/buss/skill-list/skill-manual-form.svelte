@@ -157,6 +157,35 @@
 		}
 	});
 
+	// 同步 formData.name 到临时目录名称
+	let isRenaming = $state(false);
+	$effect(() => {
+		const newName = formData.name.trim() || "new-skill";
+		// 只在手动模式且有临时目录时执行重命名
+		if (manualRootPath && !isRenaming) {
+			const currentDirName = manualRootPath.split(/[/\\]/).pop() || "";
+			if (newName !== currentDirName) {
+				// 捕获当前路径值
+				const oldRootPath = manualRootPath;
+				const parentPath = oldRootPath.substring(0, oldRootPath.length - currentDirName.length - 1);
+				const newRootPath = `${parentPath}/${newName}`;
+
+				isRenaming = true;
+				// 使用 setTimeout 避免在 effect 中直接执行异步操作
+				setTimeout(async () => {
+					try {
+						await window.electronAPI.appService.renameFile(oldRootPath, newRootPath);
+						handleRootPathChange(newRootPath);
+					} catch (error) {
+						console.error("Failed to rename directory:", error);
+					} finally {
+						isRenaming = false;
+					}
+				}, 0);
+			}
+		}
+	});
+
 	// 清理临时目录
 	export async function cleanup(): Promise<void> {
 		if (manualRootPath) {
