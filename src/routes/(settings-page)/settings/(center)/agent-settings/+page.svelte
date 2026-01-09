@@ -33,15 +33,14 @@
 			selectedKey={selectedPlatform}
 			onSelect={handlePlatformSelect}
 		/>
+	</div>
 
+	{#if selectedPlatform === "remote"}
 		<SettingSwitchItem
 			label={m.auto_deploy()}
 			checked={codeAgentGlobalConfigsState.autoDeploy}
 			onCheckedChange={() => codeAgentGlobalConfigsState.toggleAutoDeploy()}
 		/>
-	</div>
-
-	{#if selectedPlatform === "remote"}
 		<RemotePlatform />
 	{:else if selectedPlatform === "local"}
 		<LocalPlatform />

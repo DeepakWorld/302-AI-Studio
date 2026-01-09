@@ -8,7 +8,7 @@
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { cn } from "$lib/utils";
-	import { BookOpen, Ghost, Server, Settings } from "@lucide/svelte";
+	import { Ghost, Server, Settings } from "@lucide/svelte";
 
 	async function handleNewSettingsTab() {
 		await window.electronAPI.windowService.handleOpenSettingsWindow();
@@ -34,13 +34,13 @@
 	}
 
 	// Handle skills-only mode toggle (no sandbox required)
-	function handleSkillsOnlyToggle() {
-		if (agentPreviewState.isVisible && agentPreviewState.isSkillsOnlyMode) {
-			agentPreviewState.closePreview();
-		} else {
-			agentPreviewState.openSkillsOnlyMode();
-		}
-	}
+	// function handleSkillsOnlyToggle() {
+	// 	if (agentPreviewState.isVisible && agentPreviewState.isSkillsOnlyMode) {
+	// 		agentPreviewState.closePreview();
+	// 	} else {
+	// 		agentPreviewState.openSkillsOnlyMode();
+	// 	}
+	// }
 </script>
 
 <div
@@ -81,7 +81,7 @@
 		{/if}
 
 		<!-- Skills management button (always visible) -->
-		<ButtonWithTooltip
+		<!-- <ButtonWithTooltip
 			class={cn(
 				"hover:!bg-icon-btn-hover",
 				agentPreviewState.isVisible &&
@@ -100,7 +100,7 @@
 						"!text-icon-btn-active-fg",
 				)}
 			/>
-		</ButtonWithTooltip>
+		</ButtonWithTooltip> -->
 
 		<ButtonWithTooltip
 			class={cn(
