@@ -1,9 +1,14 @@
 <script lang="ts">
 	import Button from "$lib/components/ui/button/button.svelte";
+	import * as ContextMenu from "$lib/components/ui/context-menu";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
+	import Input from "$lib/components/ui/input/input.svelte";
+	import * as Popover from "$lib/components/ui/popover";
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import { m } from "$lib/paraglide/messages";
+	import { FilePlus, FolderPlus } from "@lucide/svelte";
 	import type { FileNode } from "@shared/types";
+	import { tick } from "svelte";
 	import { SvelteSet } from "svelte/reactivity";
 	import FileNameDialog from "./file-name-dialog.svelte";
 	import SkillFileTreeNode from "./skill-file-tree-node.svelte";
@@ -52,6 +57,17 @@
 	// Delete confirmation dialog
 	let deleteDialogOpen = $state(false);
 	let deleteNode = $state<FileNode | null>(null);
+
+	// Global create popover state (for empty area right-click)
+	type GlobalPopoverMode = "none" | "create-file" | "create-folder";
+	let globalPopoverMode = $state<GlobalPopoverMode>("none");
+	let globalPopoverValue = $state("");
+	let globalPopoverInputRef = $state<HTMLInputElement | null>(null);
+	let isGlobalPopoverOpen = $derived(globalPopoverMode !== "none");
+	// Mouse position for popover positioning
+	let mouseX = $state(0);
+	let mouseY = $state(0);
+	let popoverAnchorRef = $state<HTMLDivElement | null>(null);
 
 	const {
 		scanDirectory,
@@ -251,32 +267,186 @@
 		parts.pop();
 		return parts.join(separator);
 	}
+
+	// Capture mouse position on context menu
+	function handleContextMenu(e: MouseEvent) {
+		mouseX = e.clientX;
+		mouseY = e.clientY;
+		// Update anchor position
+		if (popoverAnchorRef) {
+			popoverAnchorRef.style.left = `${mouseX}px`;
+			popoverAnchorRef.style.top = `${mouseY}px`;
+		}
+	}
+
+	// Global popover handlers (for empty area right-click)
+	async function handleGlobalCreateFile() {
+		globalPopoverValue = "";
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		globalPopoverMode = "create-file";
+		await tick();
+		globalPopoverInputRef?.focus();
+	}
+
+	async function handleGlobalCreateFolder() {
+		globalPopoverValue = "";
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		globalPopoverMode = "create-folder";
+		await tick();
+		globalPopoverInputRef?.focus();
+	}
+
+	function closeGlobalPopover() {
+		globalPopoverMode = "none";
+		globalPopoverValue = "";
+	}
+
+	async function confirmGlobalPopover() {
+		const trimmed = globalPopoverValue.trim();
+		if (!trimmed) {
+			closeGlobalPopover();
+			return;
+		}
+
+		// Create in root directory
+		if (globalPopoverMode === "create-file") {
+			await handleCreateFileConfirm(rootPath, trimmed);
+		} else if (globalPopoverMode === "create-folder") {
+			await handleCreateFolderConfirm(rootPath, trimmed);
+		}
+		closeGlobalPopover();
+	}
+
+	function handleGlobalPopoverKeydown(e: KeyboardEvent) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			confirmGlobalPopover();
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			closeGlobalPopover();
+		}
+	}
+
+	function getGlobalPopoverTitle(): string {
+		switch (globalPopoverMode) {
+			case "create-file":
+				return m.file_tree_new_file();
+			case "create-folder":
+				return m.file_tree_new_folder();
+			default:
+				return "";
+		}
+	}
+
+	function handleGlobalPopoverOpenChange(open: boolean) {
+		if (!open) {
+			closeGlobalPopover();
+		}
+	}
 </script>
 
-<div class="h-full w-full bg-background">
-	<ScrollArea class="h-full">
-		<div class="p-2">
-			{#if loading}
-				<div class="p-2 text-sm text-muted-foreground">Loading...</div>
-			{:else if tree}
-				<SkillFileTreeNode
-					node={tree}
-					{selectedPath}
-					{expandedPaths}
-					{readOnly}
-					onSelect={handleNodeSelect}
-					onCreateFileConfirm={handleCreateFileConfirm}
-					onCreateFolderConfirm={handleCreateFolderConfirm}
-					onRenameConfirm={handleRenameConfirm}
-					onDelete={handleDelete}
-					onToggleExpand={handleToggleExpand}
-				/>
-			{:else}
-				<div class="p-2 text-sm text-muted-foreground">No files found</div>
-			{/if}
-		</div>
-	</ScrollArea>
-</div>
+{#if readOnly}
+	<div class="h-full w-full bg-background">
+		<ScrollArea class="h-full">
+			<div class="p-2">
+				{#if loading}
+					<div class="p-2 text-sm text-muted-foreground">Loading...</div>
+				{:else if tree}
+					<SkillFileTreeNode
+						node={tree}
+						{selectedPath}
+						{expandedPaths}
+						{readOnly}
+						onSelect={handleNodeSelect}
+						onCreateFileConfirm={handleCreateFileConfirm}
+						onCreateFolderConfirm={handleCreateFolderConfirm}
+						onRenameConfirm={handleRenameConfirm}
+						onDelete={handleDelete}
+						onToggleExpand={handleToggleExpand}
+					/>
+				{:else}
+					<div class="p-2 text-sm text-muted-foreground">No files found</div>
+				{/if}
+			</div>
+		</ScrollArea>
+	</div>
+{:else}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="relative h-full w-full" oncontextmenu={handleContextMenu}>
+		<ContextMenu.Root>
+			<ContextMenu.Trigger class="h-full w-full">
+				<div class="h-full w-full bg-background">
+					<ScrollArea class="h-full">
+						<div class="p-2">
+							{#if loading}
+								<div class="p-2 text-sm text-muted-foreground">Loading...</div>
+							{:else if tree}
+								<SkillFileTreeNode
+									node={tree}
+									{selectedPath}
+									{expandedPaths}
+									{readOnly}
+									onSelect={handleNodeSelect}
+									onCreateFileConfirm={handleCreateFileConfirm}
+									onCreateFolderConfirm={handleCreateFolderConfirm}
+									onRenameConfirm={handleRenameConfirm}
+									onDelete={handleDelete}
+									onToggleExpand={handleToggleExpand}
+								/>
+							{:else}
+								<div class="p-2 text-sm text-muted-foreground">No files found</div>
+							{/if}
+						</div>
+					</ScrollArea>
+				</div>
+			</ContextMenu.Trigger>
+			<ContextMenu.Content class="w-48">
+				<ContextMenu.Item onclick={handleGlobalCreateFile}>
+					<FilePlus class="mr-2 h-4 w-4" />
+					{m.file_tree_new_file()}
+				</ContextMenu.Item>
+				<ContextMenu.Item onclick={handleGlobalCreateFolder}>
+					<FolderPlus class="mr-2 h-4 w-4" />
+					{m.file_tree_new_folder()}
+				</ContextMenu.Item>
+			</ContextMenu.Content>
+		</ContextMenu.Root>
+
+		<!-- Virtual anchor for popover positioning -->
+		<Popover.Root open={isGlobalPopoverOpen} onOpenChange={handleGlobalPopoverOpenChange}>
+			<Popover.Trigger class="pointer-events-none">
+				{#snippet child({ props })}
+					<div
+						{...props}
+						bind:this={popoverAnchorRef}
+						class="pointer-events-none fixed h-0 w-0"
+						style="left: {mouseX}px; top: {mouseY}px;"
+					></div>
+				{/snippet}
+			</Popover.Trigger>
+			<Popover.Content class="w-64 p-3" align="start" side="bottom">
+				<div class="flex flex-col gap-3">
+					<span class="text-xs text-muted-foreground">{getGlobalPopoverTitle()}</span>
+					<Input
+						bind:ref={globalPopoverInputRef}
+						bind:value={globalPopoverValue}
+						placeholder={m.file_tree_name_placeholder()}
+						class="h-8 dark:border-[#3d3d3d]"
+						onkeydown={handleGlobalPopoverKeydown}
+					/>
+					<div class="flex justify-end gap-2">
+						<Button variant="ghost" size="sm" onclick={closeGlobalPopover}>
+							{m.common_cancel()}
+						</Button>
+						<Button size="sm" onclick={confirmGlobalPopover}>
+							{m.text_button_confirm()}
+						</Button>
+					</div>
+				</div>
+			</Popover.Content>
+		</Popover.Root>
+	</div>
+{/if}
 
 <!-- Name Input Dialog -->
 <FileNameDialog
