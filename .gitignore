@@ -36,3 +36,6 @@ dist
 plugins/external
 .aider*
 .ace-tool/
+
+# Temporary files
+temp

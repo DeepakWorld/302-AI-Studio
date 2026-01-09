@@ -171,8 +171,15 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:updateClaudeCodeSandboxRemark", (event, sandbox_id, remark) =>
 		codeAgentService.updateClaudeCodeSandboxRemark(event, sandbox_id, remark),
 	);
-	ipcMain.handle("codeAgentService:createClaudeCodeSandboxByIpc", (event, threadId, sandboxName) =>
-		codeAgentService.createClaudeCodeSandboxByIpc(event, threadId, sandboxName),
+	ipcMain.handle(
+		"codeAgentService:updateClaudeCodeSandboxThinkingBudget",
+		(event, sandbox_id, maxThinkingToken) =>
+			codeAgentService.updateClaudeCodeSandboxThinkingBudget(event, sandbox_id, maxThinkingToken),
+	);
+	ipcMain.handle(
+		"codeAgentService:createClaudeCodeSandboxByIpc",
+		(event, threadId, sandboxName, maxThinkingToken) =>
+			codeAgentService.createClaudeCodeSandboxByIpc(event, threadId, sandboxName, maxThinkingToken),
 	);
 	ipcMain.handle("codeAgentService:deleteClaudeCodeSandboxByIpc", (event, sandbox_id) =>
 		codeAgentService.deleteClaudeCodeSandboxByIpc(event, sandbox_id),
@@ -500,6 +507,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSessions");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeCurrentSessionIdByThreadId");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxRemark");
+	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxThinkingBudget");
 	ipcMain.removeHandler("codeAgentService:createClaudeCodeSandboxByIpc");
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSandboxByIpc");
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSession");
