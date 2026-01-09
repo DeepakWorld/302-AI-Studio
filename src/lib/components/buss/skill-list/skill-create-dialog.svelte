@@ -287,9 +287,9 @@ description:
 				<div></div>
 				<span class="text-foreground text-base font-semibold">{m.skills_create_title()}</span>
 				<div class="flex justify-end">
-					<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
-						<X class="h-4 w-4" />
-					</Button>
+				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
+					<X class="h-4 w-4" />
+				</Button>
 				</div>
 			</div>
 
@@ -327,21 +327,21 @@ description:
 			<!-- Secondary View -->
 			<div class="grid grid-cols-[1fr_auto_1fr] items-center border-b px-4 py-3">
 				<div class="flex justify-start">
-					<Button
-						variant="ghost"
-						class="text-muted-foreground flex items-center text-center text-[14px]"
-						size="sm"
-						onclick={handleBack}
-					>
-						<ChevronLeft class="h-4 w-4" />
-						{m.skills_back()}
-					</Button>
+				<Button
+					variant="ghost"
+					class="text-muted-foreground flex items-center text-center text-[14px]"
+					size="sm"
+					onclick={handleBack}
+				>
+					<ChevronLeft class="h-4 w-4" />
+					{m.skills_back()}
+				</Button>
 				</div>
 				<span class="text-foreground text-base font-semibold">{m.skills_create_title()}</span>
 				<div class="flex justify-end">
-					<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
-						<X class="h-4 w-4" />
-					</Button>
+				<Button variant="ghost" size="icon" class="h-8 w-8" onclick={handleClose}>
+					<X class="h-4 w-4" />
+				</Button>
 				</div>
 			</div>
 

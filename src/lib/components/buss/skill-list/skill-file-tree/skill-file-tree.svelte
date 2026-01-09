@@ -163,11 +163,15 @@
 		expandedPaths.add(parentPath);
 	}
 
-	function handleRename(node: FileNode) {
-		targetNode = node;
-		nameDialogMode = "rename";
-		nameDialogInitialValue = node.name;
-		nameDialogOpen = true;
+	async function handleRenameConfirm(node: FileNode, newName: string) {
+		try {
+			const parentPath = getParentPath(node.path);
+			const newPath = joinPath(parentPath, newName);
+			await renameFile(node.path, newPath);
+			await loadTree(rootPath);
+		} catch (error) {
+			console.error("Rename failed:", error);
+		}
 	}
 
 	function handleDelete(node: FileNode) {
@@ -200,10 +204,6 @@
 				await createDirectory(folderPath);
 				// Ensure parent folder is expanded after creation
 				expandedPaths.add(targetPath);
-			} else if (nameDialogMode === "rename" && targetNode) {
-				const parentPath = getParentPath(targetNode.path);
-				const newPath = joinPath(parentPath, name);
-				await renameFile(targetNode.path, newPath);
 			}
 			// Refresh tree
 			await loadTree(rootPath);
@@ -257,7 +257,7 @@
 					onSelect={handleNodeSelect}
 					onCreateFile={handleCreateFile}
 					onCreateFolder={handleCreateFolder}
-					onRename={handleRename}
+					onRenameConfirm={handleRenameConfirm}
 					onDelete={handleDelete}
 					onToggleExpand={handleToggleExpand}
 				/>

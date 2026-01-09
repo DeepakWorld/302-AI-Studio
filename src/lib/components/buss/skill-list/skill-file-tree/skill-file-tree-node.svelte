@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { Button } from "$lib/components/ui/button";
 	import * as Collapsible from "$lib/components/ui/collapsible";
 	import * as ContextMenu from "$lib/components/ui/context-menu";
+	import Input from "$lib/components/ui/input/input.svelte";
+	import * as Popover from "$lib/components/ui/popover";
 	import { m } from "$lib/paraglide/messages";
 	import { cn } from "$lib/utils";
 	import {
@@ -14,6 +17,7 @@
 		Trash2,
 	} from "@lucide/svelte";
 	import type { FileNode } from "@shared/types";
+	import { tick } from "svelte";
 	import type { SvelteSet } from "svelte/reactivity";
 	import SkillFileTreeNode from "./skill-file-tree-node.svelte";
 
@@ -26,7 +30,7 @@
 		onSelect?: (node: FileNode) => void;
 		onCreateFile?: (parentPath: string) => void;
 		onCreateFolder?: (parentPath: string) => void;
-		onRename?: (node: FileNode) => void;
+		onRenameConfirm?: (node: FileNode, newName: string) => void;
 		onDelete?: (node: FileNode) => void;
 		onToggleExpand?: (path: string, expanded: boolean) => void;
 	}
@@ -40,15 +44,19 @@
 		onSelect,
 		onCreateFile,
 		onCreateFolder,
-		onRename,
+		onRenameConfirm,
 		onDelete,
 		onToggleExpand,
 	}: Props = $props();
 
 	let isOpen = $derived(expandedPaths?.has(node.path) ?? false);
+	let isEditing = $state(false);
+	let editValue = $state("");
+	let inputRef = $state<HTMLInputElement | null>(null);
 
 	function handleSelect(e: MouseEvent) {
 		e.stopPropagation();
+		if (isEditing) return;
 		if (node.type === "directory") {
 			onToggleExpand?.(node.path, !isOpen);
 		} else {
@@ -64,12 +72,36 @@
 		onCreateFolder?.(node.path);
 	}
 
-	function handleRename() {
-		onRename?.(node);
+	async function handleRename() {
+		editValue = node.name;
+		// 延迟打开 popover，等待 context menu 完全关闭
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		isEditing = true;
+		await tick();
+		inputRef?.focus();
+		inputRef?.select();
 	}
 
 	function handleDelete() {
 		onDelete?.(node);
+	}
+
+	function confirmRename() {
+		const trimmed = editValue.trim();
+		if (trimmed && trimmed !== node.name) {
+			onRenameConfirm?.(node, trimmed);
+		}
+		isEditing = false;
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			confirmRename();
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			isEditing = false;
+		}
 	}
 </script>
 
@@ -105,7 +137,7 @@
 							{onSelect}
 							{onCreateFile}
 							{onCreateFolder}
-							{onRename}
+							{onRenameConfirm}
 							{onDelete}
 							{onToggleExpand}
 						/>
@@ -116,44 +148,76 @@
 	{:else}
 		<ContextMenu.Root>
 			<ContextMenu.Trigger class="w-full">
-				<Collapsible.Root open={isOpen} onOpenChange={(open) => onToggleExpand?.(node.path, open)}>
-					<Collapsible.Trigger
-						class={cn(
-							"flex w-full items-center gap-1 rounded-sm px-2 py-1 hover:bg-accent/50",
-							selectedPath === node.path && "bg-primary/20 text-primary",
-						)}
-						style="padding-left: {level * 12 + 8}px"
+				<Popover.Root bind:open={isEditing}>
+					<Collapsible.Root
+						open={isOpen}
+						onOpenChange={(open) => onToggleExpand?.(node.path, open)}
 					>
-						<ChevronRight
-							class={cn("size-4 shrink-0 transition-transform duration-200", isOpen && "rotate-90")}
-						/>
-						{#if isOpen}
-							<FolderOpen class="size-4 shrink-0 text-blue-500" />
-						{:else}
-							<Folder class="size-4 shrink-0 text-blue-500" />
-						{/if}
-						<span class="truncate text-sm">{node.name}</span>
-					</Collapsible.Trigger>
-					<Collapsible.Content>
-						{#if node.children}
-							{#each node.children as child (child.path)}
-								<SkillFileTreeNode
-									node={child}
-									level={level + 1}
-									{selectedPath}
-									{expandedPaths}
-									{readOnly}
-									{onSelect}
-									{onCreateFile}
-									{onCreateFolder}
-									{onRename}
-									{onDelete}
-									{onToggleExpand}
-								/>
-							{/each}
-						{/if}
-					</Collapsible.Content>
-				</Collapsible.Root>
+						<Popover.Trigger>
+							{#snippet child({ props })}
+								<Collapsible.Trigger
+									{...props}
+									class={cn(
+										"flex w-full items-center gap-1 rounded-sm px-2 py-1 hover:bg-accent/50",
+										selectedPath === node.path && "bg-primary/20 text-primary",
+									)}
+									style="padding-left: {level * 12 + 8}px"
+								>
+									<ChevronRight
+										class={cn(
+											"size-4 shrink-0 transition-transform duration-200",
+											isOpen && "rotate-90",
+										)}
+									/>
+									{#if isOpen}
+										<FolderOpen class="size-4 shrink-0 text-blue-500" />
+									{:else}
+										<Folder class="size-4 shrink-0 text-blue-500" />
+									{/if}
+									<span class="truncate text-sm">{node.name}</span>
+								</Collapsible.Trigger>
+							{/snippet}
+						</Popover.Trigger>
+						<Collapsible.Content>
+							{#if node.children}
+								{#each node.children as child (child.path)}
+									<SkillFileTreeNode
+										node={child}
+										level={level + 1}
+										{selectedPath}
+										{expandedPaths}
+										{readOnly}
+										{onSelect}
+										{onCreateFile}
+										{onCreateFolder}
+										{onRenameConfirm}
+										{onDelete}
+										{onToggleExpand}
+									/>
+								{/each}
+							{/if}
+						</Collapsible.Content>
+					</Collapsible.Root>
+					<Popover.Content class="w-64 p-3" align="start" side="bottom">
+						<div class="flex flex-col gap-3">
+							<span class="text-xs text-muted-foreground">{m.file_tree_rename_title()}</span>
+							<Input
+								bind:ref={inputRef}
+								bind:value={editValue}
+								class="h-8 dark:border-[#3d3d3d]"
+								onkeydown={handleKeydown}
+							/>
+							<div class="flex justify-end gap-2">
+								<Button variant="ghost" size="sm" onclick={() => (isEditing = false)}>
+									{m.common_cancel()}
+								</Button>
+								<Button size="sm" onclick={confirmRename}>
+									{m.text_button_save()}
+								</Button>
+							</div>
+						</div>
+					</Popover.Content>
+				</Popover.Root>
 			</ContextMenu.Trigger>
 			<ContextMenu.Content class="w-48">
 				<ContextMenu.Item onclick={handleCreateFile}>
@@ -207,17 +271,43 @@
 {:else}
 	<ContextMenu.Root>
 		<ContextMenu.Trigger class="w-full">
-			<button
-				onclick={handleSelect}
-				class={cn(
-					"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent/50",
-					selectedPath === node.path && "bg-primary/20 text-primary",
-				)}
-				style="padding-left: {level * 12 + 28}px"
-			>
-				<File class="size-4 shrink-0 text-muted-foreground" />
-				<span class="truncate text-sm">{node.name}</span>
-			</button>
+			<Popover.Root bind:open={isEditing}>
+				<Popover.Trigger>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							onclick={handleSelect}
+							class={cn(
+								"flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent/50",
+								selectedPath === node.path && "bg-primary/20 text-primary",
+							)}
+							style="padding-left: {level * 12 + 28}px"
+						>
+							<File class="size-4 shrink-0 text-muted-foreground" />
+							<span class="truncate text-sm">{node.name}</span>
+						</button>
+					{/snippet}
+				</Popover.Trigger>
+				<Popover.Content class="w-64 p-3" align="start" side="bottom">
+					<div class="flex flex-col gap-3">
+						<span class="text-xs text-muted-foreground">{m.file_tree_rename_title()}</span>
+						<Input
+							bind:ref={inputRef}
+							bind:value={editValue}
+							class="h-8 dark:border-[#3d3d3d]"
+							onkeydown={handleKeydown}
+						/>
+						<div class="flex justify-end gap-2">
+							<Button variant="ghost" size="sm" onclick={() => (isEditing = false)}>
+								{m.common_cancel()}
+							</Button>
+							<Button size="sm" onclick={confirmRename}>
+								{m.text_button_save()}
+							</Button>
+						</div>
+					</div>
+				</Popover.Content>
+			</Popover.Root>
 		</ContextMenu.Trigger>
 		<ContextMenu.Content class="w-48">
 			<ContextMenu.Item onclick={handleRename}>
