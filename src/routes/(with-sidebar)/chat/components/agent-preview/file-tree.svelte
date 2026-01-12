@@ -54,6 +54,11 @@
 	let createFolderInputValue = $state("");
 	let createFolderInProgress = $state(false);
 
+	// UI-specific state for delete confirmation dialog
+	let deleteDialogOpen = $state(false);
+	let deleteNode = $state<TreeNode | null>(null);
+	let deletingInProgress = $state(false);
+
 	// Validate file name
 	function validateFileName(name: string): boolean {
 		if (!name || name.trim().length === 0) {
@@ -156,11 +161,26 @@
 		}
 	}
 
-	// Handle delete
-	async function handleDelete(file: SandboxFileInfo) {
-		const success = await fileTreeState.deleteFile(file.path);
+	// Handle delete - show confirmation dialog
+	function handleDelete(file: SandboxFileInfo) {
+		deleteNode = file as TreeNode;
+		deleteDialogOpen = true;
+	}
+
+	// Confirm delete
+	async function confirmDelete() {
+		if (!deleteNode || deletingInProgress) {
+			return;
+		}
+
+		deletingInProgress = true;
+		const success = await fileTreeState.deleteFile(deleteNode.path);
+		deletingInProgress = false;
+
 		if (success) {
-			onFileDelete?.(file);
+			onFileDelete?.(deleteNode);
+			deleteDialogOpen = false;
+			deleteNode = null;
 		}
 	}
 
@@ -1014,6 +1034,46 @@
 						<Loader2 class="h-4 w-4 animate-spin" />
 					{/if}
 					{m.text_button_create()}
+				</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<!-- Delete Confirmation Dialog -->
+	<Dialog.Root
+		bind:open={deleteDialogOpen}
+		onOpenChange={(open) => {
+			if (!open && !deletingInProgress) {
+				deleteNode = null;
+				deletingInProgress = false;
+			}
+		}}
+	>
+		<Dialog.Content class="min-w-[400px]">
+			<Dialog.Header>
+				<Dialog.Title>{m.title_confirm_delete()}</Dialog.Title>
+				<Dialog.Description>
+					{m.text_description_confirm_delete({ name: deleteNode?.name ?? "" })}
+				</Dialog.Description>
+			</Dialog.Header>
+
+			<Dialog.Footer class="flex sm:justify-between">
+				<Button
+					variant="secondary"
+					onclick={() => {
+						deleteDialogOpen = false;
+						deleteNode = null;
+						deletingInProgress = false;
+					}}
+					disabled={deletingInProgress}
+				>
+					{m.text_button_cancel()}
+				</Button>
+				<Button variant="destructive" onclick={confirmDelete} disabled={deletingInProgress}>
+					{#if deletingInProgress}
+						<Loader2 class="h-4 w-4 animate-spin" />
+					{/if}
+					{m.text_button_delete()}
 				</Button>
 			</Dialog.Footer>
 		</Dialog.Content>

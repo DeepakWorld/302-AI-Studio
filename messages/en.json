@@ -761,6 +761,8 @@
 	"text_description_rename_file": "Please enter a new file name",
 	"title_button_new_folder": "New Folder",
 	"text_description_new_folder": "Please enter a folder name",
+	"title_confirm_delete": "Confirm Delete",
+	"text_description_confirm_delete": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
 	"placeholder_input_folder_name": "Folder name...",
 	"text_button_create": "Create",
 	"toast_file_rename_invalid_name": "Failed to rename file",

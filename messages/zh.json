@@ -759,6 +759,8 @@
 	"text_description_rename_file": "重命名文件",
 	"title_button_new_folder": "新建文件夹",
 	"text_description_new_folder": "请输入文件夹名称",
+	"title_confirm_delete": "确认删除",
+	"text_description_confirm_delete": "确定要删除 \"{name}\" 吗？此操作无法撤销。",
 	"placeholder_input_folder_name": "文件夹名称...",
 	"text_button_create": "创建",
 	"toast_file_rename_invalid_name": "重命名失败",
