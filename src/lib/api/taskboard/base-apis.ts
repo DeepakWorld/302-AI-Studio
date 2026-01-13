@@ -28,7 +28,10 @@ export async function executeCommand(
 	try {
 		const response = await _302AIKy
 			.post("302/claude-code/commands", {
-				json: request,
+				json: {
+					sandbox_id: request.sandboxId,
+					command: request.command,
+				},
 			})
 			.json();
 
