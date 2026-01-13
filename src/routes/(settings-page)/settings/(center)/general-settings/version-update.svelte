@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import { appInfo } from "$lib/app-info";
+	import { ChangelogItem } from "$lib/components/buss/changelog";
 	import {
 		SettingInfoItem,
 		SettingSelectItem,
@@ -7,8 +9,11 @@
 	} from "$lib/components/buss/settings";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
+	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import { m } from "$lib/paraglide/messages.js";
+	import { changelogState } from "$lib/stores/changelog-state.svelte";
 	import { generalSettings } from "$lib/stores/general-settings.state.svelte";
+	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import Loader2Icon from "@lucide/svelte/icons/loader-2";
 	import type { UpdateChannel } from "@shared/storage/general-settings";
 	import { onMount } from "svelte";
@@ -28,6 +33,10 @@
 	let updateDownloaded = $state(false);
 
 	let isUpdating = $derived(checking || downloading);
+
+	// Check if there's a newer version available based on changelog
+	let hasNewerVersion = $derived(changelogState.hasNewerVersion());
+	let latestVersionNumber = $derived(changelogState.latestVersion?.version ?? null);
 
 	const updateChannelOptions = [
 		{ value: "stable" as UpdateChannel, label: m.update_channel_stable() },
@@ -68,7 +77,14 @@
 		} catch (error) {
 			console.error("Failed to check update status:", error);
 		}
+
+		// Fetch the latest changelog
+		changelogState.fetchLatest();
 	});
+
+	function handleViewFullChangelog() {
+		goto("/settings/about/changelog");
+	}
 
 	onMount(() => {
 		const cleanupChecking = onUpdateChecking(() => {
@@ -139,4 +155,36 @@
 	{/snippet}
 
 	<SettingInfoItem label={m.version_information()} value={appInfo.version} action={updateButton} />
+
+	<!-- New version notification -->
+	{#if hasNewerVersion && latestVersionNumber}
+		<div
+			class="rounded-settings-item bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-4 py-3"
+		>
+			<p class="text-sm text-amber-700 dark:text-amber-300">
+				{m.changelog_new_version_available({ version: latestVersionNumber })}
+			</p>
+		</div>
+	{/if}
+
+	<!-- Latest changelog display -->
+	<div class="flex flex-col gap-2">
+		{#if changelogState.loadingLatest}
+			<Skeleton class="h-14 w-full rounded-settings-item" />
+		{:else if changelogState.latestVersion}
+			<ChangelogItem
+				version={changelogState.latestVersion}
+				isCurrentVersion={changelogState.isCurrentVersion(changelogState.latestVersion.version)}
+				defaultOpen={true}
+			/>
+			<Button
+				variant="link"
+				class="self-start text-sm p-0 h-auto"
+				onclick={handleViewFullChangelog}
+			>
+				{m.changelog_view_full()}
+				<ChevronRightIcon class="size-4 ml-1" />
+			</Button>
+		{/if}
+	</div>
 </div>
