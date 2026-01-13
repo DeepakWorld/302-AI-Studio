@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	export interface LdrsLoaderProps {
-		type: "dot-pulse" | "line-spinner" | "waveform";
+		type: "dot-pulse" | "line-spinner" | "waveform" | "ripples" | "ping";
 		size?: number;
 		speed?: number;
 		color?: string;
@@ -34,6 +34,14 @@
 				const { waveform } = await import("ldrs");
 				waveform.register();
 			})
+			.with("ripples", async () => {
+				const { ripples } = await import("ldrs");
+				ripples.register();
+			})
+			.with("ping", async () => {
+				const { ping } = await import("ldrs");
+				ping.register();
+			})
 			.exhaustive();
 	});
 </script>
@@ -44,4 +52,8 @@
 	<l-line-spinner {size} {speed} {color} {stroke}></l-line-spinner>
 {:else if type === "waveform"}
 	<l-waveform {size} {speed} {color}></l-waveform>
+{:else if type === "ripples"}
+	<l-ripples {size} {speed} {color} {stroke}></l-ripples>
+{:else if type === "ping"}
+	<l-ping {size} {speed} {color} {stroke}></l-ping>
 {/if}

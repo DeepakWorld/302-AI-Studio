@@ -7,13 +7,21 @@ import { codeAgentState } from "./code-agent-state.svelte";
 import { withLoadingState } from "./utils";
 
 export class CodeAgentTaskboardState {
-	taskboardStatus = $state<"idle" | "running">("idle");
+	isTaskboardRunning = $state(false);
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
+
+	inProgressTask = $derived.by<Task | null>(() => {
+		return this.tasklist.find((task) => task.status === "in_progress") ?? null;
+	});
 
 	#isInitialized = $derived(
 		codeAgentState.enabled && codeAgentState.isFreshTab && codeAgentState.sandboxId === "",
 	);
+
+	toggleTaskboardRunningStatus() {
+		this.isTaskboardRunning = !this.isTaskboardRunning;
+	}
 
 	/**
 	 * Synchronizes the tasklist with the backend.
