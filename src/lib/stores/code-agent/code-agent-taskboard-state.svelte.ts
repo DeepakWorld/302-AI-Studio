@@ -24,7 +24,7 @@ export class CodeAgentTaskboardState {
 		await withLoadingState(
 			(loading) => (this.isLoading = loading),
 			async () => {
-				match(this.#isInitialized)
+				await match(this.#isInitialized)
 					.with(true, () => (this.tasklist = []))
 					.otherwise(async () => {
 						const tasklist = await getTasklist(codeAgentState.sandboxId);

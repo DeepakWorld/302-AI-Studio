@@ -6,6 +6,7 @@
 
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button/index.js";
+	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import * as m from "$lib/paraglide/messages";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
@@ -107,6 +108,7 @@
 	}
 
 	const isEmpty = $derived(localTasks.length === 0);
+	const isLoading = $derived(codeAgentTaskboardState.isLoading);
 </script>
 
 {#snippet taskItem(task: Task)}
@@ -175,8 +177,24 @@
 	</div>
 {/snippet}
 
+{#snippet loadingSkeleton()}
+	<div class="flex flex-col gap-2">
+		{#each Array(3) as _, i (i)}
+			<div
+				class="flex items-center gap-3 px-4 py-3 rounded-xl border bg-white dark:bg-zinc-900 border-border/60"
+			>
+				<Skeleton class="size-4 shrink-0" />
+				<Skeleton class="h-4 flex-1" />
+				<Skeleton class="h-6 w-14 rounded-lg" />
+			</div>
+		{/each}
+	</div>
+{/snippet}
+
 <div class="flex flex-col gap-2 p-3">
-	{#if isEmpty}
+	{#if isLoading}
+		{@render loadingSkeleton()}
+	{:else if isEmpty}
 		<div class="flex items-center justify-center py-12 text-muted-foreground">
 			{m.taskboard_empty()}
 		</div>
