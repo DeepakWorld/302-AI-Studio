@@ -8,12 +8,12 @@ export const executeCommandRequestSchema = type({
 export type ExecuteCommandRequest = typeof executeCommandRequestSchema.infer;
 export const executeCommandResponseSchema = type({
 	success: "boolean",
-	result: type({
+	result: {
 		exit_code: "number",
 		stdout: "string",
 		stderr: "string",
 		error: "string",
-	}),
+	},
 });
 export type ExecuteCommandResponse = typeof executeCommandResponseSchema.infer;
 
@@ -40,6 +40,58 @@ export async function executeCommand(
 		return validated;
 	} catch (error) {
 		console.error("Failed to execute command:", error);
+		throw error;
+	}
+}
+
+export const sandboxFileOperationResponseSchema = type({
+	success: "boolean",
+	file: {
+		name: "string",
+		type: "string",
+		path: "string",
+		size: "number",
+	},
+});
+export type SandboxFileOperationResponse = typeof sandboxFileOperationResponseSchema.infer;
+
+/**
+ * Uploads a file to the specified sandbox.
+ * @param sandboxId The ID of the sandbox to upload the file to.
+ * @param path The path where the file should be uploaded.
+ * @param file The file to upload.
+ * @param auto_unzip Whether to automatically unzip the file after upload.
+ * @returns The file operation response.
+ */
+export async function uploadFileToSandbox(
+	sandboxId: string,
+	path: string,
+	file: File,
+	auto_unzip: boolean = false,
+): Promise<SandboxFileOperationResponse> {
+	try {
+		const formData = new FormData();
+		formData.append("sandbox_id", sandboxId);
+		formData.append("path", path);
+		formData.append("file", file);
+		if (auto_unzip) {
+			formData.append("auto_unzip", "true");
+		}
+
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/file/upload", {
+				body: formData,
+			})
+			.json();
+
+		const validated = sandboxFileOperationResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate upload file response:", validated.summary);
+			throw new Error("Invalid response format from upload file API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to upload file:", error);
 		throw error;
 	}
 }
