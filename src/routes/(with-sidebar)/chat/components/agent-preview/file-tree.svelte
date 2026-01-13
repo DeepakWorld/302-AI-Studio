@@ -69,12 +69,15 @@
 		return !invalidChars.test(name);
 	}
 
-	// Handle file click
+	// Handle file click - always allowed, even during streaming (view-only)
 	function handleFileClick(file: SandboxFileInfo) {
 		if (fileTreeState.selectedFile === file.path) return;
 		fileTreeState.selectFile(file);
 		onFileSelect?.(file);
 	}
+
+	// Check if modification operations are disabled (streaming or loading)
+	const isModificationDisabled = $derived(fileTreeState.isStreaming || fileTreeState.loading);
 
 	// Handle create file start
 	function handleCreateFile(parentPath?: string) {
@@ -412,7 +415,7 @@
 			<!-- {#if isDir}
 			<ContextMenu.Item
 				onSelect={() => handleCreateFile(isDir ? node.path : undefined)}
-				disabled={isOperating || fileTreeState.isStreaming}
+				disabled={isOperating || isModificationDisabled}
 			>
 				{#if isOperating}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -426,7 +429,7 @@
 				<!-- Rename -->
 				<ContextMenu.Item
 					onSelect={() => handleRename(node)}
-					disabled={isOperating || fileTreeState.isStreaming}
+					disabled={isOperating || isModificationDisabled}
 				>
 					{#if isOperating}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -435,11 +438,8 @@
 				</ContextMenu.Item>
 			{/if}
 
-			<!-- Copy -->
-			<ContextMenu.Item
-				onSelect={() => handleCopy(node)}
-				disabled={isOperating || fileTreeState.isStreaming}
-			>
+			<!-- Copy - always allowed -->
+			<ContextMenu.Item onSelect={() => handleCopy(node)} disabled={isOperating}>
 				<span>{m.common_copy()}</span>
 			</ContextMenu.Item>
 
@@ -447,7 +447,7 @@
 				<!-- Paste -->
 				<ContextMenu.Item
 					onSelect={() => handlePaste(node)}
-					disabled={!fileTreeState.copiedFilePath || isPasteOperating || fileTreeState.isStreaming}
+					disabled={!fileTreeState.copiedFilePath || isPasteOperating || isModificationDisabled}
 				>
 					{#if isPasteOperating}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -459,7 +459,7 @@
 				<!-- New Folder -->
 				<ContextMenu.Item
 					onSelect={() => handleCreateFolder(node.path)}
-					disabled={isOperating || fileTreeState.isStreaming}
+					disabled={isOperating || isModificationDisabled}
 				>
 					{#if isOperating}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -470,7 +470,7 @@
 				<!-- Create File -->
 				<ContextMenu.Item
 					onSelect={() => handleCreateFile(node.path)}
-					disabled={isOperating || fileTreeState.isStreaming}
+					disabled={isOperating || isModificationDisabled}
 				>
 					{#if isOperating}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -482,7 +482,7 @@
 				<!-- Upload File -->
 				<ContextMenu.Item
 					onSelect={() => triggerFileUpload(node.path)}
-					disabled={isOperating || fileTreeState.isStreaming}
+					disabled={isOperating || isModificationDisabled}
 				>
 					{#if isOperating}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -493,7 +493,7 @@
 				<!-- Upload Folder -->
 				<ContextMenu.Item
 					onSelect={() => handleFolderUpload(node.path)}
-					disabled={isOperating || fileTreeState.isStreaming}
+					disabled={isOperating || isModificationDisabled}
 				>
 					{#if isOperating}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -504,7 +504,7 @@
 
 			<ContextMenu.Separator />
 
-			<!-- Download -->
+			<!-- Download - always allowed -->
 			<ContextMenu.Item onSelect={() => handleDownload(node)} disabled={isDownloading}>
 				{#if isDownloading}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -517,7 +517,7 @@
 			<ContextMenu.Separator />
 			<ContextMenu.Item
 				onSelect={() => handleDelete(node)}
-				disabled={isOperating || fileTreeState.isStreaming}
+				disabled={isOperating || isModificationDisabled}
 				class="text-destructive focus:text-destructive"
 			>
 				{#if isOperating}
@@ -547,7 +547,7 @@
 				};
 				handlePaste(currentDirNode);
 			}}
-			disabled={!fileTreeState.copiedFilePath || isPasteOperating || fileTreeState.isStreaming}
+			disabled={!fileTreeState.copiedFilePath || isPasteOperating || isModificationDisabled}
 		>
 			{#if isPasteOperating}
 				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
@@ -557,23 +557,23 @@
 		<ContextMenu.Separator />
 
 		<!-- New Folder -->
-		<ContextMenu.Item onSelect={() => handleCreateFolder()} disabled={fileTreeState.isStreaming}>
+		<ContextMenu.Item onSelect={() => handleCreateFolder()} disabled={isModificationDisabled}>
 			<span>{m.label_file_tree_new_folder()}</span>
 		</ContextMenu.Item>
 
 		<!-- Create File -->
-		<ContextMenu.Item onSelect={() => handleCreateFile()} disabled={fileTreeState.isStreaming}>
+		<ContextMenu.Item onSelect={() => handleCreateFile()} disabled={isModificationDisabled}>
 			<span>{m.label_file_tree_create_file()}</span>
 		</ContextMenu.Item>
 		<ContextMenu.Separator />
 
 		<!-- Upload File -->
-		<ContextMenu.Item onSelect={() => triggerFileUpload()} disabled={fileTreeState.isStreaming}>
+		<ContextMenu.Item onSelect={() => triggerFileUpload()} disabled={isModificationDisabled}>
 			<span>{m.label_file_tree_upload_file()}</span>
 		</ContextMenu.Item>
 
 		<!-- Upload Folder -->
-		<ContextMenu.Item onSelect={() => handleFolderUpload()} disabled={fileTreeState.isStreaming}>
+		<ContextMenu.Item onSelect={() => handleFolderUpload()} disabled={isModificationDisabled}>
 			<span>{m.label_file_tree_upload_folder()}</span>
 		</ContextMenu.Item>
 	</ContextMenu.Content>
@@ -663,7 +663,7 @@
 				type="button"
 				onclick={() => handleCreateFile()}
 				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-				disabled={fileTreeState.loading || fileTreeState.isStreaming}
+				disabled={isModificationDisabled}
 				title={m.title_button_create_file()}
 			>
 				<FilePlus class="h-4 w-4" strokeWidth={1.25} />
@@ -674,7 +674,7 @@
 				type="button"
 				onclick={() => handleCreateFolder()}
 				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-				disabled={fileTreeState.loading || fileTreeState.isStreaming}
+				disabled={isModificationDisabled}
 				title={m.title_button_new_folder()}
 			>
 				<FolderPlus class="h-4 w-4" strokeWidth={1.25} />
@@ -685,7 +685,7 @@
 				type="button"
 				onclick={() => triggerFileUpload()}
 				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-				disabled={fileTreeState.loading || fileTreeState.isStreaming}
+				disabled={isModificationDisabled}
 				title={m.label_file_tree_upload_file()}
 			>
 				<FileUp class="h-4 w-4" strokeWidth={1.25} />
@@ -696,7 +696,7 @@
 				type="button"
 				onclick={() => handleFolderUpload()}
 				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-				disabled={fileTreeState.loading || fileTreeState.isStreaming}
+				disabled={isModificationDisabled}
 				title={m.label_file_tree_upload_folder()}
 			>
 				<FolderUp class="h-4 w-4" strokeWidth={1.25} />
@@ -712,7 +712,7 @@
 					});
 				}}
 				class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-				disabled={fileTreeState.loading || fileTreeState.isStreaming}
+				disabled={fileTreeState.loading}
 				title={m.label_file_tree_download_all()}
 			>
 				<ArrowDownToLine class="h-4 w-4" strokeWidth={1.25} />
@@ -726,7 +726,7 @@
 					<button
 						type="button"
 						class="rounded p-1 transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1 cursor-pointer"
-						disabled={fileTreeState.loading || fileTreeState.isStreaming}
+						disabled={isModificationDisabled}
 						title={m.common_actions()}
 						aria-label={m.common_actions()}
 					>
@@ -749,19 +749,13 @@
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content align="start">
 					<!-- Create File -->
-					<DropdownMenu.Item
-						onclick={() => handleCreateFile()}
-						disabled={fileTreeState.loading || fileTreeState.isStreaming}
-					>
+					<DropdownMenu.Item onclick={() => handleCreateFile()} disabled={isModificationDisabled}>
 						<FilePlus class="mr-2 h-4 w-4" />
 						<span>{m.label_file_tree_create_file()}</span>
 					</DropdownMenu.Item>
 
 					<!-- Create Folder -->
-					<DropdownMenu.Item
-						onclick={() => handleCreateFolder()}
-						disabled={fileTreeState.loading || fileTreeState.isStreaming}
-					>
+					<DropdownMenu.Item onclick={() => handleCreateFolder()} disabled={isModificationDisabled}>
 						<FolderPlus class="mr-2 h-4 w-4" />
 						<span>{m.label_file_tree_new_folder()}</span>
 					</DropdownMenu.Item>
@@ -769,19 +763,13 @@
 					<DropdownMenu.Separator />
 
 					<!-- Upload File -->
-					<DropdownMenu.Item
-						onclick={() => triggerFileUpload()}
-						disabled={fileTreeState.loading || fileTreeState.isStreaming}
-					>
+					<DropdownMenu.Item onclick={() => triggerFileUpload()} disabled={isModificationDisabled}>
 						<FileUp class="mr-2 h-4 w-4" />
 						<span>{m.label_file_tree_upload_file()}</span>
 					</DropdownMenu.Item>
 
 					<!-- Upload Folder -->
-					<DropdownMenu.Item
-						onclick={() => handleFolderUpload()}
-						disabled={fileTreeState.loading || fileTreeState.isStreaming}
-					>
+					<DropdownMenu.Item onclick={() => handleFolderUpload()} disabled={isModificationDisabled}>
 						<FolderUp class="mr-2 h-4 w-4" />
 						<span>{m.label_file_tree_upload_folder()}</span>
 					</DropdownMenu.Item>
@@ -797,7 +785,7 @@
 								type: "dir",
 							});
 						}}
-						disabled={fileTreeState.loading || fileTreeState.isStreaming}
+						disabled={fileTreeState.loading}
 					>
 						<ArrowDownToLine class="mr-2 h-4 w-4" />
 						<span>{m.label_file_tree_download_all()}</span>

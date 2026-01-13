@@ -109,6 +109,19 @@
 
 		if (result.success) {
 			toast.success("Update session remark success");
+
+			// Mark isManualNote = true for any thread that uses this session
+			try {
+				const { codeAgentService } = window.electronAPI;
+				await codeAgentService.setIsManualNoteBySession(
+					sandbox.sandboxId,
+					targetSession.sessionId,
+					true,
+				);
+			} catch (error) {
+				console.error("[handleConfirmSessionRename] Failed to update isManualNote:", error);
+			}
+
 			// Refresh sessions
 			await claudeCodeSandboxState.refreshSessions(sandbox.sandboxId);
 		} else {

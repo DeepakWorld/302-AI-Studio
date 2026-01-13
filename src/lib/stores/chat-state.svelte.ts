@@ -1,4 +1,3 @@
-import { updateSessionNote } from "$lib/api/sandbox-session";
 import { generateSuggestions } from "$lib/api/suggestions-generation";
 import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
@@ -1017,23 +1016,14 @@ class ChatState {
 				await broadcastService.broadcastToAll("thread-list-updated", {});
 
 				// 如果是 code agent 类型，同步备注到 302.AI
+				// 使用 handleThreadTitleUpdated 以正确检查 isManualNote 标志
 				if (codeAgentState.enabled) {
-					const sandboxId = claudeCodeAgentState.sandboxId;
-					const sessionId = claudeCodeAgentState.currentSessionId;
-					const provider302AI = providerState.getProvider("302AI");
-
-					if (sandboxId && sessionId && provider302AI) {
-						try {
-							await updateSessionNote(provider302AI, {
-								sandbox_id: sandboxId,
-								session_id: sessionId,
-								note: result.title,
-							});
-							console.log("[ChatState] Session note synced to 302.AI");
-						} catch (syncError) {
-							console.error("[ChatState] Failed to sync session note:", syncError);
-							// 不阻塞主流程，只记录错误
-						}
+					try {
+						await claudeCodeAgentState.handleThreadTitleUpdated({ title: result.title });
+						console.log("[ChatState] Session note synced to 302.AI");
+					} catch (syncError) {
+						console.error("[ChatState] Failed to sync session note:", syncError);
+						// 不阻塞主流程，只记录错误
 					}
 				}
 

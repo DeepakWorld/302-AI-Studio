@@ -42,6 +42,11 @@ export const codeAgentMetadata = type({
 	 * thinking budget for claude code
 	 */
 	thinkingBudget: thinkingBudgetType,
+	/**
+	 * Whether the session note was manually set by user.
+	 * If true, auto-generated titles will not overwrite the note.
+	 */
+	isManualNote: "boolean",
 });
 export type CodeAgentMetadata = typeof codeAgentMetadata.infer;
 
