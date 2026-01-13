@@ -1144,5 +1144,16 @@
 	"file_tree_name_placeholder": "Enter name",
 	"file_tree_name_required": "Name is required",
 	"file_tree_name_invalid": "Name contains invalid characters",
-	"label_session_remark": "Session Remark"
+	"label_session_remark": "Session Remark",
+	"changelog_title": "Changelog",
+	"changelog_current_version": "Current Version",
+	"changelog_view_full": "View Full Changelog",
+	"changelog_new": "New",
+	"changelog_improved": "Improved",
+	"changelog_fixed": "Fixed",
+	"changelog_new_version_available": "New version available: {version}",
+	"changelog_loading": "Loading...",
+	"changelog_load_failed": "Failed to load changelog",
+	"changelog_empty": "No changelog available",
+	"changelog_date": "Release Date"
 }

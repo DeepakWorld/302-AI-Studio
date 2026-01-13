@@ -1141,5 +1141,16 @@
 	"file_tree_name_placeholder": "请输入名称",
 	"file_tree_name_required": "名称不能为空",
 	"file_tree_name_invalid": "名称包含非法字符",
-	"label_session_remark": "会话备注"
+	"label_session_remark": "会话备注",
+	"changelog_title": "更新日志",
+	"changelog_current_version": "当前版本",
+	"changelog_view_full": "查看完整更新日志",
+	"changelog_new": "新增",
+	"changelog_improved": "改进",
+	"changelog_fixed": "修复",
+	"changelog_new_version_available": "有新版本可用：{version}",
+	"changelog_loading": "加载中...",
+	"changelog_load_failed": "加载更新日志失败",
+	"changelog_empty": "暂无更新日志",
+	"changelog_date": "发布日期"
 }
