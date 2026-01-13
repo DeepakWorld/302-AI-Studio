@@ -1144,5 +1144,6 @@
 	"file_tree_name_placeholder": "Enter name",
 	"file_tree_name_required": "Name is required",
 	"file_tree_name_invalid": "Name contains invalid characters",
-	"label_session_remark": "Session Remark"
+	"label_session_remark": "Session Remark",
+	"taskboard_update_failed": "Task list update failed, please try again!"
 }

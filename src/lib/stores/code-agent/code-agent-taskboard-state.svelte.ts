@@ -1,5 +1,7 @@
 import { getTasklist, updateTasklist } from "$lib/api/taskboard";
+import { m } from "$lib/paraglide/messages";
 import type { Task } from "@shared/types";
+import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { withLoadingState } from "./utils";
@@ -7,38 +9,51 @@ import { withLoadingState } from "./utils";
 export class CodeAgentTaskboardState {
 	taskboardStatus = $state<"idle" | "running">("idle");
 	isLoading = $state(false);
-	isUpdating = $state(false);
+	tasklist = $state<Task[]>([]);
 
-	#initialTasklist = $state<Task[]>([]);
+	#isInitialized = $derived(
+		codeAgentState.enabled && codeAgentState.isFreshTab && codeAgentState.sandboxId === "",
+	);
 
-	#isInitialized = $derived.by(() => codeAgentState.enabled && codeAgentState.isFreshTab);
-
-	async getTasklist(): Promise<Task[]> {
-		return await withLoadingState(
+	/**
+	 * Synchronizes the tasklist with the backend.
+	 * If the taskboard is not initialized, it will fetch the tasklist from the backend.
+	 * Otherwise, it will use an empty array.
+	 */
+	async syncTasklist(): Promise<void> {
+		await withLoadingState(
 			(loading) => (this.isLoading = loading),
 			async () => {
-				return match(this.#isInitialized)
-					.with(true, () => this.#initialTasklist)
+				match(this.#isInitialized)
+					.with(true, () => (this.tasklist = []))
 					.otherwise(async () => {
 						const tasklist = await getTasklist(codeAgentState.sandboxId);
-						return tasklist.tasks;
+						this.tasklist = tasklist.tasks;
 					});
 			},
 		);
 	}
 
+	/**
+	 * Updates the tasklist in the backend.
+	 * If the taskboard is not initialized, it will update the tasklist in the backend.
+	 * Otherwise, it will use the provided tasklist.
+	 */
 	async updateTasklist(tasklist: Task[]): Promise<void> {
-		await withLoadingState(
-			(loading) => (this.isUpdating = loading),
-			() =>
-				match(this.#isInitialized)
-					.with(true, () => {
-						this.#initialTasklist = tasklist;
-					})
-					.otherwise(async () => {
-						await updateTasklist(codeAgentState.sandboxId, tasklist);
-					}),
-		);
+		match(this.#isInitialized)
+			.with(true, () => {
+				this.tasklist = tasklist;
+			})
+			.otherwise(async () => {
+				this.tasklist = tasklist;
+				const result = await updateTasklist(codeAgentState.sandboxId, tasklist);
+				if (!result.isOk) {
+					const { isOk, tasks } = await getTasklist(codeAgentState.sandboxId);
+					this.tasklist = isOk ? tasks : [];
+
+					toast.error(m.taskboard_update_failed());
+				}
+			});
 	}
 }
 

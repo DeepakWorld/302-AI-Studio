@@ -1141,5 +1141,6 @@
 	"file_tree_name_placeholder": "请输入名称",
 	"file_tree_name_required": "名称不能为空",
 	"file_tree_name_invalid": "名称包含非法字符",
-	"label_session_remark": "会话备注"
+	"label_session_remark": "会话备注",
+	"taskboard_update_failed": "任务列表更新失败，请重试！"
 }
