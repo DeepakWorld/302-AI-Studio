@@ -10,6 +10,7 @@ export class CodeAgentTaskboardState {
 	isTaskboardRunning = $state(false);
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
+	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop">("idle");
 
 	inProgressTask = $derived.by<Task | null>(() => {
 		return this.tasklist.find((task) => task.status === "in_progress") ?? null;

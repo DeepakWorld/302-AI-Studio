@@ -1,19 +1,45 @@
 <script lang="ts">
+	import { ViewerPanel } from "$lib/components/buss/viewer/index.js";
+	import {
+		formatFileSize,
+		getFileIcon,
+		shouldShowPreviewAsThumbnail,
+	} from "$lib/components/buss/viewer/viewer-utils.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import * as m from "$lib/paraglide/messages";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
-	import { X } from "@lucide/svelte";
+	import { Eye, Loader, Paperclip, Trash2 } from "@lucide/svelte";
 	import type { AttachmentFile, Task } from "@shared/types";
 	import { nanoid } from "nanoid";
 	import { toast } from "svelte-sonner";
+	import { SvelteMap } from "svelte/reactivity";
 
 	let inputValue = $state("");
 	let attachments = $state<AttachmentFile[]>([]);
+	let attachmentLoadingMap = new SvelteMap<string, boolean>();
 	let textareaRef = $state<HTMLTextAreaElement | null>(null);
 	let fileInputRef = $state<HTMLInputElement | null>(null);
+	let selectedAttachment = $state<AttachmentFile | null>(null);
+
+	function isAttachmentLoading(id: string): boolean {
+		return attachmentLoadingMap.get(id) ?? false;
+	}
+
+	function setAttachmentLoading(id: string, loading: boolean) {
+		attachmentLoadingMap.set(id, loading);
+	}
+
+	function openViewer(attachment: AttachmentFile) {
+		if (isAttachmentLoading(attachment.id)) return;
+		selectedAttachment = attachment;
+	}
+
+	function closeViewer() {
+		selectedAttachment = null;
+	}
 
 	function handleAdd() {
 		if (inputValue.trim() || attachments.length > 0) {
@@ -72,9 +98,11 @@
 			};
 
 			attachments = [...attachments, attachment];
+			setAttachmentLoading(attachmentId, true);
 
 			generateFilePreview(file).then((preview) => {
 				attachments = attachments.map((a) => (a.id === attachmentId ? { ...a, preview } : a));
+				setAttachmentLoading(attachmentId, false);
 			});
 		}
 	}
@@ -104,28 +132,71 @@
 <div class="p-3 pb-1">
 	<!-- Attachment previews above input -->
 	{#if attachments.length > 0}
-		<div class="flex flex-wrap gap-2 mb-2">
+		<div class="flex gap-2 pb-2">
 			{#each attachments as attachment (attachment.id)}
-				<div class="relative group">
-					{#if attachment.preview}
-						<img
-							src={attachment.preview}
-							alt={attachment.name}
-							class="size-12 rounded object-cover border"
-						/>
-					{:else}
+				{@const isLoading = isAttachmentLoading(attachment.id)}
+				<div class="group relative overflow-hidden rounded-lg border border-border">
+					<button
+						class={cn(
+							"relative size-14",
+							"flex items-center justify-center",
+							attachment.preview && shouldShowPreviewAsThumbnail(attachment) ? "" : "bg-muted",
+							isLoading && "cursor-wait",
+						)}
+						onclick={() => openViewer(attachment)}
+						disabled={isLoading}
+					>
+						{#if attachment.preview && shouldShowPreviewAsThumbnail(attachment)}
+							<img
+								src={attachment.preview}
+								alt={attachment.name}
+								class={cn("h-full w-full object-cover", isLoading && "opacity-50")}
+							/>
+						{:else}
+							{@const IconComponent = getFileIcon(attachment)}
+							<div
+								class={cn(
+									"flex h-full w-full flex-col items-center justify-center gap-y-1 px-0.5 text-muted-foreground",
+									isLoading && "opacity-50",
+								)}
+							>
+								<IconComponent class="size-6" />
+								<span class="max-w-full truncate text-xs leading-none">
+									{attachment.name}
+								</span>
+							</div>
+						{/if}
+
+						{#if isLoading}
+							<div class="absolute inset-0 flex items-center justify-center bg-background/50">
+								<Loader class="size-5 animate-spin" />
+							</div>
+						{/if}
+					</button>
+
+					{#if !isLoading}
 						<div
-							class="size-12 rounded border bg-muted flex items-center justify-center text-xs text-muted-foreground"
+							class={cn(
+								"pointer-events-none absolute inset-0 bg-black/70 text-white",
+								"flex flex-col items-center justify-center",
+								"opacity-0 transition-opacity duration-200 group-hover:opacity-100",
+							)}
 						>
-							{attachment.name.split(".").pop()?.toUpperCase() || "FILE"}
+							<Eye class="size-4" />
+							<div class="absolute right-0 bottom-0 left-0 px-1.5 text-center text-xs">
+								{formatFileSize(attachment.size)}
+							</div>
 						</div>
 					{/if}
-					<button
-						class="absolute -top-1 -right-1 size-4 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-						onclick={() => removeAttachment(attachment.id)}
-					>
-						<X class="size-3" />
-					</button>
+
+					{#if !isLoading}
+						<button
+							onclick={() => removeAttachment(attachment.id)}
+							class="pointer-events-auto absolute top-0.5 right-0 size-4 text-destructive opacity-0 group-hover:opacity-100 cursor-pointer"
+						>
+							<Trash2 class="size-3.5 hover:text-destructive/80" />
+						</button>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -170,7 +241,7 @@
 				class="size-9 rounded-[10px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
 				onclick={handleAttachmentClick}
 			>
-				<!-- <Paperclip class="size-4" /> -->
+				<Paperclip class="size-4" />
 			</button>
 
 			<!-- Right: Add button -->
@@ -180,3 +251,12 @@
 		</div>
 	</div>
 </div>
+
+<!-- Viewer Panel Modal -->
+{#if selectedAttachment}
+	<ViewerPanel
+		attachment={selectedAttachment}
+		isOpen={selectedAttachment !== null}
+		onClose={closeViewer}
+	/>
+{/if}
