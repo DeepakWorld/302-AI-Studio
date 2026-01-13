@@ -107,3 +107,11 @@ export const codeAgentGlobalConfigs = type({
 	autoDeploy: "boolean",
 });
 export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;
+
+export const taskSchema = type({
+	id: "string",
+	content: "string",
+	status: "'pending' | 'in_progress' | 'done'",
+});
+export const taskListSchema = taskSchema.array();
+export type Task = typeof taskSchema.infer;
