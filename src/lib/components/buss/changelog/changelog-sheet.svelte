@@ -11,7 +11,6 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { changelogState } from "$lib/stores/changelog-state.svelte";
 	import ChangelogList from "./changelog-list.svelte";
-	import { onMount } from "svelte";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import { Button } from "$lib/components/ui/button/index.js";
 

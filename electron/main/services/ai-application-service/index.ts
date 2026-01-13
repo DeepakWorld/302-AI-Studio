@@ -3,11 +3,7 @@ import type { AiApplication } from "@shared/types";
 import type { IpcMainInvokeEvent } from "electron";
 import { isUndefined } from "es-toolkit";
 import { nanoid } from "nanoid";
-import {
-	fetch302AIToolDetail,
-	fetch302AIToolList,
-	fetch302AIUserInfo,
-} from "../../apis/ai-applications";
+import { fetch302AIToolDetail, fetch302AIToolList } from "../../apis/ai-applications";
 import { broadcastService, emitter } from "../broadcast-service";
 import { generalSettingsService } from "../settings-service";
 import { aiApplicationStorage } from "../storage-service/ai-application-storage";
@@ -95,9 +91,10 @@ export class AiApplicationService {
 		try {
 			const lang = language ?? (await generalSettingsService.getLanguage());
 
-			const userInfo = await fetch302AIUserInfo(key);
-			const uidBase64 = Buffer.from(userInfo.data.uid.toString(), "utf8").toString("base64");
-			const aiApplicationDetail = await fetch302AIToolDetail(uidBase64);
+			// const userInfo = await fetch302AIUserInfo(key);
+			// const uidBase64 = Buffer.from(userInfo.data.uid.toString(), "utf8").toString("base64");
+
+			const aiApplicationDetail = await fetch302AIToolDetail(key);
 
 			apps.forEach((app) => {
 				const applicationIdStr = app.toolId.toString();
