@@ -130,12 +130,12 @@ const ai302ToolDetailSchema = type({
 
 type Ai302ToolDetail = typeof ai302ToolDetailSchema.infer;
 
-export async function fetch302AIToolDetail(uidBase64: string): Promise<Ai302ToolDetail> {
+export async function fetch302AIToolDetail(apiKey: string): Promise<Ai302ToolDetail> {
 	try {
 		const response = await ky
 			.get("https://dash-api.302.ai/gpt/api/v1/code", {
-				headers: {
-					uid: uidBase64,
+				searchParams: {
+					apikey: apiKey,
 				},
 			})
 			.json();

@@ -42,7 +42,9 @@ export interface FetchChangelogOptions {
  * @param options - Options for the API call
  * @returns Promise resolving to ChangelogResponse
  */
-export async function fetchChangelog(options: FetchChangelogOptions = {}): Promise<ChangelogResponse> {
+export async function fetchChangelog(
+	options: FetchChangelogOptions = {},
+): Promise<ChangelogResponse> {
 	const url = new URL(CHANGELOG_API_URL);
 
 	// Use current language if not specified

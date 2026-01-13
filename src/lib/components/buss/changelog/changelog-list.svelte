@@ -43,7 +43,7 @@
 <div class="flex flex-col gap-3">
 	{#if loading}
 		<div class="flex flex-col gap-3">
-			{#each Array(3) as _}
+			{#each Array(3) as _, i (i)}
 				<Skeleton class="h-14 w-full rounded-settings-item" />
 			{/each}
 		</div>

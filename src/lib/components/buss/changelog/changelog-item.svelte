@@ -53,7 +53,7 @@
 						{m.changelog_new()}:
 					</span>
 					<ul class="list-inside list-disc space-y-1 pl-1">
-						{#each version.changes.new ?? [] as item}
+						{#each version.changes.new ?? [] as item, i (i)}
 							<li class="text-sm text-muted-foreground">
 								{item}
 							</li>
@@ -68,7 +68,7 @@
 						{m.changelog_improved()}:
 					</span>
 					<ul class="list-inside list-disc space-y-1 pl-1">
-						{#each version.changes.improved ?? [] as item}
+						{#each version.changes.improved ?? [] as item, i (i)}
 							<li class="text-sm text-muted-foreground">
 								{item}
 							</li>
@@ -83,7 +83,7 @@
 						{m.changelog_fixed()}:
 					</span>
 					<ul class="list-inside list-disc space-y-1 pl-1">
-						{#each version.changes.fixed ?? [] as item}
+						{#each version.changes.fixed ?? [] as item, i (i)}
 							<li class="text-sm text-muted-foreground">
 								{item}
 							</li>
