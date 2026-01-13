@@ -4,6 +4,7 @@ import { _302AIKy } from "../core/_302ai-ky";
 export const executeCommandRequestSchema = type({
 	sandboxId: "string",
 	command: "string",
+	cwd: "string",
 });
 export type ExecuteCommandRequest = typeof executeCommandRequestSchema.infer;
 export const executeCommandResponseSchema = type({

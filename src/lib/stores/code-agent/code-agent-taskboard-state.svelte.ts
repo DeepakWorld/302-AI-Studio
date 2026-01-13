@@ -3,6 +3,7 @@ import { m } from "$lib/paraglide/messages";
 import type { Task } from "@shared/types";
 import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
+import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { withLoadingState } from "./utils";
 
@@ -11,7 +12,6 @@ export class CodeAgentTaskboardState {
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
 	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop">("idle");
-
 	inProgressTask = $derived.by<Task | null>(() => {
 		return this.tasklist.find((task) => task.status === "in_progress") ?? null;
 	});
@@ -30,13 +30,16 @@ export class CodeAgentTaskboardState {
 	 * Otherwise, it will use an empty array.
 	 */
 	async syncTasklist(): Promise<void> {
+		const path = claudeCodeSandboxState.currentSessionWorkspacePath;
+		console.log({ path });
+
 		await withLoadingState(
 			(loading) => (this.isLoading = loading),
 			async () => {
 				await match(this.#isInitialized)
 					.with(true, () => (this.tasklist = []))
 					.otherwise(async () => {
-						const tasklist = await getTasklist(codeAgentState.sandboxId);
+						const tasklist = await getTasklist(codeAgentState.sandboxId, path);
 						this.tasklist = tasklist.tasks;
 					});
 			},
@@ -49,15 +52,16 @@ export class CodeAgentTaskboardState {
 	 * Otherwise, it will use the provided tasklist.
 	 */
 	async updateTasklist(tasklist: Task[]): Promise<void> {
+		const path = claudeCodeSandboxState.currentSessionWorkspacePath;
 		match(this.#isInitialized)
 			.with(true, () => {
 				this.tasklist = tasklist;
 			})
 			.otherwise(async () => {
 				this.tasklist = tasklist;
-				const result = await updateTasklist(codeAgentState.sandboxId, tasklist);
+				const result = await updateTasklist(codeAgentState.sandboxId, path, tasklist);
 				if (!result.isOk) {
-					const { isOk, tasks } = await getTasklist(codeAgentState.sandboxId);
+					const { isOk, tasks } = await getTasklist(codeAgentState.sandboxId, path);
 					this.tasklist = isOk ? tasks : [];
 
 					toast.error(m.taskboard_update_failed());

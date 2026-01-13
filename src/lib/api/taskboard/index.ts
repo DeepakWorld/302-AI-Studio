@@ -11,7 +11,11 @@ const TODO_TASKS_FILE_PATH = ".302ai/todo/tasks.json";
  * @param content - The raw JSON string content
  * @returns The validated task list or an empty array if repair was needed
  */
-async function validateAndRepairTaskList(sandboxId: string, content: string): Promise<Task[]> {
+async function validateAndRepairTaskList(
+	sandboxId: string,
+	path: string,
+	content: string,
+): Promise<Task[]> {
 	try {
 		const parsed = JSON.parse(content);
 		const validated = taskListSchema(parsed);
@@ -21,14 +25,14 @@ async function validateAndRepairTaskList(sandboxId: string, content: string): Pr
 				"Task list schema validation failed, resetting to empty list:",
 				validated.summary,
 			);
-			await updateTasklist(sandboxId, []);
+			await updateTasklist(sandboxId, path, []);
 			return [];
 		}
 
 		return validated;
 	} catch (error) {
 		console.warn("Task list JSON parse failed, resetting to empty list:", error);
-		await updateTasklist(sandboxId, []);
+		await updateTasklist(sandboxId, path, []);
 		return [];
 	}
 }
@@ -38,12 +42,18 @@ async function validateAndRepairTaskList(sandboxId: string, content: string): Pr
  * @param sandboxId - The sandbox ID
  * @returns The task list
  */
-export async function getTasklist(sandboxId: string): Promise<{ isOk: boolean; tasks: Task[] }> {
+export async function getTasklist(
+	sandboxId: string,
+	cwd: string,
+): Promise<{ isOk: boolean; tasks: Task[] }> {
 	try {
-		const dir = TODO_TASKS_FILE_PATH.substring(0, TODO_TASKS_FILE_PATH.lastIndexOf("/"));
+		const dir = `${cwd}/${TODO_TASKS_FILE_PATH}`;
+		console.log({ dir: `${cwd}/${TODO_TASKS_FILE_PATH}` });
+
 		const response = await executeCommand({
 			sandboxId,
-			command: `mkdir -p ${dir} && if [ ! -f ${TODO_TASKS_FILE_PATH} ]; then echo '[]' > ${TODO_TASKS_FILE_PATH}; fi && cat ${TODO_TASKS_FILE_PATH}`,
+			cwd,
+			command: `mkdir -p ${dir} && if [ ! -f ${dir} ]; then echo '[]' > ${dir}; fi && cat ${dir}`,
 		});
 
 		if (!response.success || response.result.exit_code !== 0) {
@@ -51,7 +61,11 @@ export async function getTasklist(sandboxId: string): Promise<{ isOk: boolean; t
 			return { isOk: false, tasks: [] };
 		}
 
-		const tasks = await validateAndRepairTaskList(sandboxId, response.result.stdout);
+		const tasks = await validateAndRepairTaskList(
+			sandboxId,
+			`${cwd}/${TODO_TASKS_FILE_PATH}`,
+			response.result.stdout,
+		);
 		return { isOk: true, tasks };
 	} catch (error) {
 		console.error("Failed to get task list:", error);
@@ -64,12 +78,20 @@ export async function getTasklist(sandboxId: string): Promise<{ isOk: boolean; t
  * @param sandboxId - The sandbox ID
  * @param tasks - The task list to update
  */
-export async function updateTasklist(sandboxId: string, tasks: Task[]): Promise<{ isOk: boolean }> {
+export async function updateTasklist(
+	sandboxId: string,
+	cwd: string,
+	tasks: Task[],
+): Promise<{ isOk: boolean }> {
 	try {
-		const dir = TODO_TASKS_FILE_PATH.substring(0, TODO_TASKS_FILE_PATH.lastIndexOf("/"));
+		const dir = `${cwd}/${TODO_TASKS_FILE_PATH}`.substring(
+			0,
+			TODO_TASKS_FILE_PATH.lastIndexOf("/"),
+		);
 		const content = JSON.stringify(tasks).replace(/'/g, "'\\''");
 		const response = await executeCommand({
 			sandboxId,
+			cwd,
 			command: `mkdir -p ${dir} && echo '${content}' > ${TODO_TASKS_FILE_PATH}`,
 		});
 
