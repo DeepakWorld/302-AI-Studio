@@ -1,0 +1,209 @@
+<script lang="ts" module>
+	import type { DndEvent } from "svelte-dnd-action";
+
+	type TaskDndEvent = DndEvent<Task>;
+</script>
+
+<script lang="ts">
+	import { Button } from "$lib/components/ui/button/index.js";
+	import * as m from "$lib/paraglide/messages";
+	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { cn } from "$lib/utils.js";
+	import { GripVertical, Trash2 } from "@lucide/svelte";
+	import type { Task } from "@shared/types";
+	import { dndzone, TRIGGERS } from "svelte-dnd-action";
+	import { flip } from "svelte/animate";
+	import { scale } from "svelte/transition";
+
+	interface Props {
+		filter?: "all" | "open" | "done";
+	}
+
+	let { filter = "all" }: Props = $props();
+
+	let draggedElementId = $state<string | null>(null);
+	let isDndFinalizing = $state(false);
+
+	// Local copy of tasks for dnd manipulation
+	let localTasks = $state<Task[]>([]);
+
+	// Filtered tasks based on filter prop
+	const filteredTasks = $derived(() => {
+		const tasks = codeAgentTaskboardState.tasklist;
+		if (filter === "open") return tasks.filter((t) => t.status !== "done");
+		if (filter === "done") return tasks.filter((t) => t.status === "done");
+		return tasks;
+	});
+
+	// Sync local tasks with store (only when not dragging)
+	$effect(() => {
+		if (!draggedElementId && !isDndFinalizing) {
+			localTasks = [...filteredTasks()];
+		}
+	});
+
+	function handleDelete(task: Task) {
+		const updatedTasklist = codeAgentTaskboardState.tasklist.filter((t) => t.id !== task.id);
+		codeAgentTaskboardState.updateTasklist(updatedTasklist);
+	}
+
+	function handleDndConsider(e: CustomEvent<TaskDndEvent>) {
+		const { info, items: newItems } = e.detail;
+
+		if (info.trigger === TRIGGERS.DRAG_STARTED) {
+			// Check if dragged item is done - if so, cancel the drag
+			const draggedTask = localTasks.find((task) => task.id === info.id);
+			if (draggedTask?.status === "done") {
+				return; // Don't allow dragging done tasks
+			}
+			draggedElementId = info.id;
+		}
+
+		// Only update if we're actively dragging a non-done task
+		if (draggedElementId) {
+			const hasOrderChanged = newItems.some((item, index) => item.id !== localTasks[index]?.id);
+			if (hasOrderChanged) localTasks = newItems;
+		}
+	}
+
+	function handleDndFinalize(e: CustomEvent<TaskDndEvent>) {
+		isDndFinalizing = true;
+
+		try {
+			draggedElementId = null;
+			localTasks = e.detail.items;
+
+			// Rebuild full tasklist with new order for filtered items
+			if (filter === "all") {
+				codeAgentTaskboardState.updateTasklist(e.detail.items);
+			} else {
+				// For filtered views, we need to preserve items not in current filter
+				const otherTasks = codeAgentTaskboardState.tasklist.filter((t) => {
+					if (filter === "open") return t.status === "done";
+					if (filter === "done") return t.status !== "done";
+					return false;
+				});
+				codeAgentTaskboardState.updateTasklist([...e.detail.items, ...otherTasks]);
+			}
+		} catch (error) {
+			console.error("Error finalizing drag operation:", error);
+		} finally {
+			queueMicrotask(() => {
+				isDndFinalizing = false;
+			});
+		}
+	}
+
+	function transformDraggedElement(element?: HTMLElement) {
+		if (!element) return;
+
+		try {
+			element.style.outline = "none";
+			element.style.borderRadius = "0.75rem";
+			element.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
+		} catch (error) {
+			console.warn("Error transforming dragged element:", error);
+		}
+	}
+
+	const isEmpty = $derived(localTasks.length === 0);
+</script>
+
+{#snippet taskItem(task: Task)}
+	<div
+		class={cn(
+			"group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200",
+			"bg-white dark:bg-zinc-900 border-border/60 hover:border-primary hover:shadow-md",
+			task.status === "done" && "opacity-80 hover:opacity-100 cursor-default",
+			task.status !== "done" && "cursor-grab active:cursor-grabbing",
+		)}
+	>
+		<!-- Drag handle -->
+		<div
+			class={cn(
+				"shrink-0",
+				task.status === "done" && "opacity-40",
+				task.status !== "done" && "cursor-grab active:cursor-grabbing",
+			)}
+		>
+			<GripVertical class="size-4 text-muted-foreground" />
+		</div>
+
+		<!-- Task content -->
+		<div class="flex-1 min-w-0">
+			<span
+				class={cn(
+					"text-sm truncate block",
+					task.status === "pending" && "font-medium text-foreground",
+					task.status === "in_progress" && "font-medium text-blue-700 dark:text-blue-300",
+					task.status === "done" && "line-through text-muted-foreground",
+				)}
+			>
+				{task.content}
+			</span>
+		</div>
+
+		<!-- Action buttons -->
+		<div class="flex items-center gap-1 shrink-0">
+			{#if task.status === "in_progress"}
+				<span
+					class="text-xs text-blue-600 dark:text-blue-400 font-medium px-2 py-1 bg-blue-100/50 dark:bg-blue-900/30 rounded-lg"
+				>
+					{m.taskboard_status_running()}
+				</span>
+			{:else if task.status === "done"}
+				<span
+					class="text-xs text-emerald-600 dark:text-emerald-400 font-medium px-2 py-1 bg-emerald-100/50 dark:bg-emerald-900/30 rounded-lg"
+				>
+					{m.taskboard_filter_done()}
+				</span>
+			{:else}
+				<span class="text-xs text-muted-foreground font-medium px-2 py-1 bg-muted/50 rounded-lg">
+					{m.taskboard_filter_open()}
+				</span>
+			{/if}
+
+			<Button
+				variant="ghost"
+				size="icon"
+				class="size-7 text-muted-foreground/60 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+				onclick={() => handleDelete(task)}
+			>
+				<Trash2 class="size-3.5" />
+			</Button>
+		</div>
+	</div>
+{/snippet}
+
+<div class="flex flex-col gap-2 p-3">
+	{#if isEmpty}
+		<div class="flex items-center justify-center py-12 text-muted-foreground">
+			{m.taskboard_empty()}
+		</div>
+	{:else}
+		<div
+			class="flex flex-col gap-2"
+			use:dndzone={{
+				items: localTasks,
+				flipDurationMs: 200,
+				dropTargetStyle: {},
+				transformDraggedElement,
+				morphDisabled: true,
+				autoAriaDisabled: false,
+			}}
+			onconsider={handleDndConsider}
+			onfinalize={handleDndFinalize}
+		>
+			{#each localTasks as task (task.id)}
+				<div
+					animate:flip={{ duration: 200 }}
+					out:scale={draggedElementId || isDndFinalizing
+						? { duration: 0 }
+						: { duration: 150, start: 0.9 }}
+				>
+					{@render taskItem(task)}
+				</div>
+			{/each}
+		</div>
+	{/if}
+</div>

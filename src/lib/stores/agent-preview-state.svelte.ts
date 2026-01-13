@@ -227,7 +227,7 @@ class SyncBus {
 	}
 }
 
-export type AgentPreviewTab = "preview" | "code" | "terminal" | "skills";
+export type AgentPreviewTab = "preview" | "code" | "terminal" | "skills" | "taskboard";
 
 export class AgentPreviewState {
 	isVisible = $state(false);

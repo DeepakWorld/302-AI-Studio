@@ -47,12 +47,14 @@
 		TAB_CODE,
 		TAB_PREVIEW,
 		TAB_SKILLS,
+		TAB_TASKBOARD,
 		TAB_TERMINAL,
 		type DeviceMode,
 		type TabType,
 	} from "./constants";
 	import FileTree from "./file-tree.svelte";
 	import SessionDeleted from "./session-deleted.svelte";
+	import TaskboardPanel from "./taskboard/taskboard-panel.svelte";
 	import Terminal from "./terminal.svelte";
 	import { handleError, isFileStillSelected, withRetry } from "./utils";
 
@@ -266,6 +268,7 @@
 		if (isAgentMode) {
 			t.push({ id: TAB_TERMINAL, label: m.label_tab_terminal() });
 			t.push({ id: TAB_SKILLS, label: "Skills" });
+			t.push({ id: TAB_TASKBOARD, label: m.label_tab_taskboard() });
 		}
 		return t;
 	});
@@ -1246,6 +1249,9 @@
 									Sandbox not available
 								</div>
 							{/if}
+						{:else if activeTab === TAB_TASKBOARD && isAgentMode}
+							<!-- Taskboard Tab Content -->
+							<TaskboardPanel />
 						{:else if activeTab === TAB_SKILLS && (isAgentMode || isSkillsOnlyMode || !currentSandboxId)}
 							<!-- Skills Tab Content -->
 							<div class="flex h-full flex-col min-h-0 overflow-hidden">
