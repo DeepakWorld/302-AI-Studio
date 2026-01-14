@@ -17,6 +17,8 @@
 
 	function handleRun() {
 		// codeAgentTaskboardState.taskboardStatus = "running";
+		if (!codeAgentTaskboardState.canStart) return;
+		codeAgentTaskboardState.startAutoExecution();
 	}
 
 	function handlePauseResume() {

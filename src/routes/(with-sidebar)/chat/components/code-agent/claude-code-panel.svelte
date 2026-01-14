@@ -77,6 +77,8 @@
 			}
 		}
 
+		claudeCodeAgentState.handleEnabled();
+
 		handleOverlayAction("enabled");
 	}
 </script>

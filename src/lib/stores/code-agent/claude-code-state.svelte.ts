@@ -87,7 +87,7 @@ class ClaudeCodeAgentState {
 	skills = $derived(persistedClaudeCodeAgentState.current?.skills ?? []);
 	thinkingBudget = $derived(persistedClaudeCodeAgentState.current?.thinkingBudget ?? "off");
 	isManualNote = $derived(persistedClaudeCodeAgentState.current?.isManualNote ?? false);
-	agentMode = $derived.by(() => {
+	agentMode = $derived.by<"new" | "existing">(() => {
 		return this.selectedSessionId === "new" ? "new" : "existing";
 	});
 
@@ -394,6 +394,26 @@ class ClaudeCodeAgentState {
 	handleSkillForceUseToggle(skillName: string, forceUse: boolean): void {
 		const updatedSkills = this.skills.map((s) => (s.name === skillName ? { ...s, forceUse } : s));
 		this.updateSkills(updatedSkills);
+	}
+
+	handleEnabled() {
+		const [isExistingMode, sandboxId, sessionId] = [
+			this.agentMode === "existing",
+			this.selectedSandboxId,
+			this.selectedSessionId,
+		];
+
+		const updateData = isExistingMode
+			? {
+					sandboxId,
+					currentSessionId: sessionId,
+				}
+			: {
+					sandboxId: sandboxId === "auto" ? "" : sandboxId,
+					currentSessionId: "",
+				};
+
+		this.updateState(updateData);
 	}
 }
 
