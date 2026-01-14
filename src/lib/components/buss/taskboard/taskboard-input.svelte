@@ -12,13 +12,12 @@
 	import { cn } from "$lib/utils.js";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { Eye, Loader, Paperclip, Trash2 } from "@lucide/svelte";
-	import type { AttachmentFile, Task } from "@shared/types";
+	import type { AttachmentFile } from "@shared/types";
 	import { nanoid } from "nanoid";
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 
-	let inputValue = $state("");
-	let attachments = $state<AttachmentFile[]>([]);
+	// Local UI state
 	let attachmentLoadingMap = new SvelteMap<string, boolean>();
 	let textareaRef = $state<HTMLTextAreaElement | null>(null);
 	let fileInputRef = $state<HTMLInputElement | null>(null);
@@ -42,19 +41,7 @@
 	}
 
 	function handleAdd() {
-		if (inputValue.trim() || attachments.length > 0) {
-			if (inputValue.trim()) {
-				const newTask: Task = {
-					id: nanoid(),
-					content: inputValue.trim(),
-					status: "pending",
-				};
-				const updatedTasklist = [...codeAgentTaskboardState.tasklist, newTask];
-				codeAgentTaskboardState.updateTasklist(updatedTasklist);
-			}
-			inputValue = "";
-			attachments = [];
-		}
+		codeAgentTaskboardState.addTaskFromInput();
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -79,7 +66,7 @@
 
 	async function processFiles(files: File[]) {
 		for (const file of files) {
-			if (attachments.length >= MAX_ATTACHMENT_COUNT) {
+			if (codeAgentTaskboardState.attachments.length >= MAX_ATTACHMENT_COUNT) {
 				toast.warning(`已达到最大附件数量：${MAX_ATTACHMENT_COUNT}`);
 				break;
 			}
@@ -97,11 +84,11 @@
 				filePath,
 			};
 
-			attachments = [...attachments, attachment];
+			codeAgentTaskboardState.addAttachment(attachment);
 			setAttachmentLoading(attachmentId, true);
 
 			generateFilePreview(file).then((preview) => {
-				attachments = attachments.map((a) => (a.id === attachmentId ? { ...a, preview } : a));
+				codeAgentTaskboardState.updateAttachment(attachmentId, { preview });
 				setAttachmentLoading(attachmentId, false);
 			});
 		}
@@ -123,17 +110,13 @@
 		event.preventDefault();
 		await processFiles(files);
 	}
-
-	function removeAttachment(id: string) {
-		attachments = attachments.filter((a) => a.id !== id);
-	}
 </script>
 
 <div class="p-3 pb-1">
 	<!-- Attachment previews above input -->
-	{#if attachments.length > 0}
+	{#if codeAgentTaskboardState.attachments.length > 0}
 		<div class="flex gap-2 pb-2">
-			{#each attachments as attachment (attachment.id)}
+			{#each codeAgentTaskboardState.attachments as attachment (attachment.id)}
 				{@const isLoading = isAttachmentLoading(attachment.id)}
 				<div class="group relative overflow-hidden rounded-lg border border-border">
 					<button
@@ -191,7 +174,7 @@
 
 					{#if !isLoading}
 						<button
-							onclick={() => removeAttachment(attachment.id)}
+							onclick={() => codeAgentTaskboardState.removeAttachment(attachment.id)}
 							class="pointer-events-auto absolute top-0.5 right-0 size-4 text-destructive opacity-0 group-hover:opacity-100 cursor-pointer"
 						>
 							<Trash2 class="size-3.5 hover:text-destructive/80" />
@@ -219,7 +202,7 @@
 					"border-none shadow-none focus-within:ring-0 focus-within:outline-hidden focus-visible:ring-0",
 				)}
 				placeholder={m.taskboard_input_placeholder()}
-				bind:value={inputValue}
+				bind:value={codeAgentTaskboardState.inputValue}
 				onkeydown={handleKeydown}
 				onpaste={handlePaste}
 			/>

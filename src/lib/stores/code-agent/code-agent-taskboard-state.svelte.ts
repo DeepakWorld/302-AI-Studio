@@ -2,7 +2,8 @@ import { getTasklist, updateTasklist } from "$lib/api/taskboard";
 import { emitter, EventNames } from "$lib/event/emitter";
 import { m } from "$lib/paraglide/messages";
 import type { MessageMetadata } from "$lib/types/chat";
-import type { Task } from "@shared/types";
+import type { AttachmentFile, Task } from "@shared/types";
+import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
 import { chatState } from "../chat-state.svelte";
@@ -18,6 +19,10 @@ export class CodeAgentTaskboardState {
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
 	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop">("idle");
+
+	// Input state
+	inputValue = $state("");
+	attachments = $state<AttachmentFile[]>([]);
 
 	currentExecutingTaskId = $state<string | null>(null);
 
@@ -52,6 +57,48 @@ export class CodeAgentTaskboardState {
 
 	toggleTaskboardRunningStatus() {
 		this.isTaskboardRunning = !this.isTaskboardRunning;
+	}
+
+	// ==================== Input Methods ====================
+
+	/**
+	 * Adds a new task from the current input value and attachments.
+	 */
+	addTaskFromInput() {
+		if (this.inputValue.trim() || this.attachments.length > 0) {
+			if (this.inputValue.trim()) {
+				const newTask: Task = {
+					id: nanoid(),
+					content: this.inputValue.trim(),
+					status: "pending",
+				};
+				const updatedTasklist = [...this.tasklist, newTask];
+				this.updateTasklist(updatedTasklist);
+			}
+			this.inputValue = "";
+			this.attachments = [];
+		}
+	}
+
+	/**
+	 * Adds an attachment to the list.
+	 */
+	addAttachment(attachment: AttachmentFile) {
+		this.attachments = [...this.attachments, attachment];
+	}
+
+	/**
+	 * Updates an attachment by id.
+	 */
+	updateAttachment(id: string, updates: Partial<AttachmentFile>) {
+		this.attachments = this.attachments.map((a) => (a.id === id ? { ...a, ...updates } : a));
+	}
+
+	/**
+	 * Removes an attachment by id.
+	 */
+	removeAttachment(id: string) {
+		this.attachments = this.attachments.filter((a) => a.id !== id);
 	}
 
 	/**

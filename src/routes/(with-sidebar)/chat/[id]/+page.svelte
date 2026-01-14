@@ -219,16 +219,14 @@
 	});
 
 	// Track previous sandboxId for edge detection
-	let previousSandboxId = "";
 
 	// Auto-open preview panel when sandbox is first created (edge trigger)
 	$effect(() => {
 		const sandboxId = claudeCodeAgentState.sandboxId;
 		// Only open when sandboxId changes from empty to non-empty
-		if (codeAgentState.enabled && sandboxId && !previousSandboxId) {
+		if (codeAgentState.inCodeAgentMode) {
 			agentPreviewState.openPreview(sandboxId);
 		}
-		previousSandboxId = sandboxId;
 	});
 
 	async function handleNewExploration() {
