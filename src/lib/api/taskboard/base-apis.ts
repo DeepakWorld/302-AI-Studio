@@ -118,8 +118,12 @@ export type InitProjectResponse = typeof initProjectResponseSchema.infer;
 export async function initProject(request: InitProjectRequest): Promise<InitProjectResponse> {
 	try {
 		const response = await testKy
-			.post("/api/v1/claude-code/sandbox/project/init", {
-				json: request,
+			.post("api/v1/claude-code/sandbox/project/init", {
+				json: {
+					sandbox_id: request.sandboxId,
+					session_id: request.sessionId,
+					workspace_path: request.workspacePath ?? "",
+				},
 			})
 			.json();
 

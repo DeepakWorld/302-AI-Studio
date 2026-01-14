@@ -28,7 +28,7 @@ export class CodeAgentTaskboardState {
 
 	#taskResolve: ((success: boolean) => void) | null = null;
 
-	#isInitialized = $derived(codeAgentState.enabled && codeAgentState.isFreshTab);
+	isInitialized = $derived(codeAgentState.enabled && codeAgentState.isFreshTab);
 
 	inTaskOrchestrationMode = $derived(
 		this.tasklist.length > 0 && this.tasklist.some((task) => task.status === "pending"),
@@ -110,7 +110,7 @@ export class CodeAgentTaskboardState {
 		await withLoadingState(
 			(loading) => (this.isLoading = loading),
 			async () => {
-				await match(this.#isInitialized)
+				await match(this.isInitialized)
 					.with(true, () => this.tasklist)
 					.otherwise(async () => {
 						const [sandboxId, path] = [
@@ -130,7 +130,7 @@ export class CodeAgentTaskboardState {
 	 * Otherwise, it will use the provided tasklist.
 	 */
 	async updateTasklist(tasklist: Task[]): Promise<void> {
-		match(this.#isInitialized)
+		match(this.isInitialized)
 			.with(true, () => {
 				this.tasklist = tasklist;
 			})

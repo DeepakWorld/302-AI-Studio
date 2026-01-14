@@ -1,6 +1,9 @@
+import { initProject } from "$lib/api/taskboard/base-apis";
+import { nanoid } from "nanoid";
 import { chatState } from "../chat-state.svelte";
 import { mcpState } from "../mcp-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
+import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
 
 const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
 
@@ -24,6 +27,20 @@ class CodeAgentSendMessageButtonState {
 		}
 
 		if (sandboxInfo) {
+			let sessionId: string = codeAgentState.sessionId;
+			if (!codeAgentState.sessionId) {
+				sessionId = nanoid();
+				codeAgentState.updateCurrentSessionId(sessionId);
+			}
+
+			if (codeAgentTaskboardState.isInitialized) {
+				const { workspace_path: workspacePath } = await initProject({
+					sandboxId: sandboxInfo.sandboxId,
+					sessionId,
+				});
+				console.log("workspacePath", workspacePath);
+			}
+
 			if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {
 				await codeAgentState.handleCodeAgentModelChange(chatState.selectedModel);
 			}
