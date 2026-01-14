@@ -1,8 +1,15 @@
 <script lang="ts">
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as m from "$lib/paraglide/messages";
+	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils.js";
+	import { toast } from "svelte-sonner";
+	import { match } from "ts-pattern";
+
+	let openModelSelect = $state<() => void>();
 
 	// Derived states from store
 	const isRunning = $derived(codeAgentTaskboardState.taskboardStatus === "running");
@@ -13,8 +20,64 @@
 	const currentTaskContent = $derived(currentTask?.content ?? "—");
 	const buttonText = $derived(codeAgentTaskboardState.buttonText);
 
-	function handleRun() {
-		codeAgentTaskboardState.startAutoExecution();
+	const hasConfiguredProviders = $derived(() => {
+		return persistedProviderState.current.some(
+			(provider) => provider.enabled && provider.apiKey && provider.apiKey.trim() !== "",
+		);
+	});
+
+	async function handleGoToModelSettings() {
+		await window.electronAPI.windowService.handleOpenSettingsWindow("/settings/model-settings");
+	}
+
+	async function handleRun() {
+		const fn = () =>
+			match({
+				isEmpty: chatState.inputValue.trim() === "" && chatState.attachments.length === 0,
+				noProviders: !hasConfiguredProviders(),
+				noModel: chatState.selectedModel === null,
+			})
+				.with({ isEmpty: true }, () => {
+					toast.warning(m.toast_empty_message());
+				})
+				.with({ noProviders: true }, () => {
+					toast.info(m.toast_no_provider_configured(), {
+						action: {
+							label: m.text_button_go_to_settings(),
+							onClick: () => handleGoToModelSettings(),
+						},
+					});
+				})
+				.with({ noModel: true }, () => {
+					toast.warning(m.toast_no_model(), {
+						action: {
+							label: m.text_button_select_model(),
+							onClick: () => {
+								if (!hasConfiguredProviders()) {
+									toast.info(m.toast_no_provider_configured(), {
+										action: {
+											label: m.text_button_go_to_settings(),
+											onClick: () => handleGoToModelSettings(),
+										},
+									});
+									return;
+								}
+								openModelSelect?.();
+							},
+						},
+					});
+				})
+				.otherwise(() => {
+					if (chatState.hasMessages) {
+						chatState.sendMessage();
+					} else {
+						document.startViewTransition(() => chatState.sendMessage());
+					}
+				});
+
+		codeAgentTaskboardState.startAutoExecution(async () => {
+			await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+		});
 	}
 </script>
 

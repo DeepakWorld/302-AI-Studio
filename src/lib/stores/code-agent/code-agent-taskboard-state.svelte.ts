@@ -153,7 +153,7 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Starts the auto execution of tasks.
 	 */
-	async startAutoExecution(): Promise<void> {
+	async startAutoExecution(fn: () => Promise<void>): Promise<void> {
 		match(this.taskboardStatus)
 			.with("running", () => {
 				this.taskboardStatus = "waiting_to_stop";
@@ -163,14 +163,14 @@ export class CodeAgentTaskboardState {
 			})
 			.with("idle", () => {
 				this.taskboardStatus = "running";
-				this.#executeLoop();
+				this.#executeLoop(fn);
 			});
 	}
 
 	/**
 	 * Executes the task loop.
 	 */
-	async #executeLoop(): Promise<void> {
+	async #executeLoop(fn: () => Promise<void>): Promise<void> {
 		while (this.taskboardStatus === "running") {
 			const nextTask = this.tasklist.find(
 				(t) => t.status === "in_progress" || t.status === "pending",
@@ -181,7 +181,7 @@ export class CodeAgentTaskboardState {
 				break;
 			}
 
-			await this.#executeTask(nextTask);
+			await this.#executeTask(nextTask, fn);
 
 			// Check if we need to pause (status may have been modified externally during await)
 			if (this.taskboardStatus !== "running") {
@@ -196,7 +196,7 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Executes a single task.
 	 */
-	async #executeTask(task: Task): Promise<void> {
+	async #executeTask(task: Task, fn: () => Promise<void>): Promise<void> {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
 
@@ -210,7 +210,7 @@ export class CodeAgentTaskboardState {
 			while (this.#currentRetryCount < this.#MAX_RETRY_COUNT) {
 				const message = this.#currentRetryCount === 0 ? task.content : m.text_continue();
 				chatState.inputValue = message;
-				await chatState.sendMessage();
+				await fn();
 
 				const success = await this.#waitForChatFinished();
 

@@ -168,6 +168,8 @@ class ChatState {
 	isParametersOpen = $state(false);
 	isCreateSkillMode = $state(false);
 
+	async handleSendMessage() {}
+
 	/**
 	 * Cancel any pending suggestions generation request.
 	 * Should be called before sending a new message to avoid race conditions.

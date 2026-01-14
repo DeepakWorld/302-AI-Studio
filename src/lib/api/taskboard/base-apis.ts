@@ -1,5 +1,6 @@
 import { type } from "arktype";
 import { _302AIKy } from "../core/_302ai-ky";
+import { testKy } from "../core/test-ky";
 
 export const executeCommandRequestSchema = type({
 	sandboxId: "string",
@@ -96,6 +97,40 @@ export async function uploadFileToSandbox(
 		return validated;
 	} catch (error) {
 		console.error("Failed to upload file:", error);
+		throw error;
+	}
+}
+
+export const initProjectRequestSchema = type({
+	sandboxId: "string",
+	sessionId: "string",
+	workspacePath: "string?",
+});
+export type InitProjectRequest = typeof initProjectRequestSchema.infer;
+export const initProjectResponseSchema = type({
+	success: "boolean",
+	workspace_path: "string",
+	session_id: "string",
+	message: "string",
+});
+export type InitProjectResponse = typeof initProjectResponseSchema.infer;
+
+export async function initProject(request: InitProjectRequest): Promise<InitProjectResponse> {
+	try {
+		const response = await testKy
+			.post("/api/v1/claude-code/sandbox/project/init", {
+				json: request,
+			})
+			.json();
+
+		const validated = initProjectResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate init project response:", validated.summary);
+			throw new Error("Invalid response format from init project API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to init project:", error);
 		throw error;
 	}
 }
