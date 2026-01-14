@@ -54,7 +54,7 @@
 	} from "./constants";
 	import FileTree from "./file-tree.svelte";
 	import SessionDeleted from "./session-deleted.svelte";
-	import TaskboardPanel from "./taskboard/taskboard-panel.svelte";
+	import { TaskboardPanel } from "$lib/components/buss/taskboard";
 	import Terminal from "./terminal.svelte";
 	import { handleError, isFileStillSelected, withRetry } from "./utils";
 
