@@ -170,7 +170,7 @@
 		</div>
 
 		<!-- Action buttons -->
-		<div class="flex items-center gap-1 shrink-0">
+		<div class="flex items-center shrink-0">
 			{#if task.status === "in_progress"}
 				<span
 					class="text-xs text-blue-600 dark:text-blue-400 font-medium px-2 py-1 bg-blue-100/50 dark:bg-blue-900/30 rounded-lg"
@@ -189,25 +189,31 @@
 				</span>
 			{/if}
 
-			{#if task.status === "pending"}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="size-7 text-muted-foreground/60 hover:text-primary hover:bg-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-					onclick={() => handleEdit(task)}
-				>
-					<SquarePen class="size-3.5" />
-				</Button>
-			{/if}
-
-			<Button
-				variant="ghost"
-				size="icon"
-				class="size-7 text-muted-foreground/60 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-				onclick={() => handleDelete(task)}
+			<div
+				class="flex items-center overflow-hidden max-w-0 group-hover:max-w-20 transition-all duration-300 ease-in-out"
 			>
-				<Trash2 class="size-3.5" />
-			</Button>
+				<div class="flex items-center gap-1 pl-2">
+					{#if task.status === "pending"}
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-7 text-muted-foreground/60 hover:text-primary hover:bg-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+							onclick={() => handleEdit(task)}
+						>
+							<SquarePen class="size-3.5" />
+						</Button>
+					{/if}
+
+					<Button
+						variant="ghost"
+						size="icon"
+						class="size-7 text-muted-foreground/60 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+						onclick={() => handleDelete(task)}
+					>
+						<Trash2 class="size-3.5" />
+					</Button>
+				</div>
+			</div>
 		</div>
 	</div>
 {/snippet}

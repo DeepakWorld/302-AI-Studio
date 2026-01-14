@@ -9,23 +9,11 @@
 	const currentTask = $derived(
 		codeAgentTaskboardState.tasklist.find((t) => t.status === "in_progress"),
 	);
-	const hasOpenTasks = $derived(
-		codeAgentTaskboardState.tasklist.some((t) => t.status === "pending"),
-	);
 	const currentTaskContent = $derived(currentTask?.content ?? "—");
+	const buttonText = $derived(codeAgentTaskboardState.buttonText);
 
 	function handleRun() {
-		if (isRunning) {
-			// 暂停
-			codeAgentTaskboardState.taskboardStatus = "idle";
-		} else if (currentTask) {
-			// 继续（有进行中的任务）
-			codeAgentTaskboardState.taskboardStatus = "running";
-		} else {
-			// 启动新任务
-			if (!codeAgentTaskboardState.canStart) return;
-			codeAgentTaskboardState.startAutoExecution();
-		}
+		codeAgentTaskboardState.startAutoExecution();
 	}
 </script>
 
@@ -61,16 +49,10 @@
 				<Button
 					variant="default"
 					size="sm"
-					disabled={!hasOpenTasks && !isRunning && !currentTask}
+					disabled={!codeAgentTaskboardState.canStart && !isRunning && !currentTask}
 					onclick={handleRun}
 				>
-					{#if isRunning}
-						{m.taskboard_button_pause()}
-					{:else if currentTask}
-						{m.taskboard_button_resume()}
-					{:else}
-						{m.taskboard_button_run()}
-					{/if}
+					{buttonText}
 				</Button>
 			</div>
 		</div>

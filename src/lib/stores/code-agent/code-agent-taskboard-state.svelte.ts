@@ -39,6 +39,19 @@ export class CodeAgentTaskboardState {
 	canPause = $derived(this.taskboardStatus === "running");
 	isWaitingToStop = $derived(this.taskboardStatus === "waiting_to_stop");
 
+	buttonText = $derived.by(() => {
+		return match(this.taskboardStatus)
+			.with("running", () => m.taskboard_button_pause())
+			.with("waiting_to_stop", () => m.taskboard_button_resume())
+			.with("idle", () => {
+				if (this.tasklist.some((t) => t.status === "in_progress")) {
+					return m.taskboard_button_resume();
+				}
+				return m.taskboard_button_run();
+			})
+			.exhaustive();
+	});
+
 	toggleTaskboardRunningStatus() {
 		this.isTaskboardRunning = !this.isTaskboardRunning;
 	}
@@ -93,16 +106,30 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
-	 * Starts or continues automatic execution of the task list.
-	 * @returns A promise that resolves when the execution is complete.
+	 * Starts the auto execution of tasks.
 	 */
 	async startAutoExecution(): Promise<void> {
-		if (this.taskboardStatus === "running") return;
+		match(this.taskboardStatus)
+			.with("running", () => {
+				this.taskboardStatus = "waiting_to_stop";
+			})
+			.with("waiting_to_stop", () => {
+				this.taskboardStatus = "running";
+			})
+			.with("idle", () => {
+				this.taskboardStatus = "running";
+				this.#executeLoop();
+			});
+	}
 
-		this.taskboardStatus = "running";
-
+	/**
+	 * Executes the task loop.
+	 */
+	async #executeLoop(): Promise<void> {
 		while (this.taskboardStatus === "running") {
-			const nextTask = this.tasklist.find((t) => t.status === "pending");
+			const nextTask = this.tasklist.find(
+				(t) => t.status === "in_progress" || t.status === "pending",
+			);
 
 			if (!nextTask) {
 				this.taskboardStatus = "idle";
@@ -111,28 +138,13 @@ export class CodeAgentTaskboardState {
 
 			await this.#executeTask(nextTask);
 
-			// Check if we should stop (status may have been changed by pauseAutoExecution during await)
-			if (this.#shouldStop()) {
-				this.taskboardStatus = "idle";
+			// Check if we need to pause (status may have been modified externally during await)
+			if (this.taskboardStatus !== "running") {
+				if (this.taskboardStatus === "waiting_to_stop") {
+					this.taskboardStatus = "idle";
+				}
 				break;
 			}
-		}
-	}
-
-	/**
-	 * Checks if the taskboard should stop executing tasks.
-	 * @returns True if the taskboard should stop, false otherwise.
-	 */
-	#shouldStop(): boolean {
-		return this.taskboardStatus === "waiting_to_stop" || this.taskboardStatus === "idle";
-	}
-
-	/**
-	 * Pauses automatic execution (waits for current task to complete)
-	 */
-	pauseAutoExecution(): void {
-		if (this.taskboardStatus === "running") {
-			this.taskboardStatus = "waiting_to_stop";
 		}
 	}
 
@@ -142,7 +154,10 @@ export class CodeAgentTaskboardState {
 	async #executeTask(task: Task): Promise<void> {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
-		await this.#updateTaskStatus(task.id, "in_progress");
+
+		if (task.status === "pending") {
+			await this.#updateTaskStatus(task.id, "in_progress");
+		}
 
 		const off = emitter.on(EventNames.CHAT_FINISHED, this.#handleChatFinished);
 
@@ -152,10 +167,7 @@ export class CodeAgentTaskboardState {
 				chatState.inputValue = message;
 				await chatState.sendMessage();
 
-				// 等待 CHAT_FINISHED 事件
-				const success = await new Promise<boolean>((resolve) => {
-					this.#taskResolve = resolve;
-				});
+				const success = await this.#waitForChatFinished();
 
 				if (success) {
 					await this.#updateTaskStatus(task.id, "done");
@@ -173,6 +185,12 @@ export class CodeAgentTaskboardState {
 			this.currentExecutingTaskId = null;
 			this.#taskResolve = null;
 		}
+	}
+
+	#waitForChatFinished(): Promise<boolean> {
+		return new Promise<boolean>((resolve) => {
+			this.#taskResolve = resolve;
+		});
 	}
 
 	/**
