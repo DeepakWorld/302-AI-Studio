@@ -10,11 +10,12 @@
 	import * as m from "$lib/paraglide/messages";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
-	import { GripVertical, Trash2 } from "@lucide/svelte";
+	import { GripVertical, SquarePen, Trash2 } from "@lucide/svelte";
 	import type { Task } from "@shared/types";
 	import { dndzone, TRIGGERS } from "svelte-dnd-action";
 	import { flip } from "svelte/animate";
 	import { scale } from "svelte/transition";
+	import TaskEditDialog from "./task-edit-dialog.svelte";
 
 	interface Props {
 		filter?: "all" | "open" | "done";
@@ -27,6 +28,10 @@
 
 	// Local copy of tasks for dnd manipulation
 	let localTasks = $state<Task[]>([]);
+
+	// Edit dialog state
+	let editDialogOpen = $state(false);
+	let editingTask = $state<Task | null>(null);
 
 	// Filtered tasks based on filter prop
 	const filteredTasks = $derived(() => {
@@ -46,6 +51,25 @@
 	function handleDelete(task: Task) {
 		const updatedTasklist = codeAgentTaskboardState.tasklist.filter((t) => t.id !== task.id);
 		codeAgentTaskboardState.updateTasklist(updatedTasklist);
+	}
+
+	function handleEdit(task: Task) {
+		editingTask = task;
+		editDialogOpen = true;
+	}
+
+	function handleEditSave(updatedContent: string) {
+		if (!editingTask) return;
+
+		const updatedTasklist = codeAgentTaskboardState.tasklist.map((t) =>
+			t.id === editingTask!.id ? { ...t, content: updatedContent } : t,
+		);
+		codeAgentTaskboardState.updateTasklist(updatedTasklist);
+		editingTask = null;
+	}
+
+	function handleEditClose() {
+		editingTask = null;
 	}
 
 	function handleDndConsider(e: CustomEvent<TaskDndEvent>) {
@@ -165,6 +189,17 @@
 				</span>
 			{/if}
 
+			{#if task.status === "pending"}
+				<Button
+					variant="ghost"
+					size="icon"
+					class="size-7 text-muted-foreground/60 hover:text-primary hover:bg-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+					onclick={() => handleEdit(task)}
+				>
+					<SquarePen class="size-3.5" />
+				</Button>
+			{/if}
+
 			<Button
 				variant="ghost"
 				size="icon"
@@ -225,3 +260,11 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Edit Task Dialog -->
+<TaskEditDialog
+	bind:open={editDialogOpen}
+	task={editingTask}
+	onSave={handleEditSave}
+	onClose={handleEditClose}
+/>
