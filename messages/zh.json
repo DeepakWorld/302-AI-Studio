@@ -721,7 +721,7 @@
 	"label_tab_taskboard": "任务板",
 	"taskboard_title": "AI 任务板",
 	"taskboard_subtitle": "执行中可添加任务；可拖动未开始任务排序；完成自动打勾",
-	"taskboard_input_placeholder": "添加任务...（执行中也可以加）",
+	"taskboard_input_placeholder": "添加任务...",
 	"taskboard_button_add": "添加",
 	"taskboard_filter_all": "全部",
 	"taskboard_filter_open": "未完成",

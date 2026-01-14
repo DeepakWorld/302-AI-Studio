@@ -725,7 +725,7 @@
 	"label_tab_taskboard": "Taskboard",
 	"taskboard_title": "AI Taskboard",
 	"taskboard_subtitle": "Add tasks during execution; drag to reorder pending tasks; auto-check on completion",
-	"taskboard_input_placeholder": "Add task... (can add during execution)",
+	"taskboard_input_placeholder": "Add task...",
 	"taskboard_button_add": "Add",
 	"taskboard_filter_all": "All",
 	"taskboard_filter_open": "Open",
