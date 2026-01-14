@@ -1072,6 +1072,7 @@
   "export_success": "Export successful",
   "export_failed": "Export failed",
   "export_conversation_title": "Conversation",
+  "export_empty_message": "(Empty message)",
   "export_format_link": "Link",
   "export_share_link_title": "Share Link",
   "export_open_link": "Open",

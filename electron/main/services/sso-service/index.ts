@@ -1,53 +1,8 @@
-import { app, shell, type IpcMainInvokeEvent } from "electron";
+import { shell, type IpcMainInvokeEvent } from "electron";
 
 export class SsoService {
 	private pendingCallback: ((apiKey: string) => void) | null = null;
 	private callbackTimeout: NodeJS.Timeout | null = null;
-	private isInitialized = false;
-
-	/**
-	 * Initialize SSO service - must be called before app.ready
-	 */
-	initializeProtocolHandler() {
-		if (this.isInitialized) {
-			return;
-		}
-
-		console.log("[SSO] Initializing protocol handler");
-
-		// Register custom protocol handler for SSO callback
-		if (!app.isDefaultProtocolClient("302aistudio")) {
-			const result = app.setAsDefaultProtocolClient("302aistudio");
-			console.log("[SSO] Set as default protocol client result:", result);
-		} else {
-			console.log("[SSO] Already set as default protocol client");
-		}
-
-		// Handle deep links (macOS/Linux)
-		app.on("open-url", (event, url) => {
-			console.log("[SSO] open-url event received:", url);
-			event.preventDefault();
-			this.handleSsoCallback(url);
-		});
-
-		this.isInitialized = true;
-	}
-
-	/**
-	 * Setup second instance handler - must be called after single instance lock
-	 */
-	setupSecondInstanceHandler() {
-		// Handle deep links (Windows) via second-instance event
-		app.on("second-instance", (_event, commandLine, _workingDirectory) => {
-			console.log("[SSO] second-instance handler in SSO service, commandLine:", commandLine);
-			// Windows: commandLine contains the deep link URL
-			const url = commandLine.find((arg) => arg.startsWith("302aistudio://"));
-			if (url) {
-				console.log("[SSO] Found SSO deep link:", url);
-				this.handleSsoCallback(url);
-			}
-		});
-	}
 
 	/**
 	 * Open SSO login in external browser
@@ -122,39 +77,6 @@ export class SsoService {
 				resolve({ success: true, apiKey });
 			};
 		});
-	}
-
-	/**
-	 * Handle SSO callback from deep link
-	 */
-	private handleSsoCallback(url: string) {
-		console.log("[SSO] Received callback URL:", url);
-
-		try {
-			// Parse URL: 302aistudio://auth/callback?apikey=xxx&uid=xxx&username=xxx
-			const parsedUrl = new URL(url);
-			console.log("[SSO] Parsed URL:", {
-				protocol: parsedUrl.protocol,
-				host: parsedUrl.host,
-				pathname: parsedUrl.pathname,
-				search: parsedUrl.search,
-			});
-
-			const apiKey = parsedUrl.searchParams.get("apikey");
-			console.log("[SSO] Extracted API key:", apiKey ? "exists" : "missing");
-
-			if (apiKey && this.pendingCallback) {
-				console.log("[SSO] API Key received, calling callback");
-				this.pendingCallback(apiKey);
-			} else {
-				console.warn("[SSO] No API key or no pending callback", {
-					hasApiKey: !!apiKey,
-					hasPendingCallback: !!this.pendingCallback,
-				});
-			}
-		} catch (error) {
-			console.error("[SSO] Failed to parse callback URL:", error);
-		}
 	}
 
 	/**

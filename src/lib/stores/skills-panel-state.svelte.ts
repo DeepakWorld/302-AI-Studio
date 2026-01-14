@@ -14,12 +14,15 @@ export type SkillView =
 	| { type: "create-select" } // 选择创建方式
 	| { type: "create-manual" }
 	| { type: "create-upload" }
-	| { type: "create-github" }
+	| { type: "create-github"; initialUrl?: string }
 	| { type: "create-history" };
 
 class SkillsPanelState {
 	// 视图堆栈
 	viewStack = $state<SkillView[]>([{ type: "list" }]);
+
+	// 预设的 GitHub URL（用于外部导入）
+	pendingGitHubUrl = $state<string | null>(null);
 
 	// 当前视图
 	get currentView(): SkillView {
@@ -118,6 +121,17 @@ class SkillsPanelState {
 			| "create-github"
 			| "create-history";
 		this.push({ type: viewType });
+	}
+
+	// 导航到 GitHub 创建页面并预设 URL（用于外部导入）
+	goToCreateGitHubWithUrl(url: string) {
+		this.pendingGitHubUrl = url;
+		this.viewStack = [{ type: "list" }, { type: "create-github", initialUrl: url }];
+	}
+
+	// 清除预设的 GitHub URL
+	clearPendingGitHubUrl() {
+		this.pendingGitHubUrl = null;
 	}
 }
 
