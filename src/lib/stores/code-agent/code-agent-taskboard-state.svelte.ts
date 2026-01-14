@@ -42,7 +42,7 @@ export class CodeAgentTaskboardState {
 	buttonText = $derived.by(() => {
 		return match(this.taskboardStatus)
 			.with("running", () => m.taskboard_button_pause())
-			.with("waiting_to_stop", () => m.taskboard_button_resume())
+			.with("waiting_to_stop", () => m.taskboard_button_waiting_to_stop())
 			.with("idle", () => {
 				if (this.tasklist.some((t) => t.status === "in_progress")) {
 					return m.taskboard_button_resume();
