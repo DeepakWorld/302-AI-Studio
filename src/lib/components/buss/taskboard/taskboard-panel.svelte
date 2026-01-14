@@ -1,16 +1,17 @@
 <script lang="ts">
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
-	import TaskboardTopbar from "./taskboard-topbar.svelte";
+	import { onMount } from "svelte";
+	import TaskboardInput from "./taskboard-input.svelte";
 	import TaskboardList from "./taskboard-list.svelte";
 	import TaskboardRunner from "./taskboard-runner.svelte";
-	import TaskboardInput from "./taskboard-input.svelte";
+	import TaskboardTopbar from "./taskboard-topbar.svelte";
 
 	type FilterValue = "all" | "open" | "done";
 
 	let filter = $state<FilterValue>("all");
 
 	// Sync tasklist on mount
-	$effect(() => {
+	onMount(() => {
 		codeAgentTaskboardState.syncTasklist();
 	});
 

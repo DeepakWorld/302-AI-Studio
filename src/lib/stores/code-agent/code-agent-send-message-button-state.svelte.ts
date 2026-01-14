@@ -1,3 +1,4 @@
+import { updateTasklist } from "$lib/api/taskboard";
 import { initProject } from "$lib/api/taskboard/base-apis";
 import { nanoid } from "nanoid";
 import { chatState } from "../chat-state.svelte";
@@ -38,7 +39,11 @@ class CodeAgentSendMessageButtonState {
 					sandboxId: sandboxInfo.sandboxId,
 					sessionId,
 				});
-				console.log("workspacePath", workspacePath);
+				await updateTasklist(
+					sandboxInfo.sandboxId,
+					workspacePath,
+					codeAgentTaskboardState.tasklist,
+				);
 			}
 
 			if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {
