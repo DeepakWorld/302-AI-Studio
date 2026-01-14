@@ -359,14 +359,24 @@
 		await tabBarState.updateTabTitle(renameTargetThreadId, trimmedName);
 
 		// Update session note for code agent threads (preserves original sessionId)
+		// But skip if user has manually set the session note
 		if (agentInfo.isCodeAgent && agentInfo.sandboxId && agentInfo.sessionId) {
-			const providerResult = validate302Provider(persistedProviderState.current);
-			if (providerResult.valid && providerResult.provider) {
-				updateSessionNote(providerResult.provider, {
-					note: trimmedName,
-					sandbox_id: agentInfo.sandboxId,
-					session_id: agentInfo.sessionId,
-				});
+			// Check if the session note was manually set by user
+			const claudeStateKey = `CodeAgentStorage:claude-code-agent-state-${renameTargetThreadId}`;
+			const claudeState = (await window.electronAPI.storageService.getItem(claudeStateKey)) as
+				| CodeAgentMetadata
+				| undefined;
+			const isManualNote = claudeState?.isManualNote ?? false;
+
+			if (!isManualNote) {
+				const providerResult = validate302Provider(persistedProviderState.current);
+				if (providerResult.valid && providerResult.provider) {
+					updateSessionNote(providerResult.provider, {
+						note: trimmedName,
+						sandbox_id: agentInfo.sandboxId,
+						session_id: agentInfo.sessionId,
+					});
+				}
 			}
 		}
 

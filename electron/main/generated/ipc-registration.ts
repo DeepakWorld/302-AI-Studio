@@ -196,6 +196,11 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:getThreadIdBySessionId", (event, sandboxId, sessionId) =>
 		codeAgentService.getThreadIdBySessionId(event, sandboxId, sessionId),
 	);
+	ipcMain.handle(
+		"codeAgentService:setIsManualNoteBySession",
+		(event, sandboxId, sessionId, isManualNote) =>
+			codeAgentService.setIsManualNoteBySession(event, sandboxId, sessionId, isManualNote),
+	);
 
 	// ghostWindowService service registration
 	ipcMain.handle("ghostWindowService:startTracking", (event) =>
@@ -517,6 +522,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:findClaudeCodeSandboxWithValidDisk");
 	ipcMain.removeHandler("codeAgentService:addClaudeCodeSandboxMCP");
 	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
+	ipcMain.removeHandler("codeAgentService:setIsManualNoteBySession");
 	ipcMain.removeHandler("ghostWindowService:startTracking");
 	ipcMain.removeHandler("ghostWindowService:stopTracking");
 	ipcMain.removeHandler("ghostWindowService:updateInsertIndex");

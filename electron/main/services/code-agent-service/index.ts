@@ -443,6 +443,38 @@ export class CodeAgentService {
 			return { isOK: false, threadId: "" };
 		}
 	}
+
+	/**
+	 * Set isManualNote flag for all threads that use the specified sandbox and session.
+	 * This is called when user manually edits session note from settings dialog.
+	 */
+	async setIsManualNoteBySession(
+		_event: IpcMainInvokeEvent,
+		sandboxId: string,
+		sessionId: string,
+		isManualNote: boolean,
+	): Promise<{ isOK: boolean; updatedCount: number }> {
+		try {
+			const keys = await claudeCodeStorage.getKeysInternal();
+			let updatedCount = 0;
+
+			for (const key of keys) {
+				if (key.startsWith("claude-code-agent-state-")) {
+					const state = await claudeCodeStorage.getItemInternal(key);
+					if (state && state.sandboxId === sandboxId && state.currentSessionId === sessionId) {
+						state.isManualNote = isManualNote;
+						await claudeCodeStorage.setItemInternal(key, state);
+						updatedCount++;
+					}
+				}
+			}
+
+			return { isOK: true, updatedCount };
+		} catch (error) {
+			console.error("Error setting isManualNote by session:", error);
+			return { isOK: false, updatedCount: 0 };
+		}
+	}
 }
 
 export const codeAgentService = new CodeAgentService();
