@@ -1,8 +1,9 @@
 import { taskListSchema, type Task } from "@shared/types";
 import { type } from "arktype";
-import { executeCommand } from "./base-apis";
+import { batchUploadFile, executeCommand } from "./base-apis";
 
 const TODO_TASKS_FILE_PATH = ".302ai/todo/tasks.json";
+const ATTACHMENTS_DIR_PATH = ".302ai/attachments";
 
 /**
  * Validate and repair the task list.
@@ -97,6 +98,50 @@ export async function updateTasklist(
 		return { isOk: true };
 	} catch (error) {
 		console.error("Failed to update task list:", error);
+		return { isOk: false };
+	}
+}
+
+export interface Attachment {
+	filename: string;
+	content: string;
+}
+
+/**
+ * Upload attachments to the sandbox
+ * @param sandboxId - The sandbox ID
+ * @param cwd - The project root directory
+ * @param attachments - The attachments to upload
+ * @returns Whether the upload was successful
+ */
+export async function uploadAttachments(
+	sandboxId: string,
+	cwd: string,
+	attachments: Attachment[],
+): Promise<{ isOk: boolean }> {
+	if (attachments.length === 0) {
+		return { isOk: true };
+	}
+
+	try {
+		const fileList = attachments.map((attachment) => ({
+			content: attachment.content,
+			save_path: `${cwd}/${ATTACHMENTS_DIR_PATH}/${attachment.filename}`,
+		}));
+
+		const response = await batchUploadFile({
+			sandbox_id: sandboxId,
+			file_list: fileList,
+		});
+
+		if (!response.success) {
+			console.error("Failed to upload attachments:", response.error?.message);
+			return { isOk: false };
+		}
+
+		return { isOk: true };
+	} catch (error) {
+		console.error("Failed to upload attachments:", error);
 		return { isOk: false };
 	}
 }

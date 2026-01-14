@@ -434,6 +434,30 @@
 		previousStreamingState = isStreaming;
 	});
 
+	// 3. Refresh file tree and current file when switching to code tab
+	let previousActiveTab: TabType | null = null;
+	$effect(() => {
+		const currentTab = activeTab;
+		// 当从其他 tab 切换到 code tab 时，刷新文件树和当前文件内容
+		if (previousActiveTab !== null && previousActiveTab !== TAB_CODE && currentTab === TAB_CODE) {
+			if (isAgentMode && currentSandboxId && currentSessionId) {
+				// 1. 刷新文件树列表
+				refreshTrigger++;
+
+				// 2. 如果有已选中的文件，清除其缓存并重新加载内容
+				if (fileViewer.selectedFile) {
+					const selectedFile = fileViewer.selectedFile;
+					// 清除所有文件内容缓存，确保获取最新内容
+					agentPreviewState.clearFileContents(currentSandboxId, currentSessionId).then(() => {
+						// 重新加载当前文件
+						handleFileSelect(selectedFile);
+					});
+				}
+			}
+		}
+		previousActiveTab = currentTab;
+	});
+
 	// Cleanup on unmount
 	onDestroy(() => {
 		abortController?.abort();

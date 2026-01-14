@@ -134,3 +134,49 @@ export async function initProject(request: InitProjectRequest): Promise<InitProj
 		throw error;
 	}
 }
+
+// Batch Upload File API
+export const batchUploadFileRequestSchema = type({
+	sandbox_id: "string",
+	file_list: type({
+		content: "string",
+		save_path: "string",
+	}).array(),
+});
+export type BatchUploadFileRequest = typeof batchUploadFileRequestSchema.infer;
+
+export const batchUploadFileResponseSchema = type({
+	success: "boolean",
+	error: type({
+		message: "string",
+	}).optional(),
+});
+export type BatchUploadFileResponse = typeof batchUploadFileResponseSchema.infer;
+
+/**
+ * Batch uploads files to the specified sandbox.
+ * @param request The batch upload request containing sandbox_id and file_list.
+ * @returns The batch upload response.
+ */
+export async function batchUploadFile(
+	request: BatchUploadFileRequest,
+): Promise<BatchUploadFileResponse> {
+	try {
+		const response = await _302AIKy
+			.post("claude-code/sandbox/file/upload/batch", {
+				json: request,
+				timeout: 120000,
+			})
+			.json();
+
+		const validated = batchUploadFileResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate batch upload file response:", validated.summary);
+			throw new Error("Invalid response format from batch upload file API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to batch upload file:", error);
+		throw error;
+	}
+}
