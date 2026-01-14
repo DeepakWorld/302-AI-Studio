@@ -1169,5 +1169,6 @@
 	"file_tree_name_invalid": "Name contains invalid characters",
 	"label_session_remark": "Session Remark",
 	"taskboard_update_failed": "Task list update failed, please try again!",
-	"title_button_taskboard_panel": "Details"
+	"title_button_taskboard_panel": "Details",
+	"text_continue": "continue"
 }

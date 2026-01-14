@@ -1,23 +1,27 @@
 import { getTasklist, updateTasklist } from "$lib/api/taskboard";
+import { emitter, EventNames } from "$lib/event/emitter";
 import { m } from "$lib/paraglide/messages";
+import type { MessageMetadata } from "$lib/types/chat";
 import type { Task } from "@shared/types";
 import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
+import { chatState } from "../chat-state.svelte";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { withLoadingState } from "./utils";
 
 export class CodeAgentTaskboardState {
+	#currentRetryCount = 0;
+	readonly #MAX_RETRY_COUNT = 3;
+
 	isTaskboardRunning = $state(false);
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
 	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop">("idle");
 
-	// 当前正在执行的任务 ID
 	currentExecutingTaskId = $state<string | null>(null);
 
-	// 错误信息（任务失败时记录）
-	lastError = $state<{ taskId: string; error: string } | null>(null);
+	#taskResolve: ((success: boolean) => void) | null = null;
 
 	#isInitialized = $derived(
 		codeAgentState.enabled && codeAgentState.isFreshTab && codeAgentState.sandboxId === "",
@@ -29,16 +33,10 @@ export class CodeAgentTaskboardState {
 	inProgressTask = $derived<Task | null>(
 		this.tasklist.find((task) => task.status === "in_progress") ?? null,
 	);
-
-	// 是否可以开始执行
 	canStart = $derived(
 		this.taskboardStatus === "idle" && this.tasklist.some((t) => t.status === "pending"),
 	);
-
-	// 是否可以暂停
 	canPause = $derived(this.taskboardStatus === "running");
-
-	// 是否正在等待停止
 	isWaitingToStop = $derived(this.taskboardStatus === "waiting_to_stop");
 
 	toggleTaskboardRunningStatus() {
@@ -95,12 +93,12 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
-	 * 开始/继续自动执行任务列表
+	 * Starts or continues automatic execution of the task list.
+	 * @returns A promise that resolves when the execution is complete.
 	 */
 	async startAutoExecution(): Promise<void> {
 		if (this.taskboardStatus === "running") return;
 
-		this.lastError = null;
 		this.taskboardStatus = "running";
 
 		while (this.taskboardStatus === "running") {
@@ -113,7 +111,7 @@ export class CodeAgentTaskboardState {
 
 			await this.#executeTask(nextTask);
 
-			// 检查是否需要暂停（状态可能在 await 期间被 pauseAutoExecution 修改）
+			// Check if we should stop (status may have been changed by pauseAutoExecution during await)
 			if (this.#shouldStop()) {
 				this.taskboardStatus = "idle";
 				break;
@@ -122,14 +120,15 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
-	 * 检查是否应该停止执行
+	 * Checks if the taskboard should stop executing tasks.
+	 * @returns True if the taskboard should stop, false otherwise.
 	 */
 	#shouldStop(): boolean {
 		return this.taskboardStatus === "waiting_to_stop" || this.taskboardStatus === "idle";
 	}
 
 	/**
-	 * 暂停自动执行（等待当前任务完成后停止）
+	 * Pauses automatic execution (waits for current task to complete)
 	 */
 	pauseAutoExecution(): void {
 		if (this.taskboardStatus === "running") {
@@ -138,31 +137,70 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
-	 * 执行单个任务
+	 * Executes a single task.
 	 */
 	async #executeTask(task: Task): Promise<void> {
 		this.currentExecutingTaskId = task.id;
+		this.#currentRetryCount = 0;
 		await this.#updateTaskStatus(task.id, "in_progress");
 
-		try {
-			const delay = 1000 + Math.random() * 2000; // 1-3秒随机延迟
-			await new Promise((resolve) => setTimeout(resolve, delay));
-			console.log(`[TaskBoard] Task completed: ${task.content}`);
+		const off = emitter.on(EventNames.CHAT_FINISHED, this.#handleChatFinished);
 
-			await this.#updateTaskStatus(task.id, "done");
-		} catch (error) {
-			this.lastError = { taskId: task.id, error: String(error) };
-			this.taskboardStatus = "idle"; // 失败时暂停整个流程
+		try {
+			while (this.#currentRetryCount < this.#MAX_RETRY_COUNT) {
+				const message = this.#currentRetryCount === 0 ? task.content : m.text_continue();
+				chatState.inputValue = message;
+				await chatState.sendMessage();
+
+				// 等待 CHAT_FINISHED 事件
+				const success = await new Promise<boolean>((resolve) => {
+					this.#taskResolve = resolve;
+				});
+
+				if (success) {
+					await this.#updateTaskStatus(task.id, "done");
+					return;
+				}
+
+				this.#currentRetryCount++;
+				console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
+			}
+
+			console.error(`[TaskBoard] Task failed after ${this.#MAX_RETRY_COUNT} retries`);
+			this.taskboardStatus = "idle";
 		} finally {
+			off();
 			this.currentExecutingTaskId = null;
+			this.#taskResolve = null;
 		}
 	}
 
 	/**
-	 * 更新单个任务状态
+	 * Handles the chat finished event.
+	 */
+	#handleChatFinished = ({ lastMessage }: { lastMessage: { metadata?: MessageMetadata } }) => {
+		if (!this.#taskResolve) return;
+
+		const result = lastMessage.metadata?.result;
+		const success = !!result && result.is_error === false;
+
+		this.#taskResolve(success);
+	};
+
+	/**
+	 * Updates the status of a single task.
 	 */
 	async #updateTaskStatus(taskId: string, status: Task["status"]): Promise<void> {
 		const updatedList = this.tasklist.map((t) => (t.id === taskId ? { ...t, status } : t));
+
+		updatedList.sort((a, b) => {
+			const isDoneA = a.status === "done";
+			const isDoneB = b.status === "done";
+
+			if (isDoneA === isDoneB) return 0;
+			return isDoneA ? 1 : -1;
+		});
+
 		await this.updateTasklist(updatedList);
 	}
 }
