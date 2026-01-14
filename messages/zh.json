@@ -732,6 +732,8 @@
 	"taskboard_label_status": "状态",
 	"taskboard_label_current": "当前",
 	"taskboard_button_run": "执行任务板",
+	"taskboard_button_pause": "暂停执行",
+	"taskboard_button_resume": "恢复执行",
 	"taskboard_button_stop": "空闲",
 	"taskboard_button_delete": "删除",
 	"taskboard_button_mark_done": "未完成",

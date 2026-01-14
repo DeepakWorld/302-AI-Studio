@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
+	import Button from "$lib/components/ui/button/button.svelte";
 	import * as m from "$lib/paraglide/messages";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
-	import { Pause, Play } from "@lucide/svelte";
 
 	// Derived states from store
 	const isRunning = $derived(codeAgentTaskboardState.taskboardStatus === "running");
@@ -16,16 +15,16 @@
 	const currentTaskContent = $derived(currentTask?.content ?? "—");
 
 	function handleRun() {
-		// codeAgentTaskboardState.taskboardStatus = "running";
-		if (!codeAgentTaskboardState.canStart) return;
-		codeAgentTaskboardState.startAutoExecution();
-	}
-
-	function handlePauseResume() {
 		if (isRunning) {
+			// 暂停
 			codeAgentTaskboardState.taskboardStatus = "idle";
-		} else {
+		} else if (currentTask) {
+			// 继续（有进行中的任务）
 			codeAgentTaskboardState.taskboardStatus = "running";
+		} else {
+			// 启动新任务
+			if (!codeAgentTaskboardState.canStart) return;
+			codeAgentTaskboardState.startAutoExecution();
 		}
 	}
 </script>
@@ -50,35 +49,30 @@
 			</div>
 
 			<!-- Buttons -->
+		</div>
+
+		<!-- Row 2: Current task -->
+		<div class="flex justify-between">
+			<div class="flex items-center gap-2 text-sm min-w-0">
+				<span class="text-muted-foreground shrink-0">{m.taskboard_label_current()}</span>
+				<span class="truncate font-medium">{currentTaskContent}</span>
+			</div>
 			<div class="flex items-center gap-2">
 				<Button
 					variant="default"
 					size="sm"
-					disabled={isRunning || !hasOpenTasks}
+					disabled={!hasOpenTasks && !isRunning && !currentTask}
 					onclick={handleRun}
 				>
-					{m.taskboard_button_run()}
-				</Button>
-				<Button
-					variant="outline"
-					size="icon"
-					class="rounded-full size-9"
-					disabled={!hasOpenTasks && !isRunning}
-					onclick={handlePauseResume}
-				>
 					{#if isRunning}
-						<Pause class="size-4" />
+						{m.taskboard_button_pause()}
+					{:else if currentTask}
+						{m.taskboard_button_resume()}
 					{:else}
-						<Play class="size-4" />
+						{m.taskboard_button_run()}
 					{/if}
 				</Button>
 			</div>
-		</div>
-
-		<!-- Row 2: Current task -->
-		<div class="flex items-center gap-2 text-sm min-w-0">
-			<span class="text-muted-foreground shrink-0">{m.taskboard_label_current()}</span>
-			<span class="truncate font-medium">{currentTaskContent}</span>
 		</div>
 	</div>
 </div>

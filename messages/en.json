@@ -736,6 +736,8 @@
 	"taskboard_label_status": "Status",
 	"taskboard_label_current": "Current",
 	"taskboard_button_run": "Run Taskboard",
+	"taskboard_button_pause": "Pause",
+	"taskboard_button_resume": "Resume",
 	"taskboard_button_stop": "Idle",
 	"taskboard_button_delete": "Delete",
 	"taskboard_button_mark_done": "Mark Done",
