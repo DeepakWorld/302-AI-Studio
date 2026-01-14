@@ -170,7 +170,7 @@ pnpm run generate:ipc  # Regenerate IPC bindings
 │   │   │   ├── tab-service/         # Multi-tab management
 │   │   │   ├── tray-service/        # System tray
 │   │   │   ├── updater-service/     # App updates
-│   │   │   ├── sso-service/         # Single Sign-On (302aistudio://)
+│   │   │   ├── sso-service/         # Single Sign-On (ai302studio://)
 │   │   │   ├── shortcut-service/    # Keyboard shortcuts
 │   │   │   ├── broadcast-service/   # Inter-window messaging
 │   │   │   ├── plugin-service/      # Plugin system
@@ -315,7 +315,7 @@ export const chatState = new ChatState();
 - **System Tray**: Minimize to tray, quick actions
 - **Keyboard Shortcuts**: Configurable with scope system
 - **Window State**: Persist window size/position
-- **Deep Links**: SSO via `302aistudio://` protocol
+- **Deep Links**: SSO via `ai302studio://` protocol
 - **Auto Updates**: Built-in update checking
 
 ### Internationalization

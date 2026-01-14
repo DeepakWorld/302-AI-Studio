@@ -12,7 +12,13 @@ import { WebContentsFactory } from "./factories/web-contents-factory";
 import { registerIpcHandlers } from "./generated/ipc-registration";
 import { initializePluginSystem } from "./plugin-manager";
 import { initServer } from "./server/router";
-import { appService, shortcutService, ssoService, trayService, windowService } from "./services";
+import {
+	appService,
+	deepLinkService,
+	shortcutService,
+	trayService,
+	windowService,
+} from "./services";
 import { UpdaterService } from "./services/updater-service";
 import { setupNetworkInterceptor } from "./utils/network-interceptor";
 
@@ -20,8 +26,8 @@ protocol.registerSchemesAsPrivileged([
 	{ scheme: "app", privileges: { standard: true, secure: true } },
 ]);
 
-// Initialize SSO protocol handler before app is ready
-ssoService.initializeProtocolHandler();
+// Initialize deep link protocol handler before app is ready
+deepLinkService.initializeProtocolHandler();
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -39,11 +45,11 @@ if (!gotTheLock) {
 	app.on("second-instance", (_event, commandLine, _workingDirectory) => {
 		console.log("[Main] second-instance event, commandLine:", commandLine);
 
-		// Check for SSO deep link first
-		const ssoUrl = commandLine.find((arg) => arg.startsWith("302aistudio://"));
-		if (ssoUrl) {
-			console.log("[Main] Found SSO deep link:", ssoUrl);
-			// SSO service will handle this via its own second-instance listener
+		// Check for deep link
+		const deepLinkUrl = commandLine.find((arg) => arg.startsWith("ai302studio://"));
+		if (deepLinkUrl) {
+			console.log("[Main] Found deep link:", deepLinkUrl);
+			// Deep link service will handle this via its own second-instance listener
 		}
 
 		// When a second instance tries to start, focus the main window instead
@@ -59,8 +65,8 @@ if (!gotTheLock) {
 		}
 	});
 
-	// Setup SSO second instance handler
-	ssoService.setupSecondInstanceHandler();
+	// Setup deep link second instance handler
+	deepLinkService.setupSecondInstanceHandler();
 
 	// This method will be called when Electron has finished
 	// initialization and is ready to create browser windows.

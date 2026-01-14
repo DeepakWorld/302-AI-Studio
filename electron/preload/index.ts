@@ -245,6 +245,13 @@ if (process.contextIsolated) {
 					return () => ipcRenderer.removeListener("plugin:notification", listener);
 				},
 			},
+			skill: {
+				onSkillImportRequested: (callback: (data: { url: string }) => void) => {
+					const listener = (_: unknown, data: { url: string }) => callback(data);
+					ipcRenderer.on("skill:import-requested", listener);
+					return () => ipcRenderer.removeListener("skill:import-requested", listener);
+				},
+			},
 		});
 
 		// Expose shell window ID from process arguments
