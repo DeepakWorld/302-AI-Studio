@@ -255,10 +255,12 @@
 
 	// Tabs definition
 	let tabs: PreviewTab[] = $derived.by(() => {
-		// Skills-only mode OR no sandbox: only show skills tab
-		// This ensures that before starting a conversation (no sandbox), only skills tab is visible
+		// Skills-only mode OR no sandbox: show skills and taskboard tabs
 		if (isSkillsOnlyMode || !currentSandboxId) {
-			return [{ id: TAB_SKILLS, label: "Skills" }];
+			return [
+				{ id: TAB_SKILLS, label: "Skills" },
+				{ id: TAB_TASKBOARD, label: m.label_tab_taskboard() },
+			];
 		}
 
 		const t = [
@@ -275,10 +277,10 @@
 
 	// --- Effects & Logic ---
 
-	// 0. Auto-switch to skills tab when no sandbox
+	// 0. Auto-switch to valid tab when no sandbox (skills or taskboard are valid)
 	$effect(() => {
-		// When there's no sandbox, force skills tab to be selected
-		if (!currentSandboxId && activeTab !== TAB_SKILLS) {
+		// When there's no sandbox, ensure we're on a valid tab (skills or taskboard)
+		if (!currentSandboxId && activeTab !== TAB_SKILLS && activeTab !== TAB_TASKBOARD) {
 			agentPreviewState.setActiveTab(TAB_SKILLS);
 		}
 	});

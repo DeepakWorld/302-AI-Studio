@@ -23,9 +23,7 @@ export class CodeAgentTaskboardState {
 
 	#taskResolve: ((success: boolean) => void) | null = null;
 
-	#isInitialized = $derived(
-		codeAgentState.enabled && codeAgentState.isFreshTab && codeAgentState.sandboxId === "",
-	);
+	#isInitialized = $derived(codeAgentState.enabled && codeAgentState.isFreshTab);
 
 	inTaskOrchestrationMode = $derived(
 		this.tasklist.length > 0 && this.tasklist.some((task) => task.status === "pending"),
@@ -66,7 +64,7 @@ export class CodeAgentTaskboardState {
 			(loading) => (this.isLoading = loading),
 			async () => {
 				await match(this.#isInitialized)
-					.with(true, () => (this.tasklist = []))
+					.with(true, () => this.tasklist)
 					.otherwise(async () => {
 						const [sandboxId, path] = [
 							codeAgentState.sandboxId,

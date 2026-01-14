@@ -803,6 +803,11 @@ export class AgentPreviewState {
 		this.isVisible = true;
 	}
 
+	openTaskboardTab() {
+		this.activeTab = "taskboard";
+		this.isVisible = true;
+	}
+
 	togglePreview() {}
 
 	setMode(mode: HtmlPreviewMode) {
