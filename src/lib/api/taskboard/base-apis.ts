@@ -162,8 +162,8 @@ export async function batchUploadFile(
 	request: BatchUploadFileRequest,
 ): Promise<BatchUploadFileResponse> {
 	try {
-		const response = await _302AIKy
-			.post("claude-code/sandbox/file/upload/batch", {
+		const response = await testKy
+			.post("api/v1/claude-code/sandbox/file/upload/batch", {
 				json: request,
 				timeout: 120000,
 			})

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { uploadAttachments, type Attachment } from "$lib/api/taskboard";
 	import { ViewerPanel } from "$lib/components/buss/viewer/index.js";
 	import {
 		formatFileSize,
@@ -8,6 +9,8 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import * as m from "$lib/paraglide/messages";
+	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
@@ -40,7 +43,52 @@
 		selectedAttachment = null;
 	}
 
-	function handleAdd() {
+	function fileToBase64(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				// 保留完整的 data:xxx;base64,xxx 格式
+				resolve(result);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}
+
+	async function handleAdd() {
+		const attachments = codeAgentTaskboardState.attachments;
+
+		// 如果有附件，先上传
+		if (attachments.length > 0) {
+			const sandboxId = codeAgentState.sandboxId;
+			const cwd = claudeCodeSandboxState.currentSessionWorkspacePath;
+
+			if (!sandboxId || !cwd) {
+				toast.error("沙盒未初始化");
+				return;
+			}
+
+			try {
+				const attachmentList: Attachment[] = await Promise.all(
+					attachments.map(async (att) => ({
+						filename: att.name,
+						content: att.file ? await fileToBase64(att.file) : "",
+					})),
+				);
+
+				const result = await uploadAttachments(sandboxId, cwd, attachmentList);
+				if (!result.isOk) {
+					toast.error("附件上传失败");
+					return;
+				}
+			} catch (error) {
+				console.error("Failed to upload attachments:", error);
+				toast.error("附件上传失败");
+				return;
+			}
+		}
+
 		codeAgentTaskboardState.addTaskFromInput();
 	}
 
