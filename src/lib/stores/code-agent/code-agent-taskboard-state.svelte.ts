@@ -30,16 +30,17 @@ export class CodeAgentTaskboardState {
 	 * Otherwise, it will use an empty array.
 	 */
 	async syncTasklist(): Promise<void> {
-		const path = claudeCodeSandboxState.currentSessionWorkspacePath;
-		console.log({ path });
-
 		await withLoadingState(
 			(loading) => (this.isLoading = loading),
 			async () => {
 				await match(this.#isInitialized)
 					.with(true, () => (this.tasklist = []))
 					.otherwise(async () => {
-						const tasklist = await getTasklist(codeAgentState.sandboxId, path);
+						const [sandboxId, path] = [
+							codeAgentState.sandboxId,
+							claudeCodeSandboxState.currentSessionWorkspacePath,
+						];
+						const tasklist = await getTasklist(sandboxId, path);
 						this.tasklist = tasklist.tasks;
 					});
 			},
@@ -52,16 +53,19 @@ export class CodeAgentTaskboardState {
 	 * Otherwise, it will use the provided tasklist.
 	 */
 	async updateTasklist(tasklist: Task[]): Promise<void> {
-		const path = claudeCodeSandboxState.currentSessionWorkspacePath;
 		match(this.#isInitialized)
 			.with(true, () => {
 				this.tasklist = tasklist;
 			})
 			.otherwise(async () => {
 				this.tasklist = tasklist;
-				const result = await updateTasklist(codeAgentState.sandboxId, path, tasklist);
+				const [sandboxId, path] = [
+					codeAgentState.sandboxId,
+					claudeCodeSandboxState.currentSessionWorkspacePath,
+				];
+				const result = await updateTasklist(sandboxId, path, tasklist);
 				if (!result.isOk) {
-					const { isOk, tasks } = await getTasklist(codeAgentState.sandboxId, path);
+					const { isOk, tasks } = await getTasklist(sandboxId, path);
 					this.tasklist = isOk ? tasks : [];
 
 					toast.error(m.taskboard_update_failed());

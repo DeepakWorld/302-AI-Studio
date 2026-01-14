@@ -22,7 +22,7 @@
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { Bot, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
+	import { Bot, Globe, Lightbulb, Settings2, Zap } from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
 	import { AttachmentUploader } from "../attachment";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
@@ -327,7 +327,7 @@
 	</Popover.Root>
 {/snippet}
 
-{#snippet actionTaskOrchestration()}
+<!-- {#snippet actionTaskOrchestration()}
 	<ButtonWithTooltip
 		class="hover:!bg-chat-action-hover"
 		tooltip={m.title_chat_parameters()}
@@ -336,7 +336,7 @@
 	>
 		<ListTodo />
 	</ButtonWithTooltip>
-{/snippet}
+{/snippet} -->
 
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
 	{@render actionUploadAttachment()}
@@ -351,7 +351,7 @@
 	{#if codeAgentState.enabled}
 		{@render actionEnableSkills()}
 		{@render actionEnabledAgentThinking()}
-		{@render actionTaskOrchestration()}
+		<!-- {@render actionTaskOrchestration()} -->
 	{:else}
 		{@render actionSetParameters()}
 	{/if}
