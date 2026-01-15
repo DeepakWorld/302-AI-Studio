@@ -8,6 +8,7 @@ import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
 import { chatState } from "../chat-state.svelte";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
+import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { withLoadingState } from "./utils";
 
@@ -28,7 +29,9 @@ export class CodeAgentTaskboardState {
 
 	#taskResolve: ((success: boolean) => void) | null = null;
 
-	isInitialized = $derived(codeAgentState.enabled && codeAgentState.isFreshTab);
+	isInitialized = $derived(
+		codeAgentState.enabled && codeAgentState.isFreshTab && claudeCodeAgentState.agentMode === "new",
+	);
 
 	inTaskOrchestrationMode = $derived(
 		this.tasklist.length > 0 && this.tasklist.some((task) => task.status === "pending"),

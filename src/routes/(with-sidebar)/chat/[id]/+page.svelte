@@ -223,8 +223,9 @@
 	// Auto-open preview panel when sandbox is first created (edge trigger)
 	$effect(() => {
 		const sandboxId = claudeCodeAgentState.sandboxId;
+		const currentSessionId = claudeCodeAgentState.currentSessionId;
 		// Only open when sandboxId changes from empty to non-empty
-		if (codeAgentState.inCodeAgentMode) {
+		if (codeAgentState.inCodeAgentMode && sandboxId && currentSessionId) {
 			agentPreviewState.openPreview(sandboxId);
 		}
 	});

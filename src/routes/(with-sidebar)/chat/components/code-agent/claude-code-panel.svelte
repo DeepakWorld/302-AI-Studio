@@ -77,7 +77,7 @@
 			}
 		}
 
-		// claudeCodeAgentState.handleEnabled();
+		claudeCodeAgentState.handleEnabled();
 
 		handleOverlayAction("enabled");
 	}

@@ -396,25 +396,25 @@ class ClaudeCodeAgentState {
 		this.updateSkills(updatedSkills);
 	}
 
-	// handleEnabled() {
-	// 	const [isExistingMode, sandboxId, sessionId] = [
-	// 		this.agentMode === "existing",
-	// 		this.selectedSandboxId,
-	// 		this.selectedSessionId,
-	// 	];
+	handleEnabled() {
+		const [isExistingMode, sandboxId, sessionId] = [
+			this.agentMode === "existing",
+			this.selectedSandboxId,
+			this.selectedSessionId,
+		];
 
-	// 	const updateData = isExistingMode
-	// 		? {
-	// 				sandboxId,
-	// 				currentSessionId: sessionId,
-	// 			}
-	// 		: {
-	// 				sandboxId: sandboxId === "auto" ? "" : sandboxId,
-	// 				currentSessionId: "",
-	// 			};
+		const updateData = isExistingMode
+			? {
+					sandboxId,
+					currentSessionId: sessionId,
+				}
+			: {
+					sandboxId: sandboxId === "auto" ? "" : sandboxId,
+					currentSessionId: "",
+				};
 
-	// 	this.updateState(updateData);
-	// }
+		this.updateState(updateData);
+	}
 }
 
 export const claudeCodeAgentState = new ClaudeCodeAgentState();
