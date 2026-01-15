@@ -33,9 +33,6 @@ export class CodeAgentTaskboardState {
 		codeAgentState.enabled && codeAgentState.isFreshTab && claudeCodeAgentState.agentMode === "new",
 	);
 
-	inTaskOrchestrationMode = $derived(
-		this.tasklist.length > 0 && this.tasklist.some((task) => task.status === "pending"),
-	);
 	inProgressTask = $derived<Task | null>(
 		this.tasklist.find((task) => task.status === "in_progress") ?? null,
 	);
@@ -60,6 +57,13 @@ export class CodeAgentTaskboardState {
 
 	toggleTaskboardRunningStatus() {
 		this.isTaskboardRunning = !this.isTaskboardRunning;
+	}
+
+	stopExecution() {
+		this.taskboardStatus = "idle";
+		if (this.currentExecutingTaskId) {
+			this.#updateTaskStatus(this.currentExecutingTaskId, "pending");
+		}
 	}
 
 	// ==================== Input Methods ====================
@@ -88,6 +92,10 @@ export class CodeAgentTaskboardState {
 	 */
 	addAttachment(attachment: AttachmentFile) {
 		this.attachments = [...this.attachments, attachment];
+
+		// Add reference to input value
+		const prefix = this.inputValue.length > 0 && !this.inputValue.endsWith(" ") ? " " : "";
+		this.inputValue += `${prefix}@${attachment.name} `;
 	}
 
 	/**
@@ -120,8 +128,10 @@ export class CodeAgentTaskboardState {
 							codeAgentState.sandboxId,
 							claudeCodeSandboxState.currentSessionWorkspacePath,
 						];
-						const tasklist = await getTasklist(sandboxId, path);
-						this.tasklist = tasklist.tasks;
+						if (path) {
+							const tasklist = await getTasklist(sandboxId, path);
+							this.tasklist = tasklist.tasks;
+						}
 					});
 			},
 		);
@@ -143,6 +153,8 @@ export class CodeAgentTaskboardState {
 					codeAgentState.sandboxId,
 					claudeCodeSandboxState.currentSessionWorkspacePath,
 				];
+				console.log("Updating tasklist", sandboxId, path, tasklist);
+
 				const result = await updateTasklist(sandboxId, path, tasklist);
 				if (!result.isOk) {
 					const { isOk, tasks } = await getTasklist(sandboxId, path);
@@ -216,6 +228,10 @@ export class CodeAgentTaskboardState {
 				await fn();
 
 				const success = await this.#waitForChatFinished();
+
+				if (this.taskboardStatus !== "running") {
+					break;
+				}
 
 				if (success) {
 					await this.#updateTaskStatus(task.id, "done");

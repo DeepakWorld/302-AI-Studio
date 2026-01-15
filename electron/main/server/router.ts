@@ -62,6 +62,8 @@ export type RouterRequestBody = {
 	autoDeploy?: boolean;
 	skills?: Skill[];
 	isCreateSkillMode?: boolean;
+	inTaskOrchestrationMode?: boolean;
+	workspacePath?: string;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1168,6 +1170,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		autoDeploy,
 		skills,
 		isCreateSkillMode,
+		inTaskOrchestrationMode,
+		workspacePath,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
@@ -1188,6 +1192,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			sessionId,
 			autoDeploy,
 			isCreateSkillMode,
+			inTaskOrchestrationMode,
+			workspacePath,
 		}),
 	);
 
@@ -1215,6 +1221,14 @@ app.post("/chat/302ai-code-agent", async (c) => {
 				: `\n\n[IMPORTANT] The user has FORCED the following skills to be used: [${skillNames.join(", ")}]. You MUST use these skills in your response. This is an explicit requirement from the user - strictly comply.`;
 
 		appendPromptToLastUserMessage(messages, skillsPrompt);
+	}
+
+	if (inTaskOrchestrationMode) {
+		const taskOrchestrationPrompt =
+			language === "zh"
+				? `\n\n 用户上传的附件内容在${workspacePath}/.302ai/attachments当中`
+				: `\n\n The attachments uploaded by the user are located in ${workspacePath}/.302ai/attachments.`;
+		appendPromptToLastUserMessage(messages, taskOrchestrationPrompt);
 	}
 
 	// Build request body for 302.AI Claude Code API

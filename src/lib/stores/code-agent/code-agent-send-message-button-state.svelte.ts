@@ -1,10 +1,11 @@
-import { updateTasklist } from "$lib/api/taskboard";
+import { updateTasklist, uploadAttachments, type Attachment } from "$lib/api/taskboard";
 import { initProject } from "$lib/api/taskboard/base-apis";
 import { nanoid } from "nanoid";
 import { chatState } from "../chat-state.svelte";
 import { mcpState } from "../mcp-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
+import { fileToBase64 } from "./utils";
 
 const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
 
@@ -39,11 +40,22 @@ class CodeAgentSendMessageButtonState {
 					sandboxId: sandboxInfo.sandboxId,
 					sessionId,
 				});
-				await updateTasklist(
-					sandboxInfo.sandboxId,
-					workspacePath,
-					codeAgentTaskboardState.tasklist,
-				);
+
+				const promises = [
+					updateTasklist(sandboxInfo.sandboxId, workspacePath, codeAgentTaskboardState.tasklist),
+				];
+
+				if (codeAgentTaskboardState.attachments.length > 0) {
+					const attachmentList: Attachment[] = await Promise.all(
+						codeAgentTaskboardState.attachments.map(async (att) => ({
+							filename: att.name,
+							content: att.file ? await fileToBase64(att.file) : "",
+						})),
+					);
+					promises.push(uploadAttachments(sandboxInfo.sandboxId, workspacePath, attachmentList));
+				}
+
+				await Promise.all(promises);
 			}
 
 			if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {

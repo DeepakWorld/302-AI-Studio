@@ -285,6 +285,15 @@
 		}
 	});
 
+	// Close preview when agent mode is disabled
+	$effect(() => {
+		if (!codeAgentState.enabled) {
+			untrack(() => {
+				agentPreviewState.closePreview();
+			});
+		}
+	});
+
 	// 1. State Restoration Logic
 	// Track the last restored session to prevent duplicate restores
 	let lastRestoredKey = "";
