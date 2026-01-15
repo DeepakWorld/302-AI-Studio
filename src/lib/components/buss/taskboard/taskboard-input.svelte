@@ -17,9 +17,12 @@
 	import { Eye, Loader, Paperclip, Trash2 } from "@lucide/svelte";
 	import type { AttachmentFile } from "@shared/types";
 	import { nanoid } from "nanoid";
+	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 	import ButtonWithTooltip from "../button-with-tooltip/button-with-tooltip.svelte";
+
+	const { onShortcutAction } = window.electronAPI.shortcut;
 
 	// Local UI state
 	let attachmentLoadingMap = new SvelteMap<string, boolean>();
@@ -98,13 +101,16 @@
 		codeAgentTaskboardState.addTaskFromInput();
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.isComposing) return;
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			handleAdd();
-		}
-	}
+	// Listen for sendMessage shortcut action (Enter key)
+	// This is needed because before-input-event blocks DOM keydown events
+	onMount(() => {
+		const unsub = onShortcutAction((action) => {
+			if (action.action === "sendMessage" && textareaRef === document.activeElement) {
+				handleAdd();
+			}
+		});
+		return () => unsub();
+	});
 
 	function handleAttachmentClick() {
 		fileInputRef?.click();
@@ -258,7 +264,6 @@
 				)}
 				placeholder={m.taskboard_input_placeholder()}
 				bind:value={codeAgentTaskboardState.inputValue}
-				onkeydown={handleKeydown}
 				onpaste={handlePaste}
 			/>
 		</div>

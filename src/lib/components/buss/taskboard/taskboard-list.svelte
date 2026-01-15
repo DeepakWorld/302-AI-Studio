@@ -26,7 +26,7 @@
 	let draggedElementId = $state<string | null>(null);
 	let isDndFinalizing = $state(false);
 
-	// Local copy of tasks for dnd manipulation
+	// Local copy of tasks for dnd manipulation (only active tasks)
 	let localTasks = $state<Task[]>([]);
 
 	// Edit dialog state
@@ -55,10 +55,14 @@
 		return filtered.toSorted((a, b) => statusPriority[a.status] - statusPriority[b.status]);
 	});
 
+	// Split filtered tasks into active (draggable) and done (static)
+	const visibleActiveTasks = $derived(() => filteredTasks().filter((t) => t.status !== "done"));
+	const visibleDoneTasks = $derived(() => filteredTasks().filter((t) => t.status === "done"));
+
 	// Sync local tasks with store (only when not dragging)
 	$effect(() => {
 		if (!draggedElementId && !isDndFinalizing) {
-			localTasks = [...filteredTasks()];
+			localTasks = [...visibleActiveTasks()];
 		}
 	});
 
@@ -90,16 +94,12 @@
 		const { info, items: newItems } = e.detail;
 
 		if (info.trigger === TRIGGERS.DRAG_STARTED) {
-			// Check if dragged item is done - if so, cancel the drag
-			const draggedTask = localTasks.find((task) => task.id === info.id);
-			if (draggedTask?.status === "done") {
-				return; // Don't allow dragging done tasks
-			}
 			draggedElementId = info.id;
 		}
 
-		// Only update if we're actively dragging a non-done task
+		// Only update if we're actively dragging
 		if (draggedElementId) {
+			// Check if order changed within the active tasks
 			const hasOrderChanged = newItems.some((item, index) => item.id !== localTasks[index]?.id);
 			if (hasOrderChanged) localTasks = newItems;
 		}
@@ -110,33 +110,19 @@
 
 		try {
 			draggedElementId = null;
-			const newItems = e.detail.items;
+			const newActiveItems = e.detail.items;
 
-			// Check if any non-done task is placed after a done task
-			const firstDoneIndex = newItems.findIndex((t) => t.status === "done");
-			if (firstDoneIndex !== -1) {
-				const hasInvalidOrder = newItems.slice(firstDoneIndex).some((t) => t.status !== "done");
-				if (hasInvalidOrder) {
-					// Invalid order - restore original
-					localTasks = [...filteredTasks()];
-					return;
-				}
-			}
+			localTasks = newActiveItems;
 
-			localTasks = newItems;
+			// Rebuild full tasklist:
+			// 1. New Active Items (reordered)
+			// 2. All Done Tasks (preserve order from store, always at bottom)
+			const allDoneTasks = codeAgentTaskboardState.tasklist.filter((t) => t.status === "done");
 
-			// Rebuild full tasklist with new order for filtered items
-			if (filter === "all") {
-				codeAgentTaskboardState.updateTasklist(newItems);
-			} else {
-				// For filtered views, we need to preserve items not in current filter
-				const otherTasks = codeAgentTaskboardState.tasklist.filter((t) => {
-					if (filter === "open") return t.status === "done";
-					if (filter === "done") return t.status !== "done";
-					return false;
-				});
-				codeAgentTaskboardState.updateTasklist([...newItems, ...otherTasks]);
-			}
+			// If filter is "open" or "all", we have all active tasks in newActiveItems.
+			// If filter is "done", we wouldn't be dragging.
+			// So safely combine:
+			codeAgentTaskboardState.updateTasklist([...newActiveItems, ...allDoneTasks]);
 		} catch (error) {
 			console.error("Error finalizing drag operation:", error);
 		} finally {
@@ -158,7 +144,7 @@
 		}
 	}
 
-	const isEmpty = $derived(localTasks.length === 0);
+	const isEmpty = $derived(localTasks.length === 0 && visibleDoneTasks().length === 0);
 	const isLoading = $derived(codeAgentTaskboardState.isLoading);
 </script>
 
@@ -234,7 +220,13 @@
 					<Button
 						variant="ghost"
 						size="icon"
-						class="size-7 text-muted-foreground/60 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+						class={cn(
+							"size-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity",
+							task.status === "in_progress"
+								? "text-muted-foreground/40 cursor-not-allowed"
+								: "text-muted-foreground/60 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30",
+						)}
+						disabled={task.status === "in_progress"}
 						onclick={() => handleDelete(task)}
 					>
 						<Trash2 class="size-3.5" />
@@ -267,6 +259,7 @@
 			{m.taskboard_empty()}
 		</div>
 	{:else}
+		<!-- Active Tasks (Draggable) -->
 		<div
 			class="flex flex-col gap-2"
 			use:dndzone={{
@@ -292,6 +285,17 @@
 				</div>
 			{/each}
 		</div>
+
+		<!-- Done Tasks (Static) -->
+		{#if visibleDoneTasks().length > 0}
+			<div class="flex flex-col gap-2">
+				{#each visibleDoneTasks() as task (task.id)}
+					<div animate:flip={{ duration: 200 }}>
+						{@render taskItem(task)}
+					</div>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 </div>
 
