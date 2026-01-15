@@ -9,6 +9,7 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
@@ -39,6 +40,12 @@
 	// 用于解决 Mac 输入法按 Enter 确认时误触发发送消息的问题
 	let compositionEndTime = 0;
 	const COMPOSITION_COOLDOWN_MS = 100;
+
+	const shouldShowTaskboardStatus = $derived(
+		codeAgentState.inCodeAgentMode &&
+			codeAgentTaskboardState.showTaskboardStatusBar &&
+			chatState.hasMessages,
+	);
 
 	function isInCompositionCooldown(): boolean {
 		return Date.now() - compositionEndTime < COMPOSITION_COOLDOWN_MS;
@@ -272,7 +279,7 @@
 
 <div class="relative w-full max-w-chat-max-w" data-layoutid="chat-input-container">
 	<AttachmentThumbnailBar />
-	<div class="absolute left-0 right-0 -top-14 z-10">
+	<div class={cn("absolute left-0 right-0 -top-14 z-10", shouldShowTaskboardStatus && "-top-30")}>
 		<StreamingIndicator />
 	</div>
 	<div

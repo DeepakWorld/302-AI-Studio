@@ -21,7 +21,6 @@ export class CodeAgentTaskboardState {
 	#currentRetryCount = 0;
 	readonly #MAX_RETRY_COUNT = 3;
 
-	isTaskboardRunning = $state(false);
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
 	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop">("idle");
@@ -49,6 +48,10 @@ export class CodeAgentTaskboardState {
 	);
 	canPause = $derived(this.taskboardStatus === "running");
 	isWaitingToStop = $derived(this.taskboardStatus === "waiting_to_stop");
+	showTaskboardStatusBar = $derived(
+		this.tasklist.some((t) => t.status === "in_progress") ||
+			this.tasklist.some((t) => t.status === "pending"),
+	);
 
 	buttonText = $derived.by(() => {
 		return match(this.taskboardStatus)
@@ -63,9 +66,7 @@ export class CodeAgentTaskboardState {
 			.exhaustive();
 	});
 
-	toggleTaskboardRunningStatus() {
-		this.isTaskboardRunning = !this.isTaskboardRunning;
-	}
+	toggleTaskboardRunningStatus() {}
 
 	stopExecution() {
 		this.taskboardStatus = "idle";
@@ -193,7 +194,7 @@ export class CodeAgentTaskboardState {
 						];
 						if (path) {
 							const tasklist = await getTasklist(sandboxId, path);
-							this.tasklist = tasklist.tasks;
+							this.tasklist = this.#sortTasks(tasklist.tasks);
 						}
 					});
 			},
@@ -206,22 +207,24 @@ export class CodeAgentTaskboardState {
 	 * Otherwise, it will use the provided tasklist.
 	 */
 	async updateTasklist(tasklist: Task[]): Promise<void> {
+		const sortedTasklist = this.#sortTasks(tasklist);
+
 		match(this.isInitialized)
 			.with(true, () => {
-				this.tasklist = tasklist;
+				this.tasklist = sortedTasklist;
 			})
 			.otherwise(async () => {
-				this.tasklist = tasklist;
+				this.tasklist = sortedTasklist;
 				const [sandboxId, path] = [
 					codeAgentState.sandboxId,
 					claudeCodeSandboxState.currentSessionWorkspacePath,
 				];
-				console.log("Updating tasklist", sandboxId, path, tasklist);
+				console.log("Updating tasklist", sandboxId, path, sortedTasklist);
 
-				const result = await updateTasklist(sandboxId, path, tasklist);
+				const result = await updateTasklist(sandboxId, path, sortedTasklist);
 				if (!result.isOk) {
 					const { isOk, tasks } = await getTasklist(sandboxId, path);
-					this.tasklist = isOk ? tasks : [];
+					this.tasklist = isOk ? this.#sortTasks(tasks) : [];
 
 					toast.error(m.taskboard_update_failed());
 				}
@@ -333,21 +336,33 @@ export class CodeAgentTaskboardState {
 	};
 
 	/**
+	 * Sorts tasks by status: in_progress -> pending -> done
+	 */
+	#sortTasks(tasks: Task[]): Task[] {
+		return [...tasks].sort((a, b) => {
+			const statusOrder = { in_progress: 0, pending: 1, done: 2 };
+			const orderA = statusOrder[a.status] ?? 1;
+			const orderB = statusOrder[b.status] ?? 1;
+			return orderA - orderB;
+		});
+	}
+
+	/**
 	 * Updates the status of a single task.
 	 */
 	async #updateTaskStatus(taskId: string, status: Task["status"]): Promise<void> {
 		const updatedList = this.tasklist.map((t) => (t.id === taskId ? { ...t, status } : t));
-
-		updatedList.sort((a, b) => {
-			const isDoneA = a.status === "done";
-			const isDoneB = b.status === "done";
-
-			if (isDoneA === isDoneB) return 0;
-			return isDoneA ? 1 : -1;
-		});
-
 		await this.updateTasklist(updatedList);
 	}
 }
 
 export const codeAgentTaskboardState = new CodeAgentTaskboardState();
+
+$effect.root(() => {
+	$effect(() => {
+		// Track enabled state
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		codeAgentState.enabled;
+		codeAgentTaskboardState.tasklist = [];
+	});
+});

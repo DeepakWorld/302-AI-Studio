@@ -1171,5 +1171,8 @@
 	"label_session_remark": "会话备注",
 	"taskboard_update_failed": "任务列表更新失败，请重试！",
 	"title_button_taskboard_panel": "详情",
-	"text_continue": "继续"
+	"text_continue": "继续",
+	"taskboard_bar_status_idle": "待执行：",
+	"taskboard_bar_status_running": "正在执行：",
+	"taskboard_bar_status_waiting_to_stop": "待结束："
 }

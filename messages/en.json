@@ -1174,5 +1174,8 @@
 	"label_session_remark": "Session Remark",
 	"taskboard_update_failed": "Task list update failed, please try again!",
 	"title_button_taskboard_panel": "Details",
-	"text_continue": "continue"
+	"text_continue": "continue",
+	"taskboard_bar_status_idle": "To be executed:",
+	"taskboard_bar_status_running": "Executing:",
+	"taskboard_bar_status_waiting_to_stop": "To be completed:"
 }

@@ -34,6 +34,7 @@
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 
+	import { TaskboardPanel } from "$lib/components/buss/taskboard";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
@@ -54,7 +55,6 @@
 	} from "./constants";
 	import FileTree from "./file-tree.svelte";
 	import SessionDeleted from "./session-deleted.svelte";
-	import { TaskboardPanel } from "$lib/components/buss/taskboard";
 	import Terminal from "./terminal.svelte";
 	import { handleError, isFileStillSelected, withRetry } from "./utils";
 

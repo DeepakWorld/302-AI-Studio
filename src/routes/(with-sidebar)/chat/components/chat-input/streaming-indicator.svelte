@@ -11,7 +11,7 @@
 		<Button
 			variant="ghost"
 			size="sm"
-			class="flex  items-center gap-2 rounded-lg bg-muted/10 px-3 py-2 text-xs text-muted-foreground hover:text-destructive hover:!bg-destructive/10"
+			class="flex items-center gap-2 rounded-lg bg-muted/10 px-3 py-2 text-xs text-muted-foreground hover:text-destructive hover:!bg-destructive/10"
 			onclick={chatState.stopGeneration}
 		>
 			<Square class="h-3 w-3 fill-current" />
