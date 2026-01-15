@@ -747,6 +747,8 @@
 	"taskboard_edit_title": "Edit Task",
 	"taskboard_edit_save": "Save",
 	"taskboard_button_edit": "Edit",
+	"taskboard_error_sandbox_not_initialized": "Sandbox not initialized",
+	"taskboard_error_attachment_upload_failed": "Attachment upload failed",
 	"label_agent_mode_badge": "Agent Mode",
 	"label_button_enable_agent_mode": "Switch to Agent Mode",
 	"tooltip_copy_deploy_url": "Copy deployment link",

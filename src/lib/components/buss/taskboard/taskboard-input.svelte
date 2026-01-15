@@ -65,7 +65,7 @@
 			const cwd = claudeCodeSandboxState.currentSessionWorkspacePath;
 
 			if (!sandboxId || !cwd) {
-				toast.error("沙盒未初始化");
+				toast.error(m.taskboard_error_sandbox_not_initialized());
 				return;
 			}
 
@@ -79,12 +79,12 @@
 
 				const result = await uploadAttachments(sandboxId, cwd, attachmentList);
 				if (!result.isOk) {
-					toast.error("附件上传失败");
+					toast.error(m.taskboard_error_attachment_upload_failed());
 					return;
 				}
 			} catch (error) {
 				console.error("Failed to upload attachments:", error);
-				toast.error("附件上传失败");
+				toast.error(m.taskboard_error_attachment_upload_failed());
 				return;
 			}
 		}

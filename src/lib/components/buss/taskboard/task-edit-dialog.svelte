@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { uploadAttachments, type Attachment } from "$lib/api/taskboard";
 	import { ViewerPanel } from "$lib/components/buss/viewer/index.js";
 	import {
 		formatFileSize,
@@ -9,6 +10,8 @@
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import * as m from "$lib/paraglide/messages";
+	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { Eye, Loader, Paperclip, Trash2 } from "@lucide/svelte";
@@ -65,6 +68,36 @@
 		if (!editedContent.trim()) return;
 		isSaving = true;
 		try {
+			// 如果有附件，先上传
+			if (attachments.length > 0) {
+				const sandboxId = codeAgentState.sandboxId;
+				const cwd = claudeCodeSandboxState.currentSessionWorkspacePath;
+
+				if (!sandboxId || !cwd) {
+					toast.error(m.taskboard_error_sandbox_not_initialized());
+					return;
+				}
+
+				try {
+					const attachmentList: Attachment[] = await Promise.all(
+						attachments.map(async (att) => ({
+							filename: att.name,
+							content: att.file ? await fileToBase64(att.file) : "",
+						})),
+					);
+
+					const result = await uploadAttachments(sandboxId, cwd, attachmentList);
+					if (!result.isOk) {
+						toast.error(m.taskboard_error_attachment_upload_failed());
+						return;
+					}
+				} catch (error) {
+					console.error("Failed to upload attachments:", error);
+					toast.error(m.taskboard_error_attachment_upload_failed());
+					return;
+				}
+			}
+
 			onSave?.(editedContent.trim());
 			open = false;
 		} finally {
@@ -140,6 +173,18 @@
 
 	function removeAttachment(id: string) {
 		attachments = attachments.filter((a) => a.id !== id);
+	}
+
+	function fileToBase64(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				resolve(result);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
 	}
 </script>
 

@@ -743,6 +743,8 @@
 	"taskboard_edit_title": "编辑任务",
 	"taskboard_edit_save": "保存",
 	"taskboard_button_edit": "编辑",
+	"taskboard_error_sandbox_not_initialized": "沙盒未初始化",
+	"taskboard_error_attachment_upload_failed": "附件上传失败",
 	"label_agent_mode_badge": "Agent 模式",
 	"label_button_enable_agent_mode": "切换到 Agent 模式",
 	"tooltip_copy_deploy_url": "复制部署链接",
