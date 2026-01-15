@@ -1,5 +1,5 @@
-import { type } from "arktype";
 import { withRetry } from "$lib/utils/retry";
+import { type } from "arktype";
 import { _302AIKy } from "../core/_302ai-ky";
 import { testKy } from "../core/test-ky";
 
@@ -23,31 +23,34 @@ export type ExecuteCommandResponse = typeof executeCommandResponseSchema.infer;
 /**
  * Executes a command in the specified sandbox.
  * @param request The command execution request.
+ * @param maxRetries Maximum number of retries on failure (default: 3).
  * @returns The command execution response.
  */
 export async function executeCommand(
 	request: ExecuteCommandRequest,
 ): Promise<ExecuteCommandResponse> {
-	try {
-		const response = await _302AIKy
-			.post("302/claude-code/commands", {
-				json: {
-					sandbox_id: request.sandboxId,
-					command: request.command,
-				},
-			})
-			.json();
+	return withRetry(
+		async () => {
+			const response = await _302AIKy
+				.post("302/claude-code/commands", {
+					json: {
+						sandbox_id: request.sandboxId,
+						command: request.command,
+					},
+				})
+				.json();
 
-		const validated = executeCommandResponseSchema(response);
-		if (validated instanceof type.errors) {
-			console.error("Failed to validate execute command response:", validated.summary);
-			throw new Error("Invalid response format from execute command API");
-		}
-		return validated;
-	} catch (error) {
-		console.error("Failed to execute command:", error);
-		throw error;
-	}
+			const validated = executeCommandResponseSchema(response);
+			if (validated instanceof type.errors) {
+				console.error("Failed to validate execute command response:", validated.summary);
+				throw new Error("Invalid response format from execute command API");
+			}
+			return validated;
+		},
+		3,
+		1000,
+		10000,
+	);
 }
 
 export const sandboxFileOperationResponseSchema = type({

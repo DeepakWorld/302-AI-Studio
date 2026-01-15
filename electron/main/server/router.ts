@@ -995,6 +995,8 @@ Latest Conversation:
 ${conversationText}
 
 Requirements:
+- Use the SAME LANGUAGE as the main language in the conversation (if the conversation is primarily in Chinese, generate Chinese title and summary; if primarily in English, use English)
+- If the conversation contains mixed languages, use the language that appears most frequently or is used by the user
 - Accurately summarize the main topic
 - Be concise and clear
 - Do not use punctuation

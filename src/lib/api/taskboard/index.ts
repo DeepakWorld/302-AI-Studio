@@ -31,7 +31,25 @@ async function validateAndRepairTaskList(
 			return [];
 		}
 
-		return validated;
+		// Remove duplicate tasks by id (keep first occurrence)
+		const seenIds = new Set<string>();
+		const uniqueTasks = validated.filter((task) => {
+			if (seenIds.has(task.id)) {
+				return false;
+			}
+			seenIds.add(task.id);
+			return true;
+		});
+
+		// If duplicates were found, update the file
+		if (uniqueTasks.length !== validated.length) {
+			console.warn(
+				`Found ${validated.length - uniqueTasks.length} duplicate task(s), removing duplicates`,
+			);
+			await updateTasklist(sandboxId, cwd, uniqueTasks);
+		}
+
+		return uniqueTasks;
 	} catch (error) {
 		console.warn("Task list JSON parse failed, resetting to empty list:", error);
 		await updateTasklist(sandboxId, cwd, []);

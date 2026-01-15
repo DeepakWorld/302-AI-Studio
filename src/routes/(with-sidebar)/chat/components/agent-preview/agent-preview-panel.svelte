@@ -285,6 +285,14 @@
 		}
 	});
 
+	// 0.1 Reset isSkillsOnlyMode when streaming starts
+	// This shows all tabs (Preview, Files, Terminal) when the AI begins responding
+	$effect(() => {
+		if (chatState.isStreaming && isSkillsOnlyMode) {
+			agentPreviewState.isSkillsOnlyMode = false;
+		}
+	});
+
 	// Close preview when agent mode is disabled
 	$effect(() => {
 		if (!codeAgentState.enabled) {

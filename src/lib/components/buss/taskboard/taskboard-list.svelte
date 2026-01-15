@@ -33,12 +33,26 @@
 	let editDialogOpen = $state(false);
 	let editingTask = $state<Task | null>(null);
 
-	// Filtered tasks based on filter prop
+	// Status priority for sorting: in_progress > pending > done
+	const statusPriority: Record<Task["status"], number> = {
+		in_progress: 0,
+		pending: 1,
+		done: 2,
+	};
+
+	// Filtered and sorted tasks based on filter prop
 	const filteredTasks = $derived(() => {
 		const tasks = codeAgentTaskboardState.tasklist;
-		if (filter === "open") return tasks.filter((t) => t.status !== "done");
-		if (filter === "done") return tasks.filter((t) => t.status === "done");
-		return tasks;
+		let filtered: Task[];
+		if (filter === "open") {
+			filtered = tasks.filter((t) => t.status !== "done");
+		} else if (filter === "done") {
+			filtered = tasks.filter((t) => t.status === "done");
+		} else {
+			filtered = tasks;
+		}
+		// Sort by status priority: in_progress > pending > done
+		return filtered.toSorted((a, b) => statusPriority[a.status] - statusPriority[b.status]);
 	});
 
 	// Sync local tasks with store (only when not dragging)
