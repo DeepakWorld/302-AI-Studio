@@ -1,4 +1,9 @@
-import { getTasklist, updateTasklist } from "$lib/api/taskboard";
+import {
+	getTasklist,
+	updateTasklist,
+	uploadAttachments,
+	type Attachment,
+} from "$lib/api/taskboard";
 import { emitter, EventNames } from "$lib/event/emitter";
 import { m } from "$lib/paraglide/messages";
 import type { MessageMetadata } from "$lib/types/chat";
@@ -24,6 +29,9 @@ export class CodeAgentTaskboardState {
 	// Input state
 	inputValue = $state("");
 	attachments = $state<AttachmentFile[]>([]);
+
+	// Pending attachments queue (for when sandbox is not yet initialized)
+	pendingAttachments = $state<AttachmentFile[]>([]);
 
 	currentExecutingTaskId = $state<string | null>(null);
 
@@ -110,6 +118,61 @@ export class CodeAgentTaskboardState {
 	 */
 	removeAttachment(id: string) {
 		this.attachments = this.attachments.filter((a) => a.id !== id);
+	}
+
+	/**
+	 * Adds attachments to the pending queue (for when sandbox is not yet initialized).
+	 */
+	addPendingAttachments(attachments: AttachmentFile[]) {
+		this.pendingAttachments = [...this.pendingAttachments, ...attachments];
+	}
+
+	/**
+	 * Clears the pending attachments queue.
+	 */
+	clearPendingAttachments() {
+		this.pendingAttachments = [];
+	}
+
+	/**
+	 * Helper function to convert file to base64.
+	 */
+	#fileToBase64(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				resolve(result);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}
+
+	/**
+	 * Uploads pending attachments after sandbox initialization.
+	 */
+	async uploadPendingAttachments(sandboxId: string, workspacePath: string): Promise<void> {
+		if (this.pendingAttachments.length === 0) return;
+
+		try {
+			const attachmentList: Attachment[] = await Promise.all(
+				this.pendingAttachments.map(async (att) => ({
+					filename: att.name,
+					content: att.file ? await this.#fileToBase64(att.file) : "",
+				})),
+			);
+
+			const result = await uploadAttachments(sandboxId, workspacePath, attachmentList);
+			if (!result.isOk) {
+				toast.error(m.taskboard_error_attachment_upload_failed());
+			}
+		} catch (error) {
+			console.error("Failed to upload pending attachments:", error);
+			toast.error(m.taskboard_error_attachment_upload_failed());
+		} finally {
+			this.clearPendingAttachments();
+		}
 	}
 
 	/**

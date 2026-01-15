@@ -35,11 +35,17 @@ class CodeAgentSendMessageButtonState {
 				codeAgentState.updateCurrentSessionId(sessionId);
 			}
 
+			let workspacePath: string | undefined;
+
 			if (codeAgentTaskboardState.isInitialized) {
-				const { workspace_path: workspacePath } = await initProject({
+				const { workspace_path } = await initProject({
 					sandboxId: sandboxInfo.sandboxId,
 					sessionId,
 				});
+				workspacePath = workspace_path;
+
+				// Refresh sessions to sync the new workspace_path to local storage
+				await window.electronAPI.codeAgentService.updateClaudeCodeSessions(sandboxInfo.sandboxId);
 
 				const promises = [
 					updateTasklist(sandboxInfo.sandboxId, workspacePath, codeAgentTaskboardState.tasklist),
@@ -56,6 +62,12 @@ class CodeAgentSendMessageButtonState {
 				}
 
 				await Promise.all(promises);
+
+				// Upload pending attachments after project initialized
+				await codeAgentTaskboardState.uploadPendingAttachments(
+					sandboxInfo.sandboxId,
+					workspacePath,
+				);
 			}
 
 			if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {

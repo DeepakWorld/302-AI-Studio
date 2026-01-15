@@ -160,27 +160,48 @@ export type BatchUploadFileResponse = typeof batchUploadFileResponseSchema.infer
 /**
  * Batch uploads files to the specified sandbox.
  * @param request The batch upload request containing sandbox_id and file_list.
+ * @param maxRetries Maximum number of retries on failure (default: 3).
  * @returns The batch upload response.
  */
 export async function batchUploadFile(
 	request: BatchUploadFileRequest,
+	maxRetries: number = 3,
 ): Promise<BatchUploadFileResponse> {
-	try {
-		const response = await testKy
-			.post("api/v1/claude-code/sandbox/file/upload/batch", {
-				json: request,
-				timeout: 120000,
-			})
-			.json();
+	let lastError: unknown;
 
-		const validated = batchUploadFileResponseSchema(response);
-		if (validated instanceof type.errors) {
-			console.error("Failed to validate batch upload file response:", validated.summary);
-			throw new Error("Invalid response format from batch upload file API");
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			const response = await testKy
+				.post("api/v1/claude-code/sandbox/file/upload/batch", {
+					json: request,
+					timeout: 300000,
+				})
+				.json();
+
+			const validated = batchUploadFileResponseSchema(response);
+			if (validated instanceof type.errors) {
+				console.error("Failed to validate batch upload file response:", validated.summary);
+				throw new Error("Invalid response format from batch upload file API");
+			}
+			return validated;
+		} catch (error) {
+			lastError = error;
+
+			if (attempt < maxRetries) {
+				const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // Exponential backoff: 1s, 2s, 4s (max 10s)
+				console.warn(
+					`Batch upload failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
+					error,
+				);
+				await new Promise((resolve) => setTimeout(resolve, delay));
+				continue;
+			}
+
+			console.error("Failed to batch upload file after all retries:", error);
+			throw error;
 		}
-		return validated;
-	} catch (error) {
-		console.error("Failed to batch upload file:", error);
-		throw error;
 	}
+
+	// This should never be reached, but TypeScript needs it
+	throw lastError;
 }

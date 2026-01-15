@@ -12,6 +12,7 @@
 	import * as m from "$lib/paraglide/messages";
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { Eye, Loader, Paperclip, Trash2 } from "@lucide/svelte";
@@ -68,33 +69,34 @@
 		if (!editedContent.trim()) return;
 		isSaving = true;
 		try {
-			// 如果有附件，先上传
+			// 如果有附件，处理上传
 			if (attachments.length > 0) {
 				const sandboxId = codeAgentState.sandboxId;
 				const cwd = claudeCodeSandboxState.currentSessionWorkspacePath;
 
 				if (!sandboxId || !cwd) {
-					toast.error(m.taskboard_error_sandbox_not_initialized());
-					return;
-				}
+					// 沙盒未初始化，将附件添加到待上传队列
+					codeAgentTaskboardState.addPendingAttachments([...attachments]);
+				} else {
+					// 沙盒已初始化，直接上传
+					try {
+						const attachmentList: Attachment[] = await Promise.all(
+							attachments.map(async (att) => ({
+								filename: att.name,
+								content: att.file ? await fileToBase64(att.file) : "",
+							})),
+						);
 
-				try {
-					const attachmentList: Attachment[] = await Promise.all(
-						attachments.map(async (att) => ({
-							filename: att.name,
-							content: att.file ? await fileToBase64(att.file) : "",
-						})),
-					);
-
-					const result = await uploadAttachments(sandboxId, cwd, attachmentList);
-					if (!result.isOk) {
+						const result = await uploadAttachments(sandboxId, cwd, attachmentList);
+						if (!result.isOk) {
+							toast.error(m.taskboard_error_attachment_upload_failed());
+							return;
+						}
+					} catch (error) {
+						console.error("Failed to upload attachments:", error);
 						toast.error(m.taskboard_error_attachment_upload_failed());
 						return;
 					}
-				} catch (error) {
-					console.error("Failed to upload attachments:", error);
-					toast.error(m.taskboard_error_attachment_upload_failed());
-					return;
 				}
 			}
 

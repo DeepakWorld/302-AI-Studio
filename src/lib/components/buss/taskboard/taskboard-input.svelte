@@ -25,6 +25,7 @@
 	let textareaRef = $state<HTMLTextAreaElement | null>(null);
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let selectedAttachment = $state<AttachmentFile | null>(null);
+	let isAdding = $state(false);
 
 	function isAttachmentLoading(id: string): boolean {
 		return attachmentLoadingMap.get(id) ?? false;
@@ -59,33 +60,37 @@
 	async function handleAdd() {
 		const attachments = codeAgentTaskboardState.attachments;
 
-		// 如果有附件，先上传
+		// 如果有附件，处理上传
 		if (attachments.length > 0) {
 			const sandboxId = codeAgentState.sandboxId;
 			const cwd = claudeCodeSandboxState.currentSessionWorkspacePath;
 
 			if (!sandboxId || !cwd) {
-				toast.error(m.taskboard_error_sandbox_not_initialized());
-				return;
-			}
+				// 沙盒未初始化，将附件添加到待上传队列
+				codeAgentTaskboardState.addPendingAttachments([...attachments]);
+			} else {
+				// 沙盒已初始化，直接上传
+				isAdding = true;
+				try {
+					const attachmentList: Attachment[] = await Promise.all(
+						attachments.map(async (att) => ({
+							filename: att.name,
+							content: att.file ? await fileToBase64(att.file) : "",
+						})),
+					);
 
-			try {
-				const attachmentList: Attachment[] = await Promise.all(
-					attachments.map(async (att) => ({
-						filename: att.name,
-						content: att.file ? await fileToBase64(att.file) : "",
-					})),
-				);
-
-				const result = await uploadAttachments(sandboxId, cwd, attachmentList);
-				if (!result.isOk) {
+					const result = await uploadAttachments(sandboxId, cwd, attachmentList);
+					if (!result.isOk) {
+						toast.error(m.taskboard_error_attachment_upload_failed());
+						return;
+					}
+				} catch (error) {
+					console.error("Failed to upload attachments:", error);
 					toast.error(m.taskboard_error_attachment_upload_failed());
 					return;
+				} finally {
+					isAdding = false;
 				}
-			} catch (error) {
-				console.error("Failed to upload attachments:", error);
-				toast.error(m.taskboard_error_attachment_upload_failed());
-				return;
 			}
 		}
 
@@ -277,7 +282,10 @@
 			</button>
 
 			<!-- Right: Add button -->
-			<Button variant="default" size="sm" onclick={handleAdd}>
+			<Button variant="default" size="sm" onclick={handleAdd} disabled={isAdding}>
+				{#if isAdding}
+					<Loader class="h-4 w-4 animate-spin mr-2" />
+				{/if}
 				{m.taskboard_button_add()}
 			</Button>
 		</div>
