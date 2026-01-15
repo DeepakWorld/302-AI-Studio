@@ -5,6 +5,7 @@
 	import { m } from "$lib/paraglide/messages";
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent";
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
@@ -77,9 +78,13 @@
 					}
 				});
 
-		codeAgentTaskboardState.startAutoExecution(async () => {
-			await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
-		});
+		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
+			codeAgentTaskboardState.startAutoExecution(async () => {
+				await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+			});
+		} else {
+			codeAgentTaskboardState.startAutoExecution(async () => fn());
+		}
 	}
 
 	const taskContent = $derived.by(() => {

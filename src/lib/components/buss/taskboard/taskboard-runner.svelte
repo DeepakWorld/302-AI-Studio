@@ -2,7 +2,7 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as m from "$lib/paraglide/messages";
 	import { chatState } from "$lib/stores/chat-state.svelte";
-	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent";
+	import { codeAgentSendMessageButtonState, codeAgentState } from "$lib/stores/code-agent";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils.js";
@@ -75,9 +75,13 @@
 					}
 				});
 
-		codeAgentTaskboardState.startAutoExecution(async () => {
-			await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
-		});
+		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
+			codeAgentTaskboardState.startAutoExecution(async () => {
+				await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+			});
+		} else {
+			codeAgentTaskboardState.startAutoExecution(async () => fn());
+		}
 	}
 </script>
 

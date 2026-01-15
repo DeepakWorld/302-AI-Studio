@@ -219,7 +219,7 @@ export class CodeAgentTaskboardState {
 					codeAgentState.sandboxId,
 					claudeCodeSandboxState.currentSessionWorkspacePath,
 				];
-				console.log("Updating tasklist", sandboxId, path, sortedTasklist);
+				console.log("Updating tasklist", path);
 
 				const result = await updateTasklist(sandboxId, path, sortedTasklist);
 				if (!result.isOk) {
