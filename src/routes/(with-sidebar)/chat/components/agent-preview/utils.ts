@@ -5,6 +5,9 @@
 import type { SandboxFileInfo } from "$lib/api/sandbox-file";
 import { toast } from "svelte-sonner";
 
+// Re-export withRetry from common utils
+export { withRetry } from "$lib/utils/retry";
+
 /**
  * Get threadId from window.tab or default to "shell"
  */
@@ -46,25 +49,6 @@ export function handleError(error: unknown, context: string, showToast = true): 
 	if (showToast) {
 		toast.error(message);
 	}
-}
-
-/**
- * Retry utility with exponential backoff
- * @param fn - Function to retry
- * @param maxRetries - Maximum number of retries (default: 3)
- * @param delay - Initial delay in milliseconds (default: 1000)
- * @returns Promise that resolves with the function result
- */
-export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> {
-	for (let i = 0; i < maxRetries; i++) {
-		try {
-			return await fn();
-		} catch (error) {
-			if (i === maxRetries - 1) throw error;
-			await new Promise((resolve) => setTimeout(resolve, delay * Math.pow(2, i)));
-		}
-	}
-	throw new Error("Max retries exceeded");
 }
 
 /**

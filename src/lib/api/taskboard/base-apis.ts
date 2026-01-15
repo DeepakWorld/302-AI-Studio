@@ -1,4 +1,5 @@
 import { type } from "arktype";
+import { withRetry } from "$lib/utils/retry";
 import { _302AIKy } from "../core/_302ai-ky";
 import { testKy } from "../core/test-ky";
 
@@ -167,10 +168,8 @@ export async function batchUploadFile(
 	request: BatchUploadFileRequest,
 	maxRetries: number = 3,
 ): Promise<BatchUploadFileResponse> {
-	let lastError: unknown;
-
-	for (let attempt = 0; attempt <= maxRetries; attempt++) {
-		try {
+	return withRetry(
+		async () => {
 			const response = await testKy
 				.post("api/v1/claude-code/sandbox/file/upload/batch", {
 					json: request,
@@ -184,24 +183,9 @@ export async function batchUploadFile(
 				throw new Error("Invalid response format from batch upload file API");
 			}
 			return validated;
-		} catch (error) {
-			lastError = error;
-
-			if (attempt < maxRetries) {
-				const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // Exponential backoff: 1s, 2s, 4s (max 10s)
-				console.warn(
-					`Batch upload failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
-					error,
-				);
-				await new Promise((resolve) => setTimeout(resolve, delay));
-				continue;
-			}
-
-			console.error("Failed to batch upload file after all retries:", error);
-			throw error;
-		}
-	}
-
-	// This should never be reached, but TypeScript needs it
-	throw lastError;
+		},
+		maxRetries,
+		1000,
+		10000,
+	);
 }
