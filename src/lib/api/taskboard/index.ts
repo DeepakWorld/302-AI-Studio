@@ -5,6 +5,22 @@ import { batchUploadFile, executeCommand } from "./base-apis";
 const TODO_TASKS_FILE_PATH = ".302ai/todo/tasks.json";
 const ATTACHMENTS_DIR_PATH = ".302ai/attachments";
 
+async function executeCommandRetry<T>(
+	fn: () => Promise<T>,
+	shouldRetry: (response: T) => boolean,
+	maxAttempts: number = 3,
+): Promise<T> {
+	let lastResponse: T | undefined;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		lastResponse = await fn();
+		if (!shouldRetry(lastResponse)) {
+			return lastResponse;
+		}
+	}
+
+	return lastResponse as T;
+}
+
 /**
  * Validate and repair the task list.
  * If the content is invalid (not JSON or not matching schema), it will be overwritten with an empty array.
@@ -70,11 +86,15 @@ export async function getTasklist(
 	try {
 		const tasksFilePath = `${cwd}/${TODO_TASKS_FILE_PATH}`;
 		const dir = tasksFilePath.substring(0, tasksFilePath.lastIndexOf("/"));
-		const response = await executeCommand({
-			sandboxId,
-			cwd,
-			command: `mkdir -p ${dir} && if [ ! -f ${tasksFilePath} ]; then echo '[]' > ${tasksFilePath}; fi && cat ${tasksFilePath}`,
-		});
+		const response = await executeCommandRetry(
+			() =>
+				executeCommand({
+					sandboxId,
+					cwd,
+					command: `mkdir -p ${dir} && if [ ! -f ${tasksFilePath} ]; then echo '[]' > ${tasksFilePath}; fi && cat ${tasksFilePath}`,
+				}),
+			(r) => !r.success || r.result.exit_code !== 0,
+		);
 
 		if (!response.success || response.result.exit_code !== 0) {
 			// If file doesn't exist or other error, return empty list for now
@@ -104,11 +124,15 @@ export async function updateTasklist(
 		const tasksFilePath = `${cwd}/${TODO_TASKS_FILE_PATH}`;
 		const dir = tasksFilePath.substring(0, tasksFilePath.lastIndexOf("/"));
 		const content = JSON.stringify(tasks).replace(/'/g, "'\\''");
-		const response = await executeCommand({
-			sandboxId,
-			cwd,
-			command: `mkdir -p ${dir} && echo '${content}' > ${tasksFilePath}`,
-		});
+		const response = await executeCommandRetry(
+			() =>
+				executeCommand({
+					sandboxId,
+					cwd,
+					command: `mkdir -p ${dir} && echo '${content}' > ${tasksFilePath}`,
+				}),
+			(r) => !r.success || r.result.exit_code !== 0,
+		);
 
 		if (!response.success || response.result.exit_code !== 0) {
 			return { isOk: false };
