@@ -265,6 +265,20 @@
 			: m.placeholder_input_chat_modifier_send({ modifier });
 	});
 
+	// Prevent Enter key from inserting newline when sendMessage shortcut is Enter
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.isComposing) return;
+
+		const sendMessageShortcut = shortcutSettings.getShortcut("sendMessage");
+		const keys = sendMessageShortcut?.keys ?? ["Enter"];
+		const isEnterSend = keys.length === 1 && keys[0].toLowerCase() === "enter";
+
+		// If sendMessage shortcut is Enter (without modifiers) and user pressed Enter without Shift
+		if (isEnterSend && e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+		}
+	}
+
 	onMount(() => {
 		const unsub = onShortcutAction((action) => {
 			if (action.action === "sendMessage" && textareaRef === document.activeElement) {
@@ -301,6 +315,7 @@
 				)}
 				bind:value={chatState.inputValue}
 				placeholder={placeholderText}
+				onkeydown={handleKeydown}
 				oncompositionend={() => (compositionEndTime = Date.now())}
 				onpaste={handlePaste}
 				disabled={codeAgentState.isDeleted}

@@ -113,6 +113,16 @@
 		open = false;
 	}
 
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.isComposing) return;
+
+		// Cmd/Ctrl+Enter to save
+		if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+			e.preventDefault();
+			handleSave();
+		}
+	}
+
 	function handleAttachmentClick() {
 		fileInputRef?.click();
 	}
@@ -191,12 +201,12 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="min-w-[500px] max-w-[600px]">
+	<Dialog.Content class="min-w-[500px] max-w-[600px] overflow-hidden">
 		<Dialog.Header>
 			<Dialog.Title>{m.taskboard_edit_title()}</Dialog.Title>
 		</Dialog.Header>
 
-		<div class="flex flex-col gap-3 py-4">
+		<div class="flex flex-col gap-3 py-4 w-full overflow-hidden">
 			<!-- Attachment preview area -->
 			{#if attachments.length > 0}
 				<div class="flex gap-2 flex-wrap">
@@ -286,6 +296,7 @@
 						)}
 						placeholder={m.taskboard_input_placeholder()}
 						bind:value={editedContent}
+						onkeydown={handleKeydown}
 						onpaste={handlePaste}
 					/>
 				</div>
@@ -299,7 +310,7 @@
 				/>
 
 				<!-- Bottom action bar -->
-				<div class="mt-2 flex items-center justify-between">
+				<div class="my-1 flex items-center justify-between">
 					<!-- Left: Attachment button -->
 					<button
 						type="button"

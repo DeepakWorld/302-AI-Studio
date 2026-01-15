@@ -183,6 +183,11 @@ export class ShortcutEngine {
 		}
 	}
 
+	// Actions that should not call preventDefault() in before-input-event.
+	// These actions need to let the DOM event propagate so other components can handle them.
+	// For example, sendMessage uses Enter key but taskboard-input also needs Enter key.
+	private readonly PASSTHROUGH_ACTIONS = new Set(["sendMessage"]);
+
 	private handleBeforeInput(
 		electronEvent: Electron.Event,
 		input: Electron.Input,
@@ -215,7 +220,11 @@ export class ShortcutEngine {
 			this.lastHandledKey = keyIdentifier;
 			this.lastHandledTime = now;
 
-			electronEvent.preventDefault();
+			// For passthrough actions, don't prevent default so the DOM event can propagate
+			// to other components (e.g., taskboard-input can receive Enter key)
+			if (!this.PASSTHROUGH_ACTIONS.has(match.binding.action)) {
+				electronEvent.preventDefault();
+			}
 			this.dispatch(match.binding.action, { windowId, viewId });
 		}
 	}

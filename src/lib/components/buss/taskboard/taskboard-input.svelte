@@ -19,6 +19,7 @@
 	import { nanoid } from "nanoid";
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
+	import ButtonWithTooltip from "../button-with-tooltip/button-with-tooltip.svelte";
 
 	// Local UI state
 	let attachmentLoadingMap = new SvelteMap<string, boolean>();
@@ -271,15 +272,15 @@
 		/>
 
 		<!-- Bottom action bar -->
-		<div class="mt-2 flex items-center justify-between">
+		<div class="my-1 flex items-center justify-between">
 			<!-- Left: Attachment button -->
-			<button
-				type="button"
-				class="size-9 rounded-[10px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+			<ButtonWithTooltip
+				tooltip={m.title_upload_attachment()}
+				class="hover:!bg-chat-action-hover"
 				onclick={handleAttachmentClick}
 			>
 				<Paperclip class="size-4" />
-			</button>
+			</ButtonWithTooltip>
 
 			<!-- Right: Add button -->
 			<Button variant="default" size="sm" onclick={handleAdd} disabled={isAdding}>
