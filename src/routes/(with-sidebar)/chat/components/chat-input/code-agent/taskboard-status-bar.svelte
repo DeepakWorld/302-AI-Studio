@@ -34,7 +34,7 @@
 	}
 
 	async function handleRun() {
-		const fn = () =>
+		const fn = async () =>
 			match({
 				isEmpty: chatState.inputValue.trim() === "" && chatState.attachments.length === 0,
 				noProviders: !hasConfiguredProviders(),
@@ -78,13 +78,13 @@
 					}
 				});
 
-		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-			codeAgentTaskboardState.startAutoExecution(async () => {
+		codeAgentTaskboardState.startAutoExecution(async () => {
+			if (codeAgentState.enabled && codeAgentState.isFreshTab) {
 				await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
-			});
-		} else {
-			codeAgentTaskboardState.startAutoExecution(async () => fn());
-		}
+			} else {
+				await fn();
+			}
+		});
 	}
 
 	const taskContent = $derived.by(() => {
@@ -125,6 +125,8 @@
 			variant="ghost"
 			size="icon-sm"
 			class="hover:bg-secondary/80 dark:hover:bg-secondary/80"
+			disabled={codeAgentTaskboardState.taskboardStatus !== "running" &&
+				(chatState.isStreaming || chatState.isSubmitted)}
 			onclick={handleRun}
 		>
 			{#if codeAgentTaskboardState.taskboardStatus === "running"}

@@ -31,7 +31,7 @@
 	}
 
 	async function handleRun() {
-		const fn = () =>
+		const fn = async () =>
 			match({
 				isEmpty: chatState.inputValue.trim() === "" && chatState.attachments.length === 0,
 				noProviders: !hasConfiguredProviders(),
@@ -75,13 +75,21 @@
 					}
 				});
 
-		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-			codeAgentTaskboardState.startAutoExecution(async () => {
+		codeAgentTaskboardState.startAutoExecution(async () => {
+			if (codeAgentState.enabled && codeAgentState.isFreshTab) {
 				await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
-			});
-		} else {
-			codeAgentTaskboardState.startAutoExecution(async () => fn());
-		}
+			} else {
+				await fn();
+			}
+		});
+
+		// if (codeAgentState.enabled && codeAgentState.isFreshTab) {
+		// 	codeAgentTaskboardState.startAutoExecution(async () => {
+		// 		await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+		// 	});
+		// } else {
+		// 	codeAgentTaskboardState.startAutoExecution(async () => fn());
+		// }
 	}
 </script>
 
@@ -122,10 +130,11 @@
 				<Button
 					variant="default"
 					size="sm"
-					disabled={!codeAgentTaskboardState.canStart &&
+					disabled={(!codeAgentTaskboardState.canStart &&
 						!isRunning &&
 						!isWaitingToStop &&
-						!currentTask}
+						!currentTask) ||
+						(!isRunning && !isWaitingToStop && (chatState.isStreaming || chatState.isSubmitted))}
 					onclick={handleRun}
 				>
 					{buttonText}
