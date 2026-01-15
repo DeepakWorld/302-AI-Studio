@@ -1,7 +1,6 @@
 import { withRetry } from "$lib/utils/retry";
 import { type } from "arktype";
 import { _302AIKy } from "../core/_302ai-ky";
-import { testKy } from "../core/test-ky";
 
 export const executeCommandRequestSchema = type({
 	sandboxId: "string",
@@ -121,8 +120,8 @@ export type InitProjectResponse = typeof initProjectResponseSchema.infer;
 
 export async function initProject(request: InitProjectRequest): Promise<InitProjectResponse> {
 	try {
-		const response = await testKy
-			.post("api/v1/claude-code/sandbox/project/init", {
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/project/init", {
 				json: {
 					sandbox_id: request.sandboxId,
 					session_id: request.sessionId,
@@ -173,8 +172,8 @@ export async function batchUploadFile(
 ): Promise<BatchUploadFileResponse> {
 	return withRetry(
 		async () => {
-			const response = await testKy
-				.post("api/v1/claude-code/sandbox/file/upload/batch", {
+			const response = await _302AIKy
+				.post("302/claude-code/sandbox/file/upload/batch", {
 					json: request,
 					timeout: 300000,
 				})

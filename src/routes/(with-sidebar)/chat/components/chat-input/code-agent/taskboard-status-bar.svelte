@@ -98,8 +98,8 @@
 	});
 </script>
 
-<Item.Root variant="outline" class="w-full max-w-chat-max-w !cursor-default">
-	<Item.Content class="flex flex-row items-center gap-x-2">
+<Item.Root variant="outline" class="w-full max-w-chat-max-w flex-nowrap !cursor-default">
+	<Item.Content class="min-w-0 flex flex-row items-center gap-x-2">
 		<div class="flex items-center justify-center">
 			{#if codeAgentTaskboardState.taskboardStatus === "running" || codeAgentTaskboardState.taskboardStatus === "waiting_to_stop"}
 				<LdrsLoader type="ripples" size={32} speed={5} />
@@ -107,7 +107,7 @@
 				<LdrsLoader type="ping" size={32} speed={5} />
 			{/if}
 		</div>
-		<span class="truncate text-sm font-medium">
+		<span class="min-w-0 flex-1 truncate text-sm font-medium">
 			{statusText}
 			{taskContent}
 		</span>
