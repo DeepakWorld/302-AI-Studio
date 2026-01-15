@@ -21,6 +21,9 @@
 </script>
 
 <div class="flex flex-col h-full bg-background">
+	<!-- Top Input -->
+	<TaskboardInput />
+
 	<!-- Filter Tabs -->
 	<TaskboardTopbar {filter} onFilterChange={handleFilterChange} />
 
@@ -31,7 +34,4 @@
 
 	<!-- Runner -->
 	<TaskboardRunner />
-
-	<!-- Bottom Input -->
-	<TaskboardInput />
 </div>
