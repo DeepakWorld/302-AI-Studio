@@ -96,11 +96,24 @@
 
 		try {
 			draggedElementId = null;
-			localTasks = e.detail.items;
+			const newItems = e.detail.items;
+
+			// Check if any non-done task is placed after a done task
+			const firstDoneIndex = newItems.findIndex((t) => t.status === "done");
+			if (firstDoneIndex !== -1) {
+				const hasInvalidOrder = newItems.slice(firstDoneIndex).some((t) => t.status !== "done");
+				if (hasInvalidOrder) {
+					// Invalid order - restore original
+					localTasks = [...filteredTasks()];
+					return;
+				}
+			}
+
+			localTasks = newItems;
 
 			// Rebuild full tasklist with new order for filtered items
 			if (filter === "all") {
-				codeAgentTaskboardState.updateTasklist(e.detail.items);
+				codeAgentTaskboardState.updateTasklist(newItems);
 			} else {
 				// For filtered views, we need to preserve items not in current filter
 				const otherTasks = codeAgentTaskboardState.tasklist.filter((t) => {
@@ -108,7 +121,7 @@
 					if (filter === "done") return t.status !== "done";
 					return false;
 				});
-				codeAgentTaskboardState.updateTasklist([...e.detail.items, ...otherTasks]);
+				codeAgentTaskboardState.updateTasklist([...newItems, ...otherTasks]);
 			}
 		} catch (error) {
 			console.error("Error finalizing drag operation:", error);
@@ -148,7 +161,7 @@
 		<div
 			class={cn(
 				"shrink-0",
-				task.status === "done" && "opacity-40",
+				task.status === "done" && "opacity-40 cursor-not-allowed",
 				task.status !== "done" && "cursor-grab active:cursor-grabbing",
 			)}
 		>
@@ -259,6 +272,12 @@
 					out:scale={draggedElementId || isDndFinalizing
 						? { duration: 0 }
 						: { duration: 150, start: 0.9 }}
+					onpointerdown={task.status === "done"
+						? (e) => {
+								e.stopPropagation();
+								e.preventDefault();
+							}
+						: undefined}
 				>
 					{@render taskItem(task)}
 				</div>
