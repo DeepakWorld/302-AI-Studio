@@ -12,7 +12,7 @@
 	import { cn } from "$lib/utils.js";
 	import { GripVertical, SquarePen, Trash2 } from "@lucide/svelte";
 	import type { Task } from "@shared/types";
-	import { dndzone, TRIGGERS } from "svelte-dnd-action";
+	import { dndzone, SHADOW_PLACEHOLDER_ITEM_ID, TRIGGERS } from "svelte-dnd-action";
 	import { flip } from "svelte/animate";
 	import { scale } from "svelte/transition";
 	import TaskEditDialog from "./task-edit-dialog.svelte";
@@ -282,16 +282,11 @@
 		>
 			{#each localTasks as task (task.id)}
 				<div
+					class={cn(task.id === SHADOW_PLACEHOLDER_ITEM_ID && "!hidden")}
 					animate:flip={{ duration: 200 }}
-					out:scale={draggedElementId || isDndFinalizing
+					in:scale={draggedElementId || isDndFinalizing
 						? { duration: 0 }
 						: { duration: 150, start: 0.9 }}
-					onpointerdown={task.status === "done"
-						? (e) => {
-								e.stopPropagation();
-								e.preventDefault();
-							}
-						: undefined}
 				>
 					{@render taskItem(task)}
 				</div>
