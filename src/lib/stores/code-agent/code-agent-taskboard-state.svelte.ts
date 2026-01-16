@@ -295,20 +295,18 @@ export class CodeAgentTaskboardState {
 
 				const success = await this.#waitForChatFinished();
 
-				if (this.taskboardStatus !== "running") {
-					break;
-				}
-
 				if (success) {
 					await this.#updateTaskStatus(task.id, "done");
 					return;
 				}
 
+				if (this.taskboardStatus !== "running") {
+					break;
+				}
+
 				this.#currentRetryCount++;
-				console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
 			}
 
-			console.error(`[TaskBoard] Task failed after ${this.#MAX_RETRY_COUNT} retries`);
 			this.taskboardStatus = "idle";
 		} finally {
 			off();
