@@ -1058,6 +1058,7 @@
 	"text_deep_thinking_type": "Deep Thinking Type",
 	"context_menu_download_image": "Download Image",
 	"context_menu_copy_image": "Copy Image",
+	"context_menu_copy_selection": "Copy Selection",
 	"export_dialog_title": "Export Conversation",
 	"export_format_plain_text": "Plain Text",
 	"export_format_html": "HTML",

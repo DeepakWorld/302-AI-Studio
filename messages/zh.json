@@ -1058,6 +1058,7 @@
 	"text_deep_thinking_type": "深度思考型",
 	"context_menu_download_image": "下载图片",
 	"context_menu_copy_image": "复制图片",
+	"context_menu_copy_selection": "复制选中内容",
 	"export_dialog_title": "导出会话记录",
 	"export_format_plain_text": "纯文本",
 	"export_format_html": "HTML",

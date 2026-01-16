@@ -2,6 +2,8 @@
 	import * as ContextMenu from "$lib/components/ui/context-menu";
 	import { m } from "$lib/paraglide/messages";
 
+	import { toast } from "svelte-sonner";
+
 	interface Props {
 		onCopy?: () => void | Promise<void>;
 		onCopyImage?: (src: string) => void | Promise<void>;
@@ -27,6 +29,7 @@
 	}: Props = $props();
 
 	let clickedImageSrc = $state<string | null>(null);
+	let selectedText = $state<string | null>(null);
 
 	function handleContextMenu(event: MouseEvent) {
 		// Check if right-click target is an image or has an image ancestor
@@ -37,6 +40,14 @@
 			clickedImageSrc = imgElement.src;
 		} else {
 			clickedImageSrc = null;
+		}
+
+		// Check for text selection
+		const selection = window.getSelection();
+		if (selection && selection.toString().trim().length > 0) {
+			selectedText = selection.toString();
+		} else {
+			selectedText = null;
 		}
 	}
 
@@ -53,6 +64,17 @@
 			onCopy();
 		}
 	}
+
+	async function handleCopySelection() {
+		if (selectedText) {
+			try {
+				await navigator.clipboard.writeText(selectedText);
+				toast.success(m.toast_copied_success());
+			} catch {
+				toast.error(m.toast_copied_failed());
+			}
+		}
+	}
 </script>
 
 <ContextMenu.Root>
@@ -64,6 +86,13 @@
 	</div>
 
 	<ContextMenu.Content>
+		{#if selectedText}
+			<ContextMenu.Item onSelect={handleCopySelection}>
+				{m.context_menu_copy_selection()}
+			</ContextMenu.Item>
+			<ContextMenu.Separator />
+		{/if}
+
 		{#if clickedImageSrc && onDownloadImage}
 			<ContextMenu.Item onSelect={handleDownloadImage}>
 				{m.context_menu_download_image()}
