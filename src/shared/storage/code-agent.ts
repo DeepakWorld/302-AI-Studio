@@ -13,6 +13,7 @@ export type CodeAgentConfigMetadata = typeof CodeAgentConfigMetadata.infer;
 export const skill = type({
 	name: "string",
 	description: "string",
+	description_zh: "string",
 	isBuiltin: "boolean?",
 	content: "string?",
 	/** Whether this skill should be forcefully included in prompts when enabled */
