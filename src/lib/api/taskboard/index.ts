@@ -5,22 +5,6 @@ import { batchUploadFile, executeCommand } from "./base-apis";
 const TODO_TASKS_FILE_PATH = ".302ai/todo/tasks.json";
 const ATTACHMENTS_DIR_PATH = ".302ai/attachments";
 
-async function executeCommandRetry<T>(
-	fn: () => Promise<T>,
-	shouldRetry: (response: T) => boolean,
-	maxAttempts: number = 3,
-): Promise<T> {
-	let lastResponse: T | undefined;
-	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-		lastResponse = await fn();
-		if (!shouldRetry(lastResponse)) {
-			return lastResponse;
-		}
-	}
-
-	return lastResponse as T;
-}
-
 /**
  * Validate and repair the task list.
  * If the content is invalid (not JSON or not matching schema), it will be overwritten with an empty array.
@@ -34,43 +18,41 @@ async function validateAndRepairTaskList(
 	cwd: string,
 	content: string,
 ): Promise<Task[]> {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let parsed: any;
 	try {
-		const parsed = JSON.parse(content);
-		const validated = taskListSchema(parsed);
-
-		if (validated instanceof type.errors) {
-			console.warn(
-				"Task list schema validation failed, resetting to empty list:",
-				validated.summary,
-			);
-			await updateTasklist(sandboxId, cwd, []);
-			return [];
-		}
-
-		// Remove duplicate tasks by id (keep first occurrence)
-		const seenIds = new Set<string>();
-		const uniqueTasks = validated.filter((task) => {
-			if (seenIds.has(task.id)) {
-				return false;
-			}
-			seenIds.add(task.id);
-			return true;
-		});
-
-		// If duplicates were found, update the file
-		if (uniqueTasks.length !== validated.length) {
-			console.warn(
-				`Found ${validated.length - uniqueTasks.length} duplicate task(s), removing duplicates`,
-			);
-			await updateTasklist(sandboxId, cwd, uniqueTasks);
-		}
-
-		return uniqueTasks;
+		parsed = JSON.parse(content);
 	} catch (error) {
-		console.warn("Task list JSON parse failed, resetting to empty list:", error);
-		await updateTasklist(sandboxId, cwd, []);
+		console.warn("Task list JSON parse failed, returning empty list:", error);
 		return [];
 	}
+
+	const validated = taskListSchema(parsed);
+
+	if (validated instanceof type.errors) {
+		console.warn("Task list schema validation failed, returning empty list:", validated.summary);
+		return [];
+	}
+
+	// Remove duplicate tasks by id (keep first occurrence)
+	const seenIds = new Set<string>();
+	const uniqueTasks = validated.filter((task) => {
+		if (seenIds.has(task.id)) {
+			return false;
+		}
+		seenIds.add(task.id);
+		return true;
+	});
+
+	// If duplicates were found, update the file
+	if (uniqueTasks.length !== validated.length) {
+		console.warn(
+			`Found ${validated.length - uniqueTasks.length} duplicate task(s), removing duplicates`,
+		);
+		await updateTasklist(sandboxId, cwd, uniqueTasks);
+	}
+
+	return uniqueTasks;
 }
 
 /**
@@ -86,15 +68,11 @@ export async function getTasklist(
 	try {
 		const tasksFilePath = `${cwd}/${TODO_TASKS_FILE_PATH}`;
 		const dir = tasksFilePath.substring(0, tasksFilePath.lastIndexOf("/"));
-		const response = await executeCommandRetry(
-			() =>
-				executeCommand({
-					sandboxId,
-					cwd,
-					command: `mkdir -p ${dir} && if [ ! -f ${tasksFilePath} ]; then echo '[]' > ${tasksFilePath}; fi && cat ${tasksFilePath}`,
-				}),
-			(r) => !r.success || r.result.exit_code !== 0,
-		);
+		const response = await executeCommand({
+			sandboxId,
+			cwd,
+			command: `mkdir -p ${dir} && if [ ! -f ${tasksFilePath} ]; then echo '[]' > ${tasksFilePath}; fi && cat ${tasksFilePath}`,
+		});
 
 		if (!response.success || response.result.exit_code !== 0) {
 			// If file doesn't exist or other error, return empty list for now
@@ -122,19 +100,29 @@ export async function updateTasklist(
 ): Promise<{ isOk: boolean }> {
 	try {
 		const tasksFilePath = `${cwd}/${TODO_TASKS_FILE_PATH}`;
-		const dir = tasksFilePath.substring(0, tasksFilePath.lastIndexOf("/"));
-		const content = JSON.stringify(tasks).replace(/'/g, "'\\''");
-		const response = await executeCommandRetry(
-			() =>
-				executeCommand({
-					sandboxId,
-					cwd,
-					command: `mkdir -p ${dir} && echo '${content}' > ${tasksFilePath}`,
-				}),
-			(r) => !r.success || r.result.exit_code !== 0,
-		);
 
-		if (!response.success || response.result.exit_code !== 0) {
+		const jsonContent = JSON.stringify(tasks);
+		console.log("Updating task list content:", jsonContent);
+		const base64Content =
+			"data:application/json;base64," +
+			window.btoa(
+				encodeURIComponent(jsonContent).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+					String.fromCharCode(parseInt(p1, 16)),
+				),
+			);
+
+		const response = await batchUploadFile({
+			sandbox_id: sandboxId,
+			file_list: [
+				{
+					content: base64Content,
+					save_path: tasksFilePath,
+				},
+			],
+		});
+
+		if (!response.success || !response.result?.[0]?.success) {
+			console.error("Failed to update task list:", response.result?.[0]?.error);
 			return { isOk: false };
 		}
 		return { isOk: true };
@@ -176,8 +164,9 @@ export async function uploadAttachments(
 			file_list: fileList,
 		});
 
-		if (!response.success) {
-			console.error("Failed to upload attachments:", response.error?.message);
+		const faileds = response.result.filter((r) => !r.success);
+		if (!response.success || faileds.length > 0) {
+			console.error("Failed to upload attachments:", faileds.map((r) => r.error).join(", "));
 			return { isOk: false };
 		}
 

@@ -154,40 +154,37 @@ export type BatchUploadFileRequest = typeof batchUploadFileRequestSchema.infer;
 
 export const batchUploadFileResponseSchema = type({
 	success: "boolean",
-	error: type({
-		message: "string",
-	}).optional(),
+	result: type({
+		success: "boolean",
+		file: {
+			save_path: "string",
+		},
+		error: "string?",
+	}).array(),
 });
 export type BatchUploadFileResponse = typeof batchUploadFileResponseSchema.infer;
 
 /**
  * Batch uploads files to the specified sandbox.
  * @param request The batch upload request containing sandbox_id and file_list.
- * @param maxRetries Maximum number of retries on failure (default: 3).
  * @returns The batch upload response.
  */
 export async function batchUploadFile(
 	request: BatchUploadFileRequest,
-	maxRetries: number = 3,
 ): Promise<BatchUploadFileResponse> {
-	return withRetry(
-		async () => {
-			const response = await _302AIKy
-				.post("302/claude-code/sandbox/file/upload/batch", {
-					json: request,
-					timeout: 300000,
-				})
-				.json();
+	const response = await _302AIKy
+		.post("302/claude-code/sandbox/file/upload/batch", {
+			json: request,
+			timeout: 300000,
+		})
+		.json();
 
-			const validated = batchUploadFileResponseSchema(response);
-			if (validated instanceof type.errors) {
-				console.error("Failed to validate batch upload file response:", validated.summary);
-				throw new Error("Invalid response format from batch upload file API");
-			}
-			return validated;
-		},
-		maxRetries,
-		1000,
-		10000,
-	);
+	console.log("Batch upload raw response:", JSON.stringify(response, null, 2));
+
+	const validated = batchUploadFileResponseSchema(response);
+	if (validated instanceof type.errors) {
+		console.error("Failed to validate batch upload file response:", validated.summary);
+		throw new Error("Invalid response format from batch upload file API");
+	}
+	return validated;
 }

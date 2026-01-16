@@ -193,8 +193,29 @@ export class CodeAgentTaskboardState {
 							claudeCodeSandboxState.currentSessionWorkspacePath,
 						];
 						if (path) {
-							const tasklist = await getTasklist(sandboxId, path);
-							this.tasklist = this.#sortTasks(tasklist.tasks);
+							const { isOk, tasks } = await getTasklist(sandboxId, path);
+
+							// Strategy: Prefer local data if remote is suspiciously empty/corrupted
+							if (isOk) {
+								if (tasks.length === 0 && this.tasklist.length > 0) {
+									// Remote is empty, but we have local data.
+									// Assume remote might be corrupted/reset, so we repair it with local data.
+									console.warn(
+										"Remote tasklist is empty but local has data. Repairing remote with local data.",
+									);
+									await this.updateTasklist(this.tasklist);
+								} else {
+									// Remote has data, or both are empty. Trust remote.
+									this.tasklist = this.#sortTasks(tasks);
+								}
+							} else {
+								// Get failed completely.
+								// If we have local data, try to push it to remote to fix the issue.
+								if (this.tasklist.length > 0) {
+									console.warn("Failed to get tasklist. Attempting to restore from local state.");
+									await this.updateTasklist(this.tasklist);
+								}
+							}
 						}
 					});
 			},
@@ -289,7 +310,8 @@ export class CodeAgentTaskboardState {
 
 		try {
 			while (this.#currentRetryCount < this.#MAX_RETRY_COUNT) {
-				const message = this.#currentRetryCount === 0 ? task.content : m.text_continue();
+				const message =
+					this.#currentRetryCount === 0 ? task.content : `${m.text_continue()}: ${task.content}`;
 				chatState.inputValue = message;
 				await fn();
 
@@ -310,6 +332,7 @@ export class CodeAgentTaskboardState {
 			console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
 
 			this.taskboardStatus = "idle";
+			await this.#updateTaskStatus(task.id, "pending");
 		} finally {
 			off();
 			this.currentExecutingTaskId = null;
