@@ -90,18 +90,15 @@
 	}
 
 	function handleSkillsPanelToggle() {
-		// Toggle between skills tab and preview tab in the agent preview panel
-		if (agentPreviewState.activeTab === "skills") {
-			agentPreviewState.setActiveTab("preview");
-		} else {
+		// Open skills tab if not already on it
+		if (agentPreviewState.activeTab !== "skills") {
 			agentPreviewState.openSkillsTab();
 		}
 	}
 
 	function handleTaskboardPanelToggle() {
-		if (agentPreviewState.activeTab === "taskboard") {
-			agentPreviewState.setActiveTab("preview");
-		} else {
+		// Open taskboard tab if not already on it
+		if (agentPreviewState.activeTab !== "taskboard") {
 			agentPreviewState.openTaskboardTab();
 		}
 	}
