@@ -159,6 +159,10 @@
 			attachments = [...attachments, attachment];
 			setAttachmentLoading(attachmentId, true);
 
+			// Add reference to input value
+			const prefix = editedContent.length > 0 && !editedContent.endsWith(" ") ? " " : "";
+			editedContent += `${prefix}@${attachment.name} `;
+
 			generateFilePreview(file).then((preview) => {
 				attachments = attachments.map((a) => (a.id === attachmentId ? { ...a, preview } : a));
 				setAttachmentLoading(attachmentId, false);
