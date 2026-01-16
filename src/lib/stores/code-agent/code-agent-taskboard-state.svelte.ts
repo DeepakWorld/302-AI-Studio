@@ -305,7 +305,9 @@ export class CodeAgentTaskboardState {
 				}
 
 				this.#currentRetryCount++;
+				console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
 			}
+			console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
 
 			this.taskboardStatus = "idle";
 		} finally {
