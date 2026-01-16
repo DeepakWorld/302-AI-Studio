@@ -14,7 +14,6 @@
 	import type { Task } from "@shared/types";
 	import { dndzone, SHADOW_PLACEHOLDER_ITEM_ID, TRIGGERS } from "svelte-dnd-action";
 	import { flip } from "svelte/animate";
-	import { scale } from "svelte/transition";
 	import TaskEditDialog from "./task-edit-dialog.svelte";
 
 	interface Props {
@@ -55,14 +54,17 @@
 		return filtered.toSorted((a, b) => statusPriority[a.status] - statusPriority[b.status]);
 	});
 
-	// Split filtered tasks into active (draggable) and done (static)
-	const visibleActiveTasks = $derived(() => filteredTasks().filter((t) => t.status !== "done"));
+	// Split filtered tasks into running (static), pending (draggable) and done (static)
+	const visibleRunningTasks = $derived(() =>
+		filteredTasks().filter((t) => t.status === "in_progress"),
+	);
+	const visiblePendingTasks = $derived(() => filteredTasks().filter((t) => t.status === "pending"));
 	const visibleDoneTasks = $derived(() => filteredTasks().filter((t) => t.status === "done"));
 
 	// Sync local tasks with store (only when not dragging)
 	$effect(() => {
 		if (!draggedElementId && !isDndFinalizing) {
-			localTasks = [...visibleActiveTasks()];
+			localTasks = [...visiblePendingTasks()];
 		}
 	});
 
@@ -110,19 +112,24 @@
 
 		try {
 			draggedElementId = null;
-			const newActiveItems = e.detail.items;
+			const newPendingItems = e.detail.items;
 
-			localTasks = newActiveItems;
+			localTasks = newPendingItems;
 
 			// Rebuild full tasklist:
-			// 1. New Active Items (reordered)
-			// 2. All Done Tasks (preserve order from store, always at bottom)
+			// 1. All Running Tasks (preserve order from store, always at top)
+			// 2. New Pending Items (reordered)
+			// 3. All Done Tasks (preserve order from store, always at bottom)
+			const allRunningTasks = codeAgentTaskboardState.tasklist.filter(
+				(t) => t.status === "in_progress",
+			);
 			const allDoneTasks = codeAgentTaskboardState.tasklist.filter((t) => t.status === "done");
 
-			// If filter is "open" or "all", we have all active tasks in newActiveItems.
-			// If filter is "done", we wouldn't be dragging.
-			// So safely combine:
-			codeAgentTaskboardState.updateTasklist([...newActiveItems, ...allDoneTasks]);
+			codeAgentTaskboardState.updateTasklist([
+				...allRunningTasks,
+				...newPendingItems,
+				...allDoneTasks,
+			]);
 		} catch (error) {
 			console.error("Error finalizing drag operation:", error);
 		} finally {
@@ -144,7 +151,11 @@
 		}
 	}
 
-	const isEmpty = $derived(localTasks.length === 0 && visibleDoneTasks().length === 0);
+	const isEmpty = $derived(
+		localTasks.length === 0 &&
+			visibleRunningTasks().length === 0 &&
+			visibleDoneTasks().length === 0,
+	);
 	const isLoading = $derived(codeAgentTaskboardState.isLoading);
 </script>
 
@@ -154,15 +165,17 @@
 			"group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200",
 			"bg-white dark:bg-zinc-900 border-border/60 hover:border-primary hover:shadow-md",
 			task.status === "done" && "opacity-80 hover:opacity-100 cursor-default",
-			task.status !== "done" && "cursor-grab active:cursor-grabbing",
+			task.status === "in_progress" && "cursor-default",
+			task.status === "pending" && "cursor-grab active:cursor-grabbing",
 		)}
 	>
 		<!-- Drag handle -->
 		<div
 			class={cn(
 				"shrink-0",
-				task.status === "done" && "opacity-40 cursor-not-allowed",
-				task.status !== "done" && "cursor-grab active:cursor-grabbing",
+				(task.status === "done" || task.status === "in_progress") &&
+					"opacity-40 cursor-not-allowed",
+				task.status === "pending" && "cursor-grab active:cursor-grabbing",
 			)}
 		>
 			<GripVertical class="size-4 text-muted-foreground" />
@@ -223,7 +236,7 @@
 						class={cn(
 							"size-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity",
 							task.status === "in_progress"
-								? "text-muted-foreground/40 cursor-not-allowed"
+								? "text-muted-foreground/40 !cursor-not-allowed"
 								: "text-muted-foreground/60 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30",
 						)}
 						disabled={task.status === "in_progress"}
@@ -259,7 +272,18 @@
 			{m.taskboard_empty()}
 		</div>
 	{:else}
-		<!-- Active Tasks (Draggable) -->
+		<!-- Running Tasks (Static) -->
+		{#if visibleRunningTasks().length > 0}
+			<div class="flex flex-col gap-2">
+				{#each visibleRunningTasks() as task (task.id)}
+					<div animate:flip={{ duration: 200 }}>
+						{@render taskItem(task)}
+					</div>
+				{/each}
+			</div>
+		{/if}
+
+		<!-- Pending Tasks (Draggable) -->
 		<div
 			class="flex flex-col gap-2"
 			use:dndzone={{
@@ -274,13 +298,7 @@
 			onfinalize={handleDndFinalize}
 		>
 			{#each localTasks as task (task.id)}
-				<div
-					class={cn(task.id === SHADOW_PLACEHOLDER_ITEM_ID && "!hidden")}
-					animate:flip={{ duration: 200 }}
-					in:scale={draggedElementId || isDndFinalizing
-						? { duration: 0 }
-						: { duration: 150, start: 0.9 }}
-				>
+				<div class={cn(task.id === SHADOW_PLACEHOLDER_ITEM_ID && "!hidden")}>
 					{@render taskItem(task)}
 				</div>
 			{/each}
