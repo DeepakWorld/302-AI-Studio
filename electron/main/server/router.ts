@@ -312,17 +312,16 @@ app.post("/chat/302ai", async (c) => {
 		enhanceMessagesWithFeedback(resolvedMessages),
 	);
 
-	const streamTextOptions = {
+	const baseConfig = {
 		model: wrapModel,
 		messages: convertedMessages,
 		providerOptions: {
 			"302": provider302Options,
 		},
-		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
-	addDefinedParams(streamTextOptions, {
+	addDefinedParams(baseConfig, {
 		temperature,
 		topP,
 		maxTokens,
@@ -333,6 +332,11 @@ app.post("/chat/302ai", async (c) => {
 	// Check if model supports streaming (image generation models don't)
 	if (!isStreamingSupported(model)) {
 		console.log(`[302ai] Model ${model} does not support streaming, using generateText`);
+
+		const streamTextOptions = {
+			...baseConfig,
+			...(systemPrompt && { system: systemPrompt }),
+		};
 
 		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
 		const stream = createUIMessageStreamFromGenerator(
@@ -358,21 +362,10 @@ app.post("/chat/302ai", async (c) => {
 	// Stream the main text response using Agent without waiting for suggestions
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
-		model: wrapModel,
+		...baseConfig,
 		...(systemPrompt && { instructions: systemPrompt }),
-		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
-		providerOptions: {
-			"302": provider302Options,
-		},
 	};
-	addDefinedParams(agentConfig, {
-		temperature,
-		topP,
-		maxTokens,
-		frequencyPenalty,
-		presencePenalty,
-	});
 
 	const result = await new Agent(agentConfig).stream({
 		messages: convertedMessages,
