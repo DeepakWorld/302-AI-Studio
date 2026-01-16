@@ -283,7 +283,7 @@
 		const unsub = onShortcutAction((action) => {
 			if (action.action === "sendMessage" && textareaRef === document.activeElement) {
 				if (isMac && isInCompositionCooldown()) return;
-
+				if (codeAgentState.enabled && codeAgentSendMessageButtonState.isChecking) return;
 				handleSendMessage();
 			}
 		});
