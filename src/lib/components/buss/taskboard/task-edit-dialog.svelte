@@ -14,6 +14,10 @@
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
+	import {
+		addAttachmentReference,
+		removeAttachmentReference,
+	} from "$lib/utils/attachment-text-utils";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { Eye, Loader, Paperclip, Trash2 } from "@lucide/svelte";
 	import type { AttachmentFile, Task } from "@shared/types";
@@ -159,9 +163,7 @@
 			attachments = [...attachments, attachment];
 			setAttachmentLoading(attachmentId, true);
 
-			// Add reference to input value
-			const prefix = editedContent.length > 0 && !editedContent.endsWith(" ") ? " " : "";
-			editedContent += `${prefix}@${attachment.name} `;
+			editedContent = addAttachmentReference(editedContent, attachment.name);
 
 			generateFilePreview(file).then((preview) => {
 				attachments = attachments.map((a) => (a.id === attachmentId ? { ...a, preview } : a));
@@ -188,6 +190,10 @@
 	}
 
 	function removeAttachment(id: string) {
+		const attachment = attachments.find((a) => a.id === id);
+		if (attachment) {
+			editedContent = removeAttachmentReference(editedContent, attachment.name);
+		}
 		attachments = attachments.filter((a) => a.id !== id);
 	}
 

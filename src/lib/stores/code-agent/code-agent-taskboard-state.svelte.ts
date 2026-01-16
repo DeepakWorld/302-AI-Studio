@@ -7,6 +7,10 @@ import {
 import { emitter, EventNames } from "$lib/event/emitter";
 import { m } from "$lib/paraglide/messages";
 import type { MessageMetadata } from "$lib/types/chat";
+import {
+	addAttachmentReference,
+	removeAttachmentReference,
+} from "$lib/utils/attachment-text-utils";
 import type { AttachmentFile, Task } from "@shared/types";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
@@ -101,10 +105,7 @@ export class CodeAgentTaskboardState {
 	 */
 	addAttachment(attachment: AttachmentFile) {
 		this.attachments = [...this.attachments, attachment];
-
-		// Add reference to input value
-		const prefix = this.inputValue.length > 0 && !this.inputValue.endsWith(" ") ? " " : "";
-		this.inputValue += `${prefix}@${attachment.name} `;
+		this.inputValue = addAttachmentReference(this.inputValue, attachment.name);
 	}
 
 	/**
@@ -118,6 +119,10 @@ export class CodeAgentTaskboardState {
 	 * Removes an attachment by id.
 	 */
 	removeAttachment(id: string) {
+		const attachment = this.attachments.find((a) => a.id === id);
+		if (attachment) {
+			this.inputValue = removeAttachmentReference(this.inputValue, attachment.name);
+		}
 		this.attachments = this.attachments.filter((a) => a.id !== id);
 	}
 
