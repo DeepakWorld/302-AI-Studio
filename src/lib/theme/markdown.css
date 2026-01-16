@@ -67,6 +67,24 @@
 	color: #1d2129;
 }
 
+/* Handle overflow for pre elements that are not syntax highlighted */
+.prose pre:not(.shiki) {
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	background-color: #f3f4f6;
+	padding: 1rem;
+	border-radius: 0.5rem;
+	margin-bottom: 1rem;
+}
+
+.prose pre:not(.shiki) code {
+	background-color: transparent;
+	padding: 0;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
 .prose ul {
 	margin-bottom: 1.25rem;
 	padding-left: 1.625rem;
@@ -240,7 +258,7 @@
 	color: #f9fafb;
 }
 
-.dark .prose pre {
+.dark .prose pre:not(.shiki) {
 	background-color: #1f2937;
 }
 

@@ -9,6 +9,7 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
@@ -39,6 +40,12 @@
 	// 用于解决 Mac 输入法按 Enter 确认时误触发发送消息的问题
 	let compositionEndTime = 0;
 	const COMPOSITION_COOLDOWN_MS = 100;
+
+	const shouldShowTaskboardStatus = $derived(
+		codeAgentState.inCodeAgentMode &&
+			codeAgentTaskboardState.showTaskboardStatusBar &&
+			chatState.hasMessages,
+	);
 
 	function isInCompositionCooldown(): boolean {
 		return Date.now() - compositionEndTime < COMPOSITION_COOLDOWN_MS;
@@ -258,11 +265,25 @@
 			: m.placeholder_input_chat_modifier_send({ modifier });
 	});
 
+	// Prevent Enter key from inserting newline when sendMessage shortcut is Enter
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.isComposing) return;
+
+		const sendMessageShortcut = shortcutSettings.getShortcut("sendMessage");
+		const keys = sendMessageShortcut?.keys ?? ["Enter"];
+		const isEnterSend = keys.length === 1 && keys[0].toLowerCase() === "enter";
+
+		// If sendMessage shortcut is Enter (without modifiers) and user pressed Enter without Shift
+		if (isEnterSend && e.key === "Enter" && !e.shiftKey) {
+			e.preventDefault();
+		}
+	}
+
 	onMount(() => {
 		const unsub = onShortcutAction((action) => {
 			if (action.action === "sendMessage" && textareaRef === document.activeElement) {
 				if (isMac && isInCompositionCooldown()) return;
-
+				if (codeAgentState.enabled && codeAgentSendMessageButtonState.isChecking) return;
 				handleSendMessage();
 			}
 		});
@@ -272,7 +293,7 @@
 
 <div class="relative w-full max-w-chat-max-w" data-layoutid="chat-input-container">
 	<AttachmentThumbnailBar />
-	<div class="absolute left-0 right-0 -top-14 z-10">
+	<div class={cn("absolute left-0 right-0 -top-14 z-10", shouldShowTaskboardStatus && "-top-30")}>
 		<StreamingIndicator />
 	</div>
 	<div
@@ -294,6 +315,7 @@
 				)}
 				bind:value={chatState.inputValue}
 				placeholder={placeholderText}
+				onkeydown={handleKeydown}
 				oncompositionend={() => (compositionEndTime = Date.now())}
 				onpaste={handlePaste}
 				disabled={codeAgentState.isDeleted}

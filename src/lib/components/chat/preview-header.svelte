@@ -75,13 +75,13 @@
 	>
 		<!-- 左侧：Tabs -->
 		<div
-			class="flex flex-row items-center gap-0.5 rounded-md bg-muted p-0.5 overflow-hidden shrink"
+			class="flex flex-row items-center gap-0.5 rounded-md bg-muted p-0.5 overflow-x-auto shrink min-w-0 scrollbar-none"
 		>
 			{#each tabs as tab (tab.id)}
 				<button
 					type="button"
 					class={cn(
-						"text-xs font-medium transition-colors rounded whitespace-nowrap px-2.5 py-0.5 [@container(max-width:349px)]:px-1.5 cursor-pointer",
+						"text-xs font-medium transition-colors rounded whitespace-nowrap px-2.5 py-0.5 [@container(max-width:349px)]:px-1.5 cursor-pointer shrink-0",
 						activeTab === tab.id
 							? "bg-primary text-primary-foreground shadow-sm"
 							: "text-muted-foreground hover:text-foreground",

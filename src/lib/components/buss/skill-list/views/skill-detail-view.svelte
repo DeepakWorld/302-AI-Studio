@@ -2,6 +2,7 @@
 	import { downloadSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { generalSettings } from "$lib/stores/general-settings.state.svelte";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
 	import { Loader2, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
@@ -18,6 +19,14 @@
 
 	// 内置的 skill 不能编辑
 	const isBuiltin = $derived(skill?.isBuiltin ?? false);
+
+	const description = $derived(
+		skill
+			? generalSettings.language === "zh" && skill.description_zh
+				? skill.description_zh
+				: skill.description
+			: "",
+	);
 
 	function handlePreview() {
 		skillsPanelState.goToPreview(skillName);
@@ -74,7 +83,7 @@
 				{m.skills_description()}
 			</h3>
 			<p class="text-[#6b7280] dark:text-gray-400 text-sm leading-relaxed">
-				{skill?.description ?? ""}
+				{description}
 			</p>
 		</div>
 	</div>

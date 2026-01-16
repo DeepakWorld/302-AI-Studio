@@ -22,7 +22,7 @@
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { Bot, Globe, Lightbulb, Settings2, Zap } from "@lucide/svelte";
+	import { Bot, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
 	import { AttachmentUploader } from "../attachment";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
@@ -90,11 +90,16 @@
 	}
 
 	function handleSkillsPanelToggle() {
-		// Toggle between skills tab and preview tab in the agent preview panel
-		if (agentPreviewState.activeTab === "skills") {
-			agentPreviewState.setActiveTab("preview");
-		} else {
+		// Open skills tab if not already on it
+		if (agentPreviewState.activeTab !== "skills") {
 			agentPreviewState.openSkillsTab();
+		}
+	}
+
+	function handleTaskboardPanelToggle() {
+		// Open taskboard tab if not already on it
+		if (agentPreviewState.activeTab !== "taskboard") {
+			agentPreviewState.openTaskboardTab();
 		}
 	}
 </script>
@@ -327,6 +332,17 @@
 	</Popover.Root>
 {/snippet}
 
+{#snippet actionTaskOrchestration()}
+	<ButtonWithTooltip
+		class="hover:!bg-chat-action-hover"
+		tooltip={m.label_tab_taskboard()}
+		onclick={handleTaskboardPanelToggle}
+		{disabled}
+	>
+		<ListTodo />
+	</ButtonWithTooltip>
+{/snippet}
+
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
 	{@render actionUploadAttachment()}
 
@@ -340,6 +356,7 @@
 	{#if codeAgentState.enabled}
 		{@render actionEnableSkills()}
 		{@render actionEnabledAgentThinking()}
+		{@render actionTaskOrchestration()}
 	{:else}
 		{@render actionSetParameters()}
 	{/if}

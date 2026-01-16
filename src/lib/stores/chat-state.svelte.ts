@@ -27,7 +27,8 @@ import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelt
 import { emitter, EventNames } from "$lib/event/emitter";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
-import { codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
+import { claudeCodeSandboxState, codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
+import { codeAgentTaskboardState } from "./code-agent/code-agent-taskboard-state.svelte";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -167,6 +168,8 @@ class ChatState {
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
 	isCreateSkillMode = $state(false);
+
+	async handleSendMessage() {}
 
 	/**
 	 * Cancel any pending suggestions generation request.
@@ -778,6 +781,12 @@ class ChatState {
 	};
 
 	stopGeneration = () => {
+		if (
+			codeAgentTaskboardState.taskboardStatus === "running" ||
+			codeAgentTaskboardState.taskboardStatus === "waiting_to_stop"
+		) {
+			codeAgentTaskboardState.stopExecution();
+		}
 		chat.stop();
 	};
 
@@ -1348,28 +1357,13 @@ export const chat = new Chat({
 			const codeAgentEnabled = codeAgentState.enabled;
 			const sessionId = codeAgentEnabled
 				? (() => {
-						// const getId = (s: string | { id: string }) => (typeof s === "string" ? s : s.id);
-
-						// If currentSessionId matches one of the known valid sessionIds, use it
-						if (
-							claudeCodeAgentState.currentSessionId
-							// &&
-							// claudeCodeAgentState.sessionIds.some(
-							// 	(s) => getId(s) === claudeCodeAgentState.currentSessionId,
-							// )
-						) {
+						if (claudeCodeAgentState.currentSessionId) {
 							return claudeCodeAgentState.currentSessionId;
 						}
-						// Otherwise fallback to the first available session ID (assuming single active session in most cases)
-						// Filter out empty IDs just in case
-						// const firstValidSession = claudeCodeAgentState.sessionIds.find((s) => getId(s));
-						// if (firstValidSession) {
-						// 	return getId(firstValidSession);
-						// }
 
-						// If no session exists, generate a new one
+						// Fallback: If no session exists, generate a new one
+						// This should rarely happen if the flow is controlled correctly
 						const newSessionId = nanoid();
-						// claudeCodeAgentState.addSessionId(newSessionId);
 						claudeCodeAgentState.updateCurrentSessionId(newSessionId);
 						return newSessionId;
 					})()
@@ -1426,6 +1420,10 @@ export const chat = new Chat({
 				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 				skills: codeAgentState.skills,
 				isCreateSkillMode: chatState.isCreateSkillMode,
+
+				inTaskOrchestrationMode:
+					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
+				workspacePath: codeAgentEnabled && claudeCodeSandboxState.currentSessionWorkspacePath,
 			};
 		},
 	}),

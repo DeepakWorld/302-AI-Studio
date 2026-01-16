@@ -12,6 +12,7 @@ export const _302AIKy = ky.create({
 		"HTTP-Referer": "https://studio.302.ai/",
 		"X-Title": "302.AI Studio",
 	},
+	retry: 3,
 	hooks: {
 		beforeRequest: [
 			async (request) => {

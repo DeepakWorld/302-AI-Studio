@@ -15,6 +15,8 @@ import {
 import { match } from "ts-pattern";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-state.svelte";
+import { codeAgentGlobalConfigsState } from "./code-agent-global-configs-state.svelte";
+import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
 import { withLoadingState } from "./utils";
 
 const tab = window.tab ?? null;
@@ -69,6 +71,11 @@ class CodeAgentState {
 	});
 
 	handleChatFinished = (event: { canDeploy: boolean; lastMessage: ChatMessage }) => {
+		// Skip deployment if taskboard is still running - deployment will be triggered when all tasks complete
+		if (codeAgentTaskboardState.isRunning) {
+			return;
+		}
+
 		if (this.currentAgentId === "claude-code") {
 			claudeCodeAgentState.handleChatFinished(event);
 		}
@@ -77,6 +84,24 @@ class CodeAgentState {
 	handleThreadTitleUpdated = (event: { title: string }) => {
 		if (this.currentAgentId === "claude-code") {
 			claudeCodeAgentState.handleThreadTitleUpdated(event);
+		}
+	};
+
+	handleTaskboardAllTasksDone = async (_event: {
+		sandboxId: string;
+		sessionId: string;
+		taskCount: number;
+	}) => {
+		// Only trigger deployment if auto-deploy is enabled and current agent is claude-code
+		if (this.currentAgentId === "claude-code" && codeAgentGlobalConfigsState.autoDeploy) {
+			// Get the last message for deployment check
+			const lastMessage = chatState.messages[chatState.messages.length - 1];
+			if (lastMessage) {
+				await claudeCodeAgentState.handleChatFinished({
+					canDeploy: true, // Explicitly allow deployment when taskboard completes
+					lastMessage,
+				});
+			}
 		}
 	};
 
@@ -262,10 +287,15 @@ $effect.root(() => {
 				EventNames.THREAD_TITLE_UPDATED,
 				codeAgentState.handleThreadTitleUpdated,
 			);
+			const offTaskboard = emitter.on(
+				EventNames.TASKBOARD_ALL_TASKS_DONE,
+				codeAgentState.handleTaskboardAllTasksDone,
+			);
 
 			return () => {
 				offChat();
 				offTitle();
+				offTaskboard();
 			};
 		}
 	});

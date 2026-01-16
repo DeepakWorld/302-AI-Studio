@@ -30,6 +30,9 @@
 	import { ChevronRight, Star } from "@lucide/svelte";
 	// import { CLUADE_CODE_MODELS } from "@shared/constants/codeAgentModel";
 	import type { Model, ModelCapability, Model as ProviderModel } from "@shared/types";
+	import { onMount } from "svelte";
+
+	const { onShortcutAction } = window.electronAPI.shortcut;
 
 	const { trigger, selectedModel, onModelSelect }: ModelSelectProps = $props();
 
@@ -39,6 +42,7 @@
 	let listRef = $state<HTMLElement | null>(null);
 	const collapsedProviders = $state<Record<string, boolean>>({});
 	let focusedModelIndex = $state(-1);
+	let dialogJustOpened = $state(false);
 
 	const triggerProps: TriggerProps = {
 		onclick: () => {
@@ -352,6 +356,17 @@
 		}
 	}
 
+	function handleInputKeyDown(event: KeyboardEvent) {
+		if (event.key === "Enter") {
+			event.preventDefault();
+			event.stopPropagation();
+			const models = flattenedModels;
+			if (focusedModelIndex >= 0 && focusedModelIndex < models.length) {
+				handleModelSelect(models[focusedModelIndex]);
+			}
+		}
+	}
+
 	function getCapabilityText(capability: ModelCapability): string {
 		switch (capability) {
 			case "reasoning":
@@ -399,6 +414,19 @@
 		}
 	});
 
+	// Listen for sendMessage shortcut action (Enter key is captured by Electron before-input-event)
+	onMount(() => {
+		const unsub = onShortcutAction((action) => {
+			if (action.action === "sendMessage" && isOpen) {
+				const models = flattenedModels;
+				if (focusedModelIndex >= 0 && focusedModelIndex < models.length) {
+					handleModelSelect(models[focusedModelIndex]);
+				}
+			}
+		});
+		return () => unsub();
+	});
+
 	// Keyboard event listener
 	$effect(() => {
 		if (!isOpen) return;
@@ -411,24 +439,33 @@
 		};
 	});
 
-	// Reset focus index when dialog opens/closes or search changes
+	// Reset focus index when dialog opens/closes
 	$effect(() => {
 		if (!isOpen) {
 			focusedModelIndex = -1;
-		} else if (selectedModel) {
-			// When dialog opens, set focus to the currently selected model
-			const models = flattenedModels;
-			const selectedIndex = models.findIndex(
-				(m) => m.id === selectedModel.id && m.providerId === selectedModel.providerId,
-			);
-			focusedModelIndex = selectedIndex >= 0 ? selectedIndex : -1;
+			dialogJustOpened = false;
+		} else if (!dialogJustOpened) {
+			// Only initialize when dialog first opens, not on subsequent flattenedModels changes
+			dialogJustOpened = true;
+			if (selectedModel) {
+				const models = flattenedModels;
+				const selectedIndex = models.findIndex(
+					(m) => m.id === selectedModel.id && m.providerId === selectedModel.providerId,
+				);
+				focusedModelIndex = selectedIndex >= 0 ? selectedIndex : 0;
+			} else {
+				// No selected model, focus on first item
+				focusedModelIndex = flattenedModels.length > 0 ? 0 : -1;
+			}
 		}
 	});
 
 	$effect(() => {
-		// Reset focus when search value changes
+		// When search value changes, set focus to first result if available
 		if (searchValue) {
-			focusedModelIndex = -1;
+			// Use untrack to avoid circular dependency
+			const models = flattenedModels;
+			focusedModelIndex = models.length > 0 ? 0 : -1;
 		}
 	});
 
@@ -458,7 +495,11 @@
 
 <Command.Dialog bind:open={isOpen} class="w-[638px]">
 	<div class="[&_[data-slot=command-input-wrapper]]:!h-12">
-		<Command.Input bind:value={searchValue} placeholder={m.placeholder_input_search_model()} />
+		<Command.Input
+			bind:value={searchValue}
+			placeholder={m.placeholder_input_search_model()}
+			onkeydown={handleInputKeyDown}
+		/>
 	</div>
 	<ScrollArea.Root class="max-h-[424px]">
 		<Command.List bind:ref={listRef} onmouseleave={handleListMouseLeave} class="max-h-full">

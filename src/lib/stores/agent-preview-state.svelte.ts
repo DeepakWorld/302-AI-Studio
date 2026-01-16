@@ -3,6 +3,7 @@ import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 import type { CodeAgentType } from "@shared/storage/code-agent";
 import { SvelteDate, SvelteSet } from "svelte/reactivity";
+import { claudeCodeAgentState } from "./code-agent";
 
 /**
  * Get threadId from window.tab or default to "shell"
@@ -227,7 +228,7 @@ class SyncBus {
 	}
 }
 
-export type AgentPreviewTab = "preview" | "code" | "terminal" | "skills";
+export type AgentPreviewTab = "preview" | "code" | "terminal" | "skills" | "taskboard";
 
 export class AgentPreviewState {
 	isVisible = $state(false);
@@ -803,7 +804,12 @@ export class AgentPreviewState {
 		this.isVisible = true;
 	}
 
-	togglePreview() {}
+	openTaskboardTab() {
+		this.activeTab = "taskboard";
+		this.isVisible = true;
+		this.isSkillsOnlyMode =
+			!claudeCodeAgentState.currentSessionId || !claudeCodeAgentState.sandboxId;
+	}
 
 	setMode(mode: HtmlPreviewMode) {
 		this.mode = mode;

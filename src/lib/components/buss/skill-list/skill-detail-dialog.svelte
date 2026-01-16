@@ -2,6 +2,7 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
+	import { generalSettings } from "$lib/stores/general-settings.state.svelte";
 	import { ChevronLeft, Loader2, X, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 
@@ -44,6 +45,13 @@
 	}
 
 	const showFooter = $derived(!!onUse || !!onEdit || !!onDownload);
+	const description = $derived(
+		skill
+			? generalSettings.language === "zh" && skill.description_zh
+				? skill.description_zh
+				: skill.description
+			: "",
+	);
 </script>
 
 <Dialog.Root bind:open onOpenChange={(v) => onOpenChange?.(v)}>
@@ -87,7 +95,7 @@
 					{m.skills_description()}
 				</h3>
 				<p class="text-[#6b7280] dark:text-gray-400 text-sm leading-relaxed">
-					{skill?.description ?? ""}
+					{description}
 				</p>
 			</div>
 		</div>

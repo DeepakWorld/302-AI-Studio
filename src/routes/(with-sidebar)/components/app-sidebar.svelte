@@ -445,7 +445,7 @@
 					{/await}
 				{:else if groupedThreadList}
 					{#each TIME_GROUP_ORDER as groupKey (groupKey)}
-						{@const group = groupedThreadList[groupKey]}
+						{@const group = groupedThreadList?.[groupKey] ?? []}
 						{#if group.length > 0}
 							<Collapsible.Root
 								bind:open={groupCollapsedState[groupKey]}

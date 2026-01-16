@@ -18,7 +18,8 @@
 	const showAgentPreviewButton = $derived(
 		codeAgentState.enabled &&
 			codeAgentState.currentAgentId === "claude-code" &&
-			claudeCodeAgentState.sandboxId !== "",
+			claudeCodeAgentState.sandboxId !== "" &&
+			claudeCodeAgentState.currentSessionId !== "",
 	);
 
 	// Handle agent preview toggle (full mode with sandbox)

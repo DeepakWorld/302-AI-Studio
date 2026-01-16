@@ -108,7 +108,49 @@ export async function fetch302AIToolList(
 			category_name: lang === "cn" ? "图片处理" : lang === "jp" ? "画像処理" : "Image Processing",
 			category_id: 4,
 		};
-		const tools = [drawingRobotData, ...validated.data.data];
+		const newToolsNotFromApi = [
+			{
+				tool_id: 9997,
+				tool_name:
+					lang === "cn" ? "3D摄影棚" : lang === "jp" ? "3Dカメラスタジオ" : "3D Camera Studio",
+				tool_description:
+					lang === "cn"
+						? "对图像进行多角度变换及背景融合处理"
+						: lang === "jp"
+							? "画像を複数角度で変換し、背景を融合処理"
+							: "Transform images from multiple angles and fuse backgrounds",
+				enable: true,
+				category_name: lang === "cn" ? "图片处理" : lang === "jp" ? "画像処理" : "Image Processing",
+				category_id: 4,
+			},
+			{
+				tool_id: 9998,
+				tool_name: "Nano Banana MD",
+				tool_description:
+					lang === "cn"
+						? "使用Nano-Banana来自动为文章配图"
+						: lang === "jp"
+							? "Nano-Bananaを使って記事に画像を自動で付ける"
+							: "Use Nano-Banana to automatically add images to articles",
+				enable: true,
+				category_name: lang === "cn" ? "工作效率" : lang === "jp" ? "効率化" : "Work Efficiency",
+				category_id: 1,
+			},
+			{
+				tool_id: 9999,
+				tool_name: "Nano Banana PPT",
+				tool_description:
+					lang === "cn"
+						? "使用Nano-Banana来制作PPT"
+						: lang === "jp"
+							? "Nano-Bananaを使ってPPTを作成"
+							: "Use Nano-Banana to create PPT",
+				enable: true,
+				category_name: lang === "cn" ? "工作效率" : lang === "jp" ? "効率化" : "Work Efficiency",
+				category_id: 1,
+			},
+		];
+		const tools = [...newToolsNotFromApi, drawingRobotData, ...validated.data.data];
 
 		return tools;
 	} catch (error) {
