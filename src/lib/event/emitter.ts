@@ -4,6 +4,7 @@ import mitt from "mitt";
 
 export enum EventNames {
 	CHAT_FINISHED = "chat:finish",
+	TASKBOARD_ALL_TASKS_DONE = "taskboard:all_tasks_done",
 
 	THREAD_TITLE_UPDATED = "thread:title:updated",
 }
@@ -12,6 +13,12 @@ type Events = {
 	[EventNames.CHAT_FINISHED]: {
 		canDeploy: boolean;
 		lastMessage: ChatMessage;
+	};
+
+	[EventNames.TASKBOARD_ALL_TASKS_DONE]: {
+		sandboxId: string;
+		sessionId: string;
+		taskCount: number;
 	};
 
 	[EventNames.THREAD_TITLE_UPDATED]: {

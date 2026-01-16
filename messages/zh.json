@@ -430,6 +430,7 @@
 	"toast_title_generation_success": "标题生成成功",
 	"toast_title_generation_failed": "标题生成失败",
 	"toast_unknown_error": "发生未知错误",
+	"toast_attachment_convert_failed": "转换附件失败: {fileName}",
 	"version_information": "版本信息",
 	"version_update": "版本更新",
 	"label_button_incognito_model": "切换为隐私模式",

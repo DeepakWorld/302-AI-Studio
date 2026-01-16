@@ -18,87 +18,92 @@ class CodeAgentSendMessageButtonState {
 	async *enableCodeAgentFlow(fn: () => void) {
 		this.isChecking = true;
 
-		if (chatState.selectedModel && codeAgentState.currentModel !== chatState.selectedModel.id) {
-			codeAgentState.updateSandboxModel(chatState.selectedModel.id);
-		}
-
-		const { isOK, sandboxInfo } = await codeAgentState.executeCodeAgentMode();
-		if (!isOK) {
-			this.isChecking = false;
-			return;
-		}
-
-		if (sandboxInfo) {
-			let sessionId: string = codeAgentState.sessionId;
-			if (!codeAgentState.sessionId) {
-				sessionId = nanoid();
-				codeAgentState.updateCurrentSessionId(sessionId);
+		try {
+			if (chatState.selectedModel && codeAgentState.currentModel !== chatState.selectedModel.id) {
+				codeAgentState.updateSandboxModel(chatState.selectedModel.id);
 			}
 
-			let workspacePath: string | undefined;
+			const { isOK, sandboxInfo } = await codeAgentState.executeCodeAgentMode();
+			if (!isOK) {
+				this.isChecking = false;
+				return;
+			}
 
-			if (codeAgentTaskboardState.isInitialized) {
-				const { workspace_path } = await initProject({
-					sandboxId: sandboxInfo.sandboxId,
-					sessionId,
-				});
-				workspacePath = workspace_path;
+			if (sandboxInfo) {
+				let workspacePath: string | undefined;
 
-				// Refresh sessions to sync the new workspace_path to local storage
-				await window.electronAPI.codeAgentService.updateClaudeCodeSessions(sandboxInfo.sandboxId);
+				if (codeAgentTaskboardState.isInitialized) {
+					const isSessionIdEmpty = codeAgentState.sessionId === "";
+					const sessionId: string = isSessionIdEmpty ? nanoid() : codeAgentState.sessionId;
 
-				const promises = [
-					updateTasklist(sandboxInfo.sandboxId, workspacePath, codeAgentTaskboardState.tasklist),
-				];
+					const { workspace_path } = await initProject({
+						sandboxId: sandboxInfo.sandboxId,
+						sessionId,
+					});
+					if (isSessionIdEmpty) {
+						codeAgentState.updateCurrentSessionId(sessionId);
+					}
+					workspacePath = workspace_path;
 
-				if (codeAgentTaskboardState.attachments.length > 0) {
-					const attachmentList: Attachment[] = await Promise.all(
-						codeAgentTaskboardState.attachments.map(async (att) => ({
-							filename: att.name,
-							content: att.file ? await fileToBase64(att.file) : "",
-						})),
+					// Refresh sessions to sync the new workspace_path to local storage
+					await window.electronAPI.codeAgentService.updateClaudeCodeSessions(sandboxInfo.sandboxId);
+
+					const promises = [
+						updateTasklist(sandboxInfo.sandboxId, workspacePath, codeAgentTaskboardState.tasklist),
+					];
+
+					if (codeAgentTaskboardState.attachments.length > 0) {
+						const attachmentList: Attachment[] = await Promise.all(
+							codeAgentTaskboardState.attachments.map(async (att) => ({
+								filename: att.name,
+								content: att.file ? await fileToBase64(att.file) : "",
+							})),
+						);
+						promises.push(uploadAttachments(sandboxInfo.sandboxId, workspacePath, attachmentList));
+					}
+
+					await Promise.all(promises);
+
+					// Upload pending attachments after project initialized
+					await codeAgentTaskboardState.uploadPendingAttachments(
+						sandboxInfo.sandboxId,
+						workspacePath,
 					);
-					promises.push(uploadAttachments(sandboxInfo.sandboxId, workspacePath, attachmentList));
 				}
 
-				await Promise.all(promises);
+				if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {
+					await codeAgentState.handleCodeAgentModelChange(chatState.selectedModel);
+				}
 
-				// Upload pending attachments after project initialized
-				await codeAgentTaskboardState.uploadPendingAttachments(
-					sandboxInfo.sandboxId,
-					workspacePath,
-				);
-			}
+				// 在 sandbox 确定后，添加用户选择的 MCP 服务器
+				if (chatState.mcpServerIds.length > 0) {
+					const infos = mcpState.getMCPInfosByIds(chatState.mcpServerIds);
+					if (infos.length > 0) {
+						try {
+							await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, infos);
+						} catch (error) {
+							console.error("Failed to add MCP servers:", error);
+						}
+					}
+				}
 
-			if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {
-				await codeAgentState.handleCodeAgentModelChange(chatState.selectedModel);
-			}
-
-			// 在 sandbox 确定后，添加用户选择的 MCP 服务器
-			if (chatState.mcpServerIds.length > 0) {
-				const infos = mcpState.getMCPInfosByIds(chatState.mcpServerIds);
-				if (infos.length > 0) {
-					try {
-						await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, infos);
-					} catch (error) {
-						console.error("Failed to add MCP servers:", error);
+				if (sandboxInfo.diskUsage === "insufficient") {
+					this.showLackOfDiskDialog = true;
+					const shouldContinue: boolean = yield "wait_user_choice";
+					if (!shouldContinue) {
+						codeAgentState.isCodeAgentPanelOpen = true;
+						this.isChecking = false;
+						return;
 					}
 				}
 			}
 
-			if (sandboxInfo.diskUsage === "insufficient") {
-				this.showLackOfDiskDialog = true;
-				const shouldContinue: boolean = yield "wait_user_choice";
-				if (!shouldContinue) {
-					codeAgentState.isCodeAgentPanelOpen = true;
-					this.isChecking = false;
-					return;
-				}
-			}
+			fn();
+		} catch (error) {
+			console.error("Failed to enable code agent flow:", error);
+		} finally {
+			this.isChecking = false;
 		}
-
-		this.isChecking = false;
-		fn();
 	}
 
 	async handleContinueAnyway() {

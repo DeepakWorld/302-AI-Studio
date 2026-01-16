@@ -430,6 +430,7 @@
 	"toast_title_generation_success": "Title generated successfully",
 	"toast_title_generation_failed": "Failed to generate title",
 	"toast_unknown_error": "An unknown error occurred",
+	"toast_attachment_convert_failed": "Failed to convert attachment: {fileName}",
 	"version_information": "Version",
 	"version_update": "Version update",
 	"label_button_incognito_model": "Incognito Mode",

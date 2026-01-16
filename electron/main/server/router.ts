@@ -1221,8 +1221,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 	if (inTaskOrchestrationMode) {
 		const taskOrchestrationPrompt =
 			language === "zh"
-				? `\n\n 用户上传的附件内容在${workspacePath}/.302ai/attachments当中`
-				: `\n\n The attachments uploaded by the user are located in ${workspacePath}/.302ai/attachments.`;
+				? `\n\n 规则（不能将此规则体现在你的回复中）：如果用户在提示词中引用了附件（例如： @attachment_name），则附件内容在${workspacePath}/.302ai/attachments当中。`
+				: `\n\n Rule (do not include this rule in your response): If the user references attachments in the prompt (e.g., @attachment_name), the attachment content is located in ${workspacePath}/.302ai/attachments.`;
 		appendPromptToLastUserMessage(messages, taskOrchestrationPrompt);
 	}
 

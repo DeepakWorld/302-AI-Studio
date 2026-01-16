@@ -52,6 +52,8 @@ export class CodeAgentTaskboardState {
 	);
 	canPause = $derived(this.taskboardStatus === "running");
 	isWaitingToStop = $derived(this.taskboardStatus === "waiting_to_stop");
+	// Whether taskboard is currently executing (used to prevent premature auto-deployment)
+	isRunning = $derived(this.taskboardStatus === "running");
 	showTaskboardStatusBar = $derived(
 		this.tasklist.some((t) => t.status === "in_progress") ||
 			this.tasklist.some((t) => t.status === "pending"),
@@ -285,6 +287,14 @@ export class CodeAgentTaskboardState {
 
 			if (!nextTask) {
 				this.taskboardStatus = "idle";
+
+				// Emit event when all tasks are completed
+				emitter.emit(EventNames.TASKBOARD_ALL_TASKS_DONE, {
+					sandboxId: codeAgentState.sandboxId,
+					sessionId: claudeCodeAgentState.currentSessionId,
+					taskCount: this.tasklist.filter((t) => t.status === "done").length,
+				});
+
 				break;
 			}
 

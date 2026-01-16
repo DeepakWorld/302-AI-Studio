@@ -5,8 +5,8 @@
 
 import imageCompression from "browser-image-compression";
 
-export const MAX_SIZE_BYTES = 1 * 1024 * 1024; // 1MB in bytes
-const MAX_SIZE_MB = 1; // 1MB
+export const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 1MB in bytes
+const MAX_SIZE_MB = 20; // 1MB
 
 /**
  * Estimate base64 size from file size

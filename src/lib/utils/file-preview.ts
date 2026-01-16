@@ -1,3 +1,5 @@
+import { m } from "$lib/paraglide/messages.js";
+import { toast } from "svelte-sonner";
 import { compressFile } from "./file-compressor";
 
 /**
@@ -115,7 +117,24 @@ export async function generateFilePreview(file: File): Promise<string | undefine
 		file.type.includes("compressed") ||
 		file.name.toLowerCase().endsWith(".zip");
 
-	if (isOfficeFile || isArchiveFile) {
+	if (isOfficeFile) {
+		return undefined;
+	}
+
+	// For ZIP/Archive files, generate preview only if size <= 20MB
+	// This allows small ZIP files (like skill packages) to be re-sent from history
+	const ZIP_PREVIEW_SIZE_LIMIT = 20 * 1024 * 1024; // 20MB
+	if (isArchiveFile) {
+		if (file.size <= ZIP_PREVIEW_SIZE_LIMIT) {
+			return new Promise((resolve) => {
+				const reader = new FileReader();
+				reader.onload = (e) => resolve(e.target?.result as string);
+				reader.onerror = () => resolve(undefined);
+				reader.readAsDataURL(file);
+			});
+		}
+		// Large ZIP files don't generate preview to avoid memory issues
+		toast.error(m.toast_file_size_exceeded({ size: MAX_FILE_SIZE_MB }));
 		return undefined;
 	}
 

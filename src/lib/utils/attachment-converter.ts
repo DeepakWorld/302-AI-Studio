@@ -7,6 +7,7 @@ import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { compressFile } from "./file-compressor";
 import { officeMimeTypes } from "./file-preview";
+import { toast } from "svelte-sonner";
 
 export type MessagePart = FileUIPart | { type: "text"; text: string };
 
@@ -252,8 +253,29 @@ export async function convertAttachmentToMessagePart(
 	if (isMediaFile(attachment) || isZipFile(attachment)) {
 		let url: string;
 
-		if (attachment.preview) {
-			url = attachment.preview;
+		// Prefer file object if it exists, to ensure fresh and correct data
+		if (attachment.file && attachment.file instanceof File && attachment.file.size > 0) {
+			url = await fileToDataURL(attachment.file);
+		} else if (attachment.preview) {
+			// If preview is a blob URL, convert it to base64
+			if (attachment.preview.startsWith("blob:")) {
+				try {
+					const response = await fetch(attachment.preview);
+					const blob = await response.blob();
+					url = await new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = () => resolve(reader.result as string);
+						reader.onerror = reject;
+						reader.readAsDataURL(blob);
+					});
+				} catch (error) {
+					console.error("Failed to convert blob URL to data URL:", error);
+					// Fallback to filePath if blob fetch fails
+					url = await fileToDataURL(attachment.file, attachment.filePath);
+				}
+			} else {
+				url = attachment.preview;
+			}
 		} else {
 			// For images, use compression to ensure base64 size < 1MB
 			if (attachment.type.startsWith("image/")) {
@@ -360,6 +382,7 @@ export async function convertAttachmentToMessagePart(
 			}
 		} catch (error) {
 			console.error(`Failed to read Office document ${attachment.name}:`, error);
+			toast.error(m.toast_attachment_convert_failed({ fileName: attachment.name }));
 			// If parsing fails, return a description instead
 			const sizeInKB = (attachment.size / 1024).toFixed(2);
 			return {
@@ -417,6 +440,7 @@ export async function convertAttachmentsToMessageParts(
 			metadataList.push(createAttachmentMetadata(attachment, textContent, preview));
 		} catch (error) {
 			console.error(`Failed to convert attachment ${attachment.name}:`, error);
+			toast.error(m.toast_attachment_convert_failed({ fileName: attachment.name }));
 		}
 	}
 
