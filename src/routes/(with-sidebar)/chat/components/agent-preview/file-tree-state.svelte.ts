@@ -354,11 +354,16 @@ export class FileTreeState {
 	/**
 	 * Load files from API
 	 */
+	/**
+	 * Load files from API
+	 */
 	async loadFiles(
 		path: string = DEFAULT_WORKSPACE_PATH,
 		merge: boolean = false,
 		force: boolean = false,
 	): Promise<void> {
+		console.log("[FileTree] loadFiles", { path, merge, force, isStreaming: this.isStreaming });
+
 		if (!this.sandboxId) {
 			return;
 		}
@@ -373,8 +378,9 @@ export class FileTreeState {
 			return;
 		}
 
-		// Do not load files while agent is streaming
-		if (this.isStreaming) {
+		// Do not load files while agent is streaming, unless forced (e.g. user initiated navigation)
+		if (this.isStreaming && !force) {
+			console.log("[FileTree] loadFiles skipped due to streaming");
 			return;
 		}
 
@@ -478,14 +484,15 @@ export class FileTreeState {
 	 * Sets currentDirectory to the target folder and loads its contents
 	 */
 	async navigateToFolder(folderPath: string): Promise<void> {
+		console.log("[FileTree] navigateToFolder", folderPath);
 		if (!folderPath) {
 			return;
 		}
 
-		// Load folder contents first if not already cached (show loading on folder item)
-		if (!this.loadedDirs.has(folderPath)) {
-			await this.loadFiles(folderPath, true);
-		}
+		// Load folder contents first (always force refresh to ensure sync with server)
+		// merge=false: replace existing files to ensure deleted files are removed
+		// force=true: force API call even if locally cached
+		await this.loadFiles(folderPath, false, true);
 
 		// After loading completes, set the current directory to the target folder
 		this.currentDirectory = folderPath;
@@ -502,6 +509,7 @@ export class FileTreeState {
 	 * Computes parent path and navigates to it, guarding against system root boundary
 	 */
 	async navigateToParent(): Promise<void> {
+		console.log("[FileTree] navigateToParent");
 		// Guard against navigating above system root
 		if (this.currentDirectory === "/" || this.currentDirectory === "") {
 			return;

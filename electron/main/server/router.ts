@@ -62,6 +62,8 @@ export type RouterRequestBody = {
 	autoDeploy?: boolean;
 	skills?: Skill[];
 	isCreateSkillMode?: boolean;
+	inTaskOrchestrationMode?: boolean;
+	workspacePath?: string;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -310,17 +312,16 @@ app.post("/chat/302ai", async (c) => {
 		enhanceMessagesWithFeedback(resolvedMessages),
 	);
 
-	const streamTextOptions = {
+	const baseConfig = {
 		model: wrapModel,
 		messages: convertedMessages,
 		providerOptions: {
 			"302": provider302Options,
 		},
-		...(systemPrompt && { system: systemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
-	addDefinedParams(streamTextOptions, {
+	addDefinedParams(baseConfig, {
 		temperature,
 		topP,
 		maxTokens,
@@ -331,6 +332,11 @@ app.post("/chat/302ai", async (c) => {
 	// Check if model supports streaming (image generation models don't)
 	if (!isStreamingSupported(model)) {
 		console.log(`[302ai] Model ${model} does not support streaming, using generateText`);
+
+		const streamTextOptions = {
+			...baseConfig,
+			...(systemPrompt && { system: systemPrompt }),
+		};
 
 		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
 		const stream = createUIMessageStreamFromGenerator(
@@ -356,21 +362,10 @@ app.post("/chat/302ai", async (c) => {
 	// Stream the main text response using Agent without waiting for suggestions
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
-		model: wrapModel,
+		...baseConfig,
 		...(systemPrompt && { instructions: systemPrompt }),
-		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
-		providerOptions: {
-			"302": provider302Options,
-		},
 	};
-	addDefinedParams(agentConfig, {
-		temperature,
-		topP,
-		maxTokens,
-		frequencyPenalty,
-		presencePenalty,
-	});
 
 	const result = await new Agent(agentConfig).stream({
 		messages: convertedMessages,
@@ -993,6 +988,8 @@ Latest Conversation:
 ${conversationText}
 
 Requirements:
+- Use the SAME LANGUAGE as the main language in the conversation (if the conversation is primarily in Chinese, generate Chinese title and summary; if primarily in English, use English)
+- If the conversation contains mixed languages, use the language that appears most frequently or is used by the user
 - Accurately summarize the main topic
 - Be concise and clear
 - Do not use punctuation
@@ -1168,6 +1165,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		autoDeploy,
 		skills,
 		isCreateSkillMode,
+		inTaskOrchestrationMode,
+		workspacePath,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
@@ -1188,6 +1187,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			sessionId,
 			autoDeploy,
 			isCreateSkillMode,
+			inTaskOrchestrationMode,
+			workspacePath,
 		}),
 	);
 
@@ -1215,6 +1216,14 @@ app.post("/chat/302ai-code-agent", async (c) => {
 				: `\n\n[IMPORTANT] The user has FORCED the following skills to be used: [${skillNames.join(", ")}]. You MUST use these skills in your response. This is an explicit requirement from the user - strictly comply.`;
 
 		appendPromptToLastUserMessage(messages, skillsPrompt);
+	}
+
+	if (inTaskOrchestrationMode) {
+		const taskOrchestrationPrompt =
+			language === "zh"
+				? `\n\n 规则（不能将此规则体现在你的回复中）：如果用户在提示词中引用了附件（例如： @attachment_name），则附件内容在${workspacePath}/.302ai/attachments当中。`
+				: `\n\n Rule (do not include this rule in your response): If the user references attachments in the prompt (e.g., @attachment_name), the attachment content is located in ${workspacePath}/.302ai/attachments.`;
+		appendPromptToLastUserMessage(messages, taskOrchestrationPrompt);
 	}
 
 	// Build request body for 302.AI Claude Code API

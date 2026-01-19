@@ -4,7 +4,20 @@
 	import { m } from "$lib/paraglide/messages";
 	import { toast } from "svelte-sonner";
 
-	let githubUrl = $state("");
+	interface Props {
+		initialUrl?: string;
+	}
+
+	let { initialUrl = "" }: Props = $props();
+
+	let githubUrl = $state(initialUrl);
+
+	// Sync with initialUrl changes
+	$effect(() => {
+		if (initialUrl) {
+			githubUrl = initialUrl;
+		}
+	});
 
 	export function validate(): boolean {
 		if (!githubUrl.trim()) {
@@ -20,6 +33,10 @@
 
 	export function reset() {
 		githubUrl = "";
+	}
+
+	export function setUrl(url: string) {
+		githubUrl = url;
 	}
 </script>
 

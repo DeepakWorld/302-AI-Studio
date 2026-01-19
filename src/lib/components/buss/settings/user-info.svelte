@@ -161,37 +161,44 @@
 		</div>
 	{/if}
 
-	<!-- Balance Section -->
-	<div class="gap-settings-gap flex flex-col">
-		<div class="flex items-center justify-between">
-			<Label class="text-label-fg font-normal">{m.settings_balance_usage()}</Label>
-			<Button variant="outline" size="sm" onclick={openWallet} class="dark:hover:bg-muted gap-1.5">
-				{m.settings_recharge()}
-				<ExternalLink class="size-3.5" />
-			</Button>
-		</div>
+	<!-- Balance Section - hidden for sub accounts -->
+	{#if !userState.userInfo.is_sub_account}
+		<div class="gap-settings-gap flex flex-col">
+			<div class="flex items-center justify-between">
+				<Label class="text-label-fg font-normal">{m.settings_balance_usage()}</Label>
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={openWallet}
+					class="dark:hover:bg-muted gap-1.5"
+				>
+					{m.settings_recharge()}
+					<ExternalLink class="size-3.5" />
+				</Button>
+			</div>
 
-		<SettingInfoItem
-			label={m.settings_current_balance()}
-			value="${formatCurrency(userState.userInfo.balance)}"
-			isBold
-		/>
-		<SettingInfoItem
-			label={m.settings_total_consumed()}
-			value="${formatCurrency(userState.userInfo.gpt_cost)}"
-			isBold
-		/>
-		<SettingInfoItem
-			label={m.settings_total_requests()}
-			value={String(userState.userInfo.gpt_request_times)}
-			isBold
-		/>
-		<SettingInfoItem
-			label={m.settings_total_earnings()}
-			value="${formatCurrency(userState.userInfo.total_earning)}"
-			isBold
-		/>
-	</div>
+			<SettingInfoItem
+				label={m.settings_current_balance()}
+				value="${formatCurrency(userState.userInfo.balance)}"
+				isBold
+			/>
+			<SettingInfoItem
+				label={m.settings_total_consumed()}
+				value="${formatCurrency(userState.userInfo.gpt_cost)}"
+				isBold
+			/>
+			<SettingInfoItem
+				label={m.settings_total_requests()}
+				value={String(userState.userInfo.gpt_request_times)}
+				isBold
+			/>
+			<SettingInfoItem
+				label={m.settings_total_earnings()}
+				value="${formatCurrency(userState.userInfo.total_earning)}"
+				isBold
+			/>
+		</div>
+	{/if}
 
 	<!-- Logout Dialog -->
 	<SsoLogoutDialog

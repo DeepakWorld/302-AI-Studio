@@ -3,11 +3,7 @@ import type { AiApplication } from "@shared/types";
 import type { IpcMainInvokeEvent } from "electron";
 import { isUndefined } from "es-toolkit";
 import { nanoid } from "nanoid";
-import {
-	fetch302AIToolDetail,
-	fetch302AIToolList,
-	fetch302AIUserInfo,
-} from "../../apis/ai-applications";
+import { fetch302AIToolDetail, fetch302AIToolList } from "../../apis/ai-applications";
 import { broadcastService, emitter } from "../broadcast-service";
 import { generalSettingsService } from "../settings-service";
 import { aiApplicationStorage } from "../storage-service/ai-application-storage";
@@ -15,8 +11,14 @@ import { providerStorage } from "../storage-service/provider-storage";
 import { tabService } from "../tab-service";
 
 const UNSUPPORTED_INJECTING_LANGUAGE: number[] = [
-	-1, 7, 11, 13, 19, 4, 5, 14, 17, 45, 48, 49, 8, 12, 15, 18, 23, 24,
+	9997, 9998, 9999, -1, 7, 11, 13, 19, 4, 5, 14, 17, 45, 48, 49, 8, 12, 15, 18, 23, 24,
 ];
+const NEW_TOOLS_NOT_FROM_API: number[] = [9997, 9998, 9999];
+const NEW_TOOLS_DEFAULT_URL: Record<number, string> = {
+	9997: "https://3d-camera.302.ai/",
+	9998: "https://nano-banana-md.302.ai/",
+	9999: "https://nano-banana-ppt.302.ai/",
+};
 
 export class AiApplicationService {
 	private aiApplicationUrlMap = new Map<string, string>();
@@ -95,13 +97,16 @@ export class AiApplicationService {
 		try {
 			const lang = language ?? (await generalSettingsService.getLanguage());
 
-			const userInfo = await fetch302AIUserInfo(key);
-			const uidBase64 = Buffer.from(userInfo.data.uid.toString(), "utf8").toString("base64");
-			const aiApplicationDetail = await fetch302AIToolDetail(uidBase64);
+			// const userInfo = await fetch302AIUserInfo(key);
+			// const uidBase64 = Buffer.from(userInfo.data.uid.toString(), "utf8").toString("base64");
+
+			const aiApplicationDetail = await fetch302AIToolDetail(key);
 
 			apps.forEach((app) => {
 				const applicationIdStr = app.toolId.toString();
-				const originalUrl = aiApplicationDetail.data.app_box_detail[applicationIdStr].url;
+				const originalUrl = NEW_TOOLS_NOT_FROM_API.includes(app.toolId)
+					? NEW_TOOLS_DEFAULT_URL[app.toolId] + `?key=${key}`
+					: aiApplicationDetail.data.app_box_detail[applicationIdStr].url;
 				const baseUrl = originalUrl.split("?")[0];
 				const urlWithLang = UNSUPPORTED_INJECTING_LANGUAGE.includes(app.toolId)
 					? originalUrl

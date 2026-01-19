@@ -13,10 +13,11 @@ import {
 	aiApplicationService,
 	appService,
 	dataService,
+	ssoService,
+	deepLinkService,
 	externalLinkService,
 	mcpService,
 	providerService,
-	ssoService,
 	threadService,
 	updaterService,
 } from "../services";
@@ -195,6 +196,11 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("codeAgentService:getThreadIdBySessionId", (event, sandboxId, sessionId) =>
 		codeAgentService.getThreadIdBySessionId(event, sandboxId, sessionId),
+	);
+	ipcMain.handle(
+		"codeAgentService:setIsManualNoteBySession",
+		(event, sandboxId, sessionId, isManualNote) =>
+			codeAgentService.setIsManualNoteBySession(event, sandboxId, sessionId, isManualNote),
 	);
 
 	// ghostWindowService service registration
@@ -381,6 +387,20 @@ export function registerIpcHandlers() {
 			dataService.exportChatToFile(event, content, extension, filterName, defaultFileName),
 	);
 
+	// ssoService service registration
+	ipcMain.handle("ssoService:openSsoLogin", (event, serverPort, language) =>
+		ssoService.openSsoLogin(event, serverPort, language),
+	);
+	ipcMain.handle("ssoService:waitForSsoCallback", (event, timeoutMs) =>
+		ssoService.waitForSsoCallback(event, timeoutMs),
+	);
+	ipcMain.handle("ssoService:cancelSsoLogin", (event) => ssoService.cancelSsoLogin(event));
+
+	// deepLinkService service registration
+	ipcMain.handle("deepLinkService:simulateDeepLink", (event, url) =>
+		deepLinkService.simulateDeepLink(event, url),
+	);
+
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
 		externalLinkService.openExternalLink(event, url),
@@ -401,15 +421,6 @@ export function registerIpcHandlers() {
 	ipcMain.handle("providerService:get302AIApiKey", (event) =>
 		providerService.get302AIApiKey(event),
 	);
-
-	// ssoService service registration
-	ipcMain.handle("ssoService:openSsoLogin", (event, serverPort, language) =>
-		ssoService.openSsoLogin(event, serverPort, language),
-	);
-	ipcMain.handle("ssoService:waitForSsoCallback", (event, timeoutMs) =>
-		ssoService.waitForSsoCallback(event, timeoutMs),
-	);
-	ipcMain.handle("ssoService:cancelSsoLogin", (event) => ssoService.cancelSsoLogin(event));
 
 	// threadService service registration
 	ipcMain.handle("threadService:addThread", (event, threadId) =>
@@ -517,6 +528,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:findClaudeCodeSandboxWithValidDisk");
 	ipcMain.removeHandler("codeAgentService:addClaudeCodeSandboxMCP");
 	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
+	ipcMain.removeHandler("codeAgentService:setIsManualNoteBySession");
 	ipcMain.removeHandler("ghostWindowService:startTracking");
 	ipcMain.removeHandler("ghostWindowService:stopTracking");
 	ipcMain.removeHandler("ghostWindowService:updateInsertIndex");
@@ -575,14 +587,15 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
+	ipcMain.removeHandler("ssoService:openSsoLogin");
+	ipcMain.removeHandler("ssoService:waitForSsoCallback");
+	ipcMain.removeHandler("ssoService:cancelSsoLogin");
+	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
 	ipcMain.removeHandler("providerService:handle302AIProviderChange");
 	ipcMain.removeHandler("providerService:get302AIApiKey");
-	ipcMain.removeHandler("ssoService:openSsoLogin");
-	ipcMain.removeHandler("ssoService:waitForSsoCallback");
-	ipcMain.removeHandler("ssoService:cancelSsoLogin");
 	ipcMain.removeHandler("threadService:addThread");
 	ipcMain.removeHandler("threadService:getThreads");
 	ipcMain.removeHandler("threadService:getThread");

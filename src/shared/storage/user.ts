@@ -26,6 +26,8 @@ export interface UserInfo {
 	is_developer: number;
 	resource_area: number;
 	register_from: string;
+	/** 是否为子账户 */
+	is_sub_account: boolean;
 }
 
 export interface UserState {

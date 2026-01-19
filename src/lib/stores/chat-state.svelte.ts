@@ -1,4 +1,3 @@
-import { updateSessionNote } from "$lib/api/sandbox-session";
 import { generateSuggestions } from "$lib/api/suggestions-generation";
 import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
@@ -28,7 +27,8 @@ import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelt
 import { emitter, EventNames } from "$lib/event/emitter";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
-import { codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
+import { claudeCodeSandboxState, codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
+import { codeAgentTaskboardState } from "./code-agent/code-agent-taskboard-state.svelte";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -168,6 +168,8 @@ class ChatState {
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
 	isCreateSkillMode = $state(false);
+
+	async handleSendMessage() {}
 
 	/**
 	 * Cancel any pending suggestions generation request.
@@ -779,6 +781,12 @@ class ChatState {
 	};
 
 	stopGeneration = () => {
+		if (
+			codeAgentTaskboardState.taskboardStatus === "running" ||
+			codeAgentTaskboardState.taskboardStatus === "waiting_to_stop"
+		) {
+			codeAgentTaskboardState.stopExecution();
+		}
 		chat.stop();
 	};
 
@@ -1017,23 +1025,14 @@ class ChatState {
 				await broadcastService.broadcastToAll("thread-list-updated", {});
 
 				// 如果是 code agent 类型，同步备注到 302.AI
+				// 使用 handleThreadTitleUpdated 以正确检查 isManualNote 标志
 				if (codeAgentState.enabled) {
-					const sandboxId = claudeCodeAgentState.sandboxId;
-					const sessionId = claudeCodeAgentState.currentSessionId;
-					const provider302AI = providerState.getProvider("302AI");
-
-					if (sandboxId && sessionId && provider302AI) {
-						try {
-							await updateSessionNote(provider302AI, {
-								sandbox_id: sandboxId,
-								session_id: sessionId,
-								note: result.title,
-							});
-							console.log("[ChatState] Session note synced to 302.AI");
-						} catch (syncError) {
-							console.error("[ChatState] Failed to sync session note:", syncError);
-							// 不阻塞主流程，只记录错误
-						}
+					try {
+						await claudeCodeAgentState.handleThreadTitleUpdated({ title: result.title });
+						console.log("[ChatState] Session note synced to 302.AI");
+					} catch (syncError) {
+						console.error("[ChatState] Failed to sync session note:", syncError);
+						// 不阻塞主流程，只记录错误
 					}
 				}
 
@@ -1358,28 +1357,13 @@ export const chat = new Chat({
 			const codeAgentEnabled = codeAgentState.enabled;
 			const sessionId = codeAgentEnabled
 				? (() => {
-						// const getId = (s: string | { id: string }) => (typeof s === "string" ? s : s.id);
-
-						// If currentSessionId matches one of the known valid sessionIds, use it
-						if (
-							claudeCodeAgentState.currentSessionId
-							// &&
-							// claudeCodeAgentState.sessionIds.some(
-							// 	(s) => getId(s) === claudeCodeAgentState.currentSessionId,
-							// )
-						) {
+						if (claudeCodeAgentState.currentSessionId) {
 							return claudeCodeAgentState.currentSessionId;
 						}
-						// Otherwise fallback to the first available session ID (assuming single active session in most cases)
-						// Filter out empty IDs just in case
-						// const firstValidSession = claudeCodeAgentState.sessionIds.find((s) => getId(s));
-						// if (firstValidSession) {
-						// 	return getId(firstValidSession);
-						// }
 
-						// If no session exists, generate a new one
+						// Fallback: If no session exists, generate a new one
+						// This should rarely happen if the flow is controlled correctly
 						const newSessionId = nanoid();
-						// claudeCodeAgentState.addSessionId(newSessionId);
 						claudeCodeAgentState.updateCurrentSessionId(newSessionId);
 						return newSessionId;
 					})()
@@ -1436,6 +1420,10 @@ export const chat = new Chat({
 				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 				skills: codeAgentState.skills,
 				isCreateSkillMode: chatState.isCreateSkillMode,
+
+				inTaskOrchestrationMode:
+					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
+				workspacePath: codeAgentEnabled && claudeCodeSandboxState.currentSessionWorkspacePath,
 			};
 		},
 	}),
@@ -1588,20 +1576,23 @@ export const chat = new Chat({
 			currentTitle === "新会话";
 		const isFirstMessage = messages.length === 2; // User message + AI response
 
-		// 计算当前对话轮数（一轮 = 用户消息 + 助手回复）
-		const conversationRounds = Math.floor(messages.length / 2);
-		// 每隔多少轮更新一次标题（首次对话模式下）
-		const TITLE_UPDATE_INTERVAL = 5;
+		// // 计算当前对话轮数（一轮 = 用户消息 + 助手回复）
+		// const conversationRounds = Math.floor(messages.length / 2);
+		// // 每隔多少轮更新一次标题（首次对话模式下）
+		// const TITLE_UPDATE_INTERVAL = 5;
 
 		let shouldGenerateTitle = false;
 
 		if (titleTiming === "off") {
 			shouldGenerateTitle = false;
 		} else if (titleTiming === "firstTime") {
-			// 首次生成 或 每隔 N 轮更新一次
-			shouldGenerateTitle =
-				(isFirstMessage && isDefaultTitle) ||
-				(conversationRounds > 1 && conversationRounds % TITLE_UPDATE_INTERVAL === 0);
+			// 仅在首次对话时生成标题（当标题为默认值时）
+			shouldGenerateTitle = isFirstMessage && isDefaultTitle;
+
+			// // 首次生成 或 每隔 N 轮更新一次
+			// shouldGenerateTitle =
+			// 	(isFirstMessage && isDefaultTitle) ||
+			// 	(conversationRounds > 1 && conversationRounds % TITLE_UPDATE_INTERVAL === 0);
 		} else if (titleTiming === "everyTime") {
 			shouldGenerateTitle = messages.length >= 2;
 		}

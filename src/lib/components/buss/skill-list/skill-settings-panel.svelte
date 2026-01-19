@@ -49,6 +49,17 @@
 		// Reset to list view when mounting
 		skillsPanelState.reset();
 		loadSkills();
+
+		// Listen for skill import requests from deep links
+		const unsubscribe = window.electronAPI.skill.onSkillImportRequested((data) => {
+			console.log("[SkillSettingsPanel] Received skill import request:", data.url);
+			skillsPanelState.goToCreateGitHubWithUrl(data.url);
+			toast.info(m.skills_import_from_link());
+		});
+
+		return () => {
+			unsubscribe?.();
+		};
 	});
 </script>
 
@@ -106,7 +117,10 @@
 		{:else if skillsPanelState.currentView.type === "create-upload"}
 			<SkillCreateUploadView onRefresh={loadSkills} />
 		{:else if skillsPanelState.currentView.type === "create-github"}
-			<SkillCreateGithubView onRefresh={loadSkills} />
+			<SkillCreateGithubView
+				onRefresh={loadSkills}
+				initialUrl={skillsPanelState.currentView.initialUrl}
+			/>
 		{:else if skillsPanelState.currentView.type === "create-history"}
 			<SkillCreateHistoryView />
 		{/if}

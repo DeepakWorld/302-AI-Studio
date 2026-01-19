@@ -84,6 +84,9 @@ declare global {
 					}) => void,
 				) => () => void;
 			};
+			skill: {
+				onSkillImportRequested: (callback: (data: { url: string }) => void) => () => void;
+			};
 		};
 		windowId: string;
 		tab: Tab;

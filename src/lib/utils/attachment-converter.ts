@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { m } from "$lib/paraglide/messages.js";
 import pdf2md from "@opendocsg/pdf2md";
 import type { AttachmentFile } from "@shared/types";
@@ -6,6 +7,7 @@ import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { compressFile } from "./file-compressor";
 import { officeMimeTypes } from "./file-preview";
+import { toast } from "svelte-sonner";
 
 export type MessagePart = FileUIPart | { type: "text"; text: string };
 
@@ -246,12 +248,34 @@ export function createAttachmentMetadata(
 
 export async function convertAttachmentToMessagePart(
 	attachment: AttachmentFile,
+	enableZipSupport = false,
 ): Promise<{ part: MessagePart; textContent?: string; preview?: string }> {
 	if (isMediaFile(attachment) || isZipFile(attachment)) {
 		let url: string;
 
-		if (attachment.preview) {
-			url = attachment.preview;
+		// Prefer file object if it exists, to ensure fresh and correct data
+		if (attachment.file && attachment.file instanceof File && attachment.file.size > 0) {
+			url = await fileToDataURL(attachment.file);
+		} else if (attachment.preview) {
+			// If preview is a blob URL, convert it to base64
+			if (attachment.preview.startsWith("blob:")) {
+				try {
+					const response = await fetch(attachment.preview);
+					const blob = await response.blob();
+					url = await new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = () => resolve(reader.result as string);
+						reader.onerror = reject;
+						reader.readAsDataURL(blob);
+					});
+				} catch (error) {
+					console.error("Failed to convert blob URL to data URL:", error);
+					// Fallback to filePath if blob fetch fails
+					url = await fileToDataURL(attachment.file, attachment.filePath);
+				}
+			} else {
+				url = attachment.preview;
+			}
 		} else {
 			// For images, use compression to ensure base64 size < 1MB
 			if (attachment.type.startsWith("image/")) {
@@ -259,11 +283,11 @@ export async function convertAttachmentToMessagePart(
 					url = await compressFile(attachment.file);
 				} catch (error) {
 					console.error("[AttachmentConverter] Failed to compress image, using original:", error);
-					url = await fileToDataURL(attachment.file);
+					url = await fileToDataURL(attachment.file, attachment.filePath);
 				}
 			} else {
 				// For audio/video/zip, use original (no compression)
-				url = await fileToDataURL(attachment.file);
+				url = await fileToDataURL(attachment.file, attachment.filePath);
 			}
 		}
 
@@ -303,7 +327,7 @@ export async function convertAttachmentToMessagePart(
 				// Generate preview for message history (only if not already present)
 				const preview =
 					attachment.preview ||
-					(attachment.file ? await fileToDataURL(attachment.file) : undefined);
+					(attachment.file ? await fileToDataURL(attachment.file, attachment.filePath) : undefined);
 				return {
 					part: {
 						type: "text",
@@ -320,7 +344,7 @@ export async function convertAttachmentToMessagePart(
 				// Generate preview for message history (only if not already present)
 				const preview =
 					attachment.preview ||
-					(attachment.file ? await fileToDataURL(attachment.file) : undefined);
+					(attachment.file ? await fileToDataURL(attachment.file, attachment.filePath) : undefined);
 				return {
 					part: {
 						type: "text",
@@ -358,6 +382,7 @@ export async function convertAttachmentToMessagePart(
 			}
 		} catch (error) {
 			console.error(`Failed to read Office document ${attachment.name}:`, error);
+			toast.error(m.toast_attachment_convert_failed({ fileName: attachment.name }));
 			// If parsing fails, return a description instead
 			const sizeInKB = (attachment.size / 1024).toFixed(2);
 			return {
@@ -381,12 +406,25 @@ export async function convertAttachmentToMessagePart(
 		};
 	}
 
+	// Fallback for Agent Mode: allow any file type if zip support is enabled
+	// This ensures that files with unknown MIME types (e.g. some ZIPs) are still sent
+	if (enableZipSupport) {
+		const url = await fileToDataURL(attachment.file, attachment.filePath);
+		return {
+			part: {
+				type: "file",
+				mediaType: attachment.type || "application/octet-stream",
+				filename: attachment.name,
+				url,
+			},
+		};
+	}
+
 	throw new Error(`Unsupported file type: ${attachment.type} (${attachment.name})`);
 }
 
 export async function convertAttachmentsToMessageParts(
 	attachments: AttachmentFile[],
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	options: { enableZipSupport?: boolean } = {},
 ): Promise<{ parts: MessagePart[]; metadataList: AttachmentMetadata[] }> {
 	const parts: MessagePart[] = [];
@@ -394,22 +432,53 @@ export async function convertAttachmentsToMessageParts(
 
 	for (const attachment of attachments) {
 		try {
-			const { part, textContent, preview } = await convertAttachmentToMessagePart(attachment);
+			const { part, textContent, preview } = await convertAttachmentToMessagePart(
+				attachment,
+				options.enableZipSupport,
+			);
 			parts.push(part);
 			metadataList.push(createAttachmentMetadata(attachment, textContent, preview));
 		} catch (error) {
 			console.error(`Failed to convert attachment ${attachment.name}:`, error);
+			toast.error(m.toast_attachment_convert_failed({ fileName: attachment.name }));
 		}
 	}
 
 	return { parts, metadataList };
 }
 
-async function fileToDataURL(file: File): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(reader.result as string);
-		reader.onerror = reject;
-		reader.readAsDataURL(file);
-	});
+async function fileToDataURL(file: File, filePath?: string): Promise<string> {
+	// 1. Try using FileReader (if file is a valid Blob/File)
+	if (file instanceof Blob) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as string);
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}
+
+	// 2. If file is invalid, try using filePath via Electron
+	if (filePath && window.electronAPI?.appService?.readFileAsBuffer) {
+		try {
+			const buffer = await window.electronAPI.appService.readFileAsBuffer(filePath);
+			// Use the type from the file object (if available) or fallback to generic binary
+			const type = (file as any).type || "application/octet-stream";
+
+			// Convert ArrayBuffer to Base64
+			let binary = "";
+			const bytes = new Uint8Array(buffer);
+			const len = bytes.byteLength;
+			for (let i = 0; i < len; i++) {
+				binary += String.fromCharCode(bytes[i]);
+			}
+			const base64 = window.btoa(binary);
+
+			return `data:${type};base64,${base64}`;
+		} catch (e) {
+			console.error("Failed to read file from path:", filePath, e);
+		}
+	}
+
+	throw new Error("File object is invalid and cannot be read from path");
 }

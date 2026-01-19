@@ -17,6 +17,8 @@
 		49: aiExcelIcon,
 		51: aiResumeCreationIcon,
 		75: aiNovelWritingIcon,
+		9998: aiDocumentEditorIcon,
+		9999: aiPPTProductionIcon,
 
 		// * Academic Related
 		12: aiAcademicPaperSearchIcon,
@@ -56,6 +58,7 @@
 		71: aiDrawingPromptWordExpertIcon,
 		73: aiImageCreativeStationIcon,
 		78: aiPortraitStudioIcon,
+		9997: aiSVGProductionIcon,
 
 		// * Audio Related
 		24: aiSpeechGeneratorIcon,

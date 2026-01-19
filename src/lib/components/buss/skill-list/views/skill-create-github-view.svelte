@@ -8,9 +8,10 @@
 
 	interface Props {
 		onRefresh?: () => void;
+		initialUrl?: string;
 	}
 
-	let { onRefresh }: Props = $props();
+	let { onRefresh, initialUrl = "" }: Props = $props();
 
 	let githubFormRef = $state<SkillGithubForm | undefined>();
 	let isCreating = $state(false);
@@ -26,6 +27,7 @@
 
 			if (result.success) {
 				toast.success(m.skills_create_success());
+				skillsPanelState.clearPendingGitHubUrl();
 				onRefresh?.();
 				skillsPanelState.reset();
 			} else {
@@ -41,13 +43,14 @@
 
 	function handleCancel() {
 		githubFormRef?.reset();
+		skillsPanelState.clearPendingGitHubUrl();
 		skillsPanelState.pop();
 	}
 </script>
 
 <div class="flex flex-col h-full">
 	<div class="flex-1 overflow-y-auto min-h-0">
-		<SkillGithubForm bind:this={githubFormRef} />
+		<SkillGithubForm bind:this={githubFormRef} {initialUrl} />
 	</div>
 
 	<div class="flex gap-3 border-t px-6 py-4">

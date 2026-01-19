@@ -1,14 +1,28 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import { appInfo } from "$lib/app-info";
 	import DiscordIcon from "$lib/assets/icons/social-medias/discord.svg";
 	import GithubIcon from "$lib/assets/icons/social-medias/github.svg";
 	import TwitterIcon from "$lib/assets/icons/social-medias/twitter.svg";
+	import { ChangelogList } from "$lib/components/buss/changelog";
 	import { ModelIcon } from "$lib/components/buss/model-icon/index.js";
 	import * as Avatar from "$lib/components/ui/avatar";
 	import { Button } from "$lib/components/ui/button/index.js";
+	import { Label } from "$lib/components/ui/label/index.js";
 	import { m } from "$lib/paraglide/messages";
+	import { changelogState } from "$lib/stores/changelog-state.svelte";
+	import { onMount } from "svelte";
 
 	const { openExternalLink } = window.electronAPI.externalLinkService;
+
+	onMount(() => {
+		// Fetch the latest 5 changelog entries
+		changelogState.fetchList(5);
+	});
+
+	function handleViewMore() {
+		goto("/settings/about/changelog");
+	}
 
 	const socialMedias = [
 		{
@@ -47,8 +61,8 @@
 	] as const;
 </script>
 
-<div class="mx-auto flex h-full flex-col items-center">
-	<div class="flex flex-1 items-center justify-center">
+<div class="mx-auto flex h-full w-full max-w-2xl flex-col items-center overflow-y-auto">
+	<div class="flex items-center justify-center py-8">
 		<div class="flex items-center gap-y-[22px] flex-col">
 			<ModelIcon modelName="ai302" className="size-[62px]" forceApplyClassName />
 			<div class="flex items-center gap-y-2 flex-col">
@@ -72,7 +86,22 @@
 		</div>
 	</div>
 
-	<div class="flex items-center gap-4">
+	<!-- Changelog Section -->
+	<div class="w-full flex-1 px-4 pb-6">
+		<div class="gap-settings-gap flex flex-col">
+			<Label class="text-label-fg font-normal">{m.changelog_title()}</Label>
+			<ChangelogList
+				versions={changelogState.versions}
+				currentVersion={changelogState.currentVersion}
+				loading={changelogState.loading}
+				error={changelogState.error}
+				showViewMore={true}
+				onViewMore={handleViewMore}
+			/>
+		</div>
+	</div>
+
+	<div class="flex items-center gap-4 py-4">
 		<div class="flex items-center gap-2">
 			{#each socialMedias as item (item.name)}
 				<Button

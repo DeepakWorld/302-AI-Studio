@@ -5,6 +5,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import Switch from "$lib/components/ui/switch/switch.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { generalSettings } from "$lib/stores/general-settings.state.svelte";
 	import { cn } from "$lib/utils";
 	import { Ellipsis, Loader2, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
@@ -47,6 +48,12 @@
 	const canEdit = $derived(!isBuiltin && !!onEdit);
 	const canDelete = $derived(!isBuiltin && !!onDelete);
 	const showMenu = $derived(canEdit || !!onDownload || canDelete);
+
+	const description = $derived(
+		generalSettings.language === "zh" && skill.description_zh
+			? skill.description_zh
+			: skill.description,
+	);
 
 	function handleCardClick() {
 		// Always go to detail page when clicking the card
@@ -160,7 +167,7 @@
 	<!-- Body: Description -->
 	<div class="mb-4 flex-1">
 		<p class="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-			{skill.description}
+			{description}
 		</p>
 	</div>
 

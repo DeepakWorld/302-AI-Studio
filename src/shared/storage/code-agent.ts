@@ -13,6 +13,7 @@ export type CodeAgentConfigMetadata = typeof CodeAgentConfigMetadata.infer;
 export const skill = type({
 	name: "string",
 	description: "string",
+	description_zh: "string",
 	isBuiltin: "boolean?",
 	content: "string?",
 	/** Whether this skill should be forcefully included in prompts when enabled */
@@ -42,6 +43,11 @@ export const codeAgentMetadata = type({
 	 * thinking budget for claude code
 	 */
 	thinkingBudget: thinkingBudgetType,
+	/**
+	 * Whether the session note was manually set by user.
+	 * If true, auto-generated titles will not overwrite the note.
+	 */
+	isManualNote: "boolean",
 });
 export type CodeAgentMetadata = typeof codeAgentMetadata.infer;
 
@@ -102,3 +108,11 @@ export const codeAgentGlobalConfigs = type({
 	autoDeploy: "boolean",
 });
 export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;
+
+export const taskSchema = type({
+	id: "string",
+	content: "string",
+	status: "'pending' | 'in_progress' | 'done'",
+});
+export const taskListSchema = taskSchema.array();
+export type Task = typeof taskSchema.infer;

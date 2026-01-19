@@ -5,6 +5,7 @@
 	import { chat, chatState } from "$lib/stores/chat-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
@@ -20,12 +21,19 @@
 	import AgentPreviewPanel from "../components/agent-preview/agent-preview-panel.svelte";
 	import { AiApplicationItems } from "../components/ai-applications";
 	import { ChatInputBox } from "../components/chat-input";
+	import TaskboardStatusBar from "../components/chat-input/code-agent/taskboard-status-bar.svelte";
 	import { FileUploadOverlay } from "../components/file-upload-overlay";
 	import { HtmlPreviewPanel } from "../components/html-preview";
 	import { MessageList } from "../components/message";
 
 	let isInputAreaHovered = $state(false);
 	let fileUploadOverlayRef: FileUploadOverlay | null = $state(null);
+
+	const shouldShowTaskboardStatus = $derived(
+		codeAgentState.inCodeAgentMode &&
+			codeAgentTaskboardState.showTaskboardStatusBar &&
+			chatState.hasMessages,
+	);
 
 	function handleFilesAdded(attachments: AttachmentFile[]) {
 		for (const attachment of attachments) {
@@ -219,16 +227,15 @@
 	});
 
 	// Track previous sandboxId for edge detection
-	let previousSandboxId = "";
 
 	// Auto-open preview panel when sandbox is first created (edge trigger)
 	$effect(() => {
 		const sandboxId = claudeCodeAgentState.sandboxId;
+		const currentSessionId = claudeCodeAgentState.currentSessionId;
 		// Only open when sandboxId changes from empty to non-empty
-		if (codeAgentState.enabled && sandboxId && !previousSandboxId) {
+		if (codeAgentState.inCodeAgentMode && sandboxId && currentSessionId) {
 			agentPreviewState.openPreview(sandboxId);
 		}
-		previousSandboxId = sandboxId;
 	});
 
 	async function handleNewExploration() {
@@ -247,11 +254,12 @@
 {#snippet ChatInputArea()}
 	<div
 		role="region"
-		class="group/input relative flex items-center justify-center pt-12 pb-6 px-4"
+		class="group/input relative flex flex-col items-center justify-center pb-6 px-4 pt-12"
 		onmouseenter={() => (isInputAreaHovered = true)}
 		onmouseleave={() => (isInputAreaHovered = false)}
 	>
 		<!-- New Exploration & Clear Screen Buttons -->
+
 		{#if isInputAreaHovered && !chatState.isStreaming}
 			<div
 				class="absolute top-0 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center gap-2 max-w-[calc(100vw-2rem)]"
@@ -262,32 +270,45 @@
 					class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-primary shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-[#8334EF] dark:text-white dark:hover:bg-[#7029d6] sm:px-4"
 				>
 					<MessageSquarePlus class="h-4 w-4 shrink-0" />
+
 					<span class="whitespace-nowrap">{m.text_new_exploration()}</span>
 				</button>
 
 				{#if chatState.hasVisibleMessages}
 					<!-- Show clear screen button when there are visible messages -->
+
 					<button
 						type="button"
 						onclick={handleClearScreen}
 						class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-muted-foreground shadow-md backdrop-blur-sm transition-all hover:shadow-lg hover:text-foreground dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white sm:px-4"
 					>
 						<Eraser class="h-4 w-4 shrink-0" />
+
 						<span class="whitespace-nowrap">{m.text_clear_screen()}</span>
 					</button>
 				{/if}
 
 				{#if chatState.hasClearScreen}
 					<!-- Show restore button when there are hidden messages -->
+
 					<button
 						type="button"
 						onclick={handleRestoreClearScreen}
 						class="flex shrink-0 cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-amber-600 shadow-md backdrop-blur-sm transition-all hover:shadow-lg dark:bg-amber-600 dark:text-white dark:hover:bg-amber-700 sm:px-4"
 					>
 						<History class="h-4 w-4 shrink-0" />
+
 						<span class="whitespace-nowrap">{m.text_restore_history()}</span>
 					</button>
 				{/if}
+			</div>
+		{/if}
+
+		{#if shouldShowTaskboardStatus}
+			<div
+				class="mb-3 flex w-full justify-center animate-in fade-in slide-in-from-bottom-2 duration-200"
+			>
+				<TaskboardStatusBar />
 			</div>
 		{/if}
 

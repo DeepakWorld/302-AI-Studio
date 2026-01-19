@@ -58,6 +58,7 @@ function getInitialData() {
 		sandboxRemark: "",
 		skills: [],
 		thinkingBudget: "off",
+		isManualNote: false,
 	};
 	return initialData;
 }
@@ -85,7 +86,8 @@ class ClaudeCodeAgentState {
 	sandboxRemark = $derived(persistedClaudeCodeAgentState.current?.sandboxRemark ?? "");
 	skills = $derived(persistedClaudeCodeAgentState.current?.skills ?? []);
 	thinkingBudget = $derived(persistedClaudeCodeAgentState.current?.thinkingBudget ?? "off");
-	agentMode = $derived.by(() => {
+	isManualNote = $derived(persistedClaudeCodeAgentState.current?.isManualNote ?? false);
+	agentMode = $derived.by<"new" | "existing">(() => {
 		return this.selectedSessionId === "new" ? "new" : "existing";
 	});
 
@@ -183,10 +185,14 @@ class ClaudeCodeAgentState {
 	}
 
 	async handleThreadTitleUpdated({ title }: { title: string }) {
+		// If the note was manually set by user, do not overwrite it
+		if (this.isManualNote) {
+			return;
+		}
 		await this.updateSessionRemark(title);
 	}
 
-	async updateSessionRemark(remark: string): Promise<boolean> {
+	async updateSessionRemark(remark: string, isManual: boolean = false): Promise<boolean> {
 		const { success } = await _updateSessionNote({
 			note: remark,
 			sandbox_id: this.sandboxId,
@@ -198,6 +204,11 @@ class ClaudeCodeAgentState {
 			return false;
 		} else {
 			toast.success(m.update_remark_success());
+		}
+
+		// If manually set by user, mark it so auto-generated titles won't overwrite
+		if (isManual) {
+			this.updateState({ isManualNote: true });
 		}
 
 		await updateClaudeCodeSandboxesByIpc();
@@ -212,7 +223,7 @@ class ClaudeCodeAgentState {
 	}
 
 	updateCurrentSessionId(sessionId: string): void {
-		this.updateState({ currentSessionId: sessionId });
+		this.updateState({ currentSessionId: sessionId, isManualNote: false });
 	}
 
 	updateSandboxId(sandboxId: string): void {
@@ -383,6 +394,26 @@ class ClaudeCodeAgentState {
 	handleSkillForceUseToggle(skillName: string, forceUse: boolean): void {
 		const updatedSkills = this.skills.map((s) => (s.name === skillName ? { ...s, forceUse } : s));
 		this.updateSkills(updatedSkills);
+	}
+
+	handleEnabled() {
+		const [isExistingMode, sandboxId, sessionId] = [
+			this.agentMode === "existing",
+			this.selectedSandboxId,
+			this.selectedSessionId,
+		];
+
+		const updateData = isExistingMode
+			? {
+					sandboxId,
+					currentSessionId: sessionId,
+				}
+			: {
+					sandboxId: sandboxId === "auto" ? "" : sandboxId,
+					currentSessionId: "",
+				};
+
+		this.updateState(updateData);
 	}
 }
 
