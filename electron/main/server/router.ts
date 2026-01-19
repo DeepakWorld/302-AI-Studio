@@ -62,6 +62,7 @@ export type RouterRequestBody = {
 	autoDeploy?: boolean;
 	skills?: Skill[];
 	isCreateSkillMode?: boolean;
+	inPlanMode?: boolean;
 	inTaskOrchestrationMode?: boolean;
 	workspacePath?: string;
 };
@@ -1165,6 +1166,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		autoDeploy,
 		skills,
 		isCreateSkillMode,
+		inPlanMode,
 		inTaskOrchestrationMode,
 		workspacePath,
 	} = await c.req.json<RouterRequestBody>();
@@ -1187,6 +1189,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			sessionId,
 			autoDeploy,
 			isCreateSkillMode,
+			inPlanMode,
 			inTaskOrchestrationMode,
 			workspacePath,
 		}),
@@ -1240,7 +1243,9 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		structured_output: true,
 		enable_pre_deploy_check: autoDeploy,
 		available_skills: isCreateSkillMode ? [] : availableSkills,
+		// Only include action when plan mode is ON or creating skill
 		...(isCreateSkillMode ? { action: "create_skill" } : {}),
+		...(inPlanMode && !isCreateSkillMode ? { action: "plan" } : {}),
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));
