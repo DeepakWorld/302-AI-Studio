@@ -16,6 +16,7 @@ import { match } from "ts-pattern";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-state.svelte";
 import { codeAgentGlobalConfigsState } from "./code-agent-global-configs-state.svelte";
+import { codeAgentSendMessageButtonState } from "./code-agent-send-message-button-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
 import { withLoadingState } from "./utils";
 
@@ -61,6 +62,7 @@ class CodeAgentState {
 
 	isFreshTab = $derived(!chatState.hasMessages);
 	inCodeAgentMode = $derived(!this.isFreshTab && this.enabled);
+	isChecking = $derived(codeAgentSendMessageButtonState.isChecking);
 
 	sandboxStatus = $derived.by<CodeAgentSandboxStatus>(() => {
 		return match(this.currentAgentId)

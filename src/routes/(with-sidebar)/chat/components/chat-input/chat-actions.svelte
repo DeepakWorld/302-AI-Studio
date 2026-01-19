@@ -77,6 +77,11 @@
 	}
 
 	function handleCodeAgentClick() {
+		// Prevent toggling when checking is in progress
+		if (codeAgentState.isChecking) {
+			return;
+		}
+
 		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
 			codeAgentState.updateEnabled(false);
 			return;
@@ -199,7 +204,9 @@
 		tooltip={m.title_code_agent()}
 		onclick={() => handleCodeAgentClick()}
 		size="sm"
-		disabled={disabled || (codeAgentState.isFreshTab ? false : !codeAgentState.inCodeAgentMode)}
+		disabled={disabled ||
+			codeAgentState.isChecking ||
+			(codeAgentState.isFreshTab ? false : !codeAgentState.inCodeAgentMode)}
 	>
 		<div class="flex items-center">
 			<Bot class={cn("size-4", codeAgentState.enabled && "!text-chat-action-active-fg")} />
