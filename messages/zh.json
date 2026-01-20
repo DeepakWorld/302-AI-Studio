@@ -583,6 +583,7 @@
 	"tool_call_label_claude_code": "Claude Code",
 	"title_plan_mode": "Plan 模式",
 	"plan_mode_submit": "提交",
+	"plan_mode_reset": "重置",
 	"plan_mode_other_option": "其他",
 	"plan_mode_enter_custom": "请输入自定义内容...",
 	"todo_list_title": "任务列表",

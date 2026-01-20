@@ -583,6 +583,7 @@
 	"tool_call_label_claude_code": "Claude Code",
 	"title_plan_mode": "Plan Mode",
 	"plan_mode_submit": "Submit",
+	"plan_mode_reset": "Reset",
 	"plan_mode_other_option": "Other",
 	"plan_mode_enter_custom": "Enter custom content...",
 	"todo_list_title": "Task List",

@@ -36,6 +36,7 @@
 		restoreShowCustomInput,
 		saveAnswerForMessage,
 	} from "$lib/stores/code-agent/ask-user-answers-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { cn } from "$lib/utils";
 	import {
 		Ban,
@@ -191,6 +192,11 @@
 		} else {
 			current.clear();
 			current.add(optionLabel);
+
+			// Auto-advance to next tab for single-select questions
+			if (questionIndex < questions.length - 1) {
+				activeTab = questionIndex + 1;
+			}
 		}
 
 		// Hide custom input if a predefined option is selected
@@ -246,14 +252,61 @@
 		const answerText = answerParts.join("\n");
 		chatState.inputValue = answerText;
 		chatState.sendMessage();
+
+		// Disable plan mode after submitting answers
+		if (codeAgentState.inPlanMode) {
+			codeAgentState.updatePlanMode(false);
+		}
 	}
 
-	// Check if submit is enabled
+	// Check if submit is enabled - all questions must be answered
 	const canSubmit = $derived(() => {
 		if (!questionsInput?.questions) return false;
 
-		// At least one question should have an answer
-		return questionsInput.questions.some((_, index) => hasAnswer(index));
+		// All questions must have an answer
+		return questionsInput.questions.every((_, index) => hasAnswer(index));
+	});
+
+	// Reset all answers
+	function handleReset() {
+		answers.clear();
+		customInputs.clear();
+		showCustomInput.clear();
+	}
+
+	// Build JSON display for submitted answers
+	const submittedAnswersJson = $derived(() => {
+		if (!questionsInput?.questions) return null;
+
+		const result: Record<string, string[] | string | null> = {};
+
+		questionsInput.questions.forEach((q, index) => {
+			const selected = answers.get(index);
+			const custom = customInputs.get(index);
+			const hasCustomInputValue = showCustomInput.get(index) && custom?.trim();
+
+			// Convert header to camelCase-like key (lowercase first letter, remove spaces)
+			const key = q.header.toLowerCase().replace(/\s+/g, "_");
+
+			if (selected && selected.size > 0) {
+				const selectedArray = Array.from(selected);
+				if (hasCustomInputValue) {
+					// Combine selected options with custom input
+					result[key] = [...selectedArray, custom!.trim()];
+				} else if (q.multiSelect) {
+					result[key] = selectedArray;
+				} else {
+					// Single select: use string directly
+					result[key] = selectedArray[0];
+				}
+			} else if (hasCustomInputValue) {
+				result[key] = custom!.trim();
+			} else {
+				result[key] = null;
+			}
+		});
+
+		return result;
 	});
 </script>
 
@@ -435,15 +488,32 @@
 			{/each}
 		</div>
 
-		<!-- Submit button -->
+		<!-- Action buttons -->
 		{#if !isAnswered}
-			<div class="mt-4 flex justify-end border-t border-border pt-3">
+			<div class="mt-4 flex justify-end gap-2 border-t border-border pt-3">
+				<Button
+					variant="outline"
+					onclick={handleReset}
+					disabled={chatState.isStreaming || chatState.isSubmitted}
+				>
+					{m.plan_mode_reset()}
+				</Button>
 				<Button
 					onclick={handleSubmit}
 					disabled={!canSubmit() || chatState.isStreaming || chatState.isSubmitted}
 				>
 					{m.plan_mode_submit()}
 				</Button>
+			</div>
+		{:else}
+			<!-- Display submitted answers in JSON format -->
+			<div class="mt-4 border-t border-border pt-3">
+				<pre
+					class="rounded-lg bg-muted/50 p-3 text-xs text-foreground overflow-x-auto font-mono">{JSON.stringify(
+						submittedAnswersJson(),
+						null,
+						2,
+					)}</pre>
 			</div>
 		{/if}
 	{/if}
