@@ -37,7 +37,7 @@ const threadId =
  * Uses messageId as the key to associate answers with specific messages.
  */
 export const askUserAnswersState = new PersistedState<AskUserAnswersStorage>(
-	`ask-user-answers:${threadId}`,
+	`plan-answers:${threadId}`,
 	{},
 );
 

@@ -8,6 +8,7 @@ import { windowService } from "../window-service";
 export class ShortcutActionsHandler {
 	async handle(action: string, ctx: ShortcutContext): Promise<void> {
 		const { windowId } = ctx;
+		console.log(`[MainActionsHandler] Received Action: "${action}" (Window: ${windowId})`);
 
 		// Tab-related actions require more than one tab
 		const tabRelatedActions = [
@@ -85,6 +86,9 @@ export class ShortcutActionsHandler {
 					break;
 				case "toggleChatParametersPanel":
 					await this.handleToggleChatParametersPanel(windowId);
+					break;
+				case "togglePlanMode":
+					await this.handleTogglePlanMode(windowId);
 					break;
 
 				case "newChat":
@@ -347,6 +351,19 @@ export class ShortcutActionsHandler {
 		if (activeView && !activeView.isDestroyed()) {
 			activeView.send("shortcut:action", {
 				action: "toggleChatParametersPanel",
+				ctx: { windowId },
+			});
+		}
+	}
+
+	private async handleTogglePlanMode(windowId: number): Promise<void> {
+		const activeView = this.getActiveTabWebContents(windowId);
+		console.log(
+			`[MainActionsHandler] handleTogglePlanMode for Window ${windowId}. Active View: ${activeView ? activeView.id : "None"}`,
+		);
+		if (activeView && !activeView.isDestroyed()) {
+			activeView.send("shortcut:action", {
+				action: "togglePlanMode",
 				ctx: { windowId },
 			});
 		}

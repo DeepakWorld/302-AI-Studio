@@ -26,6 +26,7 @@
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
+	import * as Tabs from "$lib/components/ui/tabs";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import {
@@ -46,7 +47,6 @@
 		LoaderCircle,
 		MessageCircleQuestion,
 	} from "@lucide/svelte";
-	import { onMount } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 
 	let { part, messageId }: AskUserQuestionCardProps = $props();
@@ -56,28 +56,7 @@
 	const questions = $derived(questionsInput?.questions ?? []);
 
 	// Track active tab index
-	let activeTab = $state(0);
-
-	// Tab thumb animation (reusing seg-button style)
-	let thumbStyle: { left: string; width: string } = $state({ left: "", width: "" });
-	const tabElements: HTMLElement[] = $state([]);
-	let tabContainerElement: HTMLElement | null = $state(null);
-
-	function updateThumbPosition() {
-		const item = tabElements[activeTab];
-		if (!item) return;
-
-		thumbStyle = {
-			left: `${item.offsetLeft}px`,
-			width: `${item.offsetWidth}px`,
-		};
-	}
-
-	$effect(() => {
-		if (activeTab >= 0 && questions.length > 1) {
-			updateThumbPosition();
-		}
-	});
+	let activeTab = $state("0");
 
 	// Track selected answers per question index
 	// Note: Using $state because we reassign entire maps when restoring from storage
@@ -105,18 +84,6 @@
 			hasSubmitted = true;
 		}
 		hasRestoredFromStorage = true;
-	});
-
-	onMount(() => {
-		updateThumbPosition();
-
-		if (tabContainerElement) {
-			const observer = new ResizeObserver(() => {
-				updateThumbPosition();
-			});
-			observer.observe(tabContainerElement);
-			return () => observer.disconnect();
-		}
 	});
 
 	const statusConfig = $derived(() => {
@@ -195,7 +162,7 @@
 
 			// Auto-advance to next tab for single-select questions
 			if (questionIndex < questions.length - 1) {
-				activeTab = questionIndex + 1;
+				activeTab = String(questionIndex + 1);
 			}
 		}
 
@@ -339,153 +306,136 @@
 	</div>
 
 	<!-- Questions with Tabs -->
+	<!-- Questions with Tabs -->
 	{#if questions.length > 0}
 		<div class="border-t border-border pt-3">
-			<!-- Tab Headers (seg-button style) -->
-			{#if questions.length > 1}
-				<div
-					bind:this={tabContainerElement}
-					class="h-seg rounded-seg-button-container bg-settings-item-bg px-seg-x relative flex items-center mb-4"
-				>
-					<!-- Sliding thumb -->
-					{#if thumbStyle.left}
-						<div
-							class="h-seg-thumb bg-accent absolute z-1 rounded-md transition-all duration-400 ease-in-out"
-							style="left: {thumbStyle.left}; width: {thumbStyle.width};"
-						></div>
-					{/if}
-
-					<div class="flex w-full gap-2">
+			<Tabs.Root bind:value={activeTab} class="w-full">
+				<!-- Tab Headers -->
+				{#if questions.length > 1}
+					<Tabs.List class="w-full justify-start mb-4 bg-muted/50 p-1 h-auto flex-wrap">
 						{#each questions as question, qIndex (qIndex)}
-							{@const isActive = activeTab === qIndex}
 							{@const answered = hasAnswer(qIndex)}
-							<button
-								bind:this={tabElements[qIndex]}
-								type="button"
-								class={cn(
-									"h-seg-thumb relative z-2 flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-md text-sm whitespace-nowrap",
-									isActive
-										? "text-accent-foreground"
-										: "text-secondary-foreground hover:bg-tab-hover z-1",
-								)}
-								onmousedown={() => (activeTab = qIndex)}
-							>
+							<Tabs.Trigger value={String(qIndex)} class="flex-1 min-w-[100px]">
 								<span>{question.header}</span>
 								{#if answered}
-									<Check class="h-3.5 w-3.5" />
+									<Check class="ml-2 h-3.5 w-3.5" />
 								{/if}
-							</button>
+							</Tabs.Trigger>
 						{/each}
-					</div>
-				</div>
-			{/if}
+					</Tabs.List>
+				{/if}
 
-			<!-- Active Question Content -->
-			{#each questions as question, qIndex (qIndex)}
-				{#if activeTab === qIndex}
-					{@const isOtherActive = showCustomInput.get(qIndex)}
-					<div class="space-y-3">
-						<!-- Question text -->
-						<p class="text-sm font-medium text-foreground">{question.question}</p>
+				<!-- Active Question Content -->
+				{#each questions as question, qIndex (qIndex)}
+					<Tabs.Content value={String(qIndex)}>
+						{@const isOtherActive = showCustomInput.get(qIndex)}
+						<div class="space-y-3">
+							<!-- Question text -->
+							<p class="text-sm font-medium text-foreground">{question.question}</p>
 
-						<!-- Options -->
-						<div class="grid gap-2">
-							{#each question.options as option (option.label)}
-								{@const isSelected = answers.get(qIndex)?.has(option.label)}
+							<!-- Options -->
+							<div class="grid gap-2">
+								{#each question.options as option (option.label)}
+									{@const isSelected = answers.get(qIndex)?.has(option.label)}
+									<button
+										type="button"
+										class={cn(
+											"flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
+											isSelected
+												? "border-primary bg-primary/5"
+												: "border-border hover:bg-muted/50",
+											isAnswered && "cursor-not-allowed opacity-60",
+										)}
+										onclick={() => handleOptionSelect(qIndex, option.label, question.multiSelect)}
+										disabled={isAnswered}
+									>
+										{#if question.multiSelect}
+											<!-- Checkbox style -->
+											<div
+												class={cn(
+													"mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center",
+													isSelected ? "border-primary bg-primary" : "border-muted-foreground",
+												)}
+											>
+												{#if isSelected}
+													<Check class="h-3 w-3 text-primary-foreground" />
+												{/if}
+											</div>
+										{:else}
+											<!-- Radio style -->
+											<div
+												class={cn(
+													"mt-0.5 h-4 w-4 rounded-full border-2 flex items-center justify-center",
+													isSelected ? "border-primary" : "border-muted-foreground",
+												)}
+											>
+												{#if isSelected}
+													<div class="h-2 w-2 rounded-full bg-primary"></div>
+												{/if}
+											</div>
+										{/if}
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium text-foreground">{option.label}</p>
+											<p class="text-xs text-muted-foreground">{option.description}</p>
+										</div>
+									</button>
+								{/each}
+
+								<!-- Other option -->
 								<button
 									type="button"
 									class={cn(
-										"flex items-start gap-3 p-3 rounded-lg border text-left transition-colors",
-										isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
+										"flex items-center gap-3 p-3 rounded-lg border text-left transition-colors",
+										isOtherActive
+											? "border-primary bg-primary/5"
+											: "border-border hover:bg-muted/50",
 										isAnswered && "cursor-not-allowed opacity-60",
 									)}
-									onclick={() => handleOptionSelect(qIndex, option.label, question.multiSelect)}
+									onclick={() => handleOtherClick(qIndex, question.multiSelect)}
 									disabled={isAnswered}
 								>
 									{#if question.multiSelect}
-										<!-- Checkbox style -->
 										<div
 											class={cn(
-												"mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center",
-												isSelected ? "border-primary bg-primary" : "border-muted-foreground",
+												"h-4 w-4 rounded border-2 flex items-center justify-center",
+												isOtherActive ? "border-primary bg-primary" : "border-muted-foreground",
 											)}
 										>
-											{#if isSelected}
+											{#if isOtherActive}
 												<Check class="h-3 w-3 text-primary-foreground" />
 											{/if}
 										</div>
 									{:else}
-										<!-- Radio style -->
 										<div
 											class={cn(
-												"mt-0.5 h-4 w-4 rounded-full border-2 flex items-center justify-center",
-												isSelected ? "border-primary" : "border-muted-foreground",
+												"h-4 w-4 rounded-full border-2 flex items-center justify-center",
+												isOtherActive ? "border-primary" : "border-muted-foreground",
 											)}
 										>
-											{#if isSelected}
+											{#if isOtherActive}
 												<div class="h-2 w-2 rounded-full bg-primary"></div>
 											{/if}
 										</div>
 									{/if}
-									<div class="flex-1 min-w-0">
-										<p class="text-sm font-medium text-foreground">{option.label}</p>
-										<p class="text-xs text-muted-foreground">{option.description}</p>
-									</div>
+									<span class="text-sm text-foreground">{m.plan_mode_other_option()}</span>
 								</button>
-							{/each}
 
-							<!-- Other option -->
-							<button
-								type="button"
-								class={cn(
-									"flex items-center gap-3 p-3 rounded-lg border text-left transition-colors",
-									isOtherActive ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
-									isAnswered && "cursor-not-allowed opacity-60",
-								)}
-								onclick={() => handleOtherClick(qIndex, question.multiSelect)}
-								disabled={isAnswered}
-							>
-								{#if question.multiSelect}
-									<div
-										class={cn(
-											"h-4 w-4 rounded border-2 flex items-center justify-center",
-											isOtherActive ? "border-primary bg-primary" : "border-muted-foreground",
-										)}
-									>
-										{#if isOtherActive}
-											<Check class="h-3 w-3 text-primary-foreground" />
-										{/if}
-									</div>
-								{:else}
-									<div
-										class={cn(
-											"h-4 w-4 rounded-full border-2 flex items-center justify-center",
-											isOtherActive ? "border-primary" : "border-muted-foreground",
-										)}
-									>
-										{#if isOtherActive}
-											<div class="h-2 w-2 rounded-full bg-primary"></div>
-										{/if}
-									</div>
+								{#if showCustomInput.get(qIndex)}
+									<Input
+										placeholder={m.plan_mode_enter_custom()}
+										value={customInputs.get(qIndex) || ""}
+										oninput={(e) => {
+											customInputs.set(qIndex, e.currentTarget.value);
+										}}
+										disabled={isAnswered}
+										class="mt-1"
+									/>
 								{/if}
-								<span class="text-sm text-foreground">{m.plan_mode_other_option()}</span>
-							</button>
-
-							{#if showCustomInput.get(qIndex)}
-								<Input
-									placeholder={m.plan_mode_enter_custom()}
-									value={customInputs.get(qIndex) || ""}
-									oninput={(e) => {
-										customInputs.set(qIndex, e.currentTarget.value);
-									}}
-									disabled={isAnswered}
-									class="mt-1"
-								/>
-							{/if}
+							</div>
 						</div>
-					</div>
-				{/if}
-			{/each}
+					</Tabs.Content>
+				{/each}
+			</Tabs.Root>
 		</div>
 
 		<!-- Action buttons -->
