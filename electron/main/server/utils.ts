@@ -364,10 +364,30 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function appendPromptToLastUserMessage(messages: any[], prompt: string): void {
+	const EXCLUDE_PREFIX = ["/commands", "/deploy", "/model", "/max_thinking_token"];
+
 	// Find the last user message and append the prompt
 	for (let i = messages.length - 1; i >= 0; i--) {
 		if (messages[i].role === "user") {
 			const msg = messages[i];
+
+			// Check if the message starts with any of the excluded prefixes
+			let firstText = "";
+			if (typeof msg.content === "string") {
+				firstText = msg.content;
+			} else if (
+				Array.isArray(msg.content) &&
+				msg.content.length > 0 &&
+				msg.content[0].type === "text"
+			) {
+				firstText = msg.content[0].text;
+			} else if (Array.isArray(msg.parts) && msg.parts.length > 0 && msg.parts[0].type === "text") {
+				firstText = msg.parts[0].text;
+			}
+
+			if (EXCLUDE_PREFIX.some((prefix) => firstText.startsWith(prefix))) {
+				break;
+			}
 
 			// Handle 'parts' property (priority, common in newer AI SDK)
 			if (Array.isArray(msg.parts)) {
