@@ -361,7 +361,9 @@
 			return;
 		}
 
-		isRestoringState = true;
+		if (!deployment.url) {
+			isRestoringState = true;
+		}
 
 		try {
 			// Then refresh sessions to get workspace_path for the current session

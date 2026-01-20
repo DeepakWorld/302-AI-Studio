@@ -219,7 +219,7 @@
 	<Popover.Root bind:open={isThinkingBudgetOpen}>
 		<TooltipProvider delayDuration={500}>
 			<Tooltip ignoreNonKeyboardFocus={true}>
-				<TooltipTrigger disabled={codeAgentState.isChecking}>
+				<TooltipTrigger>
 					{#snippet child({ props: tooltipProps })}
 						<Popover.Trigger>
 							{#snippet child({ props: popoverProps })}
@@ -233,7 +233,9 @@
 										codeAgentState.thinkingBudget !== "off" &&
 											"!bg-chat-action-active hover:!bg-chat-action-active",
 									)}
-									disabled={disabled || codeAgentState.isUpdatingThinkingBudget}
+									disabled={disabled ||
+										codeAgentState.isUpdatingThinkingBudget ||
+										codeAgentState.isChecking}
 								>
 									{#if codeAgentState.isUpdatingThinkingBudget}
 										<LdrsLoader type="line-spinner" size={16} />

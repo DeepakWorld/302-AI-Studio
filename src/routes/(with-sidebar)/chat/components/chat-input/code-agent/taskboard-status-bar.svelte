@@ -20,6 +20,7 @@
 			.with("idle", () => m.taskboard_bar_status_idle())
 			.with("running", () => m.taskboard_bar_status_running())
 			.with("waiting_to_stop", () => m.taskboard_bar_status_waiting_to_stop())
+			.with("waiting_for_chat", () => m.taskboard_bar_status_waiting_for_chat())
 			.exhaustive(),
 	);
 
@@ -126,7 +127,9 @@
 			size="icon-sm"
 			class="hover:bg-secondary/80 dark:hover:bg-secondary/80"
 			disabled={codeAgentTaskboardState.taskboardStatus !== "running" &&
-				(chatState.isStreaming || chatState.isSubmitted)}
+				codeAgentTaskboardState.taskboardStatus !== "waiting_to_stop" &&
+				codeAgentTaskboardState.taskboardStatus !== "waiting_for_chat" &&
+				(!codeAgentTaskboardState.canStart || codeAgentState.isChecking)}
 			onclick={handleRun}
 		>
 			{#if codeAgentTaskboardState.taskboardStatus === "running"}

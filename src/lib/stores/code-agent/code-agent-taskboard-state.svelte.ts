@@ -15,7 +15,7 @@ import type { AttachmentFile, Task } from "@shared/types";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
-import { chatState } from "../chat-state.svelte";
+import { chat, chatState } from "../chat-state.svelte";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
@@ -27,7 +27,7 @@ export class CodeAgentTaskboardState {
 
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
-	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop">("idle");
+	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop" | "waiting_for_chat">("idle");
 
 	// Input state
 	inputValue = $state("");
@@ -48,10 +48,12 @@ export class CodeAgentTaskboardState {
 		this.tasklist.find((task) => task.status === "in_progress") ?? null,
 	);
 	canStart = $derived(
-		this.taskboardStatus === "idle" && this.tasklist.some((t) => t.status === "pending"),
+		(this.taskboardStatus === "idle" || this.taskboardStatus === "waiting_for_chat") &&
+			this.tasklist.some((t) => t.status === "pending"),
 	);
 	canPause = $derived(this.taskboardStatus === "running");
 	isWaitingToStop = $derived(this.taskboardStatus === "waiting_to_stop");
+	isWaitingForChat = $derived(this.taskboardStatus === "waiting_for_chat");
 	// Whether taskboard is currently executing (used to prevent premature auto-deployment)
 	isRunning = $derived(this.taskboardStatus === "running");
 	showTaskboardStatusBar = $derived(
@@ -63,6 +65,7 @@ export class CodeAgentTaskboardState {
 		return match(this.taskboardStatus)
 			.with("running", () => m.taskboard_button_pause())
 			.with("waiting_to_stop", () => m.taskboard_button_waiting_to_stop())
+			.with("waiting_for_chat", () => m.taskboard_button_waiting_for_chat())
 			.with("idle", () => {
 				if (this.tasklist.some((t) => t.status === "in_progress")) {
 					return m.taskboard_button_resume();
@@ -78,6 +81,15 @@ export class CodeAgentTaskboardState {
 		this.taskboardStatus = "idle";
 		if (this.currentExecutingTaskId) {
 			this.#updateTaskStatus(this.currentExecutingTaskId, "pending");
+		}
+	}
+
+	/**
+	 * Cancels the waiting for chat state.
+	 */
+	cancelWaitingForChat() {
+		if (this.taskboardStatus === "waiting_for_chat") {
+			this.taskboardStatus = "idle";
 		}
 	}
 
@@ -265,14 +277,35 @@ export class CodeAgentTaskboardState {
 	async startAutoExecution(fn: () => Promise<void>): Promise<void> {
 		match(this.taskboardStatus)
 			.with("running", () => {
+				// 正在运行时点击 -> 暂停
 				this.taskboardStatus = "waiting_to_stop";
 			})
 			.with("waiting_to_stop", () => {
+				// 暂停中点击 -> 恢复运行
 				this.taskboardStatus = "running";
 			})
-			.with("idle", () => {
-				this.taskboardStatus = "running";
-				this.#executeLoop(fn);
+			.with("waiting_for_chat", () => {
+				// 等待聊天中点击 -> 取消等待
+				this.taskboardStatus = "idle";
+			})
+			.with("idle", async () => {
+				// 空闲时点击 -> 检查是否需要等待聊天
+				if (chatState.isStreaming || chatState.isSubmitted) {
+					// 聊天正在进行，进入等待状态
+					this.taskboardStatus = "waiting_for_chat";
+					await this.#waitForChatCompletion();
+
+					// 聊天完成后，检查状态是否仍然是 waiting_for_chat
+					// （用户可能在等待期间取消了）
+					if (this.taskboardStatus === "waiting_for_chat") {
+						this.taskboardStatus = "running";
+						this.#executeLoop(fn);
+					}
+				} else {
+					// 聊天未进行，直接开始执行
+					this.taskboardStatus = "running";
+					this.#executeLoop(fn);
+				}
 			});
 	}
 
@@ -358,6 +391,32 @@ export class CodeAgentTaskboardState {
 	#waitForChatFinished(): Promise<boolean> {
 		return new Promise<boolean>((resolve) => {
 			this.#taskResolve = resolve;
+		});
+	}
+
+	/**
+	 * Waits for the current chat to complete.
+	 * Resolves when chat status becomes "ready" or when user cancels the chat.
+	 */
+	async #waitForChatCompletion(): Promise<void> {
+		return new Promise<void>((resolve) => {
+			// 如果聊天已经完成，立��返回
+			if (!chatState.isStreaming && !chatState.isSubmitted) {
+				resolve();
+				return;
+			}
+
+			// 使用 $effect 监听状态变化
+			const cleanup = $effect.root(() => {
+				$effect(() => {
+					// 监听 chat.status 变化
+					const status = chat.status;
+					if (status === "ready" || status === "error") {
+						cleanup();
+						resolve();
+					}
+				});
+			});
 		});
 	}
 

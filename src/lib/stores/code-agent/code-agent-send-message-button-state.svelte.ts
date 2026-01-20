@@ -40,9 +40,7 @@ class CodeAgentSendMessageButtonState {
 						sandboxId: sandboxInfo.sandboxId,
 						sessionId,
 					});
-					if (isSessionIdEmpty) {
-						codeAgentState.updateCurrentSessionId(sessionId);
-					}
+
 					workspacePath = workspace_path;
 
 					// Refresh sessions to sync the new workspace_path to local storage
@@ -69,6 +67,10 @@ class CodeAgentSendMessageButtonState {
 						sandboxInfo.sandboxId,
 						workspacePath,
 					);
+
+					if (isSessionIdEmpty) {
+						codeAgentState.updateCurrentSessionId(sessionId);
+					}
 				}
 
 				if (chatState.selectedModel && chatState.selectedModel.id !== sandboxInfo.llmModel) {
