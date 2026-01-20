@@ -400,7 +400,9 @@ $effect.root(() => {
 	$effect(() => {
 		// Track enabled state
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		codeAgentState.sessionId; // eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		codeAgentState.enabled;
+
 		codeAgentTaskboardState.tasklist = [];
 	});
 });

@@ -24,6 +24,7 @@
 	import { match } from "ts-pattern";
 	import { AttachmentThumbnailBar } from "../attachment";
 	import ChatActions from "./chat-actions.svelte";
+	import ChatInputBoxHeader from "./chat-input-box-header.svelte";
 	import SendMessageButton from "./code-agent/send-message-button.svelte";
 	import StreamingIndicator from "./streaming-indicator.svelte";
 
@@ -299,116 +300,119 @@
 	<div
 		class={cn(
 			"transition-[color,box-shadow]",
-			"flex max-h-chat-max-h min-h-chat-min-h w-full flex-col justify-between rounded-chat border p-chat-pad pb-1.5",
+			"flex max-h-chat-max-h min-h-chat-min-h w-full flex-col justify-between rounded-chat border",
 			"focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:outline-hidden",
 			"bg-input overflow-hidden",
 		)}
 		data-layoutid="chat-input-box"
 	>
-		<div class="min-h-0 flex-1 overflow-auto">
-			<Textarea
-				id="chat-input-textarea"
-				bind:ref={textareaRef}
-				class={cn(
-					"w-full resize-none p-0",
-					"border-none shadow-none focus-within:ring-0 focus-within:outline-hidden focus-visible:ring-0",
-				)}
-				bind:value={chatState.inputValue}
-				placeholder={placeholderText}
-				onkeydown={handleKeydown}
-				oncompositionend={() => (compositionEndTime = Date.now())}
-				onpaste={handlePaste}
-				disabled={codeAgentState.isDeleted}
-			/>
-		</div>
+		<ChatInputBoxHeader />
+		<div class="flex flex-col flex-1 min-h-0 p-chat-pad pb-1.5">
+			<div class="min-h-0 flex-1 overflow-auto">
+				<Textarea
+					id="chat-input-textarea"
+					bind:ref={textareaRef}
+					class={cn(
+						"w-full resize-none p-0",
+						"border-none shadow-none focus-within:ring-0 focus-within:outline-hidden focus-visible:ring-0",
+					)}
+					bind:value={chatState.inputValue}
+					placeholder={placeholderText}
+					onkeydown={handleKeydown}
+					oncompositionend={() => (compositionEndTime = Date.now())}
+					onpaste={handlePaste}
+					disabled={codeAgentState.isDeleted}
+				/>
+			</div>
 
-		<!-- Forced Skills Display -->
-		{#if forcedSkills.length > 0}
-			<div class="flex flex-wrap items-center gap-1.5 py-1.5 border-t border-border/50">
-				<span class="text-xs text-muted-foreground shrink-0">{m.skills_active_label()}:</span>
-				{#each forcedSkills as skill (skill.name)}
-					<span
-						class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
-					>
-						{skill.name}
-						<button
-							type="button"
-							class="ml-0.5 rounded hover:bg-primary/20 p-0.5"
-							onclick={() => codeAgentState.handleSkillForceUseToggle(skill.name, false)}
+			<!-- Forced Skills Display -->
+			{#if forcedSkills.length > 0}
+				<div class="flex flex-wrap items-center gap-1.5 py-1.5 border-t border-border/50">
+					<span class="text-xs text-muted-foreground shrink-0">{m.skills_active_label()}:</span>
+					{#each forcedSkills as skill (skill.name)}
+						<span
+							class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
 						>
-							<X class="h-3 w-3" />
-						</button>
-					</span>
-				{/each}
-			</div>
-		{/if}
+							{skill.name}
+							<button
+								type="button"
+								class="ml-0.5 rounded hover:bg-primary/20 p-0.5"
+								onclick={() => codeAgentState.handleSkillForceUseToggle(skill.name, false)}
+							>
+								<X class="h-3 w-3" />
+							</button>
+						</span>
+					{/each}
+				</div>
+			{/if}
 
-		<div class="mt-1.5 flex flex-row justify-between gap-2 min-w-0 overflow-hidden shrink-0">
-			<div class="flex items-center gap-2 shrink-0">
-				<ChatActions disabled={codeAgentState.isDeleted} />
-			</div>
+			<div class="mt-1.5 flex flex-row justify-between gap-2 min-w-0 overflow-hidden shrink-0">
+				<div class="flex items-center gap-2 shrink-0">
+					<ChatActions disabled={codeAgentState.isDeleted} />
+				</div>
 
-			<div class="flex items-center gap-2 min-w-0">
-				<ModelSelect
-					selectedModel={chatState.selectedModel}
-					onModelSelect={(model) => handleModelSelect(model)}
-				>
-					{#snippet trigger({ onclick })}
-						{((openModelSelect = () => {
-							if (!hasConfiguredProviders()) {
-								handleGoToModelSettings();
-								return;
-							}
-							onclick();
-						}),
-						"")}
-						<Button
-							variant="ghost"
-							class="relative text-sm text-foreground/50 hover:!bg-chat-action-hover min-w-0 max-w-[300px] !shrink overflow-visible"
-							onclick={() => {
+				<div class="flex items-center gap-2 min-w-0">
+					<ModelSelect
+						selectedModel={chatState.selectedModel}
+						onModelSelect={(model) => handleModelSelect(model)}
+					>
+						{#snippet trigger({ onclick })}
+							{((openModelSelect = () => {
 								if (!hasConfiguredProviders()) {
 									handleGoToModelSettings();
 									return;
 								}
-								openModelSelect?.();
-							}}
-							disabled={isCodeAgentModelChanging || codeAgentState.isDeleted}
+								onclick();
+							}),
+							"")}
+							<Button
+								variant="ghost"
+								class="relative text-sm text-foreground/50 hover:!bg-chat-action-hover min-w-0 max-w-[300px] !shrink overflow-visible"
+								onclick={() => {
+									if (!hasConfiguredProviders()) {
+										handleGoToModelSettings();
+										return;
+									}
+									openModelSelect?.();
+								}}
+								disabled={isCodeAgentModelChanging || codeAgentState.isDeleted}
+							>
+								{#if !hasConfiguredProviders()}
+									<span
+										class="absolute top-0 right-0 size-2 rounded-full bg-red-500 pointer-events-none"
+									></span>
+								{/if}
+								{#if isCodeAgentModelChanging}
+									<LdrsLoader type="line-spinner" size={16} />
+								{:else}
+									<p class="truncate">
+										{chatState.selectedModel?.name ?? m.text_button_select_model()}
+									</p>
+								{/if}
+							</Button>
+						{/snippet}
+					</ModelSelect>
+
+					<Separator
+						orientation="vertical"
+						class="shrink-0 rounded-2xl data-[orientation=vertical]:h-1/2 data-[orientation=vertical]:w-0.5"
+					/>
+
+					{#if codeAgentState.enabled && codeAgentState.isFreshTab}
+						<SendMessageButton onClick={handleSendMessage} />
+					{:else}
+						<button
+							disabled={!chatState.sendMessageEnabled}
+							class={cn(
+								"shrink-0 flex size-9 items-center cursor-pointer justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
+								"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",
+							)}
+							onclick={handleSendMessage}
 						>
-							{#if !hasConfiguredProviders()}
-								<span
-									class="absolute top-0 right-0 size-2 rounded-full bg-red-500 pointer-events-none"
-								></span>
-							{/if}
-							{#if isCodeAgentModelChanging}
-								<LdrsLoader type="line-spinner" size={16} />
-							{:else}
-								<p class="truncate">
-									{chatState.selectedModel?.name ?? m.text_button_select_model()}
-								</p>
-							{/if}
-						</Button>
-					{/snippet}
-				</ModelSelect>
-
-				<Separator
-					orientation="vertical"
-					class="shrink-0 rounded-2xl data-[orientation=vertical]:h-1/2 data-[orientation=vertical]:w-0.5"
-				/>
-
-				{#if codeAgentState.enabled && codeAgentState.isFreshTab}
-					<SendMessageButton onClick={handleSendMessage} />
-				{:else}
-					<button
-						disabled={!chatState.sendMessageEnabled}
-						class={cn(
-							"shrink-0 flex size-9 items-center cursor-pointer justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
-							"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",
-						)}
-						onclick={handleSendMessage}
-					>
-						<img src={sendMessageIcon} alt="plane" class="size-5" />
-					</button>
-				{/if}
+							<img src={sendMessageIcon} alt="plane" class="size-5" />
+						</button>
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>

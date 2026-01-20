@@ -1192,5 +1192,9 @@
 	"changelog_loading": "加载中...",
 	"changelog_load_failed": "加载更新日志失败",
 	"changelog_empty": "暂无更新日志",
-	"changelog_date": "发布日期"
+	"changelog_date": "发布日期",
+	"title_chat_mode": "聊天模式",
+	"title_code_agent_settings": " Vibe模式设置",
+	"title_chat_mode_description": "快问快答，适合日常使用",
+	"title_code_agent_description": "面向复杂任务，使用云端Cluade Code"
 }

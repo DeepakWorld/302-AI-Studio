@@ -22,10 +22,9 @@
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { Bot, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
+	import { Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
 	import { AttachmentUploader } from "../attachment";
-	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
 
 	const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
@@ -74,24 +73,6 @@
 		}
 
 		chatState.handleMCPServerChange(selectedIds);
-	}
-
-	function handleCodeAgentClick() {
-		// Prevent toggling when checking is in progress
-		if (codeAgentState.isChecking) {
-			return;
-		}
-
-		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-			codeAgentState.updateEnabled(false);
-			return;
-		}
-
-		codeAgentState.isCodeAgentPanelOpen = true;
-	}
-
-	function handleCodeAgentPanelClose() {
-		codeAgentState.isCodeAgentPanelOpen = false;
 	}
 
 	function handleSkillsPanelToggle() {
@@ -193,49 +174,6 @@
 	<AttachmentUploader {disabled} />
 {/snippet}
 
-{#snippet actionCodeAgent()}
-	<ButtonWithTooltip
-		class={cn(
-			"h-9 px-2.5",
-			"hover:!bg-chat-action-hover group/code-agent",
-			codeAgentState.enabled &&
-				"!bg-chat-action-active hover:!bg-chat-action-active border border-[color:var(--code-agent-primary)] rounded-[10px]",
-		)}
-		tooltip={m.title_code_agent()}
-		onclick={() => handleCodeAgentClick()}
-		size="sm"
-		disabled={disabled ||
-			codeAgentState.isChecking ||
-			(codeAgentState.isFreshTab ? false : !codeAgentState.inCodeAgentMode)}
-	>
-		<div class="flex items-center">
-			<Bot class={cn("size-4", codeAgentState.enabled && "!text-chat-action-active-fg")} />
-			<div
-				class={cn(
-					"h-3.5 border-l mx-1.5",
-					codeAgentState.enabled ? "code-agent-divider-active" : "code-agent-divider",
-				)}
-			></div>
-			<span
-				class={cn(
-					"transition-all duration-300 ease-in-out opacity-100 max-w-[200px]",
-					codeAgentState.enabled && "!text-chat-action-active-fg",
-				)}
-			>
-				{m.title_code_agent()}
-			</span>
-		</div>
-	</ButtonWithTooltip>
-
-	<Overlay
-		title={m.title_code_agent()}
-		open={codeAgentState.isCodeAgentPanelOpen}
-		onClose={handleCodeAgentPanelClose}
-	>
-		<CodeAgentPanel onClose={handleCodeAgentPanelClose} />
-	</Overlay>
-{/snippet}
-
 {#snippet actionEnableSkills()}
 	{@const hasForceUseSkills = codeAgentState.skills.some((s) => s.forceUse)}
 	<ButtonWithTooltip
@@ -247,7 +185,7 @@
 		)}
 		tooltip={m.title_skills()}
 		onclick={handleSkillsPanelToggle}
-		disabled={codeAgentState.isLoadingSkills}
+		disabled={codeAgentState.isLoadingSkills || codeAgentState.isChecking}
 	>
 		{#if codeAgentState.isLoadingSkills}
 			<LdrsLoader type="line-spinner" size={16} />
@@ -281,7 +219,7 @@
 	<Popover.Root bind:open={isThinkingBudgetOpen}>
 		<TooltipProvider delayDuration={500}>
 			<Tooltip ignoreNonKeyboardFocus={true}>
-				<TooltipTrigger>
+				<TooltipTrigger disabled={codeAgentState.isChecking}>
 					{#snippet child({ props: tooltipProps })}
 						<Popover.Trigger>
 							{#snippet child({ props: popoverProps })}
@@ -344,7 +282,7 @@
 		class="hover:!bg-chat-action-hover"
 		tooltip={m.label_tab_taskboard()}
 		onclick={handleTaskboardPanelToggle}
-		{disabled}
+		disabled={disabled || codeAgentState.isChecking}
 	>
 		<ListTodo />
 	</ButtonWithTooltip>
@@ -367,6 +305,4 @@
 	{:else}
 		{@render actionSetParameters()}
 	{/if}
-
-	{@render actionCodeAgent()}
 </div>
