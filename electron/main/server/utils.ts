@@ -350,6 +350,92 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
 }
 
 /**
+ * Prepends a prompt string to the first user message in a list of messages.
+ * Handles both string content and array content (multi-modal/parts).
+ * Immutably updates the message object in the array.
+ *
+ * Supported message structures:
+ * 1. { role: 'user', parts: [{ type: 'text', text: '...' }] }
+ * 2. { role: 'user', content: [{ type: 'text', text: '...' }] }
+ * 3. { role: 'user', content: '...' }
+ *
+ * @param messages The list of messages (mutable array)
+ * @param prompt The prompt string to prepend
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function prependPromptToFirstUserMessage(messages: any[], prompt: string): void {
+	// Find the first user message and prepend the prompt
+	for (let i = 0; i < messages.length; i++) {
+		if (messages[i].role === "user") {
+			const msg = messages[i];
+
+			// Handle 'parts' property (priority, common in newer AI SDK)
+			if (Array.isArray(msg.parts)) {
+				const newParts = [...msg.parts];
+				let firstTextPartIndex = -1;
+
+				// Find the first text part
+				for (let j = 0; j < newParts.length; j++) {
+					if (newParts[j].type === "text") {
+						firstTextPartIndex = j;
+						break;
+					}
+				}
+
+				if (firstTextPartIndex !== -1) {
+					// Create a new text part with prepended prompt
+					newParts[firstTextPartIndex] = {
+						...newParts[firstTextPartIndex],
+						text: prompt + newParts[firstTextPartIndex].text,
+					};
+				} else {
+					newParts.unshift({ type: "text", text: prompt });
+				}
+
+				messages[i] = {
+					...msg,
+					parts: newParts,
+				};
+			}
+			// Handle 'content' property (fallback)
+			else {
+				const content = msg.content;
+				let newContent = content;
+
+				if (Array.isArray(content)) {
+					newContent = [...content];
+					let firstTextPartIndex = -1;
+
+					for (let j = 0; j < newContent.length; j++) {
+						if (newContent[j].type === "text") {
+							firstTextPartIndex = j;
+							break;
+						}
+					}
+
+					if (firstTextPartIndex !== -1) {
+						newContent[firstTextPartIndex] = {
+							...newContent[firstTextPartIndex],
+							text: prompt + newContent[firstTextPartIndex].text,
+						};
+					} else {
+						newContent.unshift({ type: "text", text: prompt });
+					}
+				} else if (typeof content === "string") {
+					newContent = prompt + content;
+				}
+
+				messages[i] = {
+					...msg,
+					content: newContent,
+				};
+			}
+			break;
+		}
+	}
+}
+
+/**
  * Appends a prompt string to the last user message in a list of messages.
  * Handles both string content and array content (multi-modal/parts).
  * Immutably updates the message object in the array.
@@ -364,10 +450,30 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function appendPromptToLastUserMessage(messages: any[], prompt: string): void {
+	const EXCLUDE_PREFIX = ["/commands", "/deploy", "/model", "/max_thinking_token"];
+
 	// Find the last user message and append the prompt
 	for (let i = messages.length - 1; i >= 0; i--) {
 		if (messages[i].role === "user") {
 			const msg = messages[i];
+
+			// Check if the message starts with any of the excluded prefixes
+			let firstText = "";
+			if (typeof msg.content === "string") {
+				firstText = msg.content;
+			} else if (
+				Array.isArray(msg.content) &&
+				msg.content.length > 0 &&
+				msg.content[0].type === "text"
+			) {
+				firstText = msg.content[0].text;
+			} else if (Array.isArray(msg.parts) && msg.parts.length > 0 && msg.parts[0].type === "text") {
+				firstText = msg.parts[0].text;
+			}
+
+			if (EXCLUDE_PREFIX.some((prefix) => firstText.startsWith(prefix))) {
+				break;
+			}
 
 			// Handle 'parts' property (priority, common in newer AI SDK)
 			if (Array.isArray(msg.parts)) {

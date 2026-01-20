@@ -1197,5 +1197,9 @@
 	"changelog_loading": "Loading...",
 	"changelog_load_failed": "Failed to load changelog",
 	"changelog_empty": "No changelog available",
-	"changelog_date": "Release Date"
+	"changelog_date": "Release Date",
+	"title_chat_mode": "Chat Model",
+	"title_code_agent_settings": "Vibe Mode Settings",
+	"title_chat_mode_description": "Quick questions and answers, suitable for daily use",
+	"title_code_agent_description": "For complex tasks, use cloud Cluade Code"
 }

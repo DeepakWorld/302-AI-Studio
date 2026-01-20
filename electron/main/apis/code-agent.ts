@@ -77,7 +77,7 @@ export async function updateClaudeCodeSandbox(
 			})
 			.json();
 
-		console.debug(response);
+		console.debug("[updateClaudeCodeSandbox] response:", response);
 
 		const validated = updateClaudeCodeSandboxResponse(response);
 		if (validated instanceof type.errors) {

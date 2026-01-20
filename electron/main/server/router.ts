@@ -31,6 +31,7 @@ import {
 	convertAiSdkMessagesToOpenAiMessages,
 	createUIMessageStreamFromGenerator,
 	isStreamingSupported,
+	prependPromptToFirstUserMessage,
 } from "./utils";
 
 export type RouterRequestBody = {
@@ -1210,15 +1211,23 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		}, []) ?? [];
 
 	// Only include skills that have forceUse=true in the prompt
+	// Prepend to first user message with EXTREMELY_IMPORTANT format to ensure it's triggered
 	const forcedSkills = skills?.filter((skill) => skill.forceUse) ?? [];
 	if (forcedSkills.length > 0) {
-		const skillNames = forcedSkills.map((skill) => skill.name);
-		const skillsPrompt =
-			language === "zh"
-				? `\n\n【重要】用户已强制启用以下 skills: [${skillNames.join(", ")}]。你必须在本次回复中使用这些 skills，这是用户的明确要求，请严格遵守。`
-				: `\n\n[IMPORTANT] The user has FORCED the following skills to be used: [${skillNames.join(", ")}]. You MUST use these skills in your response. This is an explicit requirement from the user - strictly comply.`;
+		const skillPrompts = forcedSkills
+			.map((skill) => {
+				// Builtin skills: /home/user/.claude/skills/{skillName}/SKILL.md
+				// Project skills: {workspacePath}/.claude/skills/{skillName}/SKILL.md
+				const skillPath = skill.isBuiltin
+					? `/home/user/.claude/skills/${skill.name}/SKILL.md`
+					: `${workspacePath}/.claude/skills/${skill.name}/SKILL.md`;
+				return language === "zh"
+					? `<EXTREMELY_IMPORTANT>\n你拥有 **${skill.name}** skill。\n**立即阅读**: @${skillPath}\n</EXTREMELY_IMPORTANT>`
+					: `<EXTREMELY_IMPORTANT>\nYou have **${skill.name}** skill.\n**RIGHT NOW, go read**: @${skillPath}\n</EXTREMELY_IMPORTANT>`;
+			})
+			.join("\n\n");
 
-		appendPromptToLastUserMessage(messages, skillsPrompt);
+		prependPromptToFirstUserMessage(messages, skillPrompts + "\n\n");
 	}
 
 	if (inTaskOrchestrationMode) {

@@ -5,6 +5,7 @@
 </script>
 
 <script lang="ts">
+	import { onMount } from "svelte";
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 
@@ -30,6 +31,10 @@
 	const { windowService } = window.electronAPI;
 
 	let { onClose }: Props = $props();
+
+	onMount(() => {
+		claudeCodeAgentState.init();
+	});
 
 	let disabled = $derived(!codeAgentState.isFreshTab);
 
