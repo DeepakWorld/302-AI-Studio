@@ -166,22 +166,27 @@
 			}
 		}
 
-		// Hide custom input if a predefined option is selected
-		showCustomInput.set(questionIndex, false);
+		// Hide custom input if a predefined option is selected (only for single select)
+		if (!multiSelect) {
+			showCustomInput.set(questionIndex, false);
+		}
 	}
 
 	function handleOtherClick(questionIndex: number, multiSelect: boolean) {
-		if (!multiSelect) {
-			// For single-select, clear previous selection
+		if (multiSelect) {
+			// Toggle custom input for multi-select
+			const current = showCustomInput.get(questionIndex);
+			showCustomInput.set(questionIndex, !current);
+		} else {
+			// For single-select, clear previous selection and enable custom input
 			let current = answers.get(questionIndex);
 			if (!current) {
 				current = new SvelteSet<string>();
 				answers.set(questionIndex, current);
 			}
 			current.clear();
+			showCustomInput.set(questionIndex, true);
 		}
-
-		showCustomInput.set(questionIndex, true);
 	}
 
 	function handleSubmit() {
