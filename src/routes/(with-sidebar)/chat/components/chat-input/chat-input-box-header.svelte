@@ -1,0 +1,79 @@
+<script lang="ts">
+	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
+	import { Overlay } from "$lib/components/buss/overlay";
+	import { SegButton } from "$lib/components/buss/settings";
+	import { Badge } from "$lib/components/ui/badge";
+	import { m } from "$lib/paraglide/messages.js";
+	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
+	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { Settings } from "@lucide/svelte";
+	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
+
+	let selectedMode = $derived(codeAgentState.enabled ? "vibe" : "chat");
+
+	const modeOptions = $derived([
+		{ key: "chat", label: m.title_chat_mode() },
+		{ key: "vibe", label: m.title_code_agent() },
+	]);
+	const description = $derived(
+		selectedMode === "chat" ? m.title_chat_mode_description() : m.title_code_agent_description(),
+	);
+
+	function handleModeSelect(key: string) {
+		codeAgentState.updateEnabled(key === "vibe");
+	}
+
+	function handleSettingsClick() {
+		if (codeAgentState.isChecking) return;
+		codeAgentState.isCodeAgentPanelOpen = true;
+	}
+
+	function handleCodeAgentPanelClose() {
+		codeAgentState.isCodeAgentPanelOpen = false;
+
+		if (agentPreviewState.isVisible) {
+			agentPreviewState.closePreview();
+		}
+	}
+</script>
+
+<div class="flex items-center justify-between px-3 pt-2">
+	<div class="flex items-center gap-2">
+		{#if !chatState.hasMessages}
+			<SegButton
+				options={modeOptions}
+				selectedKey={selectedMode}
+				onSelect={handleModeSelect}
+				class="!h-8 w-[200px] bg-muted"
+				thumbClass="!h-6 text-xs"
+				disabled={codeAgentState.isChecking}
+			/>
+		{:else}
+			<Badge variant="secondary" class="bg-primary/20 text-primary font-light">
+				{selectedMode === "vibe" ? m.title_code_agent() : m.title_chat_mode()}
+			</Badge>
+		{/if}
+
+		{#if codeAgentState.enabled}
+			<ButtonWithTooltip
+				class="h-8 w-8 hover:!bg-chat-action-hover"
+				tooltip={m.title_code_agent_settings()}
+				onclick={handleSettingsClick}
+				disabled={codeAgentState.isChecking}
+			>
+				<Settings class="size-4" />
+			</ButtonWithTooltip>
+
+			<Overlay
+				title={m.title_code_agent_settings()}
+				open={codeAgentState.isCodeAgentPanelOpen}
+				onClose={handleCodeAgentPanelClose}
+			>
+				<CodeAgentPanel onClose={handleCodeAgentPanelClose} />
+			</Overlay>
+		{/if}
+	</div>
+
+	<p class="text-xs text-muted-foreground">{description}</p>
+</div>

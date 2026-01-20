@@ -106,8 +106,8 @@
 	/* Chat — exposed minimal knobs (preserve existing look) */
 	--ui-chat-slogan-text: 2.125rem; /* text-[34px] */
 	--ui-chat-container-max-w: 45rem; /* max-w-[720px] */
-	--ui-chat-container-max-h: 13rem; /* max-h-52 */
-	--ui-chat-container-min-h: 7.875rem; /* min-h-[126px] */
+	--ui-chat-container-max-h: 15rem; /* max-h-60 */
+	--ui-chat-container-min-h: 10.875rem; /* min-h-[174px] */
 	--ui-chat-container-gap-y: 2.25rem; /* gap-y-9 */
 	--ui-chat-container-padding: 0.75rem; /* p-3 */
 	--ui-chat-button-bar-h: 2.25rem; /* h-9 */

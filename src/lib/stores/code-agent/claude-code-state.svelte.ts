@@ -415,6 +415,12 @@ class ClaudeCodeAgentState {
 
 		this.updateState(updateData);
 	}
+
+	init() {
+		const [currentSessionId, sandboxId] = [this.currentSessionId, this.sandboxId];
+		this.selectedSessionId = currentSessionId === "" ? "new" : currentSessionId;
+		this.selectedSandboxId = sandboxId === "" ? "auto" : sandboxId;
+	}
 }
 
 export const claudeCodeAgentState = new ClaudeCodeAgentState();
