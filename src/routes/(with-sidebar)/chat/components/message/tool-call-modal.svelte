@@ -27,9 +27,9 @@
 	let isRerunning = $state(false);
 
 	function getDisplayToolName(toolName: string): string {
-		// Remove server ID prefix from display name
+		// Remove server ID suffix from display name
 		const parts = toolName.split("__");
-		return parts.length >= 2 ? parts.slice(1).join("__") : toolName;
+		return parts.length >= 2 ? parts.slice(0, -1).join("__") : toolName;
 	}
 
 	function getStatusIcon() {

@@ -234,7 +234,7 @@ export class McpService {
 				const tools = await mcpClient.tools();
 				// Add server ID prefix to each tool name to track which server it belongs to
 				for (const [toolName, toolDef] of Object.entries(tools)) {
-					const prefixedName = `${serverId}__${toolName}`;
+					const prefixedName = `${toolName}__${serverId}`;
 					allTools[prefixedName] = toolDef;
 				}
 			} catch (error) {
