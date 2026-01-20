@@ -22,7 +22,7 @@
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
+	import { ClipboardList, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
 	import { AttachmentUploader } from "../attachment";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
@@ -288,6 +288,20 @@
 	</ButtonWithTooltip>
 {/snippet}
 
+{#snippet actionEnablePlanMode()}
+	<ButtonWithTooltip
+		class={cn(
+			"hover:!bg-chat-action-hover",
+			codeAgentState.inPlanMode && "!bg-chat-action-active hover:!bg-chat-action-active",
+		)}
+		tooltip={m.title_plan_mode()}
+		onclick={() => codeAgentState.updatePlanMode(!codeAgentState.inPlanMode)}
+		{disabled}
+	>
+		<ClipboardList class={cn(codeAgentState.inPlanMode && "!text-chat-action-active-fg")} />
+	</ButtonWithTooltip>
+{/snippet}
+
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
 	{@render actionUploadAttachment()}
 
@@ -299,6 +313,7 @@
 	{@render actionEnableMCP()}
 
 	{#if codeAgentState.enabled}
+		{@render actionEnablePlanMode()}
 		{@render actionEnableSkills()}
 		{@render actionEnabledAgentThinking()}
 		{@render actionTaskOrchestration()}

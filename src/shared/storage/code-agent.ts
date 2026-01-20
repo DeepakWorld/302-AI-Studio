@@ -8,6 +8,7 @@ export const CodeAgentConfigMetadata = type({
 	type: codeAgentType,
 	currentAgentId: "string",
 	isDeleted: "boolean",
+	inPlanMode: "boolean?",
 });
 export type CodeAgentConfigMetadata = typeof CodeAgentConfigMetadata.infer;
 export const skill = type({

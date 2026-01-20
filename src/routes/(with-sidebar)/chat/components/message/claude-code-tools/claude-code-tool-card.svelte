@@ -21,6 +21,18 @@
 
 	let { part, messageId: _messageId }: ClaudeCodeToolCardProps = $props();
 
+	// Auto-disable plan mode when ExitPlanMode succeeds
+	// Disabled: Plan mode is now disabled when user submits answers in ask-user-question-card
+	// $effect(() => {
+	// 	if (
+	// 		part.toolName === "ExitPlanMode" &&
+	// 		part.state === "output-available" &&
+	// 		codeAgentState.inPlanMode
+	// 	) {
+	// 		codeAgentState.updatePlanMode(false);
+	// 	}
+	// });
+
 	let isModalOpen = $state(false);
 
 	function formatJson(obj: unknown): string {

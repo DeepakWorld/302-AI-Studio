@@ -1420,6 +1420,7 @@ export const chat = new Chat({
 				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 				skills: codeAgentState.skills,
 				isCreateSkillMode: chatState.isCreateSkillMode,
+				inPlanMode: codeAgentEnabled && codeAgentState.inPlanMode,
 
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",

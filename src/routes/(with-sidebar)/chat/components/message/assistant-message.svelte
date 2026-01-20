@@ -45,6 +45,7 @@
 	import { onDestroy } from "svelte";
 	import { toast } from "svelte-sonner";
 	import {
+		AskUserQuestionCard,
 		ClaudeCodeToolCard,
 		McpToolCard,
 		SkillCard,
@@ -574,6 +575,8 @@
 						<WriteCard {part} messageId={message.id} messagePartIndex={partIndex} />
 					{:else if part.toolName === "Skill"}
 						<SkillCard {part} messageId={message.id} />
+					{:else if part.toolName === "AskUserQuestion"}
+						<AskUserQuestionCard {part} messageId={message.id} />
 					{:else}
 						<ClaudeCodeToolCard {part} messageId={message.id} />
 					{/if}
@@ -640,6 +643,8 @@
 					<WriteCard part={toolPart} messageId={message.id} messagePartIndex={partIndex} />
 				{:else if toolName === "Skill"}
 					<SkillCard part={toolPart} messageId={message.id} />
+				{:else if toolName === "AskUserQuestion"}
+					<AskUserQuestionCard part={toolPart} messageId={message.id} />
 				{:else}
 					<ClaudeCodeToolCard part={toolPart} messageId={message.id} />
 				{/if}

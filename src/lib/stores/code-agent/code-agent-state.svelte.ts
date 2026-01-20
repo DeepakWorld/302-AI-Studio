@@ -59,6 +59,7 @@ class CodeAgentState {
 		() => persistedCodeAgentConfigState.current?.currentAgentId ?? "claude-code",
 	);
 	isDeleted = $derived.by(() => persistedCodeAgentConfigState.current?.isDeleted ?? false);
+	inPlanMode = $derived.by(() => persistedCodeAgentConfigState.current?.inPlanMode ?? false);
 
 	isFreshTab = $derived(!chatState.hasMessages);
 	inCodeAgentMode = $derived(!this.isFreshTab && this.enabled);
@@ -124,6 +125,10 @@ class CodeAgentState {
 
 	updateEnabled(enabled: boolean): void {
 		this.updateState({ enabled });
+	}
+
+	updatePlanMode(inPlanMode: boolean): void {
+		this.updateState({ inPlanMode });
 	}
 
 	getCodeAgentCfgs(): CodeAgentCfgs {
