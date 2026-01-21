@@ -1,3 +1,36 @@
+import { batchUploadFile } from "../apis/code-agent";
+
+/**
+ * Send an error message through SSE stream and close the controller.
+ * This is a helper to avoid repeating error handling code.
+ *
+ * @param controller - The ReadableStreamDefaultController to send events through
+ * @param errorMessage - The error message to display to the user
+ */
+export function sendStreamError(
+	controller: ReadableStreamDefaultController<Uint8Array>,
+	errorMessage: string,
+): void {
+	const encoder = new TextEncoder();
+	const errorId = `error-${Date.now()}`;
+
+	controller.enqueue(
+		encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: errorId })}\n\n`),
+	);
+	controller.enqueue(
+		encoder.encode(
+			`data: ${JSON.stringify({ type: "text-delta", id: errorId, delta: `**Error**: ${errorMessage}` })}\n\n`,
+		),
+	);
+	controller.enqueue(
+		encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: errorId })}\n\n`),
+	);
+	controller.enqueue(
+		encoder.encode(`data: ${JSON.stringify({ type: "finish", finishReason: "error" })}\n\n`),
+	);
+	controller.close();
+}
+
 export type OpenAIChatContentPartText = {
 	type: "text";
 	text: string;
@@ -538,5 +571,101 @@ export function appendPromptToLastUserMessage(messages: any[], prompt: string): 
 			}
 			break;
 		}
+	}
+}
+
+/**
+ * Upload attachments from message metadata to sandbox before sending to AI provider.
+ * This enables non-blocking UX where users see immediate stream response.
+ *
+ * @param sandboxId - The sandbox ID to upload to
+ * @param workspacePath - The workspace path in the sandbox
+ * @param messages - The messages array containing attachment metadata
+ * @returns Promise that resolves when upload completes (or fails gracefully)
+ */
+export async function uploadAttachmentsFromMessages(
+	sandboxId: string,
+	workspacePath: string,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	messages: any[],
+): Promise<void> {
+	if (!sandboxId || !workspacePath || messages.length === 0) {
+		return;
+	}
+
+	const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const metadata = lastUserMessage?.metadata as any;
+	if (!metadata?.attachments) {
+		return;
+	}
+
+	const attachments = metadata.attachments as Array<{
+		id: string;
+		name: string;
+		type: string;
+		size: number;
+		preview?: string;
+		filePath?: string;
+	}>;
+
+	if (attachments.length === 0) {
+		return;
+	}
+
+	console.log(`[uploadAttachmentsFromMessages] Uploading ${attachments.length} attachments`);
+
+	try {
+		const fileList = await Promise.all(
+			attachments.map(async (att) => {
+				let base64Content: string | null = null;
+
+				// Priority 1: Use preview if it's already base64
+				if (att.preview && att.preview.startsWith("data:")) {
+					base64Content = att.preview;
+				}
+
+				if (!base64Content) {
+					console.warn(
+						`[uploadAttachmentsFromMessages] Attachment ${att.name} has no preview or filePath`,
+					);
+					return null;
+				}
+
+				return {
+					content: base64Content,
+					save_path: `${workspacePath}/${att.name}`,
+				};
+			}),
+		);
+
+		// Filter out null entries (failed reads)
+		const validFiles = fileList.filter((f) => f !== null) as Array<{
+			content: string;
+			save_path: string;
+		}>;
+
+		if (validFiles.length > 0) {
+			const uploadResponse = await batchUploadFile({
+				sandbox_id: sandboxId,
+				file_list: validFiles,
+			});
+
+			const failedUploads = uploadResponse.result.filter((r) => !r.success);
+			if (!uploadResponse.success || failedUploads.length > 0) {
+				console.error(
+					"[uploadAttachmentsFromMessages] Some attachments failed to upload:",
+					failedUploads.map((r) => r.error).join(", "),
+				);
+				// Continue anyway - partial upload is better than blocking
+			} else {
+				console.log(
+					`[uploadAttachmentsFromMessages] Successfully uploaded ${validFiles.length} attachments`,
+				);
+			}
+		}
+	} catch (error) {
+		console.error("[uploadAttachmentsFromMessages] Failed to upload attachments:", error);
+		// Continue anyway - don't block message sending
 	}
 }

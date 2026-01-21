@@ -1,6 +1,7 @@
-import { updateTasklist, uploadAttachments, type Attachment } from "$lib/api/taskboard";
-import { initProject } from "$lib/api/taskboard/base-apis";
+import { batchUploadFile, initProject } from "$lib/api/taskboard/base-apis";
+import { m } from "$lib/paraglide/messages";
 import { nanoid } from "nanoid";
+import { toast } from "svelte-sonner";
 import { chatState } from "../chat-state.svelte";
 import { mcpState } from "../mcp-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
@@ -14,6 +15,31 @@ class CodeAgentSendMessageButtonState {
 
 	showLackOfDiskDialog = $state(false);
 	isChecking = $state(false);
+
+	async #attachmentToBase64(attachment: { file?: unknown; preview?: unknown; filePath?: unknown }) {
+		if (attachment.file instanceof Blob) {
+			return await fileToBase64(attachment.file as File);
+		}
+
+		if (typeof attachment.preview === "string" && attachment.preview.startsWith("data:")) {
+			return attachment.preview;
+		}
+
+		if (
+			typeof attachment.filePath === "string" &&
+			window.electronAPI?.appService?.readFileAsBuffer
+		) {
+			const buffer = await window.electronAPI.appService.readFileAsBuffer(attachment.filePath);
+			let binary = "";
+			const bytes = new Uint8Array(buffer);
+			for (let i = 0; i < bytes.byteLength; i++) {
+				binary += String.fromCharCode(bytes[i]);
+			}
+			return `data:application/octet-stream;base64,${window.btoa(binary)}`;
+		}
+
+		return "";
+	}
 
 	async *enableCodeAgentFlow(fn: () => void) {
 		this.isChecking = true;
@@ -46,27 +72,70 @@ class CodeAgentSendMessageButtonState {
 					// Refresh sessions to sync the new workspace_path to local storage
 					await window.electronAPI.codeAgentService.updateClaudeCodeSessions(sandboxInfo.sandboxId);
 
-					const promises = [
-						updateTasklist(sandboxInfo.sandboxId, workspacePath, codeAgentTaskboardState.tasklist),
-					];
+					// Collect all files to upload in a single batch request
+					const filesToUpload: Array<{ content: string; save_path: string }> = [];
 
+					// 1. tasks.json
+					const tasksFilePath = `${workspacePath}/.302ai/todo/tasks.json`;
+					const jsonContent = JSON.stringify(codeAgentTaskboardState.tasklist);
+					const base64Content =
+						"data:application/json;base64," +
+						window.btoa(
+							encodeURIComponent(jsonContent).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+								String.fromCharCode(parseInt(p1, 16)),
+							),
+						);
+					filesToUpload.push({ content: base64Content, save_path: tasksFilePath });
+
+					// 2. taskboard attachments
 					if (codeAgentTaskboardState.attachments.length > 0) {
-						const attachmentList: Attachment[] = await Promise.all(
+						const taskboardAttachments = await Promise.all(
 							codeAgentTaskboardState.attachments.map(async (att) => ({
-								filename: att.name,
 								content: att.file ? await fileToBase64(att.file) : "",
+								save_path: `${workspacePath}/.302ai/attachments/${att.name}`,
 							})),
 						);
-						promises.push(uploadAttachments(sandboxInfo.sandboxId, workspacePath, attachmentList));
+						filesToUpload.push(...taskboardAttachments);
 					}
 
-					await Promise.all(promises);
+					// 3. pending attachments
+					if (codeAgentTaskboardState.pendingAttachments.length > 0) {
+						const pendingAttachments = await Promise.all(
+							codeAgentTaskboardState.pendingAttachments.map(async (att) => ({
+								content: att.file ? await fileToBase64(att.file) : "",
+								save_path: `${workspacePath}/.302ai/attachments/${att.name}`,
+							})),
+						);
+						filesToUpload.push(...pendingAttachments);
+						codeAgentTaskboardState.clearPendingAttachments();
+					}
 
-					// Upload pending attachments after project initialized
-					await codeAgentTaskboardState.uploadPendingAttachments(
-						sandboxInfo.sandboxId,
-						workspacePath,
-					);
+					// 4. chat attachments (fresh-tab flow)
+					if (chatState.attachments.length > 0) {
+						const chatAttachments = await Promise.all(
+							chatState.attachments.map(async (att) => ({
+								content: await this.#attachmentToBase64(att),
+								save_path: `${workspacePath}/${att.name}`,
+							})),
+						);
+						filesToUpload.push(...chatAttachments);
+					}
+
+					// Upload all files in a single batch request
+					if (filesToUpload.length > 0) {
+						const response = await batchUploadFile({
+							sandbox_id: sandboxInfo.sandboxId,
+							file_list: filesToUpload,
+						});
+
+						const faileds = response.result.filter((r) => !r.success);
+						if (!response.success || faileds.length > 0) {
+							console.error("Failed to upload files:", faileds.map((r) => r.error).join(", "));
+							toast.error(m.taskboard_error_attachment_upload_failed());
+							this.isChecking = false;
+							return;
+						}
+					}
 
 					if (isSessionIdEmpty) {
 						codeAgentState.updateCurrentSessionId(sessionId);

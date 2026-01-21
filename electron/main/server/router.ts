@@ -32,6 +32,8 @@ import {
 	createUIMessageStreamFromGenerator,
 	isStreamingSupported,
 	prependPromptToFirstUserMessage,
+	sendStreamError,
+	uploadAttachmentsFromMessages,
 } from "./utils";
 
 export type RouterRequestBody = {
@@ -1296,31 +1298,25 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			controller.enqueue(encoder.encode(immediateStartEvent));
 			console.log("[302ai-code-agent] Sent immediate start event");
 
+			// Upload attachments after sending start event (non-blocking UX)
+			// This allows the UI to show "AI is typing" immediately while upload happens in background
+			if (sandboxId && workspacePath) {
+				try {
+					await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
+				} catch (uploadError) {
+					console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
+					sendStreamError(controller, "Failed to upload attachments");
+					return;
+				}
+			}
+
 			try {
 				const response = await responsePromise;
 
 				if (!response.ok) {
 					const errorText = await response.text();
 					console.error("[302ai-code-agent] API error:", response.status, errorText);
-					// Send error as text-delta so user sees it
-					const errorId = `error-${Date.now()}`;
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: errorId })}\n\n`),
-					);
-					controller.enqueue(
-						encoder.encode(
-							`data: ${JSON.stringify({ type: "text-delta", id: errorId, delta: `**Error**: ${errorText}` })}\n\n`,
-						),
-					);
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: errorId })}\n\n`),
-					);
-					controller.enqueue(
-						encoder.encode(
-							`data: ${JSON.stringify({ type: "finish", finishReason: "error" })}\n\n`,
-						),
-					);
-					controller.close();
+					sendStreamError(controller, errorText);
 					return;
 				}
 
@@ -1359,23 +1355,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 				}
 			} catch (error) {
 				console.error("[302ai-code-agent] Stream error:", error);
-				const errorId = `error-${Date.now()}`;
 				const errorMessage = error instanceof Error ? error.message : "Unknown error";
-				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: errorId })}\n\n`),
-				);
-				controller.enqueue(
-					encoder.encode(
-						`data: ${JSON.stringify({ type: "text-delta", id: errorId, delta: `**Error**: ${errorMessage}` })}\n\n`,
-					),
-				);
-				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: errorId })}\n\n`),
-				);
-				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ type: "finish", finishReason: "error" })}\n\n`),
-				);
-				controller.close();
+				sendStreamError(controller, errorMessage);
 			}
 		},
 	});

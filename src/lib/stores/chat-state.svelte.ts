@@ -621,45 +621,29 @@ class ChatState {
 					// Continue with message sending even if hook fails
 				}
 
-				const { parts: attachmentParts, metadataList: attachmentMetadata } =
-					await convertAttachmentsToMessageParts(currentAttachments, {
-						enableZipSupport: codeAgentState.enabled,
-					});
+				const codeAgentEnabled = codeAgentState.enabled;
 
-				const textParts = attachmentParts.filter(
-					(part): part is { type: "text"; text: string } => part.type === "text",
-				);
-				const fileParts = attachmentParts.filter(
-					(part): part is import("ai").FileUIPart => part.type === "file",
-				);
+				if (codeAgentEnabled) {
+					const workspacePath = claudeCodeSandboxState.currentSessionWorkspacePath;
+					if (currentAttachments.length > 0 && !workspacePath) {
+						toast.error(m.taskboard_error_attachment_upload_failed());
+						return;
+					}
 
-				if (fileParts.length > 0 && textParts.length > 0) {
-					const fileContent = textParts.map((part) => part.text).join("\n\n");
+					// Agent mode: attachments will be uploaded by backend before sending to AI provider.
+					// Only send metadata for UI preview, no content in message parts.
+					const attachmentMetadata = currentAttachments.map((att) => ({
+						id: att.id,
+						name: att.name,
+						type: att.type,
+						size: att.size,
+						preview: att.preview,
+						filePath: att.filePath,
+					}));
 
-					chat.sendMessage(
-						{
-							parts: [
-								...fileParts,
-								{ type: "text" as const, text: fileContent },
-								{ type: "text" as const, text: currentInputValue },
-							],
-							metadata: {
-								attachments: attachmentMetadata,
-								fileContentPartIndex: fileParts.length,
-							},
-						},
-						{
-							body: {
-								model: currentModel.id,
-								apiKey: this.getApiKey(currentModel.providerId),
-							},
-						},
-					);
-				} else if (fileParts.length > 0) {
 					chat.sendMessage(
 						{
 							text: currentInputValue,
-							files: fileParts,
 							metadata: { attachments: attachmentMetadata },
 						},
 						{
@@ -669,37 +653,87 @@ class ChatState {
 							},
 						},
 					);
-				} else if (textParts.length > 0) {
-					const fileContent = textParts.map((part) => part.text).join("\n\n");
-
-					chat.sendMessage(
-						{
-							parts: [
-								{ type: "text" as const, text: fileContent },
-								{ type: "text" as const, text: currentInputValue },
-							],
-							metadata: {
-								attachments: attachmentMetadata,
-								fileContentPartIndex: 0,
-							},
-						},
-						{
-							body: {
-								model: currentModel.id,
-								apiKey: this.getApiKey(currentModel.providerId),
-							},
-						},
-					);
 				} else {
-					chat.sendMessage(
-						{ text: currentInputValue },
-						{
-							body: {
-								model: currentModel.id,
-								apiKey: this.getApiKey(currentModel.providerId),
-							},
-						},
+					const { parts: attachmentParts, metadataList: attachmentMetadata } =
+						await convertAttachmentsToMessageParts(currentAttachments, {
+							enableZipSupport: false,
+						});
+
+					const textParts = attachmentParts.filter(
+						(part): part is { type: "text"; text: string } => part.type === "text",
 					);
+					const fileParts = attachmentParts.filter(
+						(part): part is import("ai").FileUIPart => part.type === "file",
+					);
+
+					if (fileParts.length > 0 && textParts.length > 0) {
+						const fileContent = textParts.map((part) => part.text).join("\n\n");
+
+						chat.sendMessage(
+							{
+								parts: [
+									...fileParts,
+									{ type: "text" as const, text: fileContent },
+									{ type: "text" as const, text: currentInputValue },
+								],
+								metadata: {
+									attachments: attachmentMetadata,
+									fileContentPartIndex: fileParts.length,
+								},
+							},
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					} else if (fileParts.length > 0) {
+						chat.sendMessage(
+							{
+								text: currentInputValue,
+								files: fileParts,
+								metadata: { attachments: attachmentMetadata },
+							},
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					} else if (textParts.length > 0) {
+						const fileContent = textParts.map((part) => part.text).join("\n\n");
+
+						chat.sendMessage(
+							{
+								parts: [
+									{ type: "text" as const, text: fileContent },
+									{ type: "text" as const, text: currentInputValue },
+								],
+								metadata: {
+									attachments: attachmentMetadata,
+									fileContentPartIndex: 0,
+								},
+							},
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					} else {
+						chat.sendMessage(
+							{ text: currentInputValue },
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					}
 				}
 
 				await threadService.addThread(threadId);
@@ -1507,8 +1541,14 @@ export const chat = new Chat({
 			"onFinish: async ({ messages }) autoDeploy",
 			codeAgentGlobalConfigsState.autoDeploy,
 		);
+
+		const isDeployCommand =
+			lastUserMessage?.parts.some(
+				(part) => part.type === "text" && part.text.trim() === "/deploy",
+			) ?? false;
+
 		emitter.emit(EventNames.CHAT_FINISHED, {
-			canDeploy: codeAgentEnabled && codeAgentGlobalConfigsState.autoDeploy,
+			canDeploy: codeAgentEnabled && (codeAgentGlobalConfigsState.autoDeploy || isDeployCommand),
 			lastMessage: messages[messages.length - 1],
 		});
 
