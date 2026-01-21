@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { editSkillDetails, updateSkill } from "$lib/api/skills";
+	import { deleteSkill, editSkillDetails, updateSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
@@ -218,6 +218,9 @@
 				await writeFile(path, content);
 			}
 
+			// 先删除原始 skill 以避免重复
+			await deleteSkill({ skill_list: [skill.name] });
+
 			// 调用 API 上传更新的 skill
 			// skillRootDir 是包含 SKILL.md 的目录，zip 名称使用 formData.name
 			const result = await updateSkill({
@@ -226,7 +229,7 @@
 			});
 
 			if (result.success) {
-				toast.success(m.skills_create_success?.() || "Skill saved successfully");
+				toast.success(m.toast_save_success?.() || "Skill saved successfully");
 				onSave?.(skill, { ...formData });
 				handleClose();
 			} else {

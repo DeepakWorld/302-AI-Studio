@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { updateSkill } from "$lib/api/skills";
+	import { deleteSkill, updateSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
@@ -24,6 +24,9 @@
 		try {
 			// Write changed files to temp directory
 			await uploadFormRef.writeChangedFiles();
+
+			// 先删除同名 skill 以避免重复
+			await deleteSkill({ skill_list: [formData.name] });
 
 			// Zip and upload
 			const result = await updateSkill({
