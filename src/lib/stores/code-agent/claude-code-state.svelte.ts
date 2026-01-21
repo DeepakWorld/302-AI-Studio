@@ -12,6 +12,7 @@ import {
 } from "@shared/storage/code-agent";
 import { toast } from "svelte-sonner";
 import { agentPreviewState } from "../agent-preview-state.svelte";
+import { BUILTIN_SKILLS } from "./constant";
 
 export interface ClaudeCodeSandboxInfo {
 	sandboxId: string;
@@ -56,7 +57,7 @@ function getInitialData() {
 		currentSessionId: "",
 		sandboxId: "",
 		sandboxRemark: "",
-		skills: [],
+		skills: BUILTIN_SKILLS,
 		thinkingBudget: "off",
 		isManualNote: false,
 	};
