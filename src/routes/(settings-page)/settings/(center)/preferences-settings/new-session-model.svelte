@@ -30,4 +30,23 @@
 		{trigger}
 		onModelSelect={handleModelSelect}
 	/>
+
+	<Label class="text-label-fg font-normal mt-4">{m.settings_vibeNewSessionModel()}</Label>
+
+	<ModelSelect
+		selectedModel={preferencesSettings.vibeNewSessionModel}
+		onModelSelect={(model) => preferencesSettings.setVibeNewSessionModel(model)}
+	>
+		{#snippet trigger({ onclick }: { onclick: () => void })}
+			<button
+				class={cn(
+					"h-settings-item rounded-settings-item bg-settings-item-bg px-settings-item-x py-settings-item-y text-settings-shortcut-size flex w-full items-center justify-between",
+				)}
+				{onclick}
+			>
+				{preferencesSettings.vibeNewSessionModel?.name ||
+					m.settings_vibeNewSessionModelPlaceholder()}
+			</button>
+		{/snippet}
+	</ModelSelect>
 </div>

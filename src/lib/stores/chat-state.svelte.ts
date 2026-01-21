@@ -154,6 +154,36 @@ $effect.root(() => {
 			};
 		}
 	});
+
+	// Auto-apply default model for new sessions
+	$effect(() => {
+		// Wait for states to be hydrated
+		if (!persistedChatParamsState.isHydrated) {
+			return;
+		}
+
+		// Only apply if no model is selected and no messages exist
+		const currentParams = persistedChatParamsState.current;
+		const hasMessages = persistedMessagesState.current.length > 0;
+		if (currentParams.selectedModel || hasMessages) {
+			return;
+		}
+
+		// Apply default model based on mode
+		if (codeAgentState.enabled) {
+			const vibeDefault = preferencesSettings.vibeNewSessionModel;
+			if (vibeDefault) {
+				persistedChatParamsState.current.selectedModel = vibeDefault;
+				console.log("[ChatState] Applied Vibe default model:", vibeDefault.name);
+			}
+		} else {
+			const chatDefault = preferencesSettings.newSessionModel;
+			if (chatDefault) {
+				persistedChatParamsState.current.selectedModel = chatDefault;
+				console.log("[ChatState] Applied Chat default model:", chatDefault.name);
+			}
+		}
+	});
 });
 
 class ChatState {

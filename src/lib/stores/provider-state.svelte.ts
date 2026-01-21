@@ -260,6 +260,12 @@ class ProviderState {
 				console.log(`[Provider] Cleared newSessionModel reference for deleted model`);
 			}
 
+			const vibeNewSessionModel = preferencesSettings.vibeNewSessionModel;
+			if (vibeNewSessionModel && deletedModelIdSet.has(vibeNewSessionModel.id)) {
+				preferencesSettings.setVibeNewSessionModel(null);
+				console.log(`[Provider] Cleared vibeNewSessionModel reference for deleted model`);
+			}
+
 			const titleGenModel = preferencesSettings.state.titleGenerationModel;
 			if (titleGenModel && deletedModelIdSet.has(titleGenModel.id)) {
 				preferencesSettings.setTitleGenerationModel(null);
@@ -396,15 +402,16 @@ class ProviderState {
 	 */
 	async applyDefaultModelIfNeeded(provider: ModelProvider): Promise<void> {
 		// Check if user already has a model preference set
-		const hasExistingModelPreference =
-			preferencesSettings.newSessionModel !== null || sessionState.latestUsedModel !== null;
+		// We process them independently now, so we proceed to find a default model first
+		// const hasExistingModelPreference =
+		// 	preferencesSettings.newSessionModel !== null || sessionState.latestUsedModel !== null;
 
-		if (hasExistingModelPreference) {
-			console.log(
-				`[Provider] User already has model preference, skipping default model setup for ${provider.name}`,
-			);
-			return;
-		}
+		// if (hasExistingModelPreference) {
+		// 	console.log(
+		// 		`[Provider] User already has model preference, skipping default model setup for ${provider.name}`,
+		// 	);
+		// 	return;
+		// }
 
 		// Find the default model from the fetched models
 		const models = persistedModelState.current;
@@ -435,23 +442,42 @@ class ProviderState {
 			// Flush model state to storage and wait for completion before broadcasting
 			// This ensures other windows can read the latest models when they receive the event
 			await persistedModelState.flush();
-			preferencesSettings.setNewSessionModel(defaultModel);
 
-			// Broadcast to all chat tabs to apply the default model
-			// This handles the case where chat tabs are already open but don't have a model selected
-			try {
-				// Clone the model object to ensure it can be serialized for IPC
-				// The original object may be a Proxy from Svelte's reactivity system
-				const modelForBroadcast = JSON.parse(JSON.stringify(defaultModel));
-				await window.electronAPI.broadcastService.broadcastToAll("apply-default-model", {
-					model: modelForBroadcast,
-				});
-				console.log(`[Provider] Applied default model "${defaultModel.name}" for ${provider.name}`);
-			} catch (error) {
-				console.error(
-					`[Provider] Failed to broadcast apply-default-model event for ${provider.name}:`,
-					error,
+			let broadcastNeeded = false;
+
+			if (preferencesSettings.newSessionModel === null && sessionState.latestUsedModel === null) {
+				preferencesSettings.setNewSessionModel(defaultModel);
+				broadcastNeeded = true;
+				console.log(
+					`[Provider] Applied Chat default model "${defaultModel.name}" for ${provider.name}`,
 				);
+			}
+
+			if (preferencesSettings.vibeNewSessionModel === null) {
+				preferencesSettings.setVibeNewSessionModel(defaultModel);
+				console.log(
+					`[Provider] Applied Vibe default model "${defaultModel.name}" for ${provider.name}`,
+				);
+				// We might want to broadcast this too, or reuse the same event if it triggers a re-check
+				broadcastNeeded = true;
+			}
+
+			if (broadcastNeeded) {
+				// Broadcast to all chat tabs to apply the default model
+				// This handles the case where chat tabs are already open but don't have a model selected
+				try {
+					// Clone the model object to ensure it can be serialized for IPC
+					// The original object may be a Proxy from Svelte's reactivity system
+					const modelForBroadcast = JSON.parse(JSON.stringify(defaultModel));
+					await window.electronAPI.broadcastService.broadcastToAll("apply-default-model", {
+						model: modelForBroadcast,
+					});
+				} catch (error) {
+					console.error(
+						`[Provider] Failed to broadcast apply-default-model event for ${provider.name}:`,
+						error,
+					);
+				}
 			}
 		}
 	}

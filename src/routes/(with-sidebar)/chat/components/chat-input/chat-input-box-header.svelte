@@ -7,6 +7,7 @@
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { Settings } from "@lucide/svelte";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
 
@@ -21,7 +22,20 @@
 	);
 
 	function handleModeSelect(key: string) {
-		codeAgentState.updateEnabled(key === "vibe");
+		const isVibe = key === "vibe";
+		codeAgentState.updateEnabled(isVibe);
+
+		if (!chatState.hasMessages) {
+			if (isVibe) {
+				if (preferencesSettings.vibeNewSessionModel) {
+					chatState.selectedModel = preferencesSettings.vibeNewSessionModel;
+				}
+			} else {
+				if (preferencesSettings.newSessionModel) {
+					chatState.selectedModel = preferencesSettings.newSessionModel;
+				}
+			}
+		}
 	}
 
 	function handleSettingsClick() {
