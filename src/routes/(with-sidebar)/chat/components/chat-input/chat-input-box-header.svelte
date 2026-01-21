@@ -46,7 +46,7 @@
 	function handleCodeAgentPanelClose() {
 		codeAgentState.isCodeAgentPanelOpen = false;
 
-		if (agentPreviewState.isVisible) {
+		if (codeAgentState.isFreshTab && agentPreviewState.isVisible) {
 			agentPreviewState.closePreview();
 		}
 	}
