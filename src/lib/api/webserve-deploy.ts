@@ -1,4 +1,5 @@
 import type { ModelProvider } from "@shared/types";
+import { _302AIKy } from "./core/_302ai-ky";
 
 /**
  * 302.AI Web Hosting API
@@ -195,6 +196,108 @@ export async function uploadToWebserve(
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : "Failed to upload file",
+		};
+	}
+}
+
+export interface WebserveListRequest {
+	page?: number;
+	limit?: number;
+}
+
+export interface WebserveListResponse {
+	success: boolean;
+	data?: {
+		id: number;
+		url: string;
+		cover: string;
+		status: number;
+	}[];
+	pagination?: {
+		current_page: number;
+		page_size: number;
+		total_items: number;
+		total_pages: number;
+	};
+	error?: string;
+}
+
+/**
+ * Get list of deployed websites
+ */
+export async function getWebserveList(
+	provider: ModelProvider,
+	request: WebserveListRequest = {},
+): Promise<WebserveListResponse> {
+	try {
+		const searchParams: Record<string, string> = {
+			only_return_success: "true",
+		};
+
+		if (request.page) searchParams.page = String(request.page);
+		if (request.limit) searchParams.limit = String(request.limit);
+
+		const data = await _302AIKy
+			.get("302/webserve/list", {
+				searchParams,
+			})
+			.json<WebserveListResponse>();
+
+		const errorMessage = extractErrorMessage(data);
+		if (errorMessage) {
+			return {
+				success: false,
+				error: errorMessage,
+			};
+		}
+
+		return {
+			success: true,
+			data: data.data,
+			pagination: data.pagination,
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Failed to fetch website list",
+		};
+	}
+}
+
+export interface DeleteWebserveResponse {
+	success: boolean;
+	data?: {
+		deleted: string;
+	};
+	error?: string;
+}
+
+/**
+ * Delete a deployed website
+ */
+export async function deleteDeployedWebsite(
+	provider: ModelProvider,
+	webId: string | number,
+): Promise<DeleteWebserveResponse> {
+	try {
+		const data = await _302AIKy.post(`302/webserve/delete/${webId}`).json<DeleteWebserveResponse>();
+
+		const errorMessage = extractErrorMessage(data);
+		if (errorMessage) {
+			return {
+				success: false,
+				error: errorMessage,
+			};
+		}
+
+		return {
+			success: true,
+			data: data.data,
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Failed to delete website",
 		};
 	}
 }
