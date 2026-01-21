@@ -27,6 +27,45 @@ async function validateAndRepairTaskList(
 		return [];
 	}
 
+	// Repair fields: normalize number/executedCount, and reset in_progress tasks.
+	for (const task of parsed) {
+		const hadNewFields =
+			task && ("executedCount" in task || (typeof task?.number === "number" && "number" in task));
+
+		// number (repeat count / total repeats): ensure finite integer in [1, 99]
+		const rawNumber = task?.number;
+		const n = typeof rawNumber === "number" ? rawNumber : Number.parseInt(String(rawNumber), 10);
+		if (!Number.isFinite(n)) {
+			task.number = 1;
+		} else {
+			task.number = Math.min(99, Math.max(1, Math.trunc(n)));
+		}
+
+		// executedCount: default missing/invalid to 0 (old data can't be reliably inferred)
+		const rawExecuted = task?.executedCount;
+		const executed =
+			typeof rawExecuted === "number" ? rawExecuted : Number.parseInt(String(rawExecuted), 10);
+		if (!Number.isFinite(executed)) {
+			task.executedCount = 0;
+		} else {
+			task.executedCount = Math.trunc(executed);
+		}
+
+		// Special case: legacy done tasks without new fields -> set both fields to 1
+		if (task?.status === "done" && !hadNewFields) {
+			task.number = 1;
+			task.executedCount = 1;
+		}
+
+		// Reset in_progress tasks to pending on load to avoid being stuck after restart
+		if (task?.status === "in_progress") {
+			task.status = "pending";
+		}
+
+		// Clamp executedCount into [0, number]
+		task.executedCount = Math.min(task.number, Math.max(0, task.executedCount));
+	}
+
 	const validated = taskListSchema(parsed);
 
 	if (validated instanceof type.errors) {

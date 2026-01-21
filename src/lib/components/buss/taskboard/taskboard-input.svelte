@@ -21,6 +21,7 @@
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 	import ButtonWithTooltip from "../button-with-tooltip/button-with-tooltip.svelte";
+	import RepeatCountInput from "./repeat-count-input.svelte";
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 
@@ -30,6 +31,11 @@
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let selectedAttachment = $state<AttachmentFile | null>(null);
 	let isAdding = $state(false);
+
+	function normalizeRepeatNumber(value: string): number {
+		const n = Number.parseInt(value, 10);
+		return Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 1;
+	}
 
 	function isAttachmentLoading(id: string): boolean {
 		return attachmentLoadingMap.get(id) ?? false;
@@ -98,6 +104,9 @@
 			}
 		}
 
+		codeAgentTaskboardState.repeatCount = normalizeRepeatNumber(
+			`${codeAgentTaskboardState.repeatCount}`,
+		);
 		codeAgentTaskboardState.addTaskFromInput();
 	}
 
@@ -279,13 +288,18 @@
 		<!-- Bottom action bar -->
 		<div class="my-1 flex items-center justify-between">
 			<!-- Left: Attachment button -->
-			<ButtonWithTooltip
-				tooltip={m.title_upload_attachment()}
-				class="hover:!bg-chat-action-hover"
-				onclick={handleAttachmentClick}
-			>
-				<Paperclip class="size-4" />
-			</ButtonWithTooltip>
+			<div class="flex items-center gap-1">
+				<ButtonWithTooltip
+					tooltip={m.title_upload_attachment()}
+					class="hover:!bg-chat-action-hover"
+					onclick={handleAttachmentClick}
+					size="icon-sm"
+				>
+					<Paperclip class="size-4" />
+				</ButtonWithTooltip>
+
+				<RepeatCountInput bind:count={codeAgentTaskboardState.repeatCount} />
+			</div>
 
 			<!-- Right: Add button -->
 			<Button variant="default" size="sm" onclick={handleAdd} disabled={isAdding}>

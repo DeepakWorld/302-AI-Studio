@@ -24,11 +24,13 @@
 	import { nanoid } from "nanoid";
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
+	import { ButtonWithTooltip } from "../button-with-tooltip";
+	import RepeatCountInput from "./repeat-count-input.svelte";
 
 	interface Props {
 		open?: boolean;
 		task: Task | null;
-		onSave?: (updatedContent: string) => void;
+		onSave?: (updatedContent: string, updatedNumber: number) => void;
 		onClose?: () => void;
 	}
 
@@ -37,6 +39,8 @@
 	// Local editing state
 	let editedContent = $state("");
 	let isSaving = $state(false);
+
+	let repeatCount = $state(1);
 
 	// Attachment state (placeholder for future implementation)
 	let attachments = $state<AttachmentFile[]>([]);
@@ -48,6 +52,7 @@
 	$effect(() => {
 		if (open && task) {
 			editedContent = task.content;
+			repeatCount = normalizeRepeatNumber(`${task.number ?? 1}`);
 			attachments = []; // Future: task.attachments || []
 		}
 	});
@@ -104,7 +109,7 @@
 				}
 			}
 
-			onSave?.(editedContent.trim());
+			onSave?.(editedContent.trim(), normalizeRepeatNumber(`${repeatCount}`));
 			open = false;
 		} finally {
 			isSaving = false;
@@ -207,6 +212,11 @@
 			reader.onerror = reject;
 			reader.readAsDataURL(file);
 		});
+	}
+
+	function normalizeRepeatNumber(value: string): number {
+		const n = Number.parseInt(value, 10);
+		return Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 1;
 	}
 </script>
 
@@ -322,13 +332,18 @@
 				<!-- Bottom action bar -->
 				<div class="my-1 flex items-center justify-between">
 					<!-- Left: Attachment button -->
-					<button
-						type="button"
-						class="size-9 rounded-[10px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-						onclick={handleAttachmentClick}
-					>
-						<Paperclip class="size-4" />
-					</button>
+					<div class="flex items-center gap-1">
+						<ButtonWithTooltip
+							tooltip={m.title_upload_attachment()}
+							class="hover:!bg-chat-action-hover"
+							onclick={handleAttachmentClick}
+							size="icon-sm"
+						>
+							<Paperclip class="size-4" />
+						</ButtonWithTooltip>
+
+						<RepeatCountInput bind:count={repeatCount} />
+					</div>
 
 					<div class="w-1"></div>
 				</div>

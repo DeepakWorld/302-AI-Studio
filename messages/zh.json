@@ -398,6 +398,7 @@
 	"title_presence_penalty_tips": " 数值范围在-2.0到2.0之间。正值会根据新词在现有文本中的出现频率对其进行惩罚，从而增加模型讨论新主题的可能性。",
 	"title_regenerate": "重新生成",
 	"title_settings": "设置",
+	"title_help_docs": "帮助文档",
 	"title_sidebar_close": "关闭边栏",
 	"title_sidebar_open": "打开边栏",
 	"title_temperature_tips": "使用什么采样温度，介于 0 和 2 之间。较高的值（如 0.8）将使输出更加随机，而较低的值（如 0.2）将使输出更加集中和确定。 我们通常建议改变这个或top_p但不是两者。",
@@ -1206,5 +1207,6 @@
 	"title_chat_mode": "聊天模式",
 	"title_code_agent_settings": " Vibe模式设置",
 	"title_chat_mode_description": "快问快答，适合日常使用",
-	"title_code_agent_description": "面向复杂任务，使用云端Cluade Code"
+	"title_code_agent_description": "面向复杂任务，使用云端Cluade Code",
+	"taskboard_repeat_times": "重复执行次数"
 }

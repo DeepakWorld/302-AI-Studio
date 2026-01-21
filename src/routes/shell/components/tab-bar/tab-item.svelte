@@ -29,6 +29,7 @@
 		HatGlasses,
 		LayoutGrid,
 		MessageCircle,
+		MessageCircleQuestionMark,
 		MonitorSmartphone,
 		Settings,
 		X,
@@ -110,6 +111,8 @@
 		<HatGlasses />
 	{:else if tabType === "htmlPreview"}
 		<MonitorSmartphone />
+	{:else if tabType === "helpDocs"}
+		<MessageCircleQuestionMark />
 	{/if}
 {/snippet}
 

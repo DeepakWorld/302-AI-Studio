@@ -32,6 +32,7 @@ export class CodeAgentTaskboardState {
 	// Input state
 	inputValue = $state("");
 	attachments = $state<AttachmentFile[]>([]);
+	repeatCount = $state(1);
 
 	// Pending attachments queue (for when sandbox is not yet initialized)
 	pendingAttachments = $state<AttachmentFile[]>([]);
@@ -105,12 +106,15 @@ export class CodeAgentTaskboardState {
 					id: nanoid(),
 					content: this.inputValue.trim(),
 					status: "pending",
+					number: Math.min(99, Math.max(1, Number.parseInt(`${this.repeatCount}`, 10) || 1)),
+					executedCount: 0,
 				};
 				const updatedTasklist = [...this.tasklist, newTask];
 				this.updateTasklist(updatedTasklist);
 			}
 			this.inputValue = "";
 			this.attachments = [];
+			this.repeatCount = 1;
 		}
 	}
 
@@ -350,8 +354,25 @@ export class CodeAgentTaskboardState {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
 
+		const total = Math.min(99, Math.max(1, Number.parseInt(`${task.number ?? 1}`, 10) || 1));
+		const executed = Math.max(0, Number.parseInt(`${task.executedCount ?? 0}`, 10) || 0);
+		const remaining = total - executed;
+		if (remaining <= 0) {
+			await this.#updateTaskStatus(task.id, "done");
+			return;
+		}
+
 		if (task.status === "pending") {
-			await this.#updateTaskStatus(task.id, "in_progress");
+			const updatedList = this.tasklist.map((t) =>
+				t.id === task.id
+					? {
+							...t,
+							status: "in_progress" as const,
+							executedCount: Math.min(total, (t.executedCount ?? 0) + 1),
+						}
+					: t,
+			);
+			await this.updateTasklist(updatedList);
 		}
 
 		const off = emitter.on(EventNames.CHAT_FINISHED, this.#handleChatFinished);
@@ -366,7 +387,17 @@ export class CodeAgentTaskboardState {
 				const success = await this.#waitForChatFinished();
 
 				if (success) {
-					await this.#updateTaskStatus(task.id, "done");
+					const updatedTask = this.tasklist.find((t) => t.id === task.id);
+					const nextTotal = Math.min(
+						99,
+						Math.max(1, Number.parseInt(`${updatedTask?.number ?? total}`, 10) || total),
+					);
+					const nextExecuted = Math.max(
+						0,
+						Number.parseInt(`${updatedTask?.executedCount ?? executed + 1}`, 10) || executed + 1,
+					);
+					const nextRemaining = nextTotal - nextExecuted;
+					await this.#updateTaskStatus(task.id, nextRemaining > 0 ? "pending" : "done");
 					return;
 				}
 
@@ -380,7 +411,15 @@ export class CodeAgentTaskboardState {
 			console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
 
 			this.taskboardStatus = "idle";
-			await this.#updateTaskStatus(task.id, "pending");
+			const updatedList = this.tasklist.map((t) => {
+				if (t.id !== task.id) return t;
+				return {
+					...t,
+					status: "pending" as const,
+					executedCount: Math.max(0, (t.executedCount ?? 0) - 1),
+				};
+			});
+			await this.updateTasklist(updatedList);
 		} finally {
 			off();
 			this.currentExecutingTaskId = null;

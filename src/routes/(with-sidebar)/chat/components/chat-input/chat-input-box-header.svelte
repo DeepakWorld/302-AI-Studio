@@ -45,8 +45,11 @@
 				options={modeOptions}
 				selectedKey={selectedMode}
 				onSelect={handleModeSelect}
-				class="!h-8 w-[200px] bg-muted"
-				thumbClass="!h-6 text-xs"
+				class="!h-8 w-[200px] !rounded-full p-1 bg-muted"
+				thumbClass="!h-6 text-xs rounded-full"
+				activeThumbClass="text-white"
+				leftThumbClass="bg-primary"
+				contentClass="gap-0"
 				disabled={codeAgentState.isChecking}
 			/>
 		{:else}
@@ -75,5 +78,7 @@
 		{/if}
 	</div>
 
-	<p class="text-xs text-muted-foreground">{description}</p>
+	{#if !chatState.hasMessages}
+		<p class="text-xs text-muted-foreground">{description}</p>
+	{/if}
 </div>

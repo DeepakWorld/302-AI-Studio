@@ -114,6 +114,8 @@ export const taskSchema = type({
 	id: "string",
 	content: "string",
 	status: "'pending' | 'in_progress' | 'done'",
+	number: "number",
+	executedCount: "number",
 });
 export const taskListSchema = taskSchema.array();
 export type Task = typeof taskSchema.infer;

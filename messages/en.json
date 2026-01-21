@@ -398,6 +398,7 @@
 	"title_presence_penalty_tips": "Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.",
 	"title_regenerate": "Regenerate",
 	"title_settings": "Settings",
+	"title_help_docs": "Help Documentation",
 	"title_sidebar_close": "Close Sidebar",
 	"title_sidebar_open": "Open Sidebar",
 	"title_temperature_tips": "What sampling temperature to use, ranging from 0 to 2. Higher values, such as 0.8, will make the output more random, while lower values, like 0.2, will make it more focused and deterministic. We generally recommend adjusting either this or top_p, but not both simultaneously.",
@@ -1206,5 +1207,6 @@
 	"title_chat_mode": "Chat Model",
 	"title_code_agent_settings": "Vibe Mode Settings",
 	"title_chat_mode_description": "Quick questions and answers, suitable for daily use",
-	"title_code_agent_description": "For complex tasks, use cloud Cluade Code"
+	"title_code_agent_description": "For complex tasks, use cloud Cluade Code",
+	"taskboard_repeat_times": "Repeat Execution Times"
 }
