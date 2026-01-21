@@ -327,22 +327,27 @@
 
 			<!-- Forced Skills Display -->
 			{#if forcedSkills.length > 0}
-				<div class="flex flex-wrap items-center gap-1.5 py-1.5 border-t border-border/50">
-					<span class="text-xs text-muted-foreground shrink-0">{m.skills_active_label()}:</span>
-					{#each forcedSkills as skill (skill.name)}
-						<span
-							class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
-						>
-							{skill.name}
-							<button
-								type="button"
-								class="ml-0.5 rounded hover:bg-primary/20 p-0.5"
-								onclick={() => codeAgentState.handleSkillForceUseToggle(skill.name, false)}
-							>
-								<X class="h-3 w-3" />
-							</button>
-						</span>
-					{/each}
+				<div class="flex items-start gap-1.5 border-t border-border/50 py-1.5">
+					<span class="mt-1 text-xs text-muted-foreground shrink-0">{m.skills_active_label()}:</span
+					>
+					<div class="max-h-14 flex-1 overflow-y-auto">
+						<div class="flex flex-wrap items-center gap-1.5">
+							{#each forcedSkills as skill (skill.name)}
+								<span
+									class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary"
+								>
+									{skill.name}
+									<button
+										type="button"
+										class="ml-0.5 rounded hover:bg-primary/20 p-0.5"
+										onclick={() => codeAgentState.handleSkillForceUseToggle(skill.name, false)}
+									>
+										<X class="h-3 w-3" />
+									</button>
+								</span>
+							{/each}
+						</div>
+					</div>
 				</div>
 			{/if}
 
