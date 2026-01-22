@@ -37,7 +37,6 @@
 		restoreShowCustomInput,
 		saveAnswerForMessage,
 	} from "$lib/stores/code-agent/ask-user-answers-state.svelte";
-	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { cn } from "$lib/utils";
 	import {
 		Ban,
@@ -224,11 +223,6 @@
 		const answerText = answerParts.join("\n");
 		chatState.inputValue = answerText;
 		chatState.sendMessage();
-
-		// Disable plan mode after submitting answers
-		if (codeAgentState.inPlanMode) {
-			codeAgentState.updatePlanMode(false);
-		}
 	}
 
 	// Check if submit is enabled - all questions must be answered

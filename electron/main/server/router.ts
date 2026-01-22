@@ -1391,6 +1391,94 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		appendPromptToLastUserMessage(messages, taskOrchestrationPrompt);
 	}
 
+	// Add plan mode instructions when plan mode is enabled
+	if (inPlanMode) {
+		const planModePrompt = `
+<plan_mode_instructions>
+<critical_constraint>
+ 每个回合只能调用一次 AskUserQuestion 工具。
+ 一旦调用过 ExitPlanMode，后续不要再调用
+
+</critical_constraint>
+
+<plan_mode_workflow>
+Plan 模式的流程：
+
+每一轮都要问自己：我是否有足够信息开始执行？
+
+第1轮 - 初次提问：
+1. 分析任务，识别所有必需信息
+2. 调用 AskUserQuestion 问第一个问题
+
+
+第2轮 - 收到回答后判断：
+1. 阅读用户回答
+2. **关键判断**：我现在能否开始执行任务？
+   - 如果还缺少关键信息 → 继续调用 AskUserQuestion
+   - 如果信息已充分 → 调用 ExitPlanMode
+
+第N轮 - 重复判断：
+继续重复第2轮的逻辑，直到信息充足
+
+</plan_mode_workflow>
+
+<tool_call_rules>
+## 核心规则（违反即错误）
+
+1. **单次调用规则**：
+   - ❌ 错误：调用2次 AskUserQuestion
+   - ❌ 错误：调用2次 ExitPlanMode  
+   - ❌ 错误：先调用 AskUserQuestion 再调用 ExitPlanMode
+   - ✅ 正确：只调用1次 AskUserQuestion
+
+
+2. **ExitPlanMode 使用限制**：
+   - 调用前必须已通过 AskUserQuestion 收集过信息
+   - 或用户明确要求退出
+
+4. **Plan 模式状态检查**：
+   - AskUserQuestion 和 ExitPlanMode 仅在 Plan 模式时可调用
+</tool_call_rules>
+
+<decision_flow>
+每次响应前按此顺序检查：
+
+1. Plan 模式是否开启？
+   - 否 → 直接执行任务，不使用 Plan 工具
+   - 是 → 继续
+
+
+2. 是否在等待用户回答？
+   - 是 → 处理用户回答，不重复提问
+   - 否 → 继续
+
+3. 是否缺少关键信息？
+   - 是 → 调用 AskUserQuestion 一次
+   - 否 → 调用 ExitPlanMode 一次
+</decision_flow>
+
+
+<examples>
+✅ 正确示例：
+回合1: [调用 AskUserQuestion]
+回合2: 收到答案，[调用 AskUserQuestion] 
+回合3: 收到答案，[调用 ExitPlanMode]，执行任务
+
+
+❌ 错误示例1（同轮多次调用）：
+回合1: [调用 AskUserQuestion] [又调用 AskUserQuestion]
+
+❌ 错误示例2（重复调用 ExitPlanMode）：
+回合3: [调用 ExitPlanMode] [又调用 ExitPlanMode]
+
+❌ 错误示例3（未问就退出）：
+回合1: [调用 ExitPlanMode]
+</examples>
+</plan_mode_instructions>
+`;
+		prependPromptToFirstUserMessage(messages, planModePrompt);
+	}
+
 	// Build request body for 302.AI Claude Code API
 	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
 	const lastAiSdkModelMessage = convertedMessages.at(-1);
