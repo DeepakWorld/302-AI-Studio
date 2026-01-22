@@ -6,6 +6,7 @@ function getInitialData() {
 	const initialData = {
 		apiKey: "",
 		autoDeploy: true,
+		notificationsEnabled: false,
 	};
 	return initialData;
 }
@@ -18,6 +19,9 @@ export const persistedCodeAgentGlobalConfigsState = new PersistedState<CodeAgent
 class CodeAgentGlobalConfigsState {
 	apiKey = $derived(persistedCodeAgentGlobalConfigsState.current?.apiKey ?? "");
 	autoDeploy = $derived(persistedCodeAgentGlobalConfigsState.current?.autoDeploy ?? true);
+	notificationsEnabled = $derived(
+		persistedCodeAgentGlobalConfigsState.current?.notificationsEnabled ?? false,
+	);
 
 	constructor() {
 		$effect.root(() => {
@@ -58,6 +62,21 @@ class CodeAgentGlobalConfigsState {
 
 	toggleAutoDeploy() {
 		this.#updateState({ autoDeploy: !this.autoDeploy });
+	}
+
+	async toggleNotificationsEnabled() {
+		const newState = !this.notificationsEnabled;
+		if (newState) {
+			const permission = await Notification.requestPermission();
+			if (permission === "granted") {
+				this.#updateState({ notificationsEnabled: true });
+			} else {
+				// permission denied or default
+				this.#updateState({ notificationsEnabled: false });
+			}
+		} else {
+			this.#updateState({ notificationsEnabled: false });
+		}
 	}
 }
 

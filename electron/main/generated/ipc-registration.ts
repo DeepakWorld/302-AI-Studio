@@ -17,6 +17,7 @@ import {
 	deepLinkService,
 	externalLinkService,
 	mcpService,
+	notificationService,
 	providerService,
 	threadService,
 	updaterService,
@@ -414,6 +415,11 @@ export function registerIpcHandlers() {
 		mcpService.closeServer(event, serverId),
 	);
 
+	// notificationService service registration
+	ipcMain.handle("notificationService:notifyTaskCompleted", (event, options) =>
+		notificationService.notifyTaskCompleted(event, options),
+	);
+
 	// providerService service registration
 	ipcMain.handle("providerService:handle302AIProviderChange", (event, apiKey) =>
 		providerService.handle302AIProviderChange(event, apiKey),
@@ -594,6 +600,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
+	ipcMain.removeHandler("notificationService:notifyTaskCompleted");
 	ipcMain.removeHandler("providerService:handle302AIProviderChange");
 	ipcMain.removeHandler("providerService:get302AIApiKey");
 	ipcMain.removeHandler("threadService:addThread");

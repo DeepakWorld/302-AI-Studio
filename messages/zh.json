@@ -1112,6 +1112,7 @@
 	"placeholder_input_api_key": "请输入API Key...",
 	"label_button_reset_api_key": "重置为302.AI默认API Key",
 	"auto_deploy": "自动部署项目",
+	"settings_notificationsEnabled": "启用系统通知",
 	"error_update_session_note": "更新沙盒会话备注失败",
 	"text_button_settings_skills": "Skills",
 	"skills_title": "Skills 管理",
@@ -1238,5 +1239,8 @@
 	"taskboard_auto_decompose_button": "拆解",
 	"taskboard_auto_decompose_success": "任务拆解完成，已添加 {count} 个子任务",
 	"taskboard_auto_decompose_error": "任务拆解失败",
-	"taskboard_auto_decompose_empty_input": "请输入需求描述"
+	"taskboard_auto_decompose_empty_input": "请输入需求描述",
+	"notification_vibe_task_completed_title": "Vibe 任务完成",
+	"notification_vibe_taskboard_completed_title": "Vibe 任务看板完成",
+	"notification_vibe_taskboard_completed_body": "{count} 个任务已完成"
 }

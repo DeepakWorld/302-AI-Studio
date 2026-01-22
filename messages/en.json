@@ -1112,6 +1112,7 @@
 	"placeholder_input_api_key": "Please enter API Key...",
 	"label_button_reset_api_key": "Reset to 302.AI default API Key",
 	"auto_deploy": "Automatically Deploy Project",
+	"settings_notificationsEnabled": "Enable System Notifications",
 	"error_update_session_note": "Failed to update sandbox session notes",
 	"text_button_settings_skills": "Skills",
 	"skills_title": "Skills Management",
@@ -1238,5 +1239,8 @@
 	"taskboard_auto_decompose_button": "Decompose",
 	"taskboard_auto_decompose_success": "Task decomposition complete, added {count} subtasks",
 	"taskboard_auto_decompose_error": "Task decomposition failed",
-	"taskboard_auto_decompose_empty_input": "Please enter requirements"
+	"taskboard_auto_decompose_empty_input": "Please enter requirements",
+	"notification_vibe_task_completed_title": "Vibe Task Completed",
+	"notification_vibe_taskboard_completed_title": "Vibe Taskboard Completed",
+	"notification_vibe_taskboard_completed_body": "{count} tasks completed"
 }

@@ -43,6 +43,11 @@
 			checked={codeAgentGlobalConfigsState.autoDeploy}
 			onCheckedChange={() => codeAgentGlobalConfigsState.toggleAutoDeploy()}
 		/>
+		<SettingSwitchItem
+			label={m.settings_notificationsEnabled()}
+			checked={codeAgentGlobalConfigsState.notificationsEnabled}
+			onCheckedChange={() => codeAgentGlobalConfigsState.toggleNotificationsEnabled()}
+		/>
 		<DeployedWebsitesList />
 		<RemotePlatform />
 	{:else if selectedPlatform === "local"}

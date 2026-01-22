@@ -8,6 +8,7 @@ import { DeepLinkService, deepLinkService } from "./deep-link-service";
 import { ExternalLinkService, externalLinkService } from "./external-link-service";
 import { GhostWindowService, ghostWindowService } from "./ghost-window-service";
 import { McpService, mcpService } from "./mcp-service";
+import { NotificationService, notificationService } from "./notification-service";
 import { PluginService, pluginService } from "./plugin-service";
 import { providerService, ProviderService } from "./provider-service";
 import { RegistryService, registryService } from "./registry-service";
@@ -34,6 +35,7 @@ export {
 	GeneralSettingsService,
 	GhostWindowService,
 	McpService,
+	NotificationService,
 	PluginService,
 	ProviderService,
 	RegistryService,
@@ -60,6 +62,7 @@ export {
 	generalSettingsService,
 	ghostWindowService,
 	mcpService,
+	notificationService,
 	pluginService,
 	providerService,
 	registryService,
