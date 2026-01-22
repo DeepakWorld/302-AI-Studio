@@ -28,6 +28,7 @@ export class CodeAgentTaskboardState {
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
 	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop" | "waiting_for_chat">("idle");
+	retryExhausted = $state(false);
 
 	// Input state
 	inputValue = $state("");
@@ -383,6 +384,7 @@ export class CodeAgentTaskboardState {
 	async #executeTask(task: Task, fn: () => Promise<void>): Promise<void> {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
+		this.retryExhausted = false;
 
 		const total = Math.min(99, Math.max(1, task.number ?? 1));
 		const executed = Math.max(0, task.executedCount ?? 0);
@@ -433,6 +435,10 @@ export class CodeAgentTaskboardState {
 				console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
 			}
 			console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
+
+			if (this.#currentRetryCount >= this.#MAX_RETRY_COUNT) {
+				this.retryExhausted = true;
+			}
 
 			this.taskboardStatus = "idle";
 			const updatedList = this.tasklist.map((t) => {

@@ -1208,6 +1208,7 @@
 	"taskboard_bar_status_running": "Executing",
 	"taskboard_bar_status_waiting_to_stop": "To be completed",
 	"taskboard_bar_status_waiting_for_chat": "Waiting for chat",
+	"taskboard_bar_status_retry_exhausted": "Max retries reached",
 	"taskboard_bar_status_waiting_for_user_input": "Waiting for your answer",
 	"taskboard_bar_progress": " ({current}/{total})",
 	"changelog_title": "Changelog",

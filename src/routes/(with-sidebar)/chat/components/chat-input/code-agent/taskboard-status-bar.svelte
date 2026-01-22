@@ -16,6 +16,10 @@
 	let openModelSelect = $state<() => void>();
 
 	const statusText = $derived.by(() => {
+		if (codeAgentTaskboardState.retryExhausted) {
+			return `${m.taskboard_bar_status_retry_exhausted()}：`;
+		}
+
 		const label = match(codeAgentTaskboardState.taskboardStatus)
 			.with("idle", () => m.taskboard_bar_status_idle())
 			.with("running", () => m.taskboard_bar_status_running())
