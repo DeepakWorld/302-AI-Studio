@@ -1224,5 +1224,14 @@
 	"title_code_agent_settings": "Vibe Mode Settings",
 	"title_chat_mode_description": "Quick questions and answers, suitable for daily use",
 	"title_code_agent_description": "For complex tasks, use cloud Cluade Code",
-	"taskboard_repeat_times": "Repeat Execution Times"
+	"taskboard_repeat_times": "Repeat Execution Times",
+	"taskboard_auto_decompose": "Auto Decompose",
+	"taskboard_auto_decompose_title": "AI Task Decomposition",
+	"taskboard_auto_decompose_description": "Enter your requirements and AI will decompose them into multiple subtasks",
+	"taskboard_auto_decompose_input_placeholder": "Enter your requirements...",
+	"taskboard_auto_decompose_count_label": "Number of subtasks",
+	"taskboard_auto_decompose_button": "Decompose",
+	"taskboard_auto_decompose_success": "Task decomposition complete, added {count} subtasks",
+	"taskboard_auto_decompose_error": "Task decomposition failed",
+	"taskboard_auto_decompose_empty_input": "Please enter requirements"
 }

@@ -119,6 +119,25 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
+	 * Adds multiple tasks from an array of task content strings.
+	 * Used by the AI task decomposition feature.
+	 */
+	addMultipleTasks(taskContents: string[]) {
+		if (taskContents.length === 0) return;
+
+		const newTasks: Task[] = taskContents.map((content) => ({
+			id: nanoid(),
+			content: content.trim(),
+			status: "pending" as const,
+			number: 1,
+			executedCount: 0,
+		}));
+
+		const updatedTasklist = [...this.tasklist, ...newTasks];
+		this.updateTasklist(updatedTasklist);
+	}
+
+	/**
 	 * Adds an attachment to the list.
 	 */
 	addAttachment(attachment: AttachmentFile) {

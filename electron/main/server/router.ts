@@ -1157,6 +1157,157 @@ app.post("/generate-suggestions", async (c) => {
 	}
 });
 
+// Task decomposition prompt
+function getTaskDecomposePrompt(count: number): string {
+	return `你是“看板任务拆解器（Task Decomposer）”。
+你的职责是：将用户输入的一句或几句高层需求，拆解成可由 AI Coding Agent 顺序执行的看板任务列表。
+目标
+输出一组可执行、可验证、顺序明确的子任务（从调研/澄清→设计→实现→测试→交付）。
+任务必须尽量小粒度，避免“一条任务干完一整个系统”。
+如果需求信息不足，先产生澄清任务（或澄清问题），保证后续任务可落地。
+拆解原则（必须遵守）
+先理解再拆解：识别目标、范围、约束、成功标准、依赖。
+可执行：每条任务要具体到“改哪些文件/模块/接口/页面/脚本/配置”这类层面（若未知则写“待确认/按项目结构定位”）。
+可验证：每条任务给出验收标准（如测试用例、接口返回、页面行为、性能指标等）。
+顺序与依赖：输出顺序编号；如可并行，在依赖字段标明。
+默认最小可交付（MVP）优先：先做最小闭环，再做增强项。
+适配不同类型任务：开发/修复bug/重构/数据处理/自动化/文档/部署/集成/算法/插件等都能覆盖。
+风险控制：遇到不确定项或高风险改动，生成“风险评估/备份/回滚方案”任务。
+不要输出空泛任务：如“完善功能”“优化代码”必须拆到具体点。
+输出格式（严格 JSON，便于程序解析）
+只输出 JSON，不要输出任何额外文本。
+
+JSON范例:
+{
+  "tasks": [
+    {
+      "id": "1",
+      "content": "具体的任务描述",
+    },
+    {
+      "id": "2",
+      "content": "另一个任务描述",
+    }
+  ]
+}
+
+User requires decomposition into ${count} sub-tasks.`;
+}
+
+app.post("/decompose-tasks", async (c) => {
+	const {
+		requirement,
+		count = 3,
+		model,
+		apiKey,
+		baseUrl,
+		providerType,
+	} = await c.req.json<{
+		requirement: string;
+		count?: number;
+		model: string;
+		apiKey?: string;
+		baseUrl?: string;
+		providerType: ModelProvider["apiType"];
+	}>();
+
+	let languageModel;
+	switch (providerType) {
+		case "302ai": {
+			const openai = createOpenAICompatible({
+				name: "302.AI",
+				baseURL: baseUrl || "https://api.openai.com/v1",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = openai.chatModel(model);
+			break;
+		}
+		case "openai": {
+			const openai = createOpenAI({
+				baseURL: baseUrl || "https://api.openai.com/v1",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = openai.chat(model);
+			break;
+		}
+		case "anthropic": {
+			const anthropic = createAnthropic({
+				baseURL: baseUrl || "https://api.anthropic.com/v1",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = anthropic.chat(model);
+			break;
+		}
+		case "gemini": {
+			const google = createGoogleGenerativeAI({
+				baseURL: baseUrl || "https://generativelanguage.googleapis.com/v1beta",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = google.chat(model);
+			break;
+		}
+		default:
+			return c.json({ error: "Invalid provider type" }, 400);
+	}
+	// Helper function to perform task decomposition
+	const doDecompose = async (modelToUse: typeof languageModel) => {
+		const { text } = await generateText({
+			model: modelToUse,
+			messages: [
+				{
+					role: "user",
+					content: getTaskDecomposePrompt(count) + "\n\n用户需求：\n" + requirement,
+				},
+			],
+		});
+
+		console.log("[TaskDecompose] Received text:", text);
+
+		// Parse the JSON response
+		let jsonStr = text.trim();
+		// Remove markdown code blocks if present
+		if (jsonStr.startsWith("```")) {
+			jsonStr = jsonStr
+				.replace(/```json?\n?/g, "")
+				.replace(/```/g, "")
+				.trim();
+		}
+
+		const parsed = JSON.parse(jsonStr);
+		if (parsed.tasks && Array.isArray(parsed.tasks)) {
+			console.log("[TaskDecompose] Parsed tasks:", parsed.tasks.length);
+			return parsed.tasks;
+		} else {
+			console.log("[TaskDecompose] Invalid response format");
+			return [];
+		}
+	};
+
+	try {
+		console.log("[TaskDecompose] Starting task decomposition with primary model...");
+		const tasks = await doDecompose(languageModel);
+		return c.json({ tasks });
+	} catch (error) {
+		console.error("[TaskDecompose] Primary model failed, trying fallback gpt-4o-mini:", error);
+
+		// Fallback to gpt-4o-mini
+		try {
+			const fallbackModel = createOpenAICompatible({
+				name: "302.AI",
+				baseURL: baseUrl || "https://api.302.ai/v1",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			}).chatModel("gpt-4o-mini");
+
+			console.log("[TaskDecompose] Retrying with fallback model gpt-4o-mini...");
+			const tasks = await doDecompose(fallbackModel);
+			return c.json({ tasks });
+		} catch (fallbackError) {
+			console.error("[TaskDecompose] Fallback model also failed:", fallbackError);
+			return c.json({ error: "Failed to decompose tasks" }, 500);
+		}
+	}
+});
+
 app.post("/chat/302ai-code-agent", async (c) => {
 	const {
 		baseUrl,
