@@ -233,7 +233,7 @@
 >
 	<div class="group flex flex-col items-end gap-2" data-message-id={message.id}>
 		{#if attachments.length > 0}
-			<div class="flex max-w-[80%] flex-wrap gap-2">
+			<div class="flex max-w-[80%] flex-wrap gap-2 justify-end">
 				{#each attachments as attachment (attachment.id)}
 					<MessageAttachment {attachment} {openViewer} />
 				{/each}
