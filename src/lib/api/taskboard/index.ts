@@ -29,8 +29,7 @@ async function validateAndRepairTaskList(
 
 	// Repair fields: normalize number/executedCount, and reset in_progress tasks.
 	for (const task of parsed) {
-		const hadNewFields =
-			task && ("executedCount" in task || (typeof task?.number === "number" && "number" in task));
+		const hadNewFields = task && ("executedCount" in task || typeof task?.number === "number");
 
 		// number (repeat count / total repeats): ensure finite integer in [1, 99]
 		const rawNumber = task?.number;

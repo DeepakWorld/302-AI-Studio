@@ -48,6 +48,17 @@ export class CodeAgentTaskboardState {
 	inProgressTask = $derived<Task | null>(
 		this.tasklist.find((task) => task.status === "in_progress") ?? null,
 	);
+
+	activeTask = $derived.by(() => {
+		if (this.taskboardStatus === "running" || this.taskboardStatus === "waiting_to_stop") {
+			return (
+				this.tasklist.find((t) => t.status === "in_progress") ??
+				this.tasklist.find((t) => t.status === "pending")
+			);
+		}
+		return this.tasklist.find((t) => t.status === "pending");
+	});
+
 	canStart = $derived(
 		(this.taskboardStatus === "idle" || this.taskboardStatus === "waiting_for_chat") &&
 			this.tasklist.some((t) => t.status === "pending"),
@@ -373,8 +384,8 @@ export class CodeAgentTaskboardState {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
 
-		const total = Math.min(99, Math.max(1, Number.parseInt(`${task.number ?? 1}`, 10) || 1));
-		const executed = Math.max(0, Number.parseInt(`${task.executedCount ?? 0}`, 10) || 0);
+		const total = Math.min(99, Math.max(1, task.number ?? 1));
+		const executed = Math.max(0, task.executedCount ?? 0);
 		const remaining = total - executed;
 		if (remaining <= 0) {
 			await this.#updateTaskStatus(task.id, "done");
@@ -407,14 +418,8 @@ export class CodeAgentTaskboardState {
 
 				if (success) {
 					const updatedTask = this.tasklist.find((t) => t.id === task.id);
-					const nextTotal = Math.min(
-						99,
-						Math.max(1, Number.parseInt(`${updatedTask?.number ?? total}`, 10) || total),
-					);
-					const nextExecuted = Math.max(
-						0,
-						Number.parseInt(`${updatedTask?.executedCount ?? executed + 1}`, 10) || executed + 1,
-					);
+					const nextTotal = Math.min(99, Math.max(1, updatedTask?.number ?? total));
+					const nextExecuted = Math.max(0, updatedTask?.executedCount ?? executed + 1);
 					const nextRemaining = nextTotal - nextExecuted;
 					await this.#updateTaskStatus(task.id, nextRemaining > 0 ? "pending" : "done");
 					return;
