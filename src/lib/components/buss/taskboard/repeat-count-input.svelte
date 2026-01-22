@@ -78,9 +78,15 @@
 			value={count}
 			oninput={(e) => {
 				const input = e.currentTarget as HTMLInputElement;
+				// 允许输入过程中暂时为空或为0，方便用户修改数字
+				if (!input.value || Number.parseInt(input.value, 10) === 0) {
+					return;
+				}
 				count = normalizeRepeatNumber(input.value);
 				// 强制同步输入框的显示值，防止显示超过 99 的数字
-				input.value = count.toString();
+				if (input.value !== count.toString()) {
+					input.value = count.toString();
+				}
 			}}
 			onblur={(e) => {
 				const input = e.currentTarget as HTMLInputElement;
