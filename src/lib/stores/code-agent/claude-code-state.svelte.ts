@@ -380,7 +380,7 @@ class ClaudeCodeAgentState {
 		const currentSkillNames = new Set(this.skills.map((s) => s.name));
 		const uniqueNewSkills = skills
 			.filter((s) => !currentSkillNames.has(s.name))
-			.map((s) => ({ ...s, forceUse: true })); // Default to forceUse=true when enabled
+			.map((s) => ({ ...s, forceUse: false })); // Default to forceUse=false when enabled
 		if (uniqueNewSkills.length > 0) {
 			this.updateSkills([...this.skills, ...uniqueNewSkills]);
 		}
