@@ -8,6 +8,7 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
+	import { MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { Settings } from "@lucide/svelte";
 	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
 
@@ -24,6 +25,12 @@
 	function handleModeSelect(key: string) {
 		const isVibe = key === "vibe";
 		codeAgentState.updateEnabled(isVibe);
+
+		// 切换到聊天模式时，自动删除超出限制的附件（保留最新的）
+		if (!isVibe && chatState.attachments.length > MAX_ATTACHMENT_COUNT) {
+			const attachmentsToKeep = chatState.attachments.slice(-MAX_ATTACHMENT_COUNT);
+			chatState.attachments = attachmentsToKeep;
+		}
 
 		if (!chatState.hasMessages) {
 			if (isVibe) {

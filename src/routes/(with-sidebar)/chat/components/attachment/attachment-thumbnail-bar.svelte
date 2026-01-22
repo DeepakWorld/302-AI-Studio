@@ -29,7 +29,7 @@
 </script>
 
 {#if attachments.length > 0}
-	<div class="flex gap-2 pb-2">
+	<div class="flex flex-wrap gap-2 pb-2">
 		{#each attachments as attachment (attachment.id)}
 			{@const isLoading = chatState.isAttachmentLoading(attachment.id)}
 			<div class="group relative overflow-hidden rounded-lg border border-border">
