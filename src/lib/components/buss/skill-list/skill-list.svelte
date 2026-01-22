@@ -6,6 +6,7 @@
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { m } from "$lib/paraglide/messages";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { Plus, Search } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import { toast } from "svelte-sonner";
@@ -120,6 +121,8 @@
 
 		try {
 			await deleteSkill({ skill_list: [deletingSkill.name] });
+			codeAgentState.handleSkillsRemove([deletingSkill]);
+
 			toast.dismiss(toastId);
 			toast.success(m.skills_delete_success());
 			deleteDialogOpen = false;

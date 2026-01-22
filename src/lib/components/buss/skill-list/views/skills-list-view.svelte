@@ -141,6 +141,8 @@
 
 		try {
 			await deleteSkill({ skill_list: [deletingSkill.name] });
+			codeAgentState.handleSkillsRemove([deletingSkill]);
+
 			toast.dismiss(toastId);
 			toast.success(m.skills_delete_success());
 			deleteDialogOpen = false;
@@ -223,6 +225,8 @@
 
 		try {
 			await deleteSkill({ skill_list: skillsToDelete.map((s) => s.name) });
+			codeAgentState.handleSkillsRemove(skillsToDelete);
+
 			toast.dismiss(toastId);
 			toast.success(m.skills_delete_success());
 			clearSelection();
