@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { updateSessionNote } from "$lib/api/sandbox-session";
 	import { validate302Provider } from "$lib/api/webserve-deploy";
+	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { Button } from "$lib/components/ui/button";
 	import * as ContextMenu from "$lib/components/ui/context-menu";
 	import * as Dialog from "$lib/components/ui/dialog";
@@ -12,7 +13,7 @@
 	} from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { formatDateTimeFull } from "$lib/utils/date-format";
-	import { Loader2 } from "@lucide/svelte";
+	import { ExternalLink, Loader2 } from "@lucide/svelte";
 	import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
 	import { toast } from "svelte-sonner";
 	import SandboxDeleteConfirmDialog from "./sandbox-delete-confirm-dialog.svelte";
@@ -44,6 +45,7 @@
 	let isSessionRemarkDialogOpen = $state(false);
 	let isSessionDeleteDialogOpen = $state(false);
 	let targetSession = $state<SessionType | null>(null);
+	let isOpeningSession = $state<string>("");
 
 	// Get the latest sessions from the persisted state
 	const sessions = $derived.by(() => {
@@ -135,6 +137,39 @@
 		isSessionDeleteDialogOpen = false;
 		// Refresh is handled in the deleteSession method
 	}
+
+	async function handleOpenSession(session: SessionType) {
+		if (!sandbox || !session) return;
+		isOpeningSession = session.sessionId;
+
+		try {
+			// Get threadId for this session
+			const { isOK, threadId } = await window.electronAPI.codeAgentService.getThreadIdBySessionId(
+				sandbox.sandboxId,
+				session.sessionId,
+			);
+
+			if (!isOK || !threadId) {
+				toast.error(m.toast_thread_not_found());
+				return;
+			}
+
+			// Navigate to the thread
+			const result = await window.electronAPI.windowService.navigateToThread(threadId);
+
+			if (result.success) {
+				// Close dialog on successful navigation
+				onClose();
+			} else {
+				toast.error(m.toast_navigate_failed());
+			}
+		} catch (error) {
+			console.error("Failed to open session:", error);
+			toast.error(m.toast_navigate_failed());
+		} finally {
+			isOpeningSession = "";
+		}
+	}
 </script>
 
 <Dialog.Root bind:open>
@@ -171,16 +206,34 @@
 					{#each sessions as session (session.sessionId)}
 						<ContextMenu.Root>
 							<ContextMenu.Trigger>
-								<div class="flex items-center justify-between p-4 rounded-xl bg-muted/50">
-									<div>
-										<p class="text-sm font-medium text-foreground">
-											{session.note || session.sessionId}
-										</p>
-										{#if session.note}
-											<p class="text-xs text-muted-foreground">{session.sessionId}</p>
-										{/if}
+								<div class="flex items-center justify-between p-4 rounded-xl bg-muted/50 group">
+									<div class="flex items-center gap-3 flex-1 min-w-0">
+										<div class="min-w-0 flex-1">
+											<p class="text-sm font-medium text-foreground">
+												{session.note || session.sessionId}
+											</p>
+											{#if session.note}
+												<p class="text-xs text-muted-foreground">{session.sessionId}</p>
+											{/if}
+										</div>
 									</div>
-									<span class="text-sm text-muted-foreground">{formatTime(session)}</span>
+									<div class="flex items-center gap-2">
+										<span class="text-sm text-muted-foreground">{formatTime(session)}</span>
+										<ButtonWithTooltip
+											tooltip={m.tooltip_open_session()}
+											variant="ghost"
+											size="icon-sm"
+											class="opacity-0 group-hover:opacity-100 transition-opacity"
+											disabled={isOpeningSession === session.sessionId}
+											onclick={() => handleOpenSession(session)}
+										>
+											{#if isOpeningSession === session.sessionId}
+												<Loader2 class="h-4 w-4 animate-spin" />
+											{:else}
+												<ExternalLink class="h-4 w-4" />
+											{/if}
+										</ButtonWithTooltip>
+									</div>
 								</div>
 							</ContextMenu.Trigger>
 							<ContextMenu.Content>

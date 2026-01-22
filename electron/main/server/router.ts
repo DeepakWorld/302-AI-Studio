@@ -1396,8 +1396,11 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		const planModePrompt = `
 <plan_mode_instructions>
 <critical_constraint>
- 每个回合只能调用一次 AskUserQuestion 工具。
- 一旦调用过 ExitPlanMode，后续不要再调用
+**硬性规则 - 违反即为严重错误：**
+在单次响应(single response)中，只能调用以下工具之一：
+   - 调用1次 AskUserQuestion，OR
+   - 调用1次 ExitPlanMode
+   - 绝不允许：调用2次AskUserQuestion
 
 </critical_constraint>
 
