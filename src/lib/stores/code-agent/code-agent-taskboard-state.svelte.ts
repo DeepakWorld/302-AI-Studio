@@ -419,6 +419,15 @@ export class CodeAgentTaskboardState {
 				const success = await this.#waitForChatFinished();
 
 				if (success) {
+					const [sandboxId, path] = [
+						codeAgentState.sandboxId,
+						claudeCodeSandboxState.currentSessionWorkspacePath,
+					];
+					const { isOk, tasks } = await _getTasklist(sandboxId, path);
+					if (isOk) {
+						this.tasklist = this.#sortTasks(tasks);
+					}
+
 					const updatedTask = this.tasklist.find((t) => t.id === task.id);
 					const nextTotal = Math.min(99, Math.max(1, updatedTask?.number ?? total));
 					const nextExecuted = Math.max(0, updatedTask?.executedCount ?? executed + 1);
