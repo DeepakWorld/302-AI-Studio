@@ -1,6 +1,6 @@
 import { taskListSchema, type Task } from "@shared/types";
 import { type } from "arktype";
-import { batchUploadFile, executeCommand } from "./base-apis";
+import { batchUploadFile, downloadFilesFromSandbox, executeCommand } from "./base-apis";
 
 const TODO_TASKS_FILE_PATH = ".302ai/todo/tasks.json";
 const ATTACHMENTS_DIR_PATH = ".302ai/attachments";
@@ -118,6 +118,32 @@ export async function getTasklist(
 		}
 
 		const tasks = await validateAndRepairTaskList(sandboxId, cwd, response.result.stdout);
+		return { isOk: true, tasks };
+	} catch (error) {
+		console.error("Failed to get task list:", error);
+		return { isOk: false, tasks: [] };
+	}
+}
+
+/**
+ * Get the task list from the sandbox
+ * @param sandboxId - The sandbox ID
+ * @param cwd - The project root directory
+ * @returns The task list
+ */
+export async function _getTasklist(
+	sandboxId: string,
+	cwd: string,
+): Promise<{ isOk: boolean; tasks: Task[] }> {
+	try {
+		const tasksFilePath = `${cwd}/${TODO_TASKS_FILE_PATH}`;
+		const response = await downloadFilesFromSandbox({
+			sandboxId,
+			path: tasksFilePath,
+			format: "text",
+		});
+
+		const tasks = await validateAndRepairTaskList(sandboxId, cwd, response.content);
 		return { isOk: true, tasks };
 	} catch (error) {
 		console.error("Failed to get task list:", error);

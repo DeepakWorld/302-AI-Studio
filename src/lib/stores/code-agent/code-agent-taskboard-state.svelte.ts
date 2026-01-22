@@ -1,5 +1,5 @@
 import {
-	getTasklist,
+	_getTasklist,
 	updateTasklist,
 	uploadAttachments,
 	type Attachment,
@@ -247,7 +247,7 @@ export class CodeAgentTaskboardState {
 							claudeCodeSandboxState.currentSessionWorkspacePath,
 						];
 						if (path) {
-							const { isOk, tasks } = await getTasklist(sandboxId, path);
+							const { isOk, tasks } = await _getTasklist(sandboxId, path);
 
 							// Strategy: Prefer local data if remote is suspiciously empty/corrupted
 							if (isOk) {
@@ -298,7 +298,7 @@ export class CodeAgentTaskboardState {
 
 				const result = await updateTasklist(sandboxId, path, sortedTasklist);
 				if (!result.isOk) {
-					const { isOk, tasks } = await getTasklist(sandboxId, path);
+					const { isOk, tasks } = await _getTasklist(sandboxId, path);
 					this.tasklist = isOk ? this.#sortTasks(tasks) : [];
 
 					toast.error(m.taskboard_update_failed());

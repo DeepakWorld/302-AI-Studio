@@ -1,4 +1,3 @@
-import { withRetry } from "$lib/utils/retry";
 import { type } from "arktype";
 import { _302AIKy } from "../core/_302ai-ky";
 
@@ -28,28 +27,26 @@ export type ExecuteCommandResponse = typeof executeCommandResponseSchema.infer;
 export async function executeCommand(
 	request: ExecuteCommandRequest,
 ): Promise<ExecuteCommandResponse> {
-	return withRetry(
-		async () => {
-			const response = await _302AIKy
-				.post("302/claude-code/commands", {
-					json: {
-						sandbox_id: request.sandboxId,
-						command: request.command,
-					},
-				})
-				.json();
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/commands", {
+				json: {
+					sandbox_id: request.sandboxId,
+					command: request.command,
+				},
+			})
+			.json();
 
-			const validated = executeCommandResponseSchema(response);
-			if (validated instanceof type.errors) {
-				console.error("Failed to validate execute command response:", validated.summary);
-				throw new Error("Invalid response format from execute command API");
-			}
-			return validated;
-		},
-		3,
-		1000,
-		10000,
-	);
+		const validated = executeCommandResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate execute command response:", validated.summary);
+			throw new Error("Invalid response format from execute command API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to execute command:", error);
+		throw error;
+	}
 }
 
 export const sandboxFileOperationResponseSchema = type({
@@ -172,19 +169,73 @@ export type BatchUploadFileResponse = typeof batchUploadFileResponseSchema.infer
 export async function batchUploadFile(
 	request: BatchUploadFileRequest,
 ): Promise<BatchUploadFileResponse> {
-	const response = await _302AIKy
-		.post("302/claude-code/sandbox/file/upload/batch", {
-			json: request,
-			timeout: 300000,
-		})
-		.json();
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/file/upload/batch", {
+				json: request,
+				timeout: 300000,
+			})
+			.json();
 
-	console.log("Batch upload raw response:", JSON.stringify(response, null, 2));
+		console.log("Batch upload raw response:", JSON.stringify(response, null, 2));
 
-	const validated = batchUploadFileResponseSchema(response);
-	if (validated instanceof type.errors) {
-		console.error("Failed to validate batch upload file response:", validated.summary);
-		throw new Error("Invalid response format from batch upload file API");
+		const validated = batchUploadFileResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate batch upload file response:", validated.summary);
+			throw new Error("Invalid response format from batch upload file API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to batch upload files:", error);
+		throw error;
 	}
-	return validated;
+}
+
+export const formatType = type("'txt' | 'text' | 'log' | 'md' | 'rst'")
+	.or(
+		"'json' | 'jsonl' | 'xml' | 'yaml' | 'yml' | 'toml' | 'ini' | 'conf' | 'cfg' | 'properties' | 'csv' | 'tsv'",
+	)
+	.or(
+		"'py' | 'js' | 'ts' | 'java' | 'c' | 'cc' | 'cpp' | 'h' | 'hpp' | 'go' | 'rs' | 'sh' | 'bat' | 'ps1' | 'php' | 'rb' | 'sql' | 'css' | 'html'",
+	);
+export type FormatType = typeof formatType.infer;
+export const downloadFilesRequestSchema = type({
+	sandboxId: "string",
+	path: "string",
+	format: formatType,
+});
+export type DownloadFilesRequest = typeof downloadFilesRequestSchema.infer;
+export const downloadFilesResponseSchema = type({
+	format: formatType,
+	path: "string",
+	content: "string",
+	filename: "string",
+});
+export type DownloadFilesResponse = typeof downloadFilesResponseSchema.infer;
+
+export async function downloadFilesFromSandbox(
+	request: DownloadFilesRequest,
+): Promise<DownloadFilesResponse> {
+	const { sandboxId, path, format } = request;
+	try {
+		const response = await _302AIKy
+			.post("302/claude-code/sandbox/file/download", {
+				json: {
+					sandbox_id: sandboxId,
+					path,
+					format,
+				},
+			})
+			.json();
+
+		const validated = downloadFilesResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate download files response:", validated.summary);
+			throw new Error("Invalid response format from download files API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to download files:", error);
+		throw error;
+	}
 }
