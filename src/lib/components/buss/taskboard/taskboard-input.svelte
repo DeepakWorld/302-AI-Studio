@@ -21,7 +21,7 @@
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 	import ButtonWithTooltip from "../button-with-tooltip/button-with-tooltip.svelte";
-	import RepeatCountInput from "./repeat-count-input.svelte";
+	import CompactNumberInput from "./compact-number-input.svelte";
 	import TaskDecomposeDialog from "./task-decompose-dialog.svelte";
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
@@ -304,7 +304,7 @@
 					<Paperclip class="size-4" />
 				</ButtonWithTooltip>
 
-				<RepeatCountInput bind:count={codeAgentTaskboardState.repeatCount} />
+				<CompactNumberInput bind:count={codeAgentTaskboardState.repeatCount} />
 			</div>
 
 			<!-- Right: Decompose and Add button -->

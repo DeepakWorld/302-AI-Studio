@@ -3,16 +3,27 @@
 	import * as m from "$lib/paraglide/messages";
 	import { cn } from "$lib/utils.js";
 	import { Repeat2 } from "@lucide/svelte";
+	import type { Component } from "svelte";
 	import ButtonWithTooltip from "../button-with-tooltip/button-with-tooltip.svelte";
 
-	let { count = $bindable(1) }: { count: number } = $props();
+	let {
+		count = $bindable(1),
+		defaultCount = 1,
+		tooltip = m.taskboard_repeat_times(),
+		Icon = Repeat2,
+	}: {
+		count: number;
+		defaultCount?: number;
+		tooltip?: string;
+		Icon?: Component;
+	} = $props();
 
-	let repeatPinned = $state(false);
-	let repeatInputRef = $state<HTMLInputElement | null>(null);
+	let isEditing = $state(false);
+	let inputRef = $state<HTMLInputElement | null>(null);
 
-	function normalizeRepeatNumber(value: string): number {
+	function normalizeNumber(value: string): number {
 		const n = Number.parseInt(value, 10);
-		return Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 1;
+		return Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : defaultCount;
 	}
 </script>
 
@@ -23,34 +34,34 @@
 		"h-8",
 	)}
 	role="group"
-	onmouseenter={() => (repeatPinned ? null : (repeatPinned = false))}
+	onmouseenter={() => (isEditing ? null : (isEditing = false))}
 	onmouseleave={() => {
-		if (!repeatPinned) {
-			repeatPinned = false;
-			repeatInputRef?.blur();
+		if (!isEditing) {
+			isEditing = false;
+			inputRef?.blur();
 		}
 	}}
 >
 	<div onmousedown={(e) => e.preventDefault()} role="none">
 		<ButtonWithTooltip
-			tooltip={m.taskboard_repeat_times()}
+			{tooltip}
 			class="hover:bg-transparent dark:hover:bg-transparent"
 			onclick={() => {
-				repeatPinned = true;
-				repeatInputRef?.focus();
+				isEditing = true;
+				inputRef?.focus();
 			}}
 			size="icon-sm"
 		>
-			<Repeat2 class="size-4" />
+			<Icon class="size-4" />
 		</ButtonWithTooltip>
 	</div>
 
-	{#if !repeatPinned}
+	{#if !isEditing}
 		<button
 			class="text-xs pr-2 pl-0.5 cursor-pointer select-none animate-in fade-in zoom-in duration-200"
 			onclick={() => {
-				repeatPinned = true;
-				repeatInputRef?.focus();
+				isEditing = true;
+				inputRef?.focus();
 			}}
 		>
 			{count}
@@ -60,11 +71,11 @@
 	<div
 		class={cn(
 			"overflow-hidden transition-[width] duration-300 ease-out",
-			repeatPinned ? "w-10" : "w-0",
+			isEditing ? "w-10" : "w-0",
 		)}
 	>
 		<Input
-			bind:ref={repeatInputRef}
+			bind:ref={inputRef}
 			type="number"
 			min={1}
 			max={99}
@@ -78,20 +89,18 @@
 			value={count}
 			oninput={(e) => {
 				const input = e.currentTarget as HTMLInputElement;
-				// 允许输入过程中暂时为空或为0，方便用户修改数字
 				if (!input.value || Number.parseInt(input.value, 10) === 0) {
 					return;
 				}
-				count = normalizeRepeatNumber(input.value);
-				// 强制同步输入框的显示值，防止显示超过 99 的数字
+				count = normalizeNumber(input.value);
 				if (input.value !== count.toString()) {
 					input.value = count.toString();
 				}
 			}}
 			onblur={(e) => {
 				const input = e.currentTarget as HTMLInputElement;
-				repeatPinned = false;
-				count = normalizeRepeatNumber(input.value);
+				isEditing = false;
+				count = normalizeNumber(input.value);
 				input.value = count.toString();
 			}}
 		/>

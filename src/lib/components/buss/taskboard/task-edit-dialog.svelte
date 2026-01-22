@@ -25,7 +25,7 @@
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 	import { ButtonWithTooltip } from "../button-with-tooltip";
-	import RepeatCountInput from "./repeat-count-input.svelte";
+	import CompactNumberInput from "./compact-number-input.svelte";
 
 	interface Props {
 		open?: boolean;
@@ -342,7 +342,7 @@
 							<Paperclip class="size-4" />
 						</ButtonWithTooltip>
 
-						<RepeatCountInput bind:count={repeatCount} />
+						<CompactNumberInput bind:count={repeatCount} />
 					</div>
 
 					<div class="w-1"></div>

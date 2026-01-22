@@ -2,7 +2,6 @@
 	import { decomposeTasks } from "$lib/api/task-decomposer";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Dialog from "$lib/components/ui/dialog";
-	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import * as m from "$lib/paraglide/messages";
@@ -11,8 +10,9 @@
 	import { persistedModelState, persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { sessionState } from "$lib/stores/session-state.svelte";
 	import { cn } from "$lib/utils.js";
-	import { Loader } from "@lucide/svelte";
+	import { ListOrdered, Loader } from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
+	import CompactNumberInput from "./compact-number-input.svelte";
 
 	interface Props {
 		open?: boolean;
@@ -70,6 +70,10 @@
 			return;
 		}
 
+		if (!taskCount || taskCount < 1) {
+			taskCount = 3;
+		}
+
 		const model = getCurrentModel();
 		if (!model) {
 			toast.error(m.toast_no_model());
@@ -112,11 +116,6 @@
 			handleDecompose();
 		}
 	}
-
-	function normalizeTaskCount(value: string): number {
-		const n = Number.parseInt(value, 10);
-		return Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 1;
-	}
 </script>
 
 <Dialog.Root bind:open>
@@ -151,26 +150,14 @@
 
 			<!-- Task count input -->
 			<div class="flex items-center gap-4">
-				<Label for="task-count" class="whitespace-nowrap">
+				<Label class="whitespace-nowrap">
 					{m.taskboard_auto_decompose_count_label()}
 				</Label>
-				<Input
-					id="task-count"
-					type="number"
-					min="1"
-					max="99"
-					class="w-20"
-					bind:value={taskCount}
-					oninput={(e) => {
-						const input = e.currentTarget as HTMLInputElement;
-						taskCount = normalizeTaskCount(input.value);
-						input.value = taskCount.toString();
-					}}
-					onblur={(e) => {
-						const input = e.currentTarget as HTMLInputElement;
-						taskCount = normalizeTaskCount(input.value);
-						input.value = taskCount.toString();
-					}}
+				<CompactNumberInput
+					bind:count={taskCount}
+					defaultCount={3}
+					Icon={ListOrdered}
+					tooltip={m.taskboard_auto_decompose_count_label()}
 				/>
 			</div>
 		</div>
