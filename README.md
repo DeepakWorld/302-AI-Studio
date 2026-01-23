@@ -6,44 +6,66 @@
 </h1>
 
 <p align="center">
-<em>302 AI Studio is a desktop client supporting multiple LLM service providers, compatible with Windows, Mac, and Linux.</em>
+<em>Your cross-platform desktop AI application for Windows, Mac, and Linux. Provides powerful general AI capabilities such as code generation, document summarization, and intelligent Q&A to comprehensively boost your productivity.</em>
 </p>
 
-<p align="center"><a href="https://302.ai/" target="blank"><img src="https://file.302.ai/gpt/imgs/github/20250102/72a57c4263944b73bf521830878ae39a.png" /></a></p >
+<p align="center"><a href="https://302.ai/" target="blank"><img src="docs/imgs/banner.png" /></a></p >
 
 <p align="center"><a href="README_zh.md">中文</a> | <a href="README.md">English</a> | <a href="README_ja.md">日本語</a></p>
 
-![](docs/imgs/桌面客户端-en.png)
+<p align="center">
+  <a href="https://studio.302.ai/en"> Official Website</a> •
+  <a href="https://studio.302.ai/en/docs"> Documentation</a> •
+  <a href="https://studio.302.ai/en/docs/getting-started"> Quick Start</a> •
+  <a href="https://studio.302.ai/en/docs/changelog"> Changelog</a> •
+  <a href="https://302.ai"> 302.AI Platform</a>
+</p>
 
-## 🖼️ Interface Screenshots
+## 🖼️ Interface Preview
 
-Home chat interface, providing input box, toolbar, model selection, and quick access to commonly used AI tools  
+### Main Chat Interface
+Clean and intuitive conversation interface, supporting multi-model switching, file uploads, tool invocation, and more
 <img src="./docs/imgs/302_AI_Studio_en_screenshot_01.png" >
 
-Multi-tab chat interface with conversation list on the left and chat window on the right
+### Multi-Tab Management
+Conversation list on the left, multi-tab dialogue window on the right, easily manage multiple conversation threads
 <img src="./docs/imgs/302_AI_Studio_en_screenshot_02.png" >
 
-Quickly open AI applications within the client, no need to visit websites
+### AI Application Integration
+Built-in 302.AI toolbox, quickly open various AI applications with one click, no need to switch to browser
 <img src="./docs/imgs/302_AI_Studio_en_screenshot_03.png" >
 
-Settings page in standalone window, including General, Account, Preferences, MCP, and other common configurations
+### Settings & Configuration
+Independent settings window, supporting data management, Vibe mode, Skills, MCP servers, and other configurations
 <img src="./docs/imgs/302_AI_Studio_en_screenshot_04.png" >
-<img src="./docs/imgs/302_AI_Studio_en_screenshot_05.png" >
 
-Agent management page, supports switching between remote/local platforms and viewing/managing the list of agent sandboxes
-<img src="./docs/imgs/302_AI_Studio_en_screenshot_06.png" >
+### Vibe Coding
+Support real-time preview of AI-generated front-end code effects, WYSIWYG development experience
+<img src="./docs/imgs/302_AI_Studio_en_screenshot_05.png" >
 
 ## 🌟 Key Features
 
 ### Multi-Model & Multi-Provider Support
-
 - 🤖 Support for OpenAI, Anthropic, Google, and other major AI providers
-- 🔄 Flexible model switching and configuration
+- 🔄 Flexible model switching and configuration, switch between different models in the same conversation at any time
 - 🎛️ Advanced conversation parameter controls (temperature, top-p, token limits, etc.)
 - 📊 MCP (Model Context Protocol) server integration
 
-### Document & Data Processing
+### Vibe Mode (Vibe Coding)
+- 🤖 Integrated Claude Code, support natural language requirement description, AI automatically completes development
+- ☁️ Cloud sandbox environment, pre-installed with Node.js, Python, Git, CMake, and other development toolchains, zero configuration out of the box
+- 🔒 Independently isolated cloud execution environment, AI operations do not affect local files
+- 📋 Task panel displays AI execution process in real-time, achieving batch management and automatic execution of multiple AI tasks
+- 🚀 One-click project deployment, instant launch, persistent hosting
+- 🎭 Side-by-side preview of code execution results, supporting preview, file tree, and terminal three view modes
+- 🧠 Support Plan mode, allowing AI to plan the implementation approach before execution, suitable for complex tasks and architectural design
 
+### Claude Skills
+- 📦 Support 4 creation methods: manual writing, file upload, GitHub import, history generation
+- 🔧 Built-in 17 official Skills, ready to use out of the box
+- 📝 Visual management interface, easily edit and organize Skills
+
+### Document & Data Processing
 - 🖼️ Upload images for AI-assisted content analysis and description generation
 - 📄 Support for multiple file formats
 - 💻 Code syntax highlighting
@@ -51,41 +73,90 @@ Agent management page, supports switching between remote/local platforms and vie
 - 📝 Full Markdown rendering support
 
 ### Excellent User Experience
-
 - 🖥️ Multi-platform support for Windows, Mac, and Linux
-- 🌙 Customizable light/dark theme system with real-time preview
-- 👤 Support account login, and allows checking balance and usage
-- 📝 Complete Markdown rendering
+- 🌙 Customizable light/dark theme system, support for custom CSS styles
+- 👤 Support account login, and query balance and usage
 - 📱 Responsive design, perfectly adapts to various screen sizes
-- 🎨 Modern component library based on Shadcn-Svelte
 
 ### Efficient Workflow
-
-- 🗂️ Manage multiple conversation threads simultaneously, organized and clear
+- 🗂️ Manage multiple conversation threads simultaneously, clear thinking without confusion
 - ⚡ Support for real-time streaming responses
 - ⌨️ Complete keyboard shortcut system
-- 🔄 Hot Module Replacement (HMR) support for smooth development experience
+- 🧰 Built-in 302.AI tool marketplace, covering 50+ AI application tools
 
-### Agent Mode
+### Data Management & Privacy
+- 📂 Conversation records stored locally, protecting privacy
+- ☁️ Support cloud synchronization, cross-device access
+- 🕶️ Conversations support incognito mode, no chat records saved
+- 📤 Support import and export of conversation history
 
-- 🤖 Invoke Claude Code via remote sandbox environments for intelligent task planning
-- 🎯 Agent task execution and real-time monitoring, track task progress and status
-- 🔄 Intelligent workflow management, supporting complex task decomposition and collaboration
-- 📊 Agent session statistics and analysis, view execution history and performance data
-- 🚀 One-click full-stack application deployment, Agent automatically writes, tests, and deploys code
-- 📦 Support for multiple tech stacks, quickly build web applications, API services, and more
 
 ### Multi-Language Support
-
-- **中文**
-- **English**
-- **日本語**(coming soon)
+- 🇨🇳 Chinese
+- 🇺🇸 English
+- 🇯🇵 Japanese (coming soon)
 
 ## 📝 Changelog
 
-**[v25.50.8]** Added Agent mode; added quick login and account configuration
+### 26.3.5 (2026-01-23)
 
-> 💡 For the complete update history, please visit [GitHub Releases](https://github.com/302ai/302-AI-Studio-sv/releases)
+#### ✨ New Features
+- Skills Store: Added Skills Store in the client, supporting direct browsing, one-click installation, and immediate use of skills within the client
+- Vibe Mode Notification Optimization: When Vibe mode is inactive, task completion will be notified via desktop notifications
+- Task Board: Support for configuring task loop count, added AI intelligent decomposition feature
+- Help Documentation Entry: Added "View Help Documentation" button for quick access to usage instructions
+- Plan Mode: Added Plan mode (planning mode) for better task and plan management
+- Web Deployment Management: Support viewing all deployed web pages and deleting deployed web pages directly from the list
+
+#### 🔧 Improvements
+- Vibe Mode Model Settings: Support configuring default model for Vibe mode
+- Mode Switching Interaction Optimization: Optimized the switching interaction experience between normal chat mode and Vibe mode
+
+#### 🐛 Bug Fixes
+- Fixed the issue where editing a Skill name would incorrectly create a new Skill
+- Fixed the issue where in Plan mode, after multi-selecting tasks, selection could not be canceled in some cases
+- Fixed the issue where uploading txt attachments in Vibe mode could not be correctly synchronized to the sandbox environment
+
+### 26.3.4 (2026-01-21)
+
+#### ✨ New Features
+- Vibe Mode: Added Plan mode
+- Settings: Support viewing and deleting all deployed web pages
+- Task Panel: Added task loop count setting
+
+#### 🔧 Improvements
+- Vibe Mode: Support setting default model to use
+
+#### 🐛 Bug Fixes
+- Fixed the issue where closing the Vibe mode settings page would mistakenly close the preview window
+- Fixed the issue where starting a chat after writing on the task board would clear the task board content
+
+### 26.3.3 (2026-01-16)
+
+#### ✨ New Features
+- Task Panel: Added task panel module, supporting task orchestration, automatic execution, and other features
+- Tool Extensions: Added Nano-Banana-MD, Nano-Banana-PPT, and 3D Studio tools to the tool marketplace
+
+#### 🔧 Improvements
+- Message Copy Optimization: Chat messages support right-click menu to copy selected text content
+- Vibe Mode Enhancement: Support viewing associated files during AI conversation
+
+#### 🐛 Bug Fixes
+- Fixed the display abnormality issue where conversation content overflowed the chat container boundary
+- Fixed the issue where kimi-for-coding model could not be called normally in Vibe mode
+
+### 26.3.1 (2026-01-13)
+
+#### ✨ New Features
+- Support displaying changelog
+
+
+### 26.2.2 (2026-01-09)
+
+#### ✨ New Features
+- Claude Skills System: Brand new visual management panel
+- Support 4 Skill creation methods (manual/upload/GitHub/history)
+- Built-in 17 official Skills, ready to use out of the box
 
 ---
 
@@ -121,8 +192,8 @@ Agent management page, supports switching between remote/local platforms and vie
 
 ```bash
 # 1️⃣ Clone the project
-git clone https://github.com/302ai/302-AI-Studio-sv.git
-cd 302-AI-Studio-sv
+git clone https://github.com/302ai/302-AI-Studio.git
+cd 302-AI-Studio
 
 # 2️⃣ Install dependencies
 pnpm install
@@ -277,17 +348,28 @@ git push origin feature/amazing-feature
 # 5. Create a Pull Request
 ```
 
+## 🔗 Related Links
+
+<div align="center">
+
+### Official Website
+[![302.AI Official Site](https://img.shields.io/badge/302.AI-Official%20Site-blue.svg)](https://302.ai)
+[![Client Official Site](https://img.shields.io/badge/Studio-Client%20Site-purple.svg)](https://studio.302.ai/en)
+[![Official Documentation](https://img.shields.io/badge/📖-Official%20Docs-green.svg)](https://studio.302.ai/en/docs)
+[![API Documentation](https://img.shields.io/badge/API-Documentation-orange.svg)](https://doc.302.ai)
+[![Help Center](https://img.shields.io/badge/Help-Center-yellow.svg)](https://help.302.ai)
+
+</div>
+
 ## 💬 Contact Us
 
 <div align="center">
 
-[![Website](https://img.shields.io/badge/Website-302.ai-blue.svg)](https://302.ai)
-[![GitHub](https://img.shields.io/badge/GitHub-302--AI--Studio-black.svg)](https://github.com/302ai/302-AI-Studio-sv)
 [![Email](https://img.shields.io/badge/Email-support@302.ai-red.svg)](mailto:support@302.ai)
 
 **Encountering issues?** Please provide feedback in [GitHub Issues](https://github.com/302ai/302-AI-Studio-sv/issues)
 
-**Have feature suggestions?** We're waiting for you in [GitHub Discussions](https://github.com/302ai/302-AI-Studio-sv/discussions)
+**Quick Start?** Check out the [Quick Start Guide](https://studio.302.ai/en/docs/getting-started)
 
 </div>
 
