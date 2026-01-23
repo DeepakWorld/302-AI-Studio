@@ -31,6 +31,7 @@ const TAB_CONFIGS: Record<TabType, TabConfig> = {
 	codeAgent: { title: "Code Agent", getHref: () => "/code-agent" },
 	htmlPreview: { title: "HTML Preview", getHref: (id) => `/html-preview/${id}` },
 	helpDocs: { title: "Help Docs", getHref: () => "https://studio.302.ai/zh/docs" },
+	skillsHub: { title: "302 Skills Hub", getHref: () => "https://skills.302.ai" },
 } as const;
 
 const getTabConfig = (type: TabType) => TAB_CONFIGS[type] || TAB_CONFIGS.chat;
@@ -64,7 +65,7 @@ export class TabService {
 	private async newWebContentsView(windowId: number, tab: Tab): Promise<WebContentsView> {
 		let view: WebContentsView;
 
-		if (tab.type === "aiApplications" || tab.type === "helpDocs") {
+		if (tab.type === "aiApplications" || tab.type === "helpDocs" || tab.type === "skillsHub") {
 			view = WebContentsFactory.createAiApplicationView({
 				windowId,
 				type: "aiApplication",
@@ -92,7 +93,7 @@ export class TabService {
 		withDevToolsShortcuts(view);
 		withLoadHandlers(view, {
 			baseUrl:
-				tab.type === "aiApplications" || tab.type === "helpDocs"
+				tab.type === "aiApplications" || tab.type === "helpDocs" || tab.type === "skillsHub"
 					? tab.href
 					: MAIN_WINDOW_VITE_DEV_SERVER_URL || "app://localhost",
 			// autoOpenDevTools: !!MAIN_WINDOW_VITE_DEV_SERVER_URL,

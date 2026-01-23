@@ -1,7 +1,7 @@
 import { type } from "arktype";
 
 export const TabType = type(
-	"'chat' | 'settings' | 'aiApplications' | 'codeAgent' | 'htmlPreview' | 'helpDocs'",
+	"'chat' | 'settings' | 'aiApplications' | 'codeAgent' | 'htmlPreview' | 'helpDocs' | 'skillsHub'",
 );
 export type TabType = typeof TabType.infer;
 

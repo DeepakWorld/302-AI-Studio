@@ -32,6 +32,7 @@
 		MessageCircleQuestionMark,
 		MonitorSmartphone,
 		Settings,
+		ShoppingBag,
 		X,
 	} from "@lucide/svelte";
 	import type { Tab } from "@shared/types";
@@ -113,6 +114,8 @@
 		<MonitorSmartphone />
 	{:else if tabType === "helpDocs"}
 		<MessageCircleQuestionMark />
+	{:else if tabType === "skillsHub"}
+		<ShoppingBag />
 	{/if}
 {/snippet}
 

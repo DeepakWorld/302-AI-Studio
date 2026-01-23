@@ -343,6 +343,7 @@ class TabBarState {
 				return true;
 			})
 			.with("helpDocs", () => true)
+			.with("skillsHub", () => true)
 			.with("chat", () => true)
 			.with("aiApplications", () => true)
 			.with("codeAgent", () => true)
