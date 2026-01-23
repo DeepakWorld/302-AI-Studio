@@ -1,3 +1,36 @@
+import { batchUploadFile } from "../apis/code-agent";
+
+/**
+ * Send an error message through SSE stream and close the controller.
+ * This is a helper to avoid repeating error handling code.
+ *
+ * @param controller - The ReadableStreamDefaultController to send events through
+ * @param errorMessage - The error message to display to the user
+ */
+export function sendStreamError(
+	controller: ReadableStreamDefaultController<Uint8Array>,
+	errorMessage: string,
+): void {
+	const encoder = new TextEncoder();
+	const errorId = `error-${Date.now()}`;
+
+	controller.enqueue(
+		encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: errorId })}\n\n`),
+	);
+	controller.enqueue(
+		encoder.encode(
+			`data: ${JSON.stringify({ type: "text-delta", id: errorId, delta: `**Error**: ${errorMessage}` })}\n\n`,
+		),
+	);
+	controller.enqueue(
+		encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: errorId })}\n\n`),
+	);
+	controller.enqueue(
+		encoder.encode(`data: ${JSON.stringify({ type: "finish", finishReason: "error" })}\n\n`),
+	);
+	controller.close();
+}
+
 export type OpenAIChatContentPartText = {
 	type: "text";
 	text: string;
@@ -350,6 +383,92 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
 }
 
 /**
+ * Prepends a prompt string to the first user message in a list of messages.
+ * Handles both string content and array content (multi-modal/parts).
+ * Immutably updates the message object in the array.
+ *
+ * Supported message structures:
+ * 1. { role: 'user', parts: [{ type: 'text', text: '...' }] }
+ * 2. { role: 'user', content: [{ type: 'text', text: '...' }] }
+ * 3. { role: 'user', content: '...' }
+ *
+ * @param messages The list of messages (mutable array)
+ * @param prompt The prompt string to prepend
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function prependPromptToFirstUserMessage(messages: any[], prompt: string): void {
+	// Find the first user message and prepend the prompt
+	for (let i = 0; i < messages.length; i++) {
+		if (messages[i].role === "user") {
+			const msg = messages[i];
+
+			// Handle 'parts' property (priority, common in newer AI SDK)
+			if (Array.isArray(msg.parts)) {
+				const newParts = [...msg.parts];
+				let firstTextPartIndex = -1;
+
+				// Find the first text part
+				for (let j = 0; j < newParts.length; j++) {
+					if (newParts[j].type === "text") {
+						firstTextPartIndex = j;
+						break;
+					}
+				}
+
+				if (firstTextPartIndex !== -1) {
+					// Create a new text part with prepended prompt
+					newParts[firstTextPartIndex] = {
+						...newParts[firstTextPartIndex],
+						text: prompt + newParts[firstTextPartIndex].text,
+					};
+				} else {
+					newParts.unshift({ type: "text", text: prompt });
+				}
+
+				messages[i] = {
+					...msg,
+					parts: newParts,
+				};
+			}
+			// Handle 'content' property (fallback)
+			else {
+				const content = msg.content;
+				let newContent = content;
+
+				if (Array.isArray(content)) {
+					newContent = [...content];
+					let firstTextPartIndex = -1;
+
+					for (let j = 0; j < newContent.length; j++) {
+						if (newContent[j].type === "text") {
+							firstTextPartIndex = j;
+							break;
+						}
+					}
+
+					if (firstTextPartIndex !== -1) {
+						newContent[firstTextPartIndex] = {
+							...newContent[firstTextPartIndex],
+							text: prompt + newContent[firstTextPartIndex].text,
+						};
+					} else {
+						newContent.unshift({ type: "text", text: prompt });
+					}
+				} else if (typeof content === "string") {
+					newContent = prompt + content;
+				}
+
+				messages[i] = {
+					...msg,
+					content: newContent,
+				};
+			}
+			break;
+		}
+	}
+}
+
+/**
  * Appends a prompt string to the last user message in a list of messages.
  * Handles both string content and array content (multi-modal/parts).
  * Immutably updates the message object in the array.
@@ -364,10 +483,30 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function appendPromptToLastUserMessage(messages: any[], prompt: string): void {
+	const EXCLUDE_PREFIX = ["/commands", "/deploy", "/model", "/max_thinking_token"];
+
 	// Find the last user message and append the prompt
 	for (let i = messages.length - 1; i >= 0; i--) {
 		if (messages[i].role === "user") {
 			const msg = messages[i];
+
+			// Check if the message starts with any of the excluded prefixes
+			let firstText = "";
+			if (typeof msg.content === "string") {
+				firstText = msg.content;
+			} else if (
+				Array.isArray(msg.content) &&
+				msg.content.length > 0 &&
+				msg.content[0].type === "text"
+			) {
+				firstText = msg.content[0].text;
+			} else if (Array.isArray(msg.parts) && msg.parts.length > 0 && msg.parts[0].type === "text") {
+				firstText = msg.parts[0].text;
+			}
+
+			if (EXCLUDE_PREFIX.some((prefix) => firstText.startsWith(prefix))) {
+				break;
+			}
 
 			// Handle 'parts' property (priority, common in newer AI SDK)
 			if (Array.isArray(msg.parts)) {
@@ -432,5 +571,167 @@ export function appendPromptToLastUserMessage(messages: any[], prompt: string): 
 			}
 			break;
 		}
+	}
+}
+
+/**
+ * Prepends or appends a prompt string to system message in a list of messages.
+ * If no system message exists, creates one. If system message exists, appends to it.
+ *
+ * @param messages The list of messages (mutable array)
+ * @param prompt The prompt string to prepend or append
+ * @param prepend Whether to prepend (before existing content) or append (after). Default is append.
+ */
+
+export function appendPromptToSystemMessage(
+	messages: any[], // eslint-disable-line @typescript-eslint/no-explicit-any
+	prompt: string,
+	prepend = false,
+): void {
+	// Find existing system message
+	const existingSystemIndex = messages.findIndex((msg) => msg.role === "system");
+
+	if (existingSystemIndex !== -1) {
+		// System message exists, append or prepend to it
+		const msg = messages[existingSystemIndex];
+		const parts = msg.parts;
+		const content = msg.content;
+
+		// Handle parts array (UIMessage structure)
+		if (Array.isArray(parts)) {
+			const newParts = [...parts];
+			if (prepend) {
+				newParts.unshift({ type: "text", text: prompt });
+			} else {
+				newParts.push({ type: "text", text: prompt });
+			}
+			messages[existingSystemIndex] = {
+				...msg,
+				parts: newParts,
+			};
+		}
+		// Handle content array
+		else if (Array.isArray(content)) {
+			const newContent = [...content];
+			if (prepend) {
+				newContent.unshift({ type: "text", text: prompt });
+			} else {
+				newContent.push({ type: "text", text: prompt });
+			}
+			messages[existingSystemIndex] = {
+				...msg,
+				content: newContent,
+			};
+		}
+		// Handle content string
+		else if (typeof content === "string") {
+			messages[existingSystemIndex] = {
+				...msg,
+				content: prepend ? prompt + content : content + prompt,
+			};
+		}
+	} else {
+		// No system message, create one at the beginning with parts structure
+		messages.unshift({
+			role: "system",
+			content: prompt,
+			parts: [{ type: "text", text: prompt }],
+		});
+	}
+}
+
+/**
+ * Upload attachments from message metadata to sandbox before sending to AI provider.
+ * This enables non-blocking UX where users see immediate stream response.
+ *
+ * @param sandboxId - The sandbox ID to upload to
+ * @param workspacePath - The workspace path in the sandbox
+ * @param messages - The messages array containing attachment metadata
+ * @returns Promise that resolves when upload completes (or fails gracefully)
+ */
+export async function uploadAttachmentsFromMessages(
+	sandboxId: string,
+	workspacePath: string,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	messages: any[],
+): Promise<void> {
+	if (!sandboxId || !workspacePath || messages.length === 0) {
+		return;
+	}
+
+	const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const metadata = lastUserMessage?.metadata as any;
+	if (!metadata?.attachments) {
+		return;
+	}
+
+	const attachments = metadata.attachments as Array<{
+		id: string;
+		name: string;
+		type: string;
+		size: number;
+		preview?: string;
+		filePath?: string;
+	}>;
+
+	if (attachments.length === 0) {
+		return;
+	}
+
+	console.log(`[uploadAttachmentsFromMessages] Uploading ${attachments.length} attachments`);
+
+	try {
+		const fileList = await Promise.all(
+			attachments.map(async (att) => {
+				let base64Content: string | null = null;
+
+				// Priority 1: Use preview if it's already base64
+				if (att.preview && att.preview.startsWith("data:")) {
+					base64Content = att.preview;
+				}
+
+				if (!base64Content) {
+					console.warn(
+						`[uploadAttachmentsFromMessages] Attachment ${att.name} has no preview or filePath`,
+					);
+					return null;
+				}
+
+				return {
+					content: base64Content,
+					save_path: `${workspacePath}/${att.name}`,
+				};
+			}),
+		);
+
+		// Filter out null entries (failed reads)
+		const validFiles = fileList.filter((f) => f !== null) as Array<{
+			content: string;
+			save_path: string;
+		}>;
+
+		if (validFiles.length > 0) {
+			const uploadResponse = await batchUploadFile({
+				sandbox_id: sandboxId,
+				file_list: validFiles,
+			});
+
+			const failedUploads = uploadResponse.result.filter((r) => !r.success);
+			if (!uploadResponse.success || failedUploads.length > 0) {
+				console.error(
+					"[uploadAttachmentsFromMessages] Some attachments failed to upload:",
+					failedUploads.map((r) => r.error).join(", "),
+				);
+				// Continue anyway - partial upload is better than blocking
+			} else {
+				console.log(
+					`[uploadAttachmentsFromMessages] Successfully uploaded ${validFiles.length} attachments`,
+				);
+			}
+		}
+	} catch (error) {
+		console.error("[uploadAttachmentsFromMessages] Failed to upload attachments:", error);
+		// Continue anyway - don't block message sending
 	}
 }

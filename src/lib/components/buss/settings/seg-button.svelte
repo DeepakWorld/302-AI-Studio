@@ -15,9 +15,24 @@
 		selectedKey: string | null;
 		onSelect: (key: string) => void;
 		disabled?: boolean;
+		class?: string;
+		thumbClass?: string;
+		leftThumbClass?: string;
+		activeThumbClass?: string;
+		contentClass?: string;
 	}
 
-	const { options, selectedKey, onSelect, disabled }: Props = $props();
+	let {
+		options,
+		selectedKey,
+		onSelect,
+		disabled,
+		class: className,
+		thumbClass,
+		leftThumbClass,
+		activeThumbClass,
+		contentClass,
+	}: Props = $props();
 
 	let thumbStyle: { left: string; width: string } = $state({ left: "", width: "" });
 	const itemElements: HTMLElement[] = $state([]);
@@ -61,23 +76,33 @@
 
 <div
 	bind:this={containerElement}
-	class="h-seg rounded-seg-button-container bg-settings-item-bg px-seg-x relative flex items-center"
+	class={cn(
+		"h-seg rounded-seg-button-container bg-settings-item-bg px-seg-x relative flex items-center",
+		className,
+	)}
 >
 	{#if thumbStyle.left}
 		<div
-			class="h-seg-thumb bg-accent absolute z-1 rounded-md transition-all duration-400 ease-in-out"
+			class={cn(
+				"h-seg-thumb bg-accent absolute z-1 rounded-md transition-all duration-400 ease-in-out",
+				thumbClass,
+				leftThumbClass,
+			)}
 			style="left: {thumbStyle.left}; width: {thumbStyle.width};"
 		></div>
 	{/if}
 
-	<div class="flex w-full gap-2">
+	<div class={cn("flex w-full gap-2", contentClass)}>
 		{#each options as option, index (option.key)}
 			{@const isActive = selectedKey === option.key}
 			<button
 				bind:this={itemElements[index]}
 				class={cn(
 					"h-seg-thumb relative z-2 flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-md text-sm",
-					isActive ? "text-accent-foreground" : "text-secondary-foreground hover:bg-tab-hover z-1",
+					isActive
+						? activeThumbClass || "text-accent-foreground"
+						: "text-secondary-foreground hover:bg-tab-hover z-1",
+					thumbClass,
 					disabled && "cursor-not-allowed opacity-50",
 				)}
 				type="button"

@@ -1,6 +1,7 @@
 import { shell, WebContentsView } from "electron";
 import { match, P } from "ts-pattern";
 import { isLinux, isMac, isWin } from "../constants";
+import { deepLinkService } from "../services/deep-link-service";
 
 export interface LoadHandlerConfig {
 	baseUrl?: string;
@@ -87,6 +88,12 @@ export const withLifecycleHandlers = (
 export const withExternalLinkHandler = (view: WebContentsView): void => {
 	// Handle links opened via window.open or target="_blank"
 	view.webContents.setWindowOpenHandler(({ url }) => {
+		// Handle deep links (ai302studio:// protocol)
+		if (url.startsWith("ai302studio://")) {
+			deepLinkService.handleDeepLink(url);
+			return { action: "deny" };
+		}
+
 		// Allow Firebase authentication popups
 		if (url.includes("firebaseapp.com/__/auth/handler") || url.includes("accounts.google.com")) {
 			return { action: "allow" };
@@ -103,6 +110,13 @@ export const withExternalLinkHandler = (view: WebContentsView): void => {
 
 	// Handle navigation attempts (clicking links without target="_blank")
 	view.webContents.on("will-navigate", (event, url) => {
+		// Handle deep links (ai302studio:// protocol)
+		if (url.startsWith("ai302studio://")) {
+			event.preventDefault();
+			deepLinkService.handleDeepLink(url);
+			return;
+		}
+
 		// Get the current URL
 		const currentUrl = view.webContents.getURL();
 

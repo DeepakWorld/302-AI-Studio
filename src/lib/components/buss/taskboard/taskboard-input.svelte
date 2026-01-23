@@ -14,13 +14,15 @@
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
-	import { Eye, Loader, Paperclip, Trash2 } from "@lucide/svelte";
+	import { Eye, Loader, Paperclip, Sparkles, Trash2 } from "@lucide/svelte";
 	import type { AttachmentFile } from "@shared/types";
 	import { nanoid } from "nanoid";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
 	import { SvelteMap } from "svelte/reactivity";
 	import ButtonWithTooltip from "../button-with-tooltip/button-with-tooltip.svelte";
+	import CompactNumberInput from "./compact-number-input.svelte";
+	import TaskDecomposeDialog from "./task-decompose-dialog.svelte";
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 
@@ -30,6 +32,16 @@
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let selectedAttachment = $state<AttachmentFile | null>(null);
 	let isAdding = $state(false);
+	let decomposeDialogOpen = $state(false);
+
+	function handleDecomposeResult(tasks: string[]) {
+		codeAgentTaskboardState.addMultipleTasks(tasks);
+	}
+
+	function normalizeRepeatNumber(value: string): number {
+		const n = Number.parseInt(value, 10);
+		return Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 1;
+	}
 
 	function isAttachmentLoading(id: string): boolean {
 		return attachmentLoadingMap.get(id) ?? false;
@@ -98,6 +110,9 @@
 			}
 		}
 
+		codeAgentTaskboardState.repeatCount = normalizeRepeatNumber(
+			`${codeAgentTaskboardState.repeatCount}`,
+		);
 		codeAgentTaskboardState.addTaskFromInput();
 	}
 
@@ -279,21 +294,37 @@
 		<!-- Bottom action bar -->
 		<div class="my-1 flex items-center justify-between">
 			<!-- Left: Attachment button -->
-			<ButtonWithTooltip
-				tooltip={m.title_upload_attachment()}
-				class="hover:!bg-chat-action-hover"
-				onclick={handleAttachmentClick}
-			>
-				<Paperclip class="size-4" />
-			</ButtonWithTooltip>
+			<div class="flex items-center gap-1">
+				<ButtonWithTooltip
+					tooltip={m.title_upload_attachment()}
+					class="hover:!bg-chat-action-hover"
+					onclick={handleAttachmentClick}
+					size="icon-sm"
+				>
+					<Paperclip class="size-4" />
+				</ButtonWithTooltip>
 
-			<!-- Right: Add button -->
-			<Button variant="default" size="sm" onclick={handleAdd} disabled={isAdding}>
-				{#if isAdding}
-					<Loader class="h-4 w-4 animate-spin mr-2" />
-				{/if}
-				{m.taskboard_button_add()}
-			</Button>
+				<CompactNumberInput bind:count={codeAgentTaskboardState.repeatCount} />
+			</div>
+
+			<!-- Right: Decompose and Add button -->
+			<div class="flex items-center gap-1">
+				<ButtonWithTooltip
+					tooltip={m.taskboard_auto_decompose()}
+					class="border border-purple-500 hover:bg-purple-500/10"
+					onclick={() => (decomposeDialogOpen = true)}
+					size="icon-sm"
+				>
+					<Sparkles class="size-4 text-purple-500" />
+				</ButtonWithTooltip>
+
+				<Button variant="default" size="sm" onclick={handleAdd} disabled={isAdding}>
+					{#if isAdding}
+						<Loader class="h-4 w-4 animate-spin mr-2" />
+					{/if}
+					{m.taskboard_button_add()}
+				</Button>
+			</div>
 		</div>
 	</div>
 </div>
@@ -306,3 +337,10 @@
 		onClose={closeViewer}
 	/>
 {/if}
+
+<!-- Task Decompose Dialog -->
+<TaskDecomposeDialog
+	bind:open={decomposeDialogOpen}
+	initialRequirement={codeAgentTaskboardState.inputValue}
+	onDecompose={handleDecomposeResult}
+/>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createSkill, createSkillFromGitHub, updateSkill } from "$lib/api/skills";
+	import { createSkill, createSkillFromGitHub, updateSkill, deleteSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
@@ -139,6 +139,9 @@ description:
 					// 使用文件树视图，需要写入修改的文件并打包整个目录
 					await manualFormRef?.writeChangedFiles?.();
 
+					// 先删除同名 skill 以避免重复
+					await deleteSkill({ skill_list: [manualFormData.name] });
+
 					const result = await updateSkill({
 						name: manualFormData.name,
 						dirPath: manualRootPath,
@@ -153,6 +156,9 @@ description:
 					}
 				} else {
 					// 默认视图，只创建 SKILL.md
+					// 先删除同名 skill 以避免重复
+					await deleteSkill({ skill_list: [manualFormData.name] });
+
 					const result = await createSkill({
 						name: manualFormData.name,
 						description: manualFormData.description,
@@ -182,6 +188,9 @@ description:
 			try {
 				// Write changed files to temp directory
 				await uploadFormRef.writeChangedFiles();
+
+				// 先删除同名 skill 以避免重复
+				await deleteSkill({ skill_list: [formData.name] });
 
 				// Zip and upload
 				const result = await updateSkill({

@@ -38,6 +38,7 @@
 			openSettings: "settings_shortcut_hints_openSettings",
 			toggleSidebar: "settings_shortcut_hints_toggleSidebar",
 			toggleChatParametersPanel: "settings_shortcut_hints_toggleChatParametersPanel",
+			togglePlanMode: "settings_shortcut_hints_togglePlanMode",
 			toggleSidebarRight: "settings_shortcut_hints_toggleSidebarRight",
 			stopGeneration: "settings_shortcut_hints_stopGeneration",
 			newTab: "settings_shortcut_hints_newTab",

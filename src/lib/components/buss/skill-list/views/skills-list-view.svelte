@@ -9,7 +9,7 @@
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
-	import { Plus, RefreshCw, Search, Star, Trash2, X, Zap } from "@lucide/svelte";
+	import { Plus, RefreshCw, Search, ShoppingBag, Star, Trash2, X, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import { toast } from "svelte-sonner";
 	import { SvelteSet } from "svelte/reactivity";
@@ -141,6 +141,8 @@
 
 		try {
 			await deleteSkill({ skill_list: [deletingSkill.name] });
+			codeAgentState.handleSkillsRemove([deletingSkill]);
+
 			toast.dismiss(toastId);
 			toast.success(m.skills_delete_success());
 			deleteDialogOpen = false;
@@ -223,6 +225,8 @@
 
 		try {
 			await deleteSkill({ skill_list: skillsToDelete.map((s) => s.name) });
+			codeAgentState.handleSkillsRemove(skillsToDelete);
+
 			toast.dismiss(toastId);
 			toast.success(m.skills_delete_success());
 			clearSelection();
@@ -319,6 +323,25 @@
 				<Plus class="h-4 w-4" />
 				{m.skills_new()}
 			</Button>
+		</div>
+		<!-- Skills Hub Link -->
+		<div class="mt-3 text-sm text-muted-foreground">
+			{m.skills_hub_hint_prefix()}
+			<button
+				type="button"
+				class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
+				onclick={() =>
+					window.electronAPI.tabService.handleNewTab(
+						"302 Skills Hub",
+						"skillsHub",
+						true,
+						"https://skills.302.ai",
+					)}
+			>
+				<ShoppingBag class="h-4 w-4" />
+				{m.skills_hub_link_text()}
+			</button>
+			{m.skills_hub_hint_suffix()}
 		</div>
 	</div>
 

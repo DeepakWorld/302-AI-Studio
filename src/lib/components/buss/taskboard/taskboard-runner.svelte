@@ -14,10 +14,11 @@
 	// Derived states from store
 	const isRunning = $derived(codeAgentTaskboardState.taskboardStatus === "running");
 	const isWaitingToStop = $derived(codeAgentTaskboardState.taskboardStatus === "waiting_to_stop");
+	const isWaitingForChat = $derived(codeAgentTaskboardState.taskboardStatus === "waiting_for_chat");
 	const currentTask = $derived(
 		codeAgentTaskboardState.tasklist.find((t) => t.status === "in_progress"),
 	);
-	const currentTaskContent = $derived(currentTask?.content ?? "—");
+	const taskContent = $derived(codeAgentTaskboardState.activeTask?.content ?? "—");
 	const buttonText = $derived(codeAgentTaskboardState.buttonText);
 
 	const hasConfiguredProviders = $derived(() => {
@@ -31,9 +32,14 @@
 	}
 
 	async function handleRun() {
-		const fn = async () =>
+		if (codeAgentState.inPlanMode) {
+			toast.info(m.toast_exit_plan_mode_first());
+			return;
+		}
+
+		const fn = async (content: string) =>
 			match({
-				isEmpty: chatState.inputValue.trim() === "" && chatState.attachments.length === 0,
+				isEmpty: content.trim() === "" && chatState.attachments.length === 0,
 				noProviders: !hasConfiguredProviders(),
 				noModel: chatState.selectedModel === null,
 			})
@@ -69,17 +75,17 @@
 				})
 				.otherwise(() => {
 					if (chatState.hasMessages) {
-						chatState.sendMessage();
+						chatState.sendMessage({ content });
 					} else {
-						document.startViewTransition(() => chatState.sendMessage());
+						document.startViewTransition(() => chatState.sendMessage({ content }));
 					}
 				});
 
-		codeAgentTaskboardState.startAutoExecution(async () => {
+		codeAgentTaskboardState.startAutoExecution(async (content) => {
 			if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-				await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+				await codeAgentSendMessageButtonState.handleCodeAgentFlow(() => fn(content));
 			} else {
-				await fn();
+				await fn(content);
 			}
 		});
 
@@ -99,7 +105,12 @@
 		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
 			<!-- Status indicator -->
 			<div class="flex items-center gap-2 text-sm">
-				{#if isWaitingToStop}
+				{#if isWaitingForChat}
+					<span class="flex items-center gap-1.5 text-blue-500">
+						<span class="size-2 rounded-full bg-blue-500 animate-pulse"></span>
+						{m.taskboard_status_waiting_for_chat()}
+					</span>
+				{:else if isWaitingToStop}
 					<span class="flex items-center gap-1.5 text-yellow-500">
 						<span class="size-2 rounded-full bg-yellow-500 animate-pulse"></span>
 						{m.taskboard_status_waiting_to_stop()}
@@ -124,7 +135,7 @@
 		<div class="flex justify-between">
 			<div class="flex items-center gap-2 text-sm min-w-0">
 				<span class="text-muted-foreground shrink-0">{m.taskboard_label_current()}</span>
-				<span class="truncate font-medium">{currentTaskContent}</span>
+				<span class="truncate font-medium">{taskContent}</span>
 			</div>
 			<div class="flex items-center gap-2">
 				<Button
@@ -133,8 +144,9 @@
 					disabled={(!codeAgentTaskboardState.canStart &&
 						!isRunning &&
 						!isWaitingToStop &&
+						!isWaitingForChat &&
 						!currentTask) ||
-						(!isRunning && !isWaitingToStop && (chatState.isStreaming || chatState.isSubmitted))}
+						(!isRunning && !isWaitingToStop && !isWaitingForChat && codeAgentState.isChecking)}
 					onclick={handleRun}
 				>
 					{buttonText}

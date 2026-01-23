@@ -5,18 +5,19 @@ import {
 	storageService,
 	pluginService,
 	generalSettingsService,
-	codeAgentService,
+	ssoService,
 	ghostWindowService,
-	windowService,
 	shortcutService,
+	windowService,
+	deepLinkService,
+	codeAgentService,
 	tabService,
 	aiApplicationService,
 	appService,
 	dataService,
-	ssoService,
-	deepLinkService,
 	externalLinkService,
 	mcpService,
+	notificationService,
 	providerService,
 	threadService,
 	updaterService,
@@ -149,6 +150,63 @@ export function registerIpcHandlers() {
 		generalSettingsService.handleLanguageChanged(event, language),
 	);
 
+	// ssoService service registration
+	ipcMain.handle("ssoService:openSsoLogin", (event, serverPort, language) =>
+		ssoService.openSsoLogin(event, serverPort, language),
+	);
+	ipcMain.handle("ssoService:waitForSsoCallback", (event, timeoutMs) =>
+		ssoService.waitForSsoCallback(event, timeoutMs),
+	);
+	ipcMain.handle("ssoService:cancelSsoLogin", (event) => ssoService.cancelSsoLogin(event));
+
+	// ghostWindowService service registration
+	ipcMain.handle("ghostWindowService:startTracking", (event) =>
+		ghostWindowService.startTracking(event),
+	);
+	ipcMain.handle("ghostWindowService:stopTracking", (event) =>
+		ghostWindowService.stopTracking(event),
+	);
+	ipcMain.handle("ghostWindowService:updateInsertIndex", (event, target) =>
+		ghostWindowService.updateInsertIndex(event, target),
+	);
+
+	// shortcutService service registration
+	ipcMain.handle("shortcutService:init", (event, shortcuts) =>
+		shortcutService.init(event, shortcuts),
+	);
+	ipcMain.handle("shortcutService:updateShortcuts", (event, shortcuts) =>
+		shortcutService.updateShortcuts(event, shortcuts),
+	);
+	ipcMain.handle("shortcutService:getConflicts", (event) => shortcutService.getConflicts(event));
+	ipcMain.handle("shortcutService:getSyncInfo", (event) => shortcutService.getSyncInfo(event));
+
+	// windowService service registration
+	ipcMain.handle("windowService:handleOpenSettingsWindow", (event, route) =>
+		windowService.handleOpenSettingsWindow(event, route),
+	);
+	ipcMain.handle("windowService:focusWindow", (event, windowId, tabId) =>
+		windowService.focusWindow(event, windowId, tabId),
+	);
+	ipcMain.handle("windowService:handleDropAtPointer", (event, tabId, pointer) =>
+		windowService.handleDropAtPointer(event, tabId, pointer),
+	);
+	ipcMain.handle("windowService:handleSplitShellWindow", (event, triggerTabId) =>
+		windowService.handleSplitShellWindow(event, triggerTabId),
+	);
+	ipcMain.handle(
+		"windowService:handleMoveTabIntoExistingWindow",
+		(event, triggerTabId, windowId, insertIndex) =>
+			windowService.handleMoveTabIntoExistingWindow(event, triggerTabId, windowId, insertIndex),
+	);
+	ipcMain.handle("windowService:navigateToThread", (event, threadId, sourceWindowId) =>
+		windowService.navigateToThread(event, threadId, sourceWindowId),
+	);
+
+	// deepLinkService service registration
+	ipcMain.handle("deepLinkService:simulateDeepLink", (event, url) =>
+		deepLinkService.simulateDeepLink(event, url),
+	);
+
 	// codeAgentService service registration
 	ipcMain.handle(
 		"codeAgentService:updateClaudeCodeSandboxModel",
@@ -202,49 +260,6 @@ export function registerIpcHandlers() {
 		(event, sandboxId, sessionId, isManualNote) =>
 			codeAgentService.setIsManualNoteBySession(event, sandboxId, sessionId, isManualNote),
 	);
-
-	// ghostWindowService service registration
-	ipcMain.handle("ghostWindowService:startTracking", (event) =>
-		ghostWindowService.startTracking(event),
-	);
-	ipcMain.handle("ghostWindowService:stopTracking", (event) =>
-		ghostWindowService.stopTracking(event),
-	);
-	ipcMain.handle("ghostWindowService:updateInsertIndex", (event, target) =>
-		ghostWindowService.updateInsertIndex(event, target),
-	);
-
-	// windowService service registration
-	ipcMain.handle("windowService:handleOpenSettingsWindow", (event, route) =>
-		windowService.handleOpenSettingsWindow(event, route),
-	);
-	ipcMain.handle("windowService:focusWindow", (event, windowId, tabId) =>
-		windowService.focusWindow(event, windowId, tabId),
-	);
-	ipcMain.handle("windowService:handleDropAtPointer", (event, tabId, pointer) =>
-		windowService.handleDropAtPointer(event, tabId, pointer),
-	);
-	ipcMain.handle("windowService:handleSplitShellWindow", (event, triggerTabId) =>
-		windowService.handleSplitShellWindow(event, triggerTabId),
-	);
-	ipcMain.handle(
-		"windowService:handleMoveTabIntoExistingWindow",
-		(event, triggerTabId, windowId, insertIndex) =>
-			windowService.handleMoveTabIntoExistingWindow(event, triggerTabId, windowId, insertIndex),
-	);
-	ipcMain.handle("windowService:navigateToThread", (event, threadId, sourceWindowId) =>
-		windowService.navigateToThread(event, threadId, sourceWindowId),
-	);
-
-	// shortcutService service registration
-	ipcMain.handle("shortcutService:init", (event, shortcuts) =>
-		shortcutService.init(event, shortcuts),
-	);
-	ipcMain.handle("shortcutService:updateShortcuts", (event, shortcuts) =>
-		shortcutService.updateShortcuts(event, shortcuts),
-	);
-	ipcMain.handle("shortcutService:getConflicts", (event) => shortcutService.getConflicts(event));
-	ipcMain.handle("shortcutService:getSyncInfo", (event) => shortcutService.getSyncInfo(event));
 
 	// tabService service registration
 	ipcMain.handle(
@@ -387,20 +402,6 @@ export function registerIpcHandlers() {
 			dataService.exportChatToFile(event, content, extension, filterName, defaultFileName),
 	);
 
-	// ssoService service registration
-	ipcMain.handle("ssoService:openSsoLogin", (event, serverPort, language) =>
-		ssoService.openSsoLogin(event, serverPort, language),
-	);
-	ipcMain.handle("ssoService:waitForSsoCallback", (event, timeoutMs) =>
-		ssoService.waitForSsoCallback(event, timeoutMs),
-	);
-	ipcMain.handle("ssoService:cancelSsoLogin", (event) => ssoService.cancelSsoLogin(event));
-
-	// deepLinkService service registration
-	ipcMain.handle("deepLinkService:simulateDeepLink", (event, url) =>
-		deepLinkService.simulateDeepLink(event, url),
-	);
-
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
 		externalLinkService.openExternalLink(event, url),
@@ -412,6 +413,14 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("mcpService:closeServer", (event, serverId) =>
 		mcpService.closeServer(event, serverId),
+	);
+
+	// notificationService service registration
+	ipcMain.handle("notificationService:notifyTaskCompleted", (event, options) =>
+		notificationService.notifyTaskCompleted(event, options),
+	);
+	ipcMain.handle("notificationService:requestPermission", (event) =>
+		notificationService.requestPermission(event),
 	);
 
 	// providerService service registration
@@ -515,6 +524,23 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("pluginService:executeAfterSendMessageHook");
 	ipcMain.removeHandler("pluginService:executeErrorHook");
 	ipcMain.removeHandler("generalSettingsService:handleLanguageChanged");
+	ipcMain.removeHandler("ssoService:openSsoLogin");
+	ipcMain.removeHandler("ssoService:waitForSsoCallback");
+	ipcMain.removeHandler("ssoService:cancelSsoLogin");
+	ipcMain.removeHandler("ghostWindowService:startTracking");
+	ipcMain.removeHandler("ghostWindowService:stopTracking");
+	ipcMain.removeHandler("ghostWindowService:updateInsertIndex");
+	ipcMain.removeHandler("shortcutService:init");
+	ipcMain.removeHandler("shortcutService:updateShortcuts");
+	ipcMain.removeHandler("shortcutService:getConflicts");
+	ipcMain.removeHandler("shortcutService:getSyncInfo");
+	ipcMain.removeHandler("windowService:handleOpenSettingsWindow");
+	ipcMain.removeHandler("windowService:focusWindow");
+	ipcMain.removeHandler("windowService:handleDropAtPointer");
+	ipcMain.removeHandler("windowService:handleSplitShellWindow");
+	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
+	ipcMain.removeHandler("windowService:navigateToThread");
+	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxModel");
 	ipcMain.removeHandler("codeAgentService:checkClaudeCodeSandbox");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxesByIpc");
@@ -529,19 +555,6 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:addClaudeCodeSandboxMCP");
 	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
 	ipcMain.removeHandler("codeAgentService:setIsManualNoteBySession");
-	ipcMain.removeHandler("ghostWindowService:startTracking");
-	ipcMain.removeHandler("ghostWindowService:stopTracking");
-	ipcMain.removeHandler("ghostWindowService:updateInsertIndex");
-	ipcMain.removeHandler("windowService:handleOpenSettingsWindow");
-	ipcMain.removeHandler("windowService:focusWindow");
-	ipcMain.removeHandler("windowService:handleDropAtPointer");
-	ipcMain.removeHandler("windowService:handleSplitShellWindow");
-	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
-	ipcMain.removeHandler("windowService:navigateToThread");
-	ipcMain.removeHandler("shortcutService:init");
-	ipcMain.removeHandler("shortcutService:updateShortcuts");
-	ipcMain.removeHandler("shortcutService:getConflicts");
-	ipcMain.removeHandler("shortcutService:getSyncInfo");
 	ipcMain.removeHandler("tabService:handleNewTabWithThread");
 	ipcMain.removeHandler("tabService:handleNewTab");
 	ipcMain.removeHandler("tabService:handleActivateTab");
@@ -587,13 +600,11 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
-	ipcMain.removeHandler("ssoService:openSsoLogin");
-	ipcMain.removeHandler("ssoService:waitForSsoCallback");
-	ipcMain.removeHandler("ssoService:cancelSsoLogin");
-	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
+	ipcMain.removeHandler("notificationService:notifyTaskCompleted");
+	ipcMain.removeHandler("notificationService:requestPermission");
 	ipcMain.removeHandler("providerService:handle302AIProviderChange");
 	ipcMain.removeHandler("providerService:get302AIApiKey");
 	ipcMain.removeHandler("threadService:addThread");

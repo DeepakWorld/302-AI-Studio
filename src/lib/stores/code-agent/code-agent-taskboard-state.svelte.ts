@@ -1,12 +1,12 @@
 import {
-	getTasklist,
+	_getTasklist,
 	updateTasklist,
 	uploadAttachments,
 	type Attachment,
 } from "$lib/api/taskboard";
 import { emitter, EventNames } from "$lib/event/emitter";
 import { m } from "$lib/paraglide/messages";
-import type { MessageMetadata } from "$lib/types/chat";
+import type { ChatMessage } from "$lib/types/chat";
 import {
 	addAttachmentReference,
 	removeAttachmentReference,
@@ -15,7 +15,7 @@ import type { AttachmentFile, Task } from "@shared/types";
 import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
-import { chatState } from "../chat-state.svelte";
+import { chat, chatState } from "../chat-state.svelte";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
@@ -27,11 +27,13 @@ export class CodeAgentTaskboardState {
 
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
-	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop">("idle");
+	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop" | "waiting_for_chat">("idle");
+	retryExhausted = $state(false);
 
 	// Input state
 	inputValue = $state("");
 	attachments = $state<AttachmentFile[]>([]);
+	repeatCount = $state(1);
 
 	// Pending attachments queue (for when sandbox is not yet initialized)
 	pendingAttachments = $state<AttachmentFile[]>([]);
@@ -47,11 +49,24 @@ export class CodeAgentTaskboardState {
 	inProgressTask = $derived<Task | null>(
 		this.tasklist.find((task) => task.status === "in_progress") ?? null,
 	);
+
+	activeTask = $derived.by(() => {
+		if (this.taskboardStatus === "running" || this.taskboardStatus === "waiting_to_stop") {
+			return (
+				this.tasklist.find((t) => t.status === "in_progress") ??
+				this.tasklist.find((t) => t.status === "pending")
+			);
+		}
+		return this.tasklist.find((t) => t.status === "pending");
+	});
+
 	canStart = $derived(
-		this.taskboardStatus === "idle" && this.tasklist.some((t) => t.status === "pending"),
+		(this.taskboardStatus === "idle" || this.taskboardStatus === "waiting_for_chat") &&
+			this.tasklist.some((t) => t.status === "pending"),
 	);
 	canPause = $derived(this.taskboardStatus === "running");
 	isWaitingToStop = $derived(this.taskboardStatus === "waiting_to_stop");
+	isWaitingForChat = $derived(this.taskboardStatus === "waiting_for_chat");
 	// Whether taskboard is currently executing (used to prevent premature auto-deployment)
 	isRunning = $derived(this.taskboardStatus === "running");
 	showTaskboardStatusBar = $derived(
@@ -63,6 +78,7 @@ export class CodeAgentTaskboardState {
 		return match(this.taskboardStatus)
 			.with("running", () => m.taskboard_button_pause())
 			.with("waiting_to_stop", () => m.taskboard_button_waiting_to_stop())
+			.with("waiting_for_chat", () => m.taskboard_button_waiting_for_chat())
 			.with("idle", () => {
 				if (this.tasklist.some((t) => t.status === "in_progress")) {
 					return m.taskboard_button_resume();
@@ -81,6 +97,15 @@ export class CodeAgentTaskboardState {
 		}
 	}
 
+	/**
+	 * Cancels the waiting for chat state.
+	 */
+	cancelWaitingForChat() {
+		if (this.taskboardStatus === "waiting_for_chat") {
+			this.taskboardStatus = "idle";
+		}
+	}
+
 	// ==================== Input Methods ====================
 
 	/**
@@ -93,13 +118,35 @@ export class CodeAgentTaskboardState {
 					id: nanoid(),
 					content: this.inputValue.trim(),
 					status: "pending",
+					number: Math.min(99, Math.max(1, Number.parseInt(`${this.repeatCount}`, 10) || 1)),
+					executedCount: 0,
 				};
 				const updatedTasklist = [...this.tasklist, newTask];
 				this.updateTasklist(updatedTasklist);
 			}
 			this.inputValue = "";
 			this.attachments = [];
+			this.repeatCount = 1;
 		}
+	}
+
+	/**
+	 * Adds multiple tasks from an array of task content strings.
+	 * Used by the AI task decomposition feature.
+	 */
+	addMultipleTasks(taskContents: string[]) {
+		if (taskContents.length === 0) return;
+
+		const newTasks: Task[] = taskContents.map((content) => ({
+			id: nanoid(),
+			content: content.trim(),
+			status: "pending" as const,
+			number: 1,
+			executedCount: 0,
+		}));
+
+		const updatedTasklist = [...this.tasklist, ...newTasks];
+		this.updateTasklist(updatedTasklist);
 	}
 
 	/**
@@ -200,7 +247,7 @@ export class CodeAgentTaskboardState {
 							claudeCodeSandboxState.currentSessionWorkspacePath,
 						];
 						if (path) {
-							const { isOk, tasks } = await getTasklist(sandboxId, path);
+							const { isOk, tasks } = await _getTasklist(sandboxId, path);
 
 							// Strategy: Prefer local data if remote is suspiciously empty/corrupted
 							if (isOk) {
@@ -251,7 +298,7 @@ export class CodeAgentTaskboardState {
 
 				const result = await updateTasklist(sandboxId, path, sortedTasklist);
 				if (!result.isOk) {
-					const { isOk, tasks } = await getTasklist(sandboxId, path);
+					const { isOk, tasks } = await _getTasklist(sandboxId, path);
 					this.tasklist = isOk ? this.#sortTasks(tasks) : [];
 
 					toast.error(m.taskboard_update_failed());
@@ -262,24 +309,45 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Starts the auto execution of tasks.
 	 */
-	async startAutoExecution(fn: () => Promise<void>): Promise<void> {
+	async startAutoExecution(fn: (content: string) => Promise<void>): Promise<void> {
 		match(this.taskboardStatus)
 			.with("running", () => {
+				// 正在运行时点击 -> 暂停
 				this.taskboardStatus = "waiting_to_stop";
 			})
 			.with("waiting_to_stop", () => {
+				// 暂停中点击 -> 恢复运行
 				this.taskboardStatus = "running";
 			})
-			.with("idle", () => {
-				this.taskboardStatus = "running";
-				this.#executeLoop(fn);
+			.with("waiting_for_chat", () => {
+				// 等待聊天中点击 -> 取消等待
+				this.taskboardStatus = "idle";
+			})
+			.with("idle", async () => {
+				// 空闲时点击 -> 检查是否需要等待聊天
+				if (chatState.isStreaming || chatState.isSubmitted) {
+					// 聊天正在进行，进入等待状态
+					this.taskboardStatus = "waiting_for_chat";
+					await this.#waitForChatCompletion();
+
+					// 聊天完成后，检查状态是否仍然是 waiting_for_chat
+					// （用户可能在等待期间取消了）
+					if (this.taskboardStatus === "waiting_for_chat") {
+						this.taskboardStatus = "running";
+						this.#executeLoop(fn);
+					}
+				} else {
+					// 聊天未进行，直接开始执行
+					this.taskboardStatus = "running";
+					this.#executeLoop(fn);
+				}
 			});
 	}
 
 	/**
 	 * Executes the task loop.
 	 */
-	async #executeLoop(fn: () => Promise<void>): Promise<void> {
+	async #executeLoop(fn: (content: string) => Promise<void>): Promise<void> {
 		while (this.taskboardStatus === "running") {
 			const nextTask = this.tasklist.find(
 				(t) => t.status === "in_progress" || t.status === "pending",
@@ -313,27 +381,60 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Executes a single task.
 	 */
-	async #executeTask(task: Task, fn: () => Promise<void>): Promise<void> {
+	async #executeTask(task: Task, fn: (content: string) => Promise<void>): Promise<void> {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
+		this.retryExhausted = false;
 
-		if (task.status === "pending") {
-			await this.#updateTaskStatus(task.id, "in_progress");
+		const total = Math.min(99, Math.max(1, task.number ?? 1));
+		const executed = Math.max(0, task.executedCount ?? 0);
+		const remaining = total - executed;
+		if (remaining <= 0) {
+			await this.#updateTaskStatus(task.id, "done");
+			return;
 		}
 
-		const off = emitter.on(EventNames.CHAT_FINISHED, this.#handleChatFinished);
+		if (task.status === "pending") {
+			const updatedList = this.tasklist.map((t) =>
+				t.id === task.id
+					? {
+							...t,
+							status: "in_progress" as const,
+							executedCount: Math.min(total, (t.executedCount ?? 0) + 1),
+						}
+					: t,
+			);
+			await this.updateTasklist(updatedList);
+		}
+
+		const offChatFinished = emitter.on(EventNames.CHAT_FINISHED, this.#handleChatFinished);
 
 		try {
 			while (this.#currentRetryCount < this.#MAX_RETRY_COUNT) {
 				const message =
 					this.#currentRetryCount === 0 ? task.content : `${m.text_continue()}: ${task.content}`;
-				chatState.inputValue = message;
-				await fn();
+				await fn(message);
 
 				const success = await this.#waitForChatFinished();
 
 				if (success) {
-					await this.#updateTaskStatus(task.id, "done");
+					const [sandboxId, path] = [
+						codeAgentState.sandboxId,
+						claudeCodeSandboxState.currentSessionWorkspacePath,
+					];
+
+					let currentTaskList = this.tasklist;
+					const { isOk, tasks } = await _getTasklist(sandboxId, path);
+					if (isOk) {
+						currentTaskList = this.#sortTasks(tasks);
+						this.tasklist = currentTaskList;
+					}
+
+					const updatedTask = currentTaskList.find((t) => t.id === task.id);
+					const nextTotal = Math.min(99, Math.max(1, updatedTask?.number ?? total));
+					const nextExecuted = Math.max(0, updatedTask?.executedCount ?? executed + 1);
+					const nextRemaining = nextTotal - nextExecuted;
+					await this.#updateTaskStatus(task.id, nextRemaining > 0 ? "pending" : "done");
 					return;
 				}
 
@@ -346,10 +447,22 @@ export class CodeAgentTaskboardState {
 			}
 			console.log(`[TaskBoard] Task retry ${this.#currentRetryCount}/${this.#MAX_RETRY_COUNT}`);
 
+			if (this.#currentRetryCount >= this.#MAX_RETRY_COUNT) {
+				this.retryExhausted = true;
+			}
+
 			this.taskboardStatus = "idle";
-			await this.#updateTaskStatus(task.id, "pending");
+			const updatedList = this.tasklist.map((t) => {
+				if (t.id !== task.id) return t;
+				return {
+					...t,
+					status: "pending" as const,
+					executedCount: Math.max(0, (t.executedCount ?? 0) - 1),
+				};
+			});
+			await this.updateTasklist(updatedList);
 		} finally {
-			off();
+			offChatFinished();
 			this.currentExecutingTaskId = null;
 			this.#taskResolve = null;
 		}
@@ -362,14 +475,46 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
+	 * Waits for the current chat to complete.
+	 * Resolves when chat status becomes "ready" or when user cancels the chat.
+	 */
+	async #waitForChatCompletion(): Promise<void> {
+		return new Promise<void>((resolve) => {
+			// 如果聊天已经完成，立��返回
+			if (!chatState.isStreaming && !chatState.isSubmitted) {
+				resolve();
+				return;
+			}
+
+			// 使用 $effect 监听状态变化
+			const cleanup = $effect.root(() => {
+				$effect(() => {
+					// 监听 chat.status 变化
+					const status = chat.status;
+					if (status === "ready" || status === "error") {
+						cleanup();
+						resolve();
+					}
+				});
+			});
+		});
+	}
+
+	/**
 	 * Handles the chat finished event.
 	 */
-	#handleChatFinished = ({ lastMessage }: { lastMessage: { metadata?: MessageMetadata } }) => {
+	#handleChatFinished = ({ lastMessage }: { lastMessage: ChatMessage }) => {
+		console.log("[TaskBoard] CHAT_FINISHED event received", {
+			hasTaskResolve: !!this.#taskResolve,
+			taskboardStatus: this.taskboardStatus,
+		});
+
 		if (!this.#taskResolve) return;
 
 		const result = lastMessage.metadata?.result;
 		const success = !!result && result.is_error === false;
 
+		console.log("[TaskBoard] Resolving task with success:", success);
 		this.#taskResolve(success);
 	};
 
@@ -399,8 +544,11 @@ export const codeAgentTaskboardState = new CodeAgentTaskboardState();
 $effect.root(() => {
 	$effect(() => {
 		// Track enabled state
+
+		// codeAgentState.sessionId;
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		codeAgentState.enabled;
+
 		codeAgentTaskboardState.tasklist = [];
 	});
 });

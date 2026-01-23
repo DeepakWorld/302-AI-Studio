@@ -8,6 +8,7 @@ export const CodeAgentConfigMetadata = type({
 	type: codeAgentType,
 	currentAgentId: "string",
 	isDeleted: "boolean",
+	inPlanMode: "boolean?",
 });
 export type CodeAgentConfigMetadata = typeof CodeAgentConfigMetadata.infer;
 export const skill = type({
@@ -106,6 +107,7 @@ export type CreateClaudeCodeSandboxResponse = typeof createClaudeCodeSandboxResp
 export const codeAgentGlobalConfigs = type({
 	apiKey: "string",
 	autoDeploy: "boolean",
+	notificationsEnabled: "boolean",
 });
 export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;
 
@@ -113,6 +115,8 @@ export const taskSchema = type({
 	id: "string",
 	content: "string",
 	status: "'pending' | 'in_progress' | 'done'",
+	number: "number",
+	executedCount: "number",
 });
 export const taskListSchema = taskSchema.array();
 export type Task = typeof taskSchema.infer;

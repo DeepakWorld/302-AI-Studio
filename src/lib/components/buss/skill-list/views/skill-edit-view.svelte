@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { editSkillDetails, updateSkill } from "$lib/api/skills";
+	import { deleteSkill, editSkillDetails, updateSkill } from "$lib/api/skills";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import { m } from "$lib/paraglide/messages";
@@ -201,15 +201,18 @@
 				await writeFile(path, content);
 			}
 
+			// 先删除原始 skill 以避免重复
+			await deleteSkill({ skill_list: [skillName] });
+
 			const result = await updateSkill({
 				name: formData.name,
 				dirPath: skillRootDir,
 			});
 
 			if (result.success) {
-				toast.success(m.skills_create_success?.() || "Skill saved successfully");
+				toast.success(m.toast_save_success?.() || "Skill saved successfully");
 				onRefresh?.();
-				skillsPanelState.pop();
+				skillsPanelState.reset();
 			} else {
 				toast.error(result.message || m.skills_load_failed?.() || "Failed to save skill");
 			}

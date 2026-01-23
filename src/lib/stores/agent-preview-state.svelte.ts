@@ -792,6 +792,8 @@ export class AgentPreviewState {
 	openSkillsTab() {
 		this.activeTab = "skills";
 		this.isVisible = true;
+		this.isSkillsOnlyMode =
+			!claudeCodeAgentState.currentSessionId || !claudeCodeAgentState.sandboxId;
 	}
 
 	/**

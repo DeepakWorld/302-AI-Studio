@@ -9,6 +9,7 @@
 	} from "lexical";
 	import { onMount, tick } from "svelte";
 	import { getEditor } from "svelte-lexical";
+	import { CustomTextNode } from "../nodes/custom-text-node";
 	import { createVariableValueNode } from "../nodes/variable-value-node";
 	import PromptMenuItem from "../prompt-menuItem.svelte";
 
@@ -195,6 +196,31 @@
 			checkForTrigger();
 		});
 
+		const unregisterTransform = editor.registerNodeTransform(CustomTextNode, (node) => {
+			const textContent = node.getTextContent();
+			// Regex to match {{#variableName#}}
+			const regex = /\{\{#([a-zA-Z0-9_]+)#\}\}/;
+			const match = regex.exec(textContent);
+
+			if (!match) return;
+
+			const [fullMatch, variableName] = match;
+			const startIndex = match.index;
+
+			let targetNode: TextNode = node;
+			if (startIndex > 0) {
+				targetNode = node.splitText(startIndex)[1];
+			}
+
+			let nodeToReplace = targetNode;
+			if (fullMatch.length < targetNode.getTextContent().length) {
+				nodeToReplace = targetNode.splitText(fullMatch.length)[0];
+			}
+
+			const variableNode = createVariableValueNode(variableName);
+			nodeToReplace.replace(variableNode);
+		});
+
 		// Use DOM event listener to capture arrow keys before Lexical processes them
 		const rootElement = editor.getRootElement();
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -233,6 +259,7 @@
 
 		return () => {
 			unregisterUpdate();
+			unregisterTransform();
 			rootElement?.removeEventListener("keydown", handleKeyDown, true);
 		};
 	});

@@ -15,13 +15,34 @@
 
 	let openModelSelect = $state<() => void>();
 
-	const statusText = $derived(
-		match(codeAgentTaskboardState.taskboardStatus)
+	const statusText = $derived.by(() => {
+		if (codeAgentTaskboardState.retryExhausted) {
+			return `${m.taskboard_bar_status_retry_exhausted()}：`;
+		}
+
+		const label = match(codeAgentTaskboardState.taskboardStatus)
 			.with("idle", () => m.taskboard_bar_status_idle())
 			.with("running", () => m.taskboard_bar_status_running())
 			.with("waiting_to_stop", () => m.taskboard_bar_status_waiting_to_stop())
-			.exhaustive(),
-	);
+			.with("waiting_for_chat", () => m.taskboard_bar_status_waiting_for_chat())
+			.exhaustive();
+
+		if (codeAgentTaskboardState.taskboardStatus === "waiting_for_chat") {
+			return `${label}：`;
+		}
+
+		const activeTask = codeAgentTaskboardState.activeTask;
+
+		if (activeTask) {
+			const progress = m.taskboard_bar_progress({
+				current: activeTask.executedCount,
+				total: activeTask.number,
+			});
+			return `${label}${progress}：`;
+		}
+
+		return `${label}：`;
+	});
 
 	const hasConfiguredProviders = $derived(() => {
 		return persistedProviderState.current.some(
@@ -87,20 +108,7 @@
 		});
 	}
 
-	const taskContent = $derived.by(() => {
-		const list = codeAgentTaskboardState.tasklist;
-		const status = codeAgentTaskboardState.taskboardStatus;
-
-		if (status === "running" || status === "waiting_to_stop") {
-			return (
-				list.find((t) => t.status === "in_progress")?.content ??
-				list.find((t) => t.status === "pending")?.content ??
-				"—"
-			);
-		}
-		// Idle
-		return list.find((t) => t.status === "pending")?.content ?? "—";
-	});
+	const taskContent = $derived(codeAgentTaskboardState.activeTask?.content ?? "—");
 </script>
 
 <Item.Root variant="outline" class="w-full max-w-chat-max-w flex-nowrap !cursor-default">
@@ -126,7 +134,9 @@
 			size="icon-sm"
 			class="hover:bg-secondary/80 dark:hover:bg-secondary/80"
 			disabled={codeAgentTaskboardState.taskboardStatus !== "running" &&
-				(chatState.isStreaming || chatState.isSubmitted)}
+				codeAgentTaskboardState.taskboardStatus !== "waiting_to_stop" &&
+				codeAgentTaskboardState.taskboardStatus !== "waiting_for_chat" &&
+				(!codeAgentTaskboardState.canStart || codeAgentState.isChecking)}
 			onclick={handleRun}
 		>
 			{#if codeAgentTaskboardState.taskboardStatus === "running"}

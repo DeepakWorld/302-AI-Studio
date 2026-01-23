@@ -14,6 +14,7 @@ export interface PreferencesSettingsState {
 	autoDisableMarkdown: boolean;
 	enableSupermarket: boolean;
 	newSessionModel: Model | null;
+	vibeNewSessionModel: Model | null;
 	autoParseUrl: boolean;
 	searchProvider: SearchProvider;
 	streamOutputEnabled: boolean;
@@ -36,6 +37,7 @@ const getDefaults = (): PreferencesSettingsState => ({
 	autoDisableMarkdown: false,
 	enableSupermarket: true,
 	newSessionModel: null,
+	vibeNewSessionModel: null,
 	autoParseUrl: false,
 	searchProvider: "search1api",
 	streamOutputEnabled: false,
@@ -124,6 +126,17 @@ class PreferencesSettingsManager {
 		persistedPreferencesSettings.current = {
 			...persistedPreferencesSettings.current,
 			newSessionModel: model,
+		};
+	}
+
+	get vibeNewSessionModel(): Model | null {
+		return persistedPreferencesSettings.current.vibeNewSessionModel;
+	}
+
+	setVibeNewSessionModel(model: Model | null): void {
+		persistedPreferencesSettings.current = {
+			...persistedPreferencesSettings.current,
+			vibeNewSessionModel: model,
 		};
 	}
 

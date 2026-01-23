@@ -29,8 +29,10 @@
 		HatGlasses,
 		LayoutGrid,
 		MessageCircle,
+		MessageCircleQuestionMark,
 		MonitorSmartphone,
 		Settings,
+		ShoppingBag,
 		X,
 	} from "@lucide/svelte";
 	import type { Tab } from "@shared/types";
@@ -110,6 +112,10 @@
 		<HatGlasses />
 	{:else if tabType === "htmlPreview"}
 		<MonitorSmartphone />
+	{:else if tabType === "helpDocs"}
+		<MessageCircleQuestionMark />
+	{:else if tabType === "skillsHub"}
+		<ShoppingBag />
 	{/if}
 {/snippet}
 

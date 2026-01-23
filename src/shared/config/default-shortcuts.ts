@@ -5,6 +5,7 @@ export type ShortcutAction =
 	| "closeCurrentTab"
 	| "closeOtherTabs"
 	| "deleteCurrentThread"
+	| "togglePlanMode"
 	| "openSettings"
 	| "toggleSidebar"
 	| "toggleSidebarRight"
@@ -238,6 +239,14 @@ export const DEFAULT_SHORTCUTS: CreateShortcutData[] = [
 		order: 44,
 		action: "toggleChatParametersPanel",
 		keys: new Set(["Cmd", "P"]),
+		scope: "app",
+		version: 1,
+	},
+	{
+		id: "togglePlanMode",
+		order: 45,
+		action: "togglePlanMode",
+		keys: new Set(["Shift", "Tab"]),
 		scope: "app",
 		version: 1,
 	},

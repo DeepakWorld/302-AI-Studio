@@ -1,11 +1,14 @@
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
+import { m } from "$lib/paraglide/messages.js";
 import { type CodeAgentGlobalConfigs } from "@shared/storage/code-agent";
+import { toast } from "svelte-sonner";
 import { persistedProviderState } from "../provider-state.svelte";
 
 function getInitialData() {
 	const initialData = {
 		apiKey: "",
 		autoDeploy: true,
+		notificationsEnabled: false,
 	};
 	return initialData;
 }
@@ -18,6 +21,9 @@ export const persistedCodeAgentGlobalConfigsState = new PersistedState<CodeAgent
 class CodeAgentGlobalConfigsState {
 	apiKey = $derived(persistedCodeAgentGlobalConfigsState.current?.apiKey ?? "");
 	autoDeploy = $derived(persistedCodeAgentGlobalConfigsState.current?.autoDeploy ?? true);
+	notificationsEnabled = $derived(
+		persistedCodeAgentGlobalConfigsState.current?.notificationsEnabled ?? false,
+	);
 
 	constructor() {
 		$effect.root(() => {
@@ -58,6 +64,18 @@ class CodeAgentGlobalConfigsState {
 
 	toggleAutoDeploy() {
 		this.#updateState({ autoDeploy: !this.autoDeploy });
+	}
+
+	async toggleNotificationsEnabled() {
+		const newState = !this.notificationsEnabled;
+		this.#updateState({ notificationsEnabled: newState });
+
+		if (newState) {
+			const granted = await window.electronAPI.notificationService.requestPermission();
+			if (!granted) {
+				toast.info(m.toast_notification_permission_required());
+			}
+		}
 	}
 }
 

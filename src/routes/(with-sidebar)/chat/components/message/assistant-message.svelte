@@ -45,6 +45,7 @@
 	import { onDestroy } from "svelte";
 	import { toast } from "svelte-sonner";
 	import {
+		AskUserQuestionCard,
 		ClaudeCodeToolCard,
 		McpToolCard,
 		SkillCard,
@@ -152,10 +153,10 @@
 	);
 
 	function getServerIcon(toolName: string): string | null {
-		// Extract server ID from toolName (format: serverId__toolName)
+		// Extract server ID from toolName (format: toolName__serverId)
 		const parts = toolName.split("__");
 		if (parts.length >= 2) {
-			const serverId = parts[0];
+			const serverId = parts[parts.length - 1];
 			const server = mcpState.getServer(serverId);
 			return server?.icon || null;
 		}
@@ -164,10 +165,10 @@
 	}
 
 	function getServerName(toolName: string): string {
-		// Extract server ID from toolName (format: serverId__toolName)
+		// Extract server ID from toolName (format: toolName__serverId)
 		const parts = toolName.split("__");
 		if (parts.length >= 2) {
-			const serverId = parts[0];
+			const serverId = parts[parts.length - 1];
 			const server = mcpState.getServer(serverId);
 			return server?.name || m.tool_call_label();
 		}
@@ -176,9 +177,9 @@
 	}
 
 	function getDisplayToolName(toolName: string): string {
-		// Remove server ID prefix from display name
+		// Remove server ID suffix from display name
 		const parts = toolName.split("__");
-		return parts.length >= 2 ? parts.slice(1).join("__") : toolName;
+		return parts.length >= 2 ? parts.slice(0, -1).join("__") : toolName;
 	}
 
 	// Check if speech synthesis is available
@@ -574,6 +575,8 @@
 						<WriteCard {part} messageId={message.id} messagePartIndex={partIndex} />
 					{:else if part.toolName === "Skill"}
 						<SkillCard {part} messageId={message.id} />
+					{:else if part.toolName === "AskUserQuestion"}
+						<AskUserQuestionCard {part} messageId={message.id} />
 					{:else}
 						<ClaudeCodeToolCard {part} messageId={message.id} />
 					{/if}
@@ -640,6 +643,8 @@
 					<WriteCard part={toolPart} messageId={message.id} messagePartIndex={partIndex} />
 				{:else if toolName === "Skill"}
 					<SkillCard part={toolPart} messageId={message.id} />
+				{:else if toolName === "AskUserQuestion"}
+					<AskUserQuestionCard part={toolPart} messageId={message.id} />
 				{:else}
 					<ClaudeCodeToolCard part={toolPart} messageId={message.id} />
 				{/if}

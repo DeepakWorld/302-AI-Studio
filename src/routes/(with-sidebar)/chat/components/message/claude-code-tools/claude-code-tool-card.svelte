@@ -16,10 +16,27 @@
 		DialogTitle,
 	} from "$lib/components/ui/dialog/index.js";
 	import { m } from "$lib/paraglide/messages.js";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { Ban, Circle, CircleCheck, LoaderCircle } from "@lucide/svelte";
 	import { getClaudeCodeToolIcon, getClaudeCodeToolLabel } from "./utils";
 
 	let { part, messageId: _messageId }: ClaudeCodeToolCardProps = $props();
+
+	// Auto-disable plan mode when ExitPlanMode succeeds
+	// Only run once - track execution with local variable
+	let hasDisabledPlanMode = false;
+	$effect(() => {
+		if (
+			part.toolName === "ExitPlanMode" &&
+			part.state === "output-available" &&
+			codeAgentState.inPlanMode &&
+			!hasDisabledPlanMode
+		) {
+			console.log("[ExitPlanMode effect] Calling updatePlanMode(false)");
+			codeAgentState.updatePlanMode(false);
+			hasDisabledPlanMode = true;
+		}
+	});
 
 	let isModalOpen = $state(false);
 

@@ -19,13 +19,14 @@
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { Bot, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
+	import { ClipboardList, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
+	import { toast } from "svelte-sonner";
 	import { AttachmentUploader } from "../attachment";
-	import CodeAgentPanel from "../code-agent/code-agent-panel.svelte";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
 
 	const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
@@ -76,19 +77,6 @@
 		chatState.handleMCPServerChange(selectedIds);
 	}
 
-	function handleCodeAgentClick() {
-		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-			codeAgentState.updateEnabled(false);
-			return;
-		}
-
-		codeAgentState.isCodeAgentPanelOpen = true;
-	}
-
-	function handleCodeAgentPanelClose() {
-		codeAgentState.isCodeAgentPanelOpen = false;
-	}
-
 	function handleSkillsPanelToggle() {
 		// Open skills tab if not already on it
 		if (agentPreviewState.activeTab !== "skills") {
@@ -101,6 +89,14 @@
 		if (agentPreviewState.activeTab !== "taskboard") {
 			agentPreviewState.openTaskboardTab();
 		}
+	}
+
+	function handlePlanModeToggle() {
+		if (codeAgentTaskboardState.taskboardStatus !== "idle") {
+			toast.info(m.toast_stop_taskboard_first());
+			return;
+		}
+		codeAgentState.updatePlanMode(!codeAgentState.inPlanMode);
 	}
 </script>
 
@@ -188,47 +184,6 @@
 	<AttachmentUploader {disabled} />
 {/snippet}
 
-{#snippet actionCodeAgent()}
-	<ButtonWithTooltip
-		class={cn(
-			"h-9 px-2.5",
-			"hover:!bg-chat-action-hover group/code-agent",
-			codeAgentState.enabled &&
-				"!bg-chat-action-active hover:!bg-chat-action-active border border-[color:var(--code-agent-primary)] rounded-[10px]",
-		)}
-		tooltip={m.title_code_agent()}
-		onclick={() => handleCodeAgentClick()}
-		size="sm"
-		disabled={disabled || (codeAgentState.isFreshTab ? false : !codeAgentState.inCodeAgentMode)}
-	>
-		<div class="flex items-center">
-			<Bot class={cn("size-4", codeAgentState.enabled && "!text-chat-action-active-fg")} />
-			<div
-				class={cn(
-					"h-3.5 border-l mx-1.5",
-					codeAgentState.enabled ? "code-agent-divider-active" : "code-agent-divider",
-				)}
-			></div>
-			<span
-				class={cn(
-					"transition-all duration-300 ease-in-out opacity-100 max-w-[200px]",
-					codeAgentState.enabled && "!text-chat-action-active-fg",
-				)}
-			>
-				{m.title_code_agent()}
-			</span>
-		</div>
-	</ButtonWithTooltip>
-
-	<Overlay
-		title={m.title_code_agent()}
-		open={codeAgentState.isCodeAgentPanelOpen}
-		onClose={handleCodeAgentPanelClose}
-	>
-		<CodeAgentPanel onClose={handleCodeAgentPanelClose} />
-	</Overlay>
-{/snippet}
-
 {#snippet actionEnableSkills()}
 	{@const hasForceUseSkills = codeAgentState.skills.some((s) => s.forceUse)}
 	<ButtonWithTooltip
@@ -240,7 +195,7 @@
 		)}
 		tooltip={m.title_skills()}
 		onclick={handleSkillsPanelToggle}
-		disabled={codeAgentState.isLoadingSkills}
+		disabled={codeAgentState.isLoadingSkills || codeAgentState.isChecking}
 	>
 		{#if codeAgentState.isLoadingSkills}
 			<LdrsLoader type="line-spinner" size={16} />
@@ -288,7 +243,9 @@
 										codeAgentState.thinkingBudget !== "off" &&
 											"!bg-chat-action-active hover:!bg-chat-action-active",
 									)}
-									disabled={disabled || codeAgentState.isUpdatingThinkingBudget}
+									disabled={disabled ||
+										codeAgentState.isUpdatingThinkingBudget ||
+										codeAgentState.isChecking}
 								>
 									{#if codeAgentState.isUpdatingThinkingBudget}
 										<LdrsLoader type="line-spinner" size={16} />
@@ -337,9 +294,23 @@
 		class="hover:!bg-chat-action-hover"
 		tooltip={m.label_tab_taskboard()}
 		onclick={handleTaskboardPanelToggle}
-		{disabled}
+		disabled={disabled || codeAgentState.isChecking}
 	>
 		<ListTodo />
+	</ButtonWithTooltip>
+{/snippet}
+
+{#snippet actionEnablePlanMode()}
+	<ButtonWithTooltip
+		class={cn(
+			"hover:!bg-chat-action-hover",
+			codeAgentState.inPlanMode && "!bg-chat-action-active hover:!bg-chat-action-active",
+		)}
+		tooltip={m.title_plan_mode()}
+		onclick={handlePlanModeToggle}
+		{disabled}
+	>
+		<ClipboardList class={cn(codeAgentState.inPlanMode && "!text-chat-action-active-fg")} />
 	</ButtonWithTooltip>
 {/snippet}
 
@@ -354,12 +325,11 @@
 	{@render actionEnableMCP()}
 
 	{#if codeAgentState.enabled}
+		{@render actionEnablePlanMode()}
 		{@render actionEnableSkills()}
 		{@render actionEnabledAgentThinking()}
 		{@render actionTaskOrchestration()}
 	{:else}
 		{@render actionSetParameters()}
 	{/if}
-
-	{@render actionCodeAgent()}
 </div>

@@ -1,7 +1,9 @@
 import type { ListSkillsResponse } from "$lib/api/skills/base-apis";
 import { emitter, EventNames } from "$lib/event/emitter";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
+import * as m from "$lib/paraglide/messages";
 import { chatState } from "$lib/stores/chat-state.svelte";
+import { persistedTabState } from "$lib/stores/tab-bar-state.svelte";
 import type { ChatMessage } from "$lib/types/chat";
 import type { Model } from "@302ai/studio-plugin-sdk";
 import {
@@ -16,6 +18,7 @@ import { match } from "ts-pattern";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-state.svelte";
 import { codeAgentGlobalConfigsState } from "./code-agent-global-configs-state.svelte";
+import { codeAgentSendMessageButtonState } from "./code-agent-send-message-button-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
 import { withLoadingState } from "./utils";
 
@@ -28,6 +31,11 @@ const threadId =
 	typeof tab.threadId === "string" &&
 	tab.threadId
 		? tab.threadId
+		: "shell";
+
+const tabId =
+	tab && typeof tab === "object" && "id" in tab && typeof tab.id === "string" && tab.id
+		? tab.id
 		: "shell";
 
 const INITIAL_CODE_AGENT_CONFIG: CodeAgentConfigMetadata = {
@@ -44,6 +52,7 @@ export const persistedCodeAgentConfigState = new PersistedState<CodeAgentConfigM
 );
 
 const { updateClaudeCodeSandboxModel } = window.electronAPI.codeAgentService;
+const { notifyTaskCompleted } = window.electronAPI.notificationService;
 
 class CodeAgentState {
 	isCodeAgentPanelOpen = $state(false);
@@ -58,9 +67,11 @@ class CodeAgentState {
 		() => persistedCodeAgentConfigState.current?.currentAgentId ?? "claude-code",
 	);
 	isDeleted = $derived.by(() => persistedCodeAgentConfigState.current?.isDeleted ?? false);
+	inPlanMode = $derived.by(() => persistedCodeAgentConfigState.current?.inPlanMode ?? false);
 
 	isFreshTab = $derived(!chatState.hasMessages);
 	inCodeAgentMode = $derived(!this.isFreshTab && this.enabled);
+	isChecking = $derived(codeAgentSendMessageButtonState.isChecking);
 
 	sandboxStatus = $derived.by<CodeAgentSandboxStatus>(() => {
 		return match(this.currentAgentId)
@@ -70,15 +81,18 @@ class CodeAgentState {
 			.otherwise(() => "waiting-for-sandbox");
 	});
 
-	handleChatFinished = (event: { canDeploy: boolean; lastMessage: ChatMessage }) => {
+	handleChatFinished = async (event: { canDeploy: boolean; lastMessage: ChatMessage }) => {
 		// Skip deployment if taskboard is still running - deployment will be triggered when all tasks complete
 		if (codeAgentTaskboardState.isRunning) {
 			return;
 		}
 
 		if (this.currentAgentId === "claude-code") {
-			claudeCodeAgentState.handleChatFinished(event);
+			await claudeCodeAgentState.handleChatFinished(event);
 		}
+
+		// Send notification if in Vibe mode and tab is inactive
+		await this.#showNotificationForChatFinished(event);
 	};
 
 	handleThreadTitleUpdated = (event: { title: string }) => {
@@ -103,7 +117,83 @@ class CodeAgentState {
 				});
 			}
 		}
+
+		// Send notification if in Vibe mode and tab is inactive
+		await this.#showNotificationForTaskboardDone(_event);
 	};
+
+	// Check if current tab is inactive by looking at the persisted tab state
+	#isCurrentTabInactive(): boolean {
+		const current = persistedTabState.current;
+		if (!current) return true;
+
+		// Find our tab across all windows
+		for (const windowId of Object.keys(current)) {
+			const windowState = current[windowId];
+			if (!windowState?.tabs) continue;
+
+			const currentTab = windowState.tabs.find((t) => t.threadId === threadId);
+			if (currentTab) {
+				return !currentTab.active;
+			}
+		}
+
+		// If we can't find the tab, assume it's inactive
+		return true;
+	}
+
+	// Extract a summary from the last message for notification body
+	#extractTaskSummary(lastMessage: ChatMessage | undefined): string {
+		if (!lastMessage) return "";
+
+		// Extract content from metadata.result.content (302.AI Claude Code result)
+		const resultContent = lastMessage.metadata?.result?.content ?? "";
+
+		// Get first 100 characters as summary
+		const summary = resultContent.slice(0, 100).trim();
+		return summary.length >= 100 ? summary + "..." : summary;
+	}
+
+	// Show notification for CHAT_FINISHED event
+	async #showNotificationForChatFinished(event: {
+		canDeploy: boolean;
+		lastMessage: ChatMessage;
+	}): Promise<void> {
+		// Only notify if Vibe mode is enabled and tab is inactive OR document is hidden (window backgrounded)
+		if (
+			this.enabled &&
+			(this.#isCurrentTabInactive() || document.hidden) &&
+			codeAgentGlobalConfigsState.notificationsEnabled
+		) {
+			const summary = this.#extractTaskSummary(event.lastMessage);
+			await notifyTaskCompleted({
+				title: m.notification_vibe_task_completed_title(),
+				body: summary,
+				windowId: window.windowId,
+				tabId: tabId,
+			});
+		}
+	}
+
+	// Show notification for TASKBOARD_ALL_TASKS_DONE event
+	async #showNotificationForTaskboardDone(event: { taskCount: number }): Promise<void> {
+		// Only notify if Vibe mode is enabled and tab is inactive OR document is hidden (window backgrounded)
+		if (
+			this.enabled &&
+			(this.#isCurrentTabInactive() || document.hidden) &&
+			codeAgentGlobalConfigsState.notificationsEnabled
+		) {
+			const lastMessage = chatState.messages[chatState.messages.length - 1];
+			const summary = this.#extractTaskSummary(lastMessage);
+
+			await notifyTaskCompleted({
+				title: m.notification_vibe_taskboard_completed_title(),
+				body: `${m.notification_vibe_taskboard_completed_body({ count: event.taskCount })}${summary ? "\n" + summary : ""}`,
+				windowId: window.windowId,
+				tabId: tabId,
+			});
+		}
+	}
 
 	private updateState(partial: Partial<CodeAgentConfigMetadata>): void {
 		persistedCodeAgentConfigState.current = {
@@ -122,6 +212,10 @@ class CodeAgentState {
 
 	updateEnabled(enabled: boolean): void {
 		this.updateState({ enabled });
+	}
+
+	updatePlanMode(inPlanMode: boolean): void {
+		this.updateState({ inPlanMode });
 	}
 
 	getCodeAgentCfgs(): CodeAgentCfgs {

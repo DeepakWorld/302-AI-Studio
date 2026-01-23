@@ -75,6 +75,9 @@ export class ShortcutActionsHandler {
 				case "toggleChatParametersPanel":
 					this.handleToggleChatParametersPanel();
 					break;
+				case "togglePlanMode":
+					this.handleTogglePlanMode();
+					break;
 
 				default:
 					console.warn(`Unhandled shortcut action: ${action}`);
@@ -255,6 +258,14 @@ export class ShortcutActionsHandler {
 
 	private handleToggleChatParametersPanel(): void {
 		chatState.isParametersOpen = !chatState.isParametersOpen;
+	}
+
+	private handleTogglePlanMode(): void {
+		console.log(
+			`[RendererActionsHandler] handleTogglePlanMode. Enabled: ${codeAgentState.enabled}, InPlanMode: ${codeAgentState.inPlanMode}`,
+		);
+		if (!codeAgentState.enabled) return;
+		codeAgentState.updatePlanMode(!codeAgentState.inPlanMode);
 	}
 }
 

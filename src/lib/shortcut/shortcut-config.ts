@@ -19,6 +19,7 @@ export const SHORTCUT_MODES: Record<ShortcutAction, "preset" | "record" | "displ
 	openSettings: "display",
 	toggleSidebar: "display",
 	toggleSidebarRight: "display",
+	togglePlanMode: "record",
 	toggleChatParametersPanel: "record",
 	stopGeneration: "record",
 	newTab: "display",
@@ -53,6 +54,7 @@ export const SHORTCUT_OPTIONS: Record<ShortcutAction, ShortcutOption[]> = {
 	openSettings: [],
 	toggleSidebar: [],
 	toggleSidebarRight: [],
+	togglePlanMode: [],
 	toggleChatParametersPanel: [],
 
 	stopGeneration: [],

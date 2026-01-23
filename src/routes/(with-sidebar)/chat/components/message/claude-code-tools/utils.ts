@@ -1,5 +1,7 @@
+import { m } from "$lib/paraglide/messages.js";
 import {
 	BookOpen,
+	Bot,
 	FilePenLine,
 	FileSearch,
 	FileText,
@@ -18,7 +20,6 @@ import {
 	Zap,
 	type Icon,
 } from "@lucide/svelte";
-import { m } from "$lib/paraglide/messages.js";
 
 // Claude Code tool names
 export const CLAUDE_CODE_TOOLS = [
@@ -96,7 +97,7 @@ export function getClaudeCodeToolIcon(toolName: string): typeof Icon {
 		case "KillShell":
 			return Skull;
 		case "Task":
-			return Zap;
+			return Bot;
 		case "Skill":
 			return Zap;
 		case "SlashCommand":

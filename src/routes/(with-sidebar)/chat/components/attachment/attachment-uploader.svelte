@@ -2,6 +2,7 @@
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
 	import { Paperclip } from "@lucide/svelte";
 	import type { AttachmentFile } from "@shared/types";
@@ -12,7 +13,8 @@
 	}
 	let { disabled = false }: Props = $props();
 
-	let isMaxReached = $derived(chatState.attachments.length >= MAX_ATTACHMENT_COUNT);
+	let maxAttachmentLimit = $derived(codeAgentState.enabled ? 20 : MAX_ATTACHMENT_COUNT);
+	let isMaxReached = $derived(chatState.attachments.length >= maxAttachmentLimit);
 	let fileInput: HTMLInputElement;
 
 	async function handleFileSelect(event: Event) {
@@ -22,7 +24,7 @@
 		if (!files) return;
 
 		const currentCount = chatState.attachments.length;
-		const availableSlots = MAX_ATTACHMENT_COUNT - currentCount;
+		const availableSlots = maxAttachmentLimit - currentCount;
 
 		if (availableSlots <= 0) {
 			target.value = "";
@@ -82,7 +84,7 @@
 
 <ButtonWithTooltip
 	class="hover:!bg-chat-action-hover"
-	tooltip={`${m.title_upload_attachment()} (${chatState.attachments.length}/${MAX_ATTACHMENT_COUNT})`}
+	tooltip={`${m.title_upload_attachment()} (${chatState.attachments.length}/${maxAttachmentLimit})`}
 	disabled={isMaxReached || disabled}
 	onclick={handleClick}
 >

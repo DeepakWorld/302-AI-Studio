@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createSkill, updateSkill } from "$lib/api/skills";
+	import { createSkill, updateSkill, deleteSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
@@ -46,6 +46,9 @@ description:
 				// 使用文件树视图，需要写入修改的文件并打包整个目录
 				await manualFormRef?.writeChangedFiles?.();
 
+				// 先删除同名 skill 以避免重复
+				await deleteSkill({ skill_list: [formData.name] });
+
 				const result = await updateSkill({
 					name: formData.name,
 					dirPath: manualRootPath,
@@ -60,6 +63,9 @@ description:
 				}
 			} else {
 				// 默认视图，只创建 SKILL.md
+				// 先删除同名 skill 以避免重复
+				await deleteSkill({ skill_list: [formData.name] });
+
 				const result = await createSkill({
 					name: formData.name,
 					description: formData.description,

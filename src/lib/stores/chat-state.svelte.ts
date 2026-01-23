@@ -154,6 +154,36 @@ $effect.root(() => {
 			};
 		}
 	});
+
+	// Auto-apply default model for new sessions
+	$effect(() => {
+		// Wait for states to be hydrated
+		if (!persistedChatParamsState.isHydrated) {
+			return;
+		}
+
+		// Only apply if no model is selected and no messages exist
+		const currentParams = persistedChatParamsState.current;
+		const hasMessages = persistedMessagesState.current.length > 0;
+		if (currentParams.selectedModel || hasMessages) {
+			return;
+		}
+
+		// Apply default model based on mode
+		if (codeAgentState.enabled) {
+			const vibeDefault = preferencesSettings.vibeNewSessionModel;
+			if (vibeDefault) {
+				persistedChatParamsState.current.selectedModel = vibeDefault;
+				console.log("[ChatState] Applied Vibe default model:", vibeDefault.name);
+			}
+		} else {
+			const chatDefault = preferencesSettings.newSessionModel;
+			if (chatDefault) {
+				persistedChatParamsState.current.selectedModel = chatDefault;
+				console.log("[ChatState] Applied Chat default model:", chatDefault.name);
+			}
+		}
+	});
 });
 
 class ChatState {
@@ -553,15 +583,25 @@ class ChatState {
 		}
 	};
 
-	sendMessage = async () => {
-		if (this.sendMessageEnabled) {
+	sendMessage = async (options?: { content?: string }) => {
+		const contentOverride = options?.content;
+		const hasContent =
+			contentOverride?.trim() || this.inputValue.trim() !== "" || this.attachments.length > 0;
+		const canSend =
+			hasContent &&
+			!!this.selectedModel &&
+			!this.isStreaming &&
+			!this.isSubmitted &&
+			this.loadingAttachmentIds.size === 0;
+
+		if (canSend) {
 			// Cancel any pending suggestions generation to avoid race conditions
 			this.cancelPendingSuggestions();
 
 			try {
 				const currentModel = this.selectedModel!;
 				const currentAttachments = [...this.attachments];
-				const currentInputValue = this.inputValue;
+				const currentInputValue = contentOverride ?? this.inputValue;
 
 				// Ensure session association is recorded for tabs created at app boot
 				// (boot-created initial tabs may not have apiKeyHash until the first real send)
@@ -621,45 +661,29 @@ class ChatState {
 					// Continue with message sending even if hook fails
 				}
 
-				const { parts: attachmentParts, metadataList: attachmentMetadata } =
-					await convertAttachmentsToMessageParts(currentAttachments, {
-						enableZipSupport: codeAgentState.enabled,
-					});
+				const codeAgentEnabled = codeAgentState.enabled;
 
-				const textParts = attachmentParts.filter(
-					(part): part is { type: "text"; text: string } => part.type === "text",
-				);
-				const fileParts = attachmentParts.filter(
-					(part): part is import("ai").FileUIPart => part.type === "file",
-				);
+				if (codeAgentEnabled) {
+					const workspacePath = claudeCodeSandboxState.currentSessionWorkspacePath;
+					if (currentAttachments.length > 0 && !workspacePath) {
+						toast.error(m.taskboard_error_attachment_upload_failed());
+						return;
+					}
 
-				if (fileParts.length > 0 && textParts.length > 0) {
-					const fileContent = textParts.map((part) => part.text).join("\n\n");
+					// Agent mode: attachments will be uploaded by backend before sending to AI provider.
+					// Only send metadata for UI preview, no content in message parts.
+					const attachmentMetadata = currentAttachments.map((att) => ({
+						id: att.id,
+						name: att.name,
+						type: att.type,
+						size: att.size,
+						preview: att.preview,
+						filePath: att.filePath,
+					}));
 
-					chat.sendMessage(
-						{
-							parts: [
-								...fileParts,
-								{ type: "text" as const, text: fileContent },
-								{ type: "text" as const, text: currentInputValue },
-							],
-							metadata: {
-								attachments: attachmentMetadata,
-								fileContentPartIndex: fileParts.length,
-							},
-						},
-						{
-							body: {
-								model: currentModel.id,
-								apiKey: this.getApiKey(currentModel.providerId),
-							},
-						},
-					);
-				} else if (fileParts.length > 0) {
 					chat.sendMessage(
 						{
 							text: currentInputValue,
-							files: fileParts,
 							metadata: { attachments: attachmentMetadata },
 						},
 						{
@@ -669,44 +693,96 @@ class ChatState {
 							},
 						},
 					);
-				} else if (textParts.length > 0) {
-					const fileContent = textParts.map((part) => part.text).join("\n\n");
-
-					chat.sendMessage(
-						{
-							parts: [
-								{ type: "text" as const, text: fileContent },
-								{ type: "text" as const, text: currentInputValue },
-							],
-							metadata: {
-								attachments: attachmentMetadata,
-								fileContentPartIndex: 0,
-							},
-						},
-						{
-							body: {
-								model: currentModel.id,
-								apiKey: this.getApiKey(currentModel.providerId),
-							},
-						},
-					);
 				} else {
-					chat.sendMessage(
-						{ text: currentInputValue },
-						{
-							body: {
-								model: currentModel.id,
-								apiKey: this.getApiKey(currentModel.providerId),
-							},
-						},
+					const { parts: attachmentParts, metadataList: attachmentMetadata } =
+						await convertAttachmentsToMessageParts(currentAttachments, {
+							enableZipSupport: false,
+						});
+
+					const textParts = attachmentParts.filter(
+						(part): part is { type: "text"; text: string } => part.type === "text",
 					);
+					const fileParts = attachmentParts.filter(
+						(part): part is import("ai").FileUIPart => part.type === "file",
+					);
+
+					if (fileParts.length > 0 && textParts.length > 0) {
+						const fileContent = textParts.map((part) => part.text).join("\n\n");
+
+						chat.sendMessage(
+							{
+								parts: [
+									...fileParts,
+									{ type: "text" as const, text: fileContent },
+									{ type: "text" as const, text: currentInputValue },
+								],
+								metadata: {
+									attachments: attachmentMetadata,
+									fileContentPartIndex: fileParts.length,
+								},
+							},
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					} else if (fileParts.length > 0) {
+						chat.sendMessage(
+							{
+								text: currentInputValue,
+								files: fileParts,
+								metadata: { attachments: attachmentMetadata },
+							},
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					} else if (textParts.length > 0) {
+						const fileContent = textParts.map((part) => part.text).join("\n\n");
+
+						chat.sendMessage(
+							{
+								parts: [
+									{ type: "text" as const, text: fileContent },
+									{ type: "text" as const, text: currentInputValue },
+								],
+								metadata: {
+									attachments: attachmentMetadata,
+									fileContentPartIndex: 0,
+								},
+							},
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					} else {
+						chat.sendMessage(
+							{ text: currentInputValue },
+							{
+								body: {
+									model: currentModel.id,
+									apiKey: this.getApiKey(currentModel.providerId),
+								},
+							},
+						);
+					}
 				}
 
 				await threadService.addThread(threadId);
 
 				await broadcastService.broadcastToAll("thread-list-updated", { threadId });
 
-				this.resetChat();
+				if (!contentOverride) {
+					this.resetChat();
+				}
 			} catch (error) {
 				this.handleChatError(error);
 			}
@@ -1420,6 +1496,7 @@ export const chat = new Chat({
 				autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 				skills: codeAgentState.skills,
 				isCreateSkillMode: chatState.isCreateSkillMode,
+				inPlanMode: codeAgentEnabled && codeAgentState.inPlanMode,
 
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
@@ -1506,8 +1583,14 @@ export const chat = new Chat({
 			"onFinish: async ({ messages }) autoDeploy",
 			codeAgentGlobalConfigsState.autoDeploy,
 		);
+
+		const isDeployCommand =
+			lastUserMessage?.parts.some(
+				(part) => part.type === "text" && part.text.trim() === "/deploy",
+			) ?? false;
+
 		emitter.emit(EventNames.CHAT_FINISHED, {
-			canDeploy: codeAgentEnabled && codeAgentGlobalConfigsState.autoDeploy,
+			canDeploy: codeAgentEnabled && (codeAgentGlobalConfigsState.autoDeploy || isDeployCommand),
 			lastMessage: messages[messages.length - 1],
 		});
 

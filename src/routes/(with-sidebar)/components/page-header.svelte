@@ -3,15 +3,24 @@
 	import * as Sidebar from "$lib/components/ui/sidebar";
 	import { useSidebar } from "$lib/components/ui/sidebar";
 	import { m } from "$lib/paraglide/messages";
+	import { getLocale } from "$lib/paraglide/runtime";
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { cn } from "$lib/utils";
-	import { Ghost, Server, Settings } from "@lucide/svelte";
+	import { Ghost, MessageCircleQuestionMark, Server, Settings } from "@lucide/svelte";
 
 	async function handleNewSettingsTab() {
 		await window.electronAPI.windowService.handleOpenSettingsWindow();
+	}
+
+	async function handleOpenHelpDocs() {
+		const locale = getLocale();
+		const lang = locale === "en" ? "en" : "zh";
+		const helpDocsUrl = `https://studio.302.ai/${lang}/docs`;
+
+		await window.electronAPI.tabService.handleNewTab("Help Docs", "helpDocs", true, helpDocsUrl);
 	}
 
 	// Check if agent preview button (with full tabs) should be shown
@@ -114,6 +123,15 @@
 			onclick={() => chatState.handlePrivateChatActiveChange(!chatState.isPrivateChatActive)}
 		>
 			<Ghost class={cn("size-5", chatState.isPrivateChatActive && "!text-icon-btn-active-fg")} />
+		</ButtonWithTooltip>
+
+		<ButtonWithTooltip
+			tooltip={m.title_help_docs()}
+			class="hover:!bg-icon-btn-hover"
+			tooltipSide="bottom"
+			onclick={() => handleOpenHelpDocs()}
+		>
+			<MessageCircleQuestionMark class="size-5" />
 		</ButtonWithTooltip>
 
 		<ButtonWithTooltip

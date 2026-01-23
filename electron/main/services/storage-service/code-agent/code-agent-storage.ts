@@ -34,6 +34,7 @@ class CodeAgentGlobalConfigsStorage extends StorageService<CodeAgentGlobalConfig
 		const defaultData = {
 			apiKey: "",
 			autoDeploy: true,
+			notificationsEnabled: false,
 		};
 		try {
 			const data = await this.getItemInternal("code-agent-global-configs");

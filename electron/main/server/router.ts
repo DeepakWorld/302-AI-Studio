@@ -28,9 +28,13 @@ import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
 import {
 	appendPromptToLastUserMessage,
+	appendPromptToSystemMessage,
 	convertAiSdkMessagesToOpenAiMessages,
 	createUIMessageStreamFromGenerator,
 	isStreamingSupported,
+	prependPromptToFirstUserMessage,
+	sendStreamError,
+	uploadAttachmentsFromMessages,
 } from "./utils";
 
 export type RouterRequestBody = {
@@ -62,6 +66,7 @@ export type RouterRequestBody = {
 	autoDeploy?: boolean;
 	skills?: Skill[];
 	isCreateSkillMode?: boolean;
+	inPlanMode?: boolean;
 	inTaskOrchestrationMode?: boolean;
 	workspacePath?: string;
 };
@@ -1153,6 +1158,144 @@ app.post("/generate-suggestions", async (c) => {
 	}
 });
 
+// Task decomposition prompt
+function getTaskDecomposePrompt(count: number): string {
+	return `你是“看板任务拆解器（Task Decomposer）”。
+你的职责是：将用户输入的一句或几句高层需求，拆解成可由 AI Coding Agent 顺序执行的看板任务列表。
+目标
+输出一组可执行、可验证、顺序明确的子任务（从调研/澄清→设计→实现→测试→交付）。
+任务必须尽量小粒度，避免“一条任务干完一整个系统”。
+如果需求信息不足，先产生澄清任务（或澄清问题），保证后续任务可落地。
+拆解原则（必须遵守）
+先理解再拆解：识别目标、范围、约束、成功标准、依赖。
+可执行：每条任务要具体到“改哪些文件/模块/接口/页面/脚本/配置”这类层面（若未知则写“待确认/按项目结构定位”）。
+可验证：每条任务给出验收标准（如测试用例、接口返回、页面行为、性能指标等）。
+顺序与依赖：输出顺序编号；如可并行，在依赖字段标明。
+默认最小可交付（MVP）优先：先做最小闭环，再做增强项。
+适配不同类型任务：开发/修复bug/重构/数据处理/自动化/文档/部署/集成/算法/插件等都能覆盖。
+风险控制：遇到不确定项或高风险改动，生成“风险评估/备份/回滚方案”任务。
+不要输出空泛任务：如“完善功能”“优化代码”必须拆到具体点。
+输出格式（严格 JSON，便于程序解析）
+只输出 JSON，不要输出任何额外文本。
+
+JSON范例:
+{
+  "tasks": [
+    { 
+      "id": "1",
+      "content": "具体的任务描述",
+    },
+    {
+      "id": "2",
+      "content": "另一个任务描述",
+    }
+  ]
+}
+
+User requires decomposition into ${count} sub-tasks.`;
+}
+
+app.post("/decompose-tasks", async (c) => {
+	const {
+		requirement,
+		count = 3,
+		model,
+		apiKey,
+		baseUrl,
+		providerType,
+	} = await c.req.json<{
+		requirement: string;
+		count?: number;
+		model: string;
+		apiKey?: string;
+		baseUrl?: string;
+		providerType: ModelProvider["apiType"];
+	}>();
+
+	let languageModel;
+	switch (providerType) {
+		case "302ai": {
+			const openai = createOpenAICompatible({
+				name: "302.AI",
+				baseURL: baseUrl || "https://api.302.ai/v1",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = openai.chatModel(model);
+			break;
+		}
+		case "openai": {
+			const openai = createOpenAI({
+				baseURL: baseUrl || "https://api.openai.com/v1",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = openai.chat(model);
+			break;
+		}
+		case "anthropic": {
+			const anthropic = createAnthropic({
+				baseURL: baseUrl || "https://api.anthropic.com/v1",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = anthropic.chat(model);
+			break;
+		}
+		case "gemini": {
+			const google = createGoogleGenerativeAI({
+				baseURL: baseUrl || "https://generativelanguage.googleapis.com/v1beta",
+				apiKey: apiKey || "[REDACTED:sk-secret]",
+			});
+			languageModel = google.chat(model);
+			break;
+		}
+		default:
+			return c.json({ error: "Invalid provider type" }, 400);
+	}
+
+	// Helper function to perform task decomposition
+	const doDecompose = async (modelToUse: typeof languageModel) => {
+		const { text } = await generateText({
+			model: modelToUse,
+			messages: [
+				{
+					role: "user",
+					content: getTaskDecomposePrompt(count) + "\n\n用户需求：\n" + requirement,
+				},
+			],
+		});
+
+		console.log("[TaskDecompose] Received text:", text);
+
+		// Parse the JSON response
+		let jsonStr = text.trim();
+		// Remove markdown code blocks if present
+		if (jsonStr.startsWith("```")) {
+			jsonStr = jsonStr
+				.replace(/```json?\n?/g, "")
+				.replace(/```/g, "")
+				.trim();
+		}
+
+		const parsed = JSON.parse(jsonStr);
+		if (parsed.tasks && Array.isArray(parsed.tasks)) {
+			console.log("[TaskDecompose] Parsed tasks:", parsed.tasks.length);
+			return parsed.tasks;
+		} else {
+			console.log("[TaskDecompose] Invalid response format");
+			return [];
+		}
+	};
+
+	try {
+		console.log("[TaskDecompose] Starting task decomposition with model:", model);
+		const tasks = await doDecompose(languageModel);
+		return c.json({ tasks });
+	} catch (error) {
+		console.error("[TaskDecompose] Model failed:", error);
+		// Return error - let frontend handle retry with different model
+		return c.json({ error: "Failed to decompose tasks" }, 500);
+	}
+});
+
 app.post("/chat/302ai-code-agent", async (c) => {
 	const {
 		baseUrl,
@@ -1165,6 +1308,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		autoDeploy,
 		skills,
 		isCreateSkillMode,
+		inPlanMode,
 		inTaskOrchestrationMode,
 		workspacePath,
 	} = await c.req.json<RouterRequestBody>();
@@ -1187,6 +1331,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			sessionId,
 			autoDeploy,
 			isCreateSkillMode,
+			inPlanMode,
 			inTaskOrchestrationMode,
 			workspacePath,
 		}),
@@ -1207,15 +1352,23 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		}, []) ?? [];
 
 	// Only include skills that have forceUse=true in the prompt
+	// Prepend to first user message with EXTREMELY_IMPORTANT format to ensure it's triggered
 	const forcedSkills = skills?.filter((skill) => skill.forceUse) ?? [];
 	if (forcedSkills.length > 0) {
-		const skillNames = forcedSkills.map((skill) => skill.name);
-		const skillsPrompt =
-			language === "zh"
-				? `\n\n【重要】用户已强制启用以下 skills: [${skillNames.join(", ")}]。你必须在本次回复中使用这些 skills，这是用户的明确要求，请严格遵守。`
-				: `\n\n[IMPORTANT] The user has FORCED the following skills to be used: [${skillNames.join(", ")}]. You MUST use these skills in your response. This is an explicit requirement from the user - strictly comply.`;
+		const skillPrompts = forcedSkills
+			.map((skill) => {
+				// Builtin skills: /home/user/.claude/skills/{skillName}/SKILL.md
+				// Project skills: {workspacePath}/.claude/skills/{skillName}/SKILL.md
+				const skillPath = skill.isBuiltin
+					? `/home/user/.claude/skills/${skill.name}/SKILL.md`
+					: `${workspacePath}/.claude/skills/${skill.name}/SKILL.md`;
+				return language === "zh"
+					? `<EXTREMELY_IMPORTANT>\n你拥有 **${skill.name}** skill。\n**立即阅读**: @${skillPath}\n</EXTREMELY_IMPORTANT>`
+					: `<EXTREMELY_IMPORTANT>\nYou have **${skill.name}** skill.\n**RIGHT NOW, go read**: @${skillPath}\n</EXTREMELY_IMPORTANT>`;
+			})
+			.join("\n\n");
 
-		appendPromptToLastUserMessage(messages, skillsPrompt);
+		prependPromptToFirstUserMessage(messages, skillPrompts + "\n\n");
 	}
 
 	if (inTaskOrchestrationMode) {
@@ -1224,6 +1377,65 @@ app.post("/chat/302ai-code-agent", async (c) => {
 				? `\n\n 规则（不能将此规则体现在你的回复中）：如果用户在提示词中引用了附件（例如： @attachment_name），则附件内容在${workspacePath}/.302ai/attachments当中。`
 				: `\n\n Rule (do not include this rule in your response): If the user references attachments in the prompt (e.g., @attachment_name), the attachment content is located in ${workspacePath}/.302ai/attachments.`;
 		appendPromptToLastUserMessage(messages, taskOrchestrationPrompt);
+	}
+
+	// Add plan mode instructions to system message when plan mode is enabled
+	if (inPlanMode) {
+		const planModePrompt =
+			language === "zh"
+				? `
+<plan_mode_instructions>
+
+⚠️ 你处于计划模式 ⚠️
+
+关键规则：每轮只问一个问题 - 严格执行
+- 在计划模式下，每轮只能调用 AskUserQuestion 一次
+- 不要在本轮对话中调用 AskUserQuestion 之后再次调用 AskUserQuestion
+- 等待用户的实际回答后再继续
+
+工作流程：
+第1轮：调用 AskUserQuestion → 等待用户回答
+第2轮：处理用户回答 → 调用 AskUserQuestion（如需要）→ 等待用户回答
+第3轮：处理用户回答 → 创建计划 → 调用 ExitPlanMode
+
+重要提示：
+- 如果你看到输出 "Answer questions?"，这意味着工具正在工作
+- 等待用户的真实回答
+- 不要在同一轮中再次尝试调用 AskUserQuestion
+
+每次行动前检查：
+□ 我在本轮中已经调用过 AskUserQuestion 了吗？ → 如果是：不要再次调用
+□ 我即将调用 AskUserQuestion 吗？ → 如果是：这将是本轮唯一一次调用
+
+</plan_mode_instructions>
+`
+				: `
+<plan_mode_instructions>
+
+⚠️ YOU ARE IN PLAN MODE ⚠️
+
+CRITICAL RULE: ONE QUESTION PER TURN - STRICTLY ENFORCED
+- In plan mode, you can only call AskUserQuestion ONCE per turn
+- DO NOT call AskUserQuestion again after calling it in the same turn
+- Wait for the user's actual response before proceeding
+
+WORKFLOW:
+Turn 1: Call AskUserQuestion → Wait for user response
+Turn 2: Process user's answer → Call AskUserQuestion (if needed) → Wait for user response
+Turn 3: Process user's answer → Create plan → Call ExitPlanMode
+
+IMPORTANT: 
+- If you see output "Answer questions?", this means the tool is working
+- Wait for the user's real answer
+- Do NOT try to call AskUserQuestion again in the same turn
+
+CHECK BEFORE EVERY ACTION:
+□ Have I already called AskUserQuestion in this turn? → If YES: Do NOT call it again
+□ Am I about to call AskUserQuestion? → If YES: This will be my ONLY call this turn
+
+</plan_mode_instructions>
+`;
+		appendPromptToSystemMessage(messages, planModePrompt);
 	}
 
 	// Build request body for 302.AI Claude Code API
@@ -1240,7 +1452,10 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		structured_output: true,
 		enable_pre_deploy_check: autoDeploy,
 		available_skills: isCreateSkillMode ? [] : availableSkills,
+		// Only include action when plan mode is ON or creating skill
 		...(isCreateSkillMode ? { action: "create_skill" } : {}),
+		...(inPlanMode && !isCreateSkillMode ? { action: "plan" } : {}),
+		...(inTaskOrchestrationMode ? { action: "sync_tasks_json" } : {}),
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));
@@ -1282,31 +1497,25 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			controller.enqueue(encoder.encode(immediateStartEvent));
 			console.log("[302ai-code-agent] Sent immediate start event");
 
+			// Upload attachments after sending start event (non-blocking UX)
+			// This allows the UI to show "AI is typing" immediately while upload happens in background
+			if (sandboxId && workspacePath) {
+				try {
+					await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
+				} catch (uploadError) {
+					console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
+					sendStreamError(controller, "Failed to upload attachments");
+					return;
+				}
+			}
+
 			try {
 				const response = await responsePromise;
 
 				if (!response.ok) {
 					const errorText = await response.text();
 					console.error("[302ai-code-agent] API error:", response.status, errorText);
-					// Send error as text-delta so user sees it
-					const errorId = `error-${Date.now()}`;
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: errorId })}\n\n`),
-					);
-					controller.enqueue(
-						encoder.encode(
-							`data: ${JSON.stringify({ type: "text-delta", id: errorId, delta: `**Error**: ${errorText}` })}\n\n`,
-						),
-					);
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: errorId })}\n\n`),
-					);
-					controller.enqueue(
-						encoder.encode(
-							`data: ${JSON.stringify({ type: "finish", finishReason: "error" })}\n\n`,
-						),
-					);
-					controller.close();
+					sendStreamError(controller, errorText);
 					return;
 				}
 
@@ -1345,23 +1554,8 @@ app.post("/chat/302ai-code-agent", async (c) => {
 				}
 			} catch (error) {
 				console.error("[302ai-code-agent] Stream error:", error);
-				const errorId = `error-${Date.now()}`;
 				const errorMessage = error instanceof Error ? error.message : "Unknown error";
-				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: errorId })}\n\n`),
-				);
-				controller.enqueue(
-					encoder.encode(
-						`data: ${JSON.stringify({ type: "text-delta", id: errorId, delta: `**Error**: ${errorMessage}` })}\n\n`,
-					),
-				);
-				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: errorId })}\n\n`),
-				);
-				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ type: "finish", finishReason: "error" })}\n\n`),
-				);
-				controller.close();
+				sendStreamError(controller, errorMessage);
 			}
 		},
 	});

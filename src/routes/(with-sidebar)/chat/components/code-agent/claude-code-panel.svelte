@@ -7,6 +7,7 @@
 <script lang="ts">
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
+	import { onMount } from "svelte";
 
 	import SettingSelect from "$lib/components/buss/settings/setting-select.svelte";
 
@@ -30,6 +31,10 @@
 	const { windowService } = window.electronAPI;
 
 	let { onClose }: Props = $props();
+
+	onMount(() => {
+		claudeCodeAgentState.init();
+	});
 
 	let disabled = $derived(!codeAgentState.isFreshTab);
 
@@ -204,7 +209,7 @@
 			{m.common_cancel()}
 		</Button>
 		<Button disabled={codeAgentState.inCodeAgentMode} onclick={handleCodeAgentEnabled}>
-			{m.text_button_open()}
+			{m.label_button_confirm()}
 		</Button>
 	</div>
 {/snippet}

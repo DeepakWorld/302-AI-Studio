@@ -5,7 +5,6 @@
 </script>
 
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import * as m from "$lib/paraglide/messages";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
@@ -14,6 +13,7 @@
 	import type { Task } from "@shared/types";
 	import { dndzone, SHADOW_PLACEHOLDER_ITEM_ID, TRIGGERS } from "svelte-dnd-action";
 	import { flip } from "svelte/animate";
+	import { ButtonWithTooltip } from "../button-with-tooltip";
 	import TaskEditDialog from "./task-edit-dialog.svelte";
 
 	interface Props {
@@ -78,12 +78,19 @@
 		editDialogOpen = true;
 	}
 
-	function handleEditSave(updatedContent: string) {
+	function handleEditSave(updatedContent: string, updatedNumber: number) {
 		if (!editingTask) return;
 
-		const updatedTasklist = codeAgentTaskboardState.tasklist.map((t) =>
-			t.id === editingTask!.id ? { ...t, content: updatedContent } : t,
-		);
+		const updatedTasklist = codeAgentTaskboardState.tasklist.map((t) => {
+			if (t.id !== editingTask!.id) return t;
+			const clampedExecutedCount = Math.min(updatedNumber, Math.max(0, t.executedCount ?? 0));
+			return {
+				...t,
+				content: updatedContent,
+				number: updatedNumber,
+				executedCount: clampedExecutedCount,
+			};
+		});
 		codeAgentTaskboardState.updateTasklist(updatedTasklist);
 		editingTask = null;
 	}
@@ -183,20 +190,28 @@
 
 		<!-- Task content -->
 		<div class="flex-1 min-w-0">
-			<span
-				class={cn(
-					"text-sm truncate block",
-					task.status === "pending" && "font-medium text-foreground",
-					task.status === "in_progress" && "font-medium text-blue-700 dark:text-blue-300",
-					task.status === "done" && "line-through text-muted-foreground",
-				)}
-			>
-				{task.content}
-			</span>
+			<div class="flex items-center gap-2 min-w-0">
+				<span
+					class={cn(
+						"text-sm truncate block min-w-0",
+						task.status === "pending" && "font-medium text-foreground",
+						task.status === "in_progress" && "font-medium text-blue-700 dark:text-blue-300",
+						task.status === "done" && "line-through text-muted-foreground",
+					)}
+				>
+					{task.content}
+				</span>
+			</div>
 		</div>
 
 		<!-- Action buttons -->
 		<div class="flex items-center shrink-0">
+			<span
+				class="shrink-0 text-xs text-muted-foreground font-medium px-2 py-1 bg-muted/50 rounded-md mr-2"
+			>
+				×{task.number}
+			</span>
+
 			{#if task.status === "in_progress"}
 				<span
 					class="text-xs text-blue-600 dark:text-blue-400 font-medium px-2 py-1 bg-blue-100/50 dark:bg-blue-900/30 rounded-lg"
@@ -220,30 +235,32 @@
 			>
 				<div class="flex items-center gap-1 pl-2">
 					{#if task.status === "pending"}
-						<Button
+						<ButtonWithTooltip
+							tooltip={m.text_button_edit()}
 							variant="ghost"
-							size="icon"
-							class="size-7 text-muted-foreground/60 hover:text-primary hover:bg-primary/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+							size="icon-sm"
+							class="size-7 hover:!bg-chat-action-hover text-muted-foreground"
 							onclick={() => handleEdit(task)}
 						>
 							<SquarePen class="size-3.5" />
-						</Button>
+						</ButtonWithTooltip>
 					{/if}
 
-					<Button
+					<ButtonWithTooltip
+						tooltip={m.text_button_delete()}
 						variant="ghost"
-						size="icon"
+						size="icon-sm"
 						class={cn(
-							"size-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity",
+							"rounded-lg size-7 opacity-0 group-hover:opacity-100 transition-opacity",
 							task.status === "in_progress"
 								? "text-muted-foreground/40 !cursor-not-allowed"
-								: "text-muted-foreground/60 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30",
+								: "text-muted-foreground hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-100/50 dark:hover:bg-rose-900/30",
 						)}
 						disabled={task.status === "in_progress"}
 						onclick={() => handleDelete(task)}
 					>
 						<Trash2 class="size-3.5" />
-					</Button>
+					</ButtonWithTooltip>
 				</div>
 			</div>
 		</div>

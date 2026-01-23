@@ -6,6 +6,8 @@
 	import LocalPlatform from "./local-platform.svelte";
 	import RemotePlatform from "./remote-platform.svelte";
 
+	import DeployedWebsitesList from "./deployed-websites-list.svelte";
+
 	const platformOptions = [
 		{
 			key: "remote",
@@ -41,6 +43,12 @@
 			checked={codeAgentGlobalConfigsState.autoDeploy}
 			onCheckedChange={() => codeAgentGlobalConfigsState.toggleAutoDeploy()}
 		/>
+		<SettingSwitchItem
+			label={m.settings_notificationsEnabled()}
+			checked={codeAgentGlobalConfigsState.notificationsEnabled}
+			onCheckedChange={() => codeAgentGlobalConfigsState.toggleNotificationsEnabled()}
+		/>
+		<DeployedWebsitesList />
 		<RemotePlatform />
 	{:else if selectedPlatform === "local"}
 		<LocalPlatform />

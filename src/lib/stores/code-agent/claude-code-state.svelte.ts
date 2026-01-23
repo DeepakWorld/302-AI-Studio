@@ -12,6 +12,7 @@ import {
 } from "@shared/storage/code-agent";
 import { toast } from "svelte-sonner";
 import { agentPreviewState } from "../agent-preview-state.svelte";
+import { BUILTIN_SKILLS } from "./constant";
 
 export interface ClaudeCodeSandboxInfo {
 	sandboxId: string;
@@ -56,7 +57,7 @@ function getInitialData() {
 		currentSessionId: "",
 		sandboxId: "",
 		sandboxRemark: "",
-		skills: [],
+		skills: BUILTIN_SKILLS,
 		thinkingBudget: "off",
 		isManualNote: false,
 	};
@@ -379,7 +380,7 @@ class ClaudeCodeAgentState {
 		const currentSkillNames = new Set(this.skills.map((s) => s.name));
 		const uniqueNewSkills = skills
 			.filter((s) => !currentSkillNames.has(s.name))
-			.map((s) => ({ ...s, forceUse: true })); // Default to forceUse=true when enabled
+			.map((s) => ({ ...s, forceUse: false })); // Default to forceUse=false when enabled
 		if (uniqueNewSkills.length > 0) {
 			this.updateSkills([...this.skills, ...uniqueNewSkills]);
 		}
@@ -414,6 +415,12 @@ class ClaudeCodeAgentState {
 				};
 
 		this.updateState(updateData);
+	}
+
+	init() {
+		const [currentSessionId, sandboxId] = [this.currentSessionId, this.sandboxId];
+		this.selectedSessionId = currentSessionId === "" ? "new" : currentSessionId;
+		this.selectedSandboxId = sandboxId === "" ? "auto" : sandboxId;
 	}
 }
 

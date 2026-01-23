@@ -6,7 +6,8 @@
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Input from "$lib/components/ui/input/input.svelte";
 	import { m } from "$lib/paraglide/messages";
-	import { Plus, Search } from "@lucide/svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { Plus, Search, ShoppingBag } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import { toast } from "svelte-sonner";
 	import { SvelteSet } from "svelte/reactivity";
@@ -120,6 +121,8 @@
 
 		try {
 			await deleteSkill({ skill_list: [deletingSkill.name] });
+			codeAgentState.handleSkillsRemove([deletingSkill]);
+
 			toast.dismiss(toastId);
 			toast.success(m.skills_delete_success());
 			deleteDialogOpen = false;
@@ -145,23 +148,48 @@
 
 	<!-- Search and New Button -->
 	{#if showSearch || showNewButton}
-		<div class="flex items-center gap-3">
+		<div class="flex flex-col gap-3">
+			<div class="flex items-center gap-3">
+				{#if showSearch}
+					<div class="relative flex-1">
+						<Search
+							class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2"
+						/>
+						<Input
+							type="text"
+							placeholder={m.skills_search_placeholder()}
+							class="border-border bg-transparent pl-9"
+							bind:value={searchQuery}
+						/>
+					</div>
+				{/if}
+				{#if showNewButton}
+					<Button class="gap-2 bg-violet-500 hover:bg-violet-600" onclick={handleNew}>
+						<Plus class="h-4 w-4" />
+						{m.skills_new()}
+					</Button>
+				{/if}
+			</div>
+			<!-- Skills Hub Link -->
 			{#if showSearch}
-				<div class="relative flex-1">
-					<Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-					<Input
-						type="text"
-						placeholder={m.skills_search_placeholder()}
-						class="border-border bg-transparent pl-9"
-						bind:value={searchQuery}
-					/>
+				<div class="text-sm text-muted-foreground">
+					{m.skills_hub_hint_prefix()}
+					<button
+						type="button"
+						class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
+						onclick={() =>
+							window.electronAPI.tabService.handleNewTab(
+								"302 Skills Hub",
+								"skillsHub",
+								true,
+								"https://skills.302.ai",
+							)}
+					>
+						<ShoppingBag class="h-4 w-4" />
+						{m.skills_hub_link_text()}
+					</button>
+					{m.skills_hub_hint_suffix()}
 				</div>
-			{/if}
-			{#if showNewButton}
-				<Button class="gap-2 bg-violet-500 hover:bg-violet-600" onclick={handleNew}>
-					<Plus class="h-4 w-4" />
-					{m.skills_new()}
-				</Button>
 			{/if}
 		</div>
 	{/if}
