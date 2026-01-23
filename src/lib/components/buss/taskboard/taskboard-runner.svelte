@@ -15,9 +15,6 @@
 	const isRunning = $derived(codeAgentTaskboardState.taskboardStatus === "running");
 	const isWaitingToStop = $derived(codeAgentTaskboardState.taskboardStatus === "waiting_to_stop");
 	const isWaitingForChat = $derived(codeAgentTaskboardState.taskboardStatus === "waiting_for_chat");
-	const isWaitingForUserInput = $derived(
-		codeAgentTaskboardState.taskboardStatus === "waiting_for_user_input",
-	);
 	const currentTask = $derived(
 		codeAgentTaskboardState.tasklist.find((t) => t.status === "in_progress"),
 	);
@@ -35,6 +32,11 @@
 	}
 
 	async function handleRun() {
+		if (codeAgentState.inPlanMode) {
+			toast.info(m.toast_exit_plan_mode_first());
+			return;
+		}
+
 		const fn = async (content: string) =>
 			match({
 				isEmpty: content.trim() === "" && chatState.attachments.length === 0,
@@ -103,12 +105,7 @@
 		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
 			<!-- Status indicator -->
 			<div class="flex items-center gap-2 text-sm">
-				{#if isWaitingForUserInput}
-					<span class="flex items-center gap-1.5 text-orange-500">
-						<span class="size-2 rounded-full bg-orange-500 animate-pulse"></span>
-						{m.taskboard_status_waiting_for_user_input()}
-					</span>
-				{:else if isWaitingForChat}
+				{#if isWaitingForChat}
 					<span class="flex items-center gap-1.5 text-blue-500">
 						<span class="size-2 rounded-full bg-blue-500 animate-pulse"></span>
 						{m.taskboard_status_waiting_for_chat()}

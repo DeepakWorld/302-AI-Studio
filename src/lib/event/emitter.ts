@@ -5,7 +5,6 @@ import mitt from "mitt";
 export enum EventNames {
 	CHAT_FINISHED = "chat:finish",
 	TASKBOARD_ALL_TASKS_DONE = "taskboard:all_tasks_done",
-	ASK_USER_ANSWERED = "ask_user:answered",
 
 	THREAD_TITLE_UPDATED = "thread:title:updated",
 }
@@ -24,10 +23,6 @@ type Events = {
 
 	[EventNames.THREAD_TITLE_UPDATED]: {
 		title: string;
-	};
-
-	[EventNames.ASK_USER_ANSWERED]: {
-		messageId: string;
 	};
 };
 

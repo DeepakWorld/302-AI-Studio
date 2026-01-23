@@ -16,7 +16,6 @@ import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
 import { chat, chatState } from "../chat-state.svelte";
-import { getAnswerForMessage } from "./ask-user-answers-state.svelte";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
@@ -28,9 +27,7 @@ export class CodeAgentTaskboardState {
 
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
-	taskboardStatus = $state<
-		"idle" | "running" | "waiting_to_stop" | "waiting_for_chat" | "waiting_for_user_input"
-	>("idle");
+	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop" | "waiting_for_chat">("idle");
 	retryExhausted = $state(false);
 
 	// Input state
@@ -70,7 +67,6 @@ export class CodeAgentTaskboardState {
 	canPause = $derived(this.taskboardStatus === "running");
 	isWaitingToStop = $derived(this.taskboardStatus === "waiting_to_stop");
 	isWaitingForChat = $derived(this.taskboardStatus === "waiting_for_chat");
-	isWaitingForUserInput = $derived(this.taskboardStatus === "waiting_for_user_input");
 	// Whether taskboard is currently executing (used to prevent premature auto-deployment)
 	isRunning = $derived(this.taskboardStatus === "running");
 	showTaskboardStatusBar = $derived(
@@ -83,7 +79,6 @@ export class CodeAgentTaskboardState {
 			.with("running", () => m.taskboard_button_pause())
 			.with("waiting_to_stop", () => m.taskboard_button_waiting_to_stop())
 			.with("waiting_for_chat", () => m.taskboard_button_waiting_for_chat())
-			.with("waiting_for_user_input", () => m.taskboard_button_waiting_for_user_input())
 			.with("idle", () => {
 				if (this.tasklist.some((t) => t.status === "in_progress")) {
 					return m.taskboard_button_resume();
@@ -328,10 +323,6 @@ export class CodeAgentTaskboardState {
 				// 等待聊天中点击 -> 取消等待
 				this.taskboardStatus = "idle";
 			})
-			.with("waiting_for_user_input", () => {
-				// 等待用户输入中点击 -> 取消等待
-				this.taskboardStatus = "idle";
-			})
 			.with("idle", async () => {
 				// 空闲时点击 -> 检查是否需要等待聊天
 				if (chatState.isStreaming || chatState.isSubmitted) {
@@ -417,10 +408,6 @@ export class CodeAgentTaskboardState {
 		}
 
 		const offChatFinished = emitter.on(EventNames.CHAT_FINISHED, this.#handleChatFinished);
-		const offAskUserAnswered = emitter.on(
-			EventNames.ASK_USER_ANSWERED,
-			this.#handleAskUserAnswered,
-		);
 
 		try {
 			while (this.#currentRetryCount < this.#MAX_RETRY_COUNT) {
@@ -476,7 +463,6 @@ export class CodeAgentTaskboardState {
 			await this.updateTasklist(updatedList);
 		} finally {
 			offChatFinished();
-			offAskUserAnswered();
 			this.currentExecutingTaskId = null;
 			this.#taskResolve = null;
 		}
@@ -525,74 +511,12 @@ export class CodeAgentTaskboardState {
 
 		if (!this.#taskResolve) return;
 
-		// Check if AI is asking user a question
-		if (this.#hasUnansweredAskUserQuestion(lastMessage)) {
-			console.log("[TaskBoard] Detected AskUserQuestion, pausing execution");
-			this.taskboardStatus = "waiting_for_user_input";
-			// Don't resolve yet - wait for user to answer
-			return;
-		}
-
 		const result = lastMessage.metadata?.result;
 		const success = !!result && result.is_error === false;
 
 		console.log("[TaskBoard] Resolving task with success:", success);
 		this.#taskResolve(success);
 	};
-
-	/**
-	 * Handles the ask user answered event.
-	 */
-	#handleAskUserAnswered = () => {
-		console.log("[TaskBoard] ASK_USER_ANSWERED event received", {
-			taskboardStatus: this.taskboardStatus,
-		});
-
-		if (this.taskboardStatus === "waiting_for_user_input") {
-			this.taskboardStatus = "running";
-			console.log("[TaskBoard] Resumed execution after user answered");
-			// After user answers, we need to wait for the next CHAT_FINISHED event
-			// The promise will be resolved by the next #handleChatFinished call
-		}
-	};
-
-	/**
-	 * Checks if the message contains an unanswered AskUserQuestion tool call.
-	 */
-	#hasUnansweredAskUserQuestion(message: ChatMessage): boolean {
-		if (!message || message.role !== "assistant") {
-			console.log("[TaskBoard] Not an assistant message or message is null");
-			return false;
-		}
-
-		console.log("[TaskBoard] Checking message parts for messageId:", message.id);
-
-		// Find all AskUserQuestion parts in the message
-		// Use string comparison since the type might not be in the union
-		const askUserParts = message.parts.filter(
-			(part) => part.type && part.type.toString().includes("AskUserQuestion"),
-		);
-
-		if (askUserParts.length === 0) {
-			console.log("[TaskBoard] No AskUserQuestion parts found");
-			return false;
-		}
-
-		console.log("[TaskBoard] Found AskUserQuestion parts:", askUserParts.length);
-
-		// Check if this message has been answered
-		const answer = getAnswerForMessage(message.id);
-		const hasAnswer = !!answer;
-
-		console.log("[TaskBoard] Answer status:", {
-			messageId: message.id,
-			hasAnswer,
-			answer,
-		});
-
-		// If there's an AskUserQuestion and no answer, it's unanswered
-		return !hasAnswer;
-	}
 
 	/**
 	 * Sorts tasks by status: in_progress -> pending -> done

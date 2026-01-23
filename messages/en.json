@@ -757,7 +757,6 @@
 	"taskboard_status_running": "Running",
 	"taskboard_status_waiting_to_stop": "Stopping",
 	"taskboard_status_waiting_for_chat": "Waiting for chat",
-	"taskboard_status_waiting_for_user_input": "Waiting for your answer",
 	"taskboard_status_pending": "Pending",
 	"taskboard_label_status": "Status",
 	"taskboard_label_current": "Current",
@@ -765,7 +764,6 @@
 	"taskboard_button_pause": "Pause",
 	"taskboard_button_waiting_to_stop": "Pausing...",
 	"taskboard_button_waiting_for_chat": "Waiting for chat...",
-	"taskboard_button_waiting_for_user_input": "Waiting for your answer...",
 	"taskboard_button_resume": "Resume",
 	"taskboard_button_stop": "Idle",
 	"taskboard_button_delete": "Delete",
@@ -1246,5 +1244,7 @@
 	"taskboard_auto_decompose_empty_input": "Please enter requirements",
 	"notification_vibe_task_completed_title": "Vibe Task Completed",
 	"notification_vibe_taskboard_completed_title": "Vibe Taskboard Completed",
-	"notification_vibe_taskboard_completed_body": "{count} tasks completed"
+	"notification_vibe_taskboard_completed_body": "{count} tasks completed",
+	"toast_exit_plan_mode_first": "Please exit Plan Mode before executing tasks",
+	"toast_stop_taskboard_first": "Please stop Taskboard execution before entering Plan Mode"
 }

@@ -27,7 +27,6 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
 	import * as Tabs from "$lib/components/ui/tabs";
-	import { emitter, EventNames } from "$lib/event/emitter";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import {
@@ -224,9 +223,6 @@
 		const answerText = answerParts.join("\n");
 		chatState.inputValue = answerText;
 		chatState.sendMessage();
-
-		// Notify taskboard that user answered
-		emitter.emit(EventNames.ASK_USER_ANSWERED, { messageId });
 	}
 
 	// Check if submit is enabled - all questions must be answered

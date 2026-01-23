@@ -25,7 +25,6 @@
 			.with("running", () => m.taskboard_bar_status_running())
 			.with("waiting_to_stop", () => m.taskboard_bar_status_waiting_to_stop())
 			.with("waiting_for_chat", () => m.taskboard_bar_status_waiting_for_chat())
-			.with("waiting_for_user_input", () => m.taskboard_bar_status_waiting_for_user_input())
 			.exhaustive();
 
 		if (codeAgentTaskboardState.taskboardStatus === "waiting_for_chat") {
@@ -115,7 +114,7 @@
 <Item.Root variant="outline" class="w-full max-w-chat-max-w flex-nowrap !cursor-default">
 	<Item.Content class="min-w-0 flex flex-row items-center gap-x-2">
 		<div class="flex items-center justify-center">
-			{#if codeAgentTaskboardState.taskboardStatus === "running" || codeAgentTaskboardState.taskboardStatus === "waiting_to_stop" || codeAgentTaskboardState.taskboardStatus === "waiting_for_user_input"}
+			{#if codeAgentTaskboardState.taskboardStatus === "running" || codeAgentTaskboardState.taskboardStatus === "waiting_to_stop"}
 				<LdrsLoader type="ripples" size={32} speed={5} />
 			{:else}
 				<LdrsLoader type="ping" size={32} speed={5} />
@@ -137,7 +136,6 @@
 			disabled={codeAgentTaskboardState.taskboardStatus !== "running" &&
 				codeAgentTaskboardState.taskboardStatus !== "waiting_to_stop" &&
 				codeAgentTaskboardState.taskboardStatus !== "waiting_for_chat" &&
-				codeAgentTaskboardState.taskboardStatus !== "waiting_for_user_input" &&
 				(!codeAgentTaskboardState.canStart || codeAgentState.isChecking)}
 			onclick={handleRun}
 		>

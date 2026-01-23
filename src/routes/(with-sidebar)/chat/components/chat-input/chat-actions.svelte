@@ -19,11 +19,13 @@
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
 	import { ClipboardList, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
+	import { toast } from "svelte-sonner";
 	import { AttachmentUploader } from "../attachment";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
 
@@ -87,6 +89,14 @@
 		if (agentPreviewState.activeTab !== "taskboard") {
 			agentPreviewState.openTaskboardTab();
 		}
+	}
+
+	function handlePlanModeToggle() {
+		if (codeAgentTaskboardState.taskboardStatus !== "idle") {
+			toast.info(m.toast_stop_taskboard_first());
+			return;
+		}
+		codeAgentState.updatePlanMode(!codeAgentState.inPlanMode);
 	}
 </script>
 
@@ -297,7 +307,7 @@
 			codeAgentState.inPlanMode && "!bg-chat-action-active hover:!bg-chat-action-active",
 		)}
 		tooltip={m.title_plan_mode()}
-		onclick={() => codeAgentState.updatePlanMode(!codeAgentState.inPlanMode)}
+		onclick={handlePlanModeToggle}
 		{disabled}
 	>
 		<ClipboardList class={cn(codeAgentState.inPlanMode && "!text-chat-action-active-fg")} />
