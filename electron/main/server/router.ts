@@ -1455,6 +1455,7 @@ CHECK BEFORE EVERY ACTION:
 		// Only include action when plan mode is ON or creating skill
 		...(isCreateSkillMode ? { action: "create_skill" } : {}),
 		...(inPlanMode && !isCreateSkillMode ? { action: "plan" } : {}),
+		...(inTaskOrchestrationMode ? { action: "sync_tasks_json" } : {}),
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));
