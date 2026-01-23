@@ -419,6 +419,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("notificationService:notifyTaskCompleted", (event, options) =>
 		notificationService.notifyTaskCompleted(event, options),
 	);
+	ipcMain.handle("notificationService:requestPermission", (event) =>
+		notificationService.requestPermission(event),
+	);
 
 	// providerService service registration
 	ipcMain.handle("providerService:handle302AIProviderChange", (event, apiKey) =>
@@ -601,6 +604,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
 	ipcMain.removeHandler("notificationService:notifyTaskCompleted");
+	ipcMain.removeHandler("notificationService:requestPermission");
 	ipcMain.removeHandler("providerService:handle302AIProviderChange");
 	ipcMain.removeHandler("providerService:get302AIApiKey");
 	ipcMain.removeHandler("threadService:addThread");

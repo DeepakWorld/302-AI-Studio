@@ -440,6 +440,7 @@
 	"toast_thread_not_found": "未找到关联的对话",
 	"toast_navigate_failed": "跳转失败",
 	"toast_attachment_convert_failed": "转换附件失败: {fileName}",
+	"toast_notification_permission_required": "请在系统设置中开启通知权限",
 	"version_information": "版本信息",
 	"version_update": "版本更新",
 	"label_button_incognito_model": "切换为隐私模式",

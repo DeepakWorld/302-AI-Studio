@@ -1,7 +1,7 @@
-import { Notification, BrowserWindow, type IpcMainInvokeEvent } from "electron";
-import { tabService } from "../tab-service";
-import { tabStorage } from "../storage-service/tab-storage";
+import { BrowserWindow, Notification, type IpcMainInvokeEvent } from "electron";
 import { isNull, isUndefined } from "es-toolkit/predicate";
+import { tabStorage } from "../storage-service/tab-storage";
+import { tabService } from "../tab-service";
 
 export class NotificationService {
 	private activeNotifications = new Set<Notification>();
@@ -70,6 +70,10 @@ export class NotificationService {
 		});
 
 		notification.show();
+	}
+
+	async requestPermission(_event: IpcMainInvokeEvent): Promise<boolean> {
+		return Notification.isSupported();
 	}
 }
 

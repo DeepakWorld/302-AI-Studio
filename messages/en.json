@@ -440,6 +440,7 @@
 	"toast_thread_not_found": "Associated thread not found",
 	"toast_navigate_failed": "Failed to navigate",
 	"toast_attachment_convert_failed": "Failed to convert attachment: {fileName}",
+	"toast_notification_permission_required": "Please enable notification permissions in system settings",
 	"version_information": "Version",
 	"version_update": "Version update",
 	"label_button_incognito_model": "Incognito Mode",

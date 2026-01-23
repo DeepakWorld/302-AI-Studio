@@ -1,5 +1,7 @@
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
+import { m } from "$lib/paraglide/messages.js";
 import { type CodeAgentGlobalConfigs } from "@shared/storage/code-agent";
+import { toast } from "svelte-sonner";
 import { persistedProviderState } from "../provider-state.svelte";
 
 function getInitialData() {
@@ -67,6 +69,13 @@ class CodeAgentGlobalConfigsState {
 	async toggleNotificationsEnabled() {
 		const newState = !this.notificationsEnabled;
 		this.#updateState({ notificationsEnabled: newState });
+
+		if (newState) {
+			const granted = await window.electronAPI.notificationService.requestPermission();
+			if (!granted) {
+				toast.info(m.toast_notification_permission_required());
+			}
+		}
 	}
 }
 
