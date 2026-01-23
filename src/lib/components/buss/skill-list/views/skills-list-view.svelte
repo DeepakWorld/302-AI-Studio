@@ -324,30 +324,27 @@
 				{m.skills_new()}
 			</Button>
 		</div>
-		<!-- Skills Hub Link -->
-		<div class="mt-3 text-sm text-muted-foreground">
-			{m.skills_hub_hint_prefix()}
-			<button
-				type="button"
-				class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
-				onclick={() => {
-					if (window.location.pathname.startsWith("/settings")) {
-						window.electronAPI.externalLinkService.openExternalLink("https://skills.302.ai");
-					} else {
+		{#if !window.location.pathname.startsWith("/settings")}
+			<!-- Skills Hub Link -->
+			<div class="mt-3 text-sm text-muted-foreground">
+				{m.skills_hub_hint_prefix()}
+				<button
+					type="button"
+					class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
+					onclick={() =>
 						window.electronAPI.tabService.handleNewTab(
 							"302 Skills Hub",
 							"skillsHub",
 							true,
 							"https://skills.302.ai",
-						);
-					}
-				}}
-			>
-				<ShoppingBag class="h-4 w-4" />
-				{m.skills_hub_link_text()}
-			</button>
-			{m.skills_hub_hint_suffix()}
-		</div>
+						)}
+				>
+					<ShoppingBag class="h-4 w-4" />
+					{m.skills_hub_link_text()}
+				</button>
+				{m.skills_hub_hint_suffix()}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Skills Grid - Scrollable -->
