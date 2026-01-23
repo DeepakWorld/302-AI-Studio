@@ -544,8 +544,9 @@ export const codeAgentTaskboardState = new CodeAgentTaskboardState();
 $effect.root(() => {
 	$effect(() => {
 		// Track enabled state
+
+		// codeAgentState.sessionId;
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-		codeAgentState.sessionId; // eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		codeAgentState.enabled;
 
 		codeAgentTaskboardState.tasklist = [];

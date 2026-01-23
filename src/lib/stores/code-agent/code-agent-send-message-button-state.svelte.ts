@@ -84,19 +84,8 @@ class CodeAgentSendMessageButtonState {
 						);
 					filesToUpload.push({ content: base64Content, save_path: tasksFilePath });
 
-					// 2. taskboard attachments
-					if (codeAgentTaskboardState.attachments.length > 0) {
-						const taskboardAttachments = await Promise.all(
-							codeAgentTaskboardState.attachments.map(async (att) => ({
-								content: att.file ? await fileToBase64(att.file) : "",
-								save_path: `${workspacePath}/.302ai/attachments/${att.name}`,
-							})),
-						);
-						filesToUpload.push(...taskboardAttachments);
-					}
-
-					// 3. pending attachments
 					if (codeAgentTaskboardState.pendingAttachments.length > 0) {
+						console.log("pending attachments", codeAgentTaskboardState.pendingAttachments);
 						const pendingAttachments = await Promise.all(
 							codeAgentTaskboardState.pendingAttachments.map(async (att) => ({
 								content: att.file ? await fileToBase64(att.file) : "",
@@ -107,7 +96,6 @@ class CodeAgentSendMessageButtonState {
 						codeAgentTaskboardState.clearPendingAttachments();
 					}
 
-					// 4. chat attachments (fresh-tab flow)
 					if (chatState.attachments.length > 0) {
 						const chatAttachments = await Promise.all(
 							chatState.attachments.map(async (att) => ({

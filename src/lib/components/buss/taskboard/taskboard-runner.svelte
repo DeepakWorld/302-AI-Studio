@@ -18,7 +18,7 @@
 	const currentTask = $derived(
 		codeAgentTaskboardState.tasklist.find((t) => t.status === "in_progress"),
 	);
-	const currentTaskContent = $derived(currentTask?.content ?? "—");
+	const taskContent = $derived(codeAgentTaskboardState.activeTask?.content ?? "—");
 	const buttonText = $derived(codeAgentTaskboardState.buttonText);
 
 	const hasConfiguredProviders = $derived(() => {
@@ -135,7 +135,7 @@
 		<div class="flex justify-between">
 			<div class="flex items-center gap-2 text-sm min-w-0">
 				<span class="text-muted-foreground shrink-0">{m.taskboard_label_current()}</span>
-				<span class="truncate font-medium">{currentTaskContent}</span>
+				<span class="truncate font-medium">{taskContent}</span>
 			</div>
 			<div class="flex items-center gap-2">
 				<Button
