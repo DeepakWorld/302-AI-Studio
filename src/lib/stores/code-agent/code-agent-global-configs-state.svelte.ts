@@ -66,17 +66,7 @@ class CodeAgentGlobalConfigsState {
 
 	async toggleNotificationsEnabled() {
 		const newState = !this.notificationsEnabled;
-		if (newState) {
-			const permission = await Notification.requestPermission();
-			if (permission === "granted") {
-				this.#updateState({ notificationsEnabled: true });
-			} else {
-				// permission denied or default
-				this.#updateState({ notificationsEnabled: false });
-			}
-		} else {
-			this.#updateState({ notificationsEnabled: false });
-		}
+		this.#updateState({ notificationsEnabled: newState });
 	}
 }
 
