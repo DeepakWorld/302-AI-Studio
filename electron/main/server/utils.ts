@@ -575,6 +575,72 @@ export function appendPromptToLastUserMessage(messages: any[], prompt: string): 
 }
 
 /**
+ * Prepends or appends a prompt string to system message in a list of messages.
+ * If no system message exists, creates one. If system message exists, appends to it.
+ *
+ * @param messages The list of messages (mutable array)
+ * @param prompt The prompt string to prepend or append
+ * @param prepend Whether to prepend (before existing content) or append (after). Default is append.
+ */
+
+export function appendPromptToSystemMessage(
+	messages: any[], // eslint-disable-line @typescript-eslint/no-explicit-any
+	prompt: string,
+	prepend = false,
+): void {
+	// Find existing system message
+	const existingSystemIndex = messages.findIndex((msg) => msg.role === "system");
+
+	if (existingSystemIndex !== -1) {
+		// System message exists, append or prepend to it
+		const msg = messages[existingSystemIndex];
+		const parts = msg.parts;
+		const content = msg.content;
+
+		// Handle parts array (UIMessage structure)
+		if (Array.isArray(parts)) {
+			const newParts = [...parts];
+			if (prepend) {
+				newParts.unshift({ type: "text", text: prompt });
+			} else {
+				newParts.push({ type: "text", text: prompt });
+			}
+			messages[existingSystemIndex] = {
+				...msg,
+				parts: newParts,
+			};
+		}
+		// Handle content array
+		else if (Array.isArray(content)) {
+			const newContent = [...content];
+			if (prepend) {
+				newContent.unshift({ type: "text", text: prompt });
+			} else {
+				newContent.push({ type: "text", text: prompt });
+			}
+			messages[existingSystemIndex] = {
+				...msg,
+				content: newContent,
+			};
+		}
+		// Handle content string
+		else if (typeof content === "string") {
+			messages[existingSystemIndex] = {
+				...msg,
+				content: prepend ? prompt + content : content + prompt,
+			};
+		}
+	} else {
+		// No system message, create one at the beginning with parts structure
+		messages.unshift({
+			role: "system",
+			content: prompt,
+			parts: [{ type: "text", text: prompt }],
+		});
+	}
+}
+
+/**
  * Upload attachments from message metadata to sandbox before sending to AI provider.
  * This enables non-blocking UX where users see immediate stream response.
  *
