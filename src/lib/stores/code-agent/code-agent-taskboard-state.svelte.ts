@@ -309,7 +309,7 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Starts the auto execution of tasks.
 	 */
-	async startAutoExecution(fn: () => Promise<void>): Promise<void> {
+	async startAutoExecution(fn: (content: string) => Promise<void>): Promise<void> {
 		match(this.taskboardStatus)
 			.with("running", () => {
 				// 正在运行时点击 -> 暂停
@@ -347,7 +347,7 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Executes the task loop.
 	 */
-	async #executeLoop(fn: () => Promise<void>): Promise<void> {
+	async #executeLoop(fn: (content: string) => Promise<void>): Promise<void> {
 		while (this.taskboardStatus === "running") {
 			const nextTask = this.tasklist.find(
 				(t) => t.status === "in_progress" || t.status === "pending",
@@ -381,7 +381,7 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Executes a single task.
 	 */
-	async #executeTask(task: Task, fn: () => Promise<void>): Promise<void> {
+	async #executeTask(task: Task, fn: (content: string) => Promise<void>): Promise<void> {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
 		this.retryExhausted = false;
@@ -413,8 +413,7 @@ export class CodeAgentTaskboardState {
 			while (this.#currentRetryCount < this.#MAX_RETRY_COUNT) {
 				const message =
 					this.#currentRetryCount === 0 ? task.content : `${m.text_continue()}: ${task.content}`;
-				chatState.inputValue = message;
-				await fn();
+				await fn(message);
 
 				const success = await this.#waitForChatFinished();
 

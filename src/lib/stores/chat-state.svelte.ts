@@ -583,15 +583,25 @@ class ChatState {
 		}
 	};
 
-	sendMessage = async () => {
-		if (this.sendMessageEnabled) {
+	sendMessage = async (options?: { content?: string }) => {
+		const contentOverride = options?.content;
+		const hasContent =
+			contentOverride?.trim() || this.inputValue.trim() !== "" || this.attachments.length > 0;
+		const canSend =
+			hasContent &&
+			!!this.selectedModel &&
+			!this.isStreaming &&
+			!this.isSubmitted &&
+			this.loadingAttachmentIds.size === 0;
+
+		if (canSend) {
 			// Cancel any pending suggestions generation to avoid race conditions
 			this.cancelPendingSuggestions();
 
 			try {
 				const currentModel = this.selectedModel!;
 				const currentAttachments = [...this.attachments];
-				const currentInputValue = this.inputValue;
+				const currentInputValue = contentOverride ?? this.inputValue;
 
 				// Ensure session association is recorded for tabs created at app boot
 				// (boot-created initial tabs may not have apiKeyHash until the first real send)
@@ -770,7 +780,9 @@ class ChatState {
 
 				await broadcastService.broadcastToAll("thread-list-updated", { threadId });
 
-				this.resetChat();
+				if (!contentOverride) {
+					this.resetChat();
+				}
 			} catch (error) {
 				this.handleChatError(error);
 			}

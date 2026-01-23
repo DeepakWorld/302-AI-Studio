@@ -25,10 +25,7 @@ class CodeAgentSendMessageButtonState {
 			return attachment.preview;
 		}
 
-		if (
-			typeof attachment.filePath === "string" &&
-			window.electronAPI?.appService?.readFileAsBuffer
-		) {
+		if (typeof attachment.filePath === "string") {
 			const buffer = await window.electronAPI.appService.readFileAsBuffer(attachment.filePath);
 			let binary = "";
 			const bytes = new Uint8Array(buffer);

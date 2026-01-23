@@ -32,9 +32,9 @@
 	}
 
 	async function handleRun() {
-		const fn = async () =>
+		const fn = async (content: string) =>
 			match({
-				isEmpty: chatState.inputValue.trim() === "" && chatState.attachments.length === 0,
+				isEmpty: content.trim() === "" && chatState.attachments.length === 0,
 				noProviders: !hasConfiguredProviders(),
 				noModel: chatState.selectedModel === null,
 			})
@@ -70,17 +70,17 @@
 				})
 				.otherwise(() => {
 					if (chatState.hasMessages) {
-						chatState.sendMessage();
+						chatState.sendMessage({ content });
 					} else {
-						document.startViewTransition(() => chatState.sendMessage());
+						document.startViewTransition(() => chatState.sendMessage({ content }));
 					}
 				});
 
-		codeAgentTaskboardState.startAutoExecution(async () => {
+		codeAgentTaskboardState.startAutoExecution(async (content) => {
 			if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-				await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+				await codeAgentSendMessageButtonState.handleCodeAgentFlow(() => fn(content));
 			} else {
-				await fn();
+				await fn(content);
 			}
 		});
 
