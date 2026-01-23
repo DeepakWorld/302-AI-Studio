@@ -56,11 +56,6 @@ async function validateAndRepairTaskList(
 			task.executedCount = 1;
 		}
 
-		// Reset in_progress tasks to pending on load to avoid being stuck after restart
-		if (task?.status === "in_progress") {
-			task.status = "pending";
-		}
-
 		// Clamp executedCount into [0, number]
 		task.executedCount = Math.min(task.number, Math.max(0, task.executedCount));
 	}
