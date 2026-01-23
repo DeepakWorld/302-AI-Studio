@@ -4,6 +4,8 @@ import { tabStorage } from "../storage-service/tab-storage";
 import { isNull, isUndefined } from "es-toolkit/predicate";
 
 export class NotificationService {
+	private activeNotifications = new Set<Notification>();
+
 	async notifyTaskCompleted(
 		_event: IpcMainInvokeEvent,
 		options: {
@@ -17,6 +19,12 @@ export class NotificationService {
 			title: options.title,
 			body: options.body,
 			silent: false,
+		});
+
+		this.activeNotifications.add(notification);
+
+		notification.on("close", () => {
+			this.activeNotifications.delete(notification);
 		});
 
 		notification.on("click", async () => {

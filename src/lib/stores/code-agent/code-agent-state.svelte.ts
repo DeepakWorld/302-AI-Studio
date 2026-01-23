@@ -33,6 +33,11 @@ const threadId =
 		? tab.threadId
 		: "shell";
 
+const tabId =
+	tab && typeof tab === "object" && "id" in tab && typeof tab.id === "string" && tab.id
+		? tab.id
+		: "shell";
+
 const INITIAL_CODE_AGENT_CONFIG: CodeAgentConfigMetadata = {
 	enabled: false,
 	threadId: threadId,
@@ -154,10 +159,10 @@ class CodeAgentState {
 		canDeploy: boolean;
 		lastMessage: ChatMessage;
 	}): Promise<void> {
-		// Only notify if Vibe mode is enabled and tab is inactive
+		// Only notify if Vibe mode is enabled and tab is inactive OR document is hidden (window backgrounded)
 		if (
 			this.enabled &&
-			this.#isCurrentTabInactive() &&
+			(this.#isCurrentTabInactive() || document.hidden) &&
 			codeAgentGlobalConfigsState.notificationsEnabled
 		) {
 			const summary = this.#extractTaskSummary(event.lastMessage);
@@ -165,17 +170,17 @@ class CodeAgentState {
 				title: m.notification_vibe_task_completed_title(),
 				body: summary,
 				windowId: window.windowId,
-				tabId: threadId,
+				tabId: tabId,
 			});
 		}
 	}
 
 	// Show notification for TASKBOARD_ALL_TASKS_DONE event
 	async #showNotificationForTaskboardDone(event: { taskCount: number }): Promise<void> {
-		// Only notify if Vibe mode is enabled and tab is inactive
+		// Only notify if Vibe mode is enabled and tab is inactive OR document is hidden (window backgrounded)
 		if (
 			this.enabled &&
-			this.#isCurrentTabInactive() &&
+			(this.#isCurrentTabInactive() || document.hidden) &&
 			codeAgentGlobalConfigsState.notificationsEnabled
 		) {
 			const lastMessage = chatState.messages[chatState.messages.length - 1];
@@ -185,7 +190,7 @@ class CodeAgentState {
 				title: m.notification_vibe_taskboard_completed_title(),
 				body: `${m.notification_vibe_taskboard_completed_body({ count: event.taskCount })}${summary ? "\n" + summary : ""}`,
 				windowId: window.windowId,
-				tabId: threadId,
+				tabId: tabId,
 			});
 		}
 	}
