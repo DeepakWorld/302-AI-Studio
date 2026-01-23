@@ -1,5 +1,6 @@
 import type { ModelProvider } from "@shared/storage/provider";
 import type { Model } from "@shared/types";
+import ky from "ky";
 
 export interface DecomposeTaskRequest {
 	requirement: string;
@@ -29,31 +30,25 @@ export async function decomposeTasks(
 ): Promise<string[]> {
 	const port = serverPort ?? 8089;
 
+	console.log("[TaskDecomposer] Starting task decomposition with model:", model.id);
+
 	try {
-		console.log("[TaskDecomposer] Starting task decomposition...");
+		const data: DecomposeTaskResponse = await ky
+			.post(`http://localhost:${port}/decompose-tasks`, {
+				json: {
+					requirement,
+					count,
+					model: model.id,
+					apiKey: provider?.apiKey,
+					baseUrl: provider?.baseUrl,
+					providerType: provider?.apiType || "openai",
+				} satisfies DecomposeTaskRequest,
+				signal: abortSignal,
+				timeout: 300000,
+				retry: 3,
+			})
+			.json();
 
-		const response = await fetch(`http://localhost:${port}/decompose-tasks`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				requirement,
-				count,
-				model: model.id,
-				apiKey: provider?.apiKey,
-				baseUrl: provider?.baseUrl,
-				providerType: provider?.apiType || "openai",
-			} satisfies DecomposeTaskRequest),
-			signal: abortSignal,
-		});
-
-		if (!response.ok) {
-			console.error("[TaskDecomposer] Failed to decompose tasks:", response.statusText);
-			throw new Error(`Failed to decompose tasks: ${response.statusText}`);
-		}
-
-		const data: DecomposeTaskResponse = await response.json();
 		console.log("[TaskDecomposer] Received response:", data);
 
 		if (!data.tasks || !Array.isArray(data.tasks)) {
@@ -67,12 +62,7 @@ export async function decomposeTasks(
 
 		return taskContents;
 	} catch (error) {
-		// Don't log abort errors as they are expected when user cancels
-		if (error instanceof Error && error.name === "AbortError") {
-			console.log("[TaskDecomposer] Decomposition aborted");
-			return [];
-		}
-		console.error("[TaskDecomposer] Decomposition failed:", error);
+		console.error("[TaskDecomposer] Error during task decomposition:", error);
 		throw error;
 	}
 }

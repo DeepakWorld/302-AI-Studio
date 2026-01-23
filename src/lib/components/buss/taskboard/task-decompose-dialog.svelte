@@ -8,10 +8,11 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { persistedModelState, persistedProviderState } from "$lib/stores/provider-state.svelte";
-	import { sessionState } from "$lib/stores/session-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { ListOrdered, Loader } from "@lucide/svelte";
+	import type { Model } from "@shared/types";
 	import { toast } from "svelte-sonner";
+	import { SvelteSet } from "svelte/reactivity";
 	import CompactNumberInput from "./compact-number-input.svelte";
 
 	interface Props {
@@ -36,32 +37,40 @@
 		}
 	});
 
-	function getCurrentModel() {
-		// Priority 1: Current chat's selected model
-		const currentModel = chatState.selectedModel;
-		if (currentModel) return currentModel;
+	const FALLBACK_MODEL_ID = "gpt-4o-mini";
 
-		// Priority 2: Vibe mode default model
-		const vibeModel = preferencesSettings.vibeNewSessionModel;
-		if (vibeModel) return vibeModel;
-
-		// Priority 3: Chat mode default model
-		const newSessionModel = preferencesSettings.newSessionModel;
-		if (newSessionModel) return newSessionModel;
-
-		// Priority 4: Latest used model
-		const latestUsedModel = sessionState.latestUsedModel;
-		if (latestUsedModel) return latestUsedModel;
-
-		// Fallback to first available model
-		const models = persistedModelState.current;
-		return models.length > 0 ? models[0] : null;
+	function modelSupportsChat(model: Model): boolean {
+		return !model.type || model.type === "language";
 	}
 
 	function getProviderForModel(modelId: string) {
 		const model = persistedModelState.current.find((m) => m.id === modelId);
 		if (!model) return undefined;
 		return persistedProviderState.current.find((p) => p.id === model.providerId);
+	}
+
+	/**
+	 * Get candidate models for task decomposition in priority order.
+	 * Returns unique models that support chat: current -> vibe default -> chat default -> gpt-4o-mini
+	 */
+	function getCandidateModels(): Model[] {
+		const candidates: Model[] = [];
+		const seen = new SvelteSet<string>();
+
+		const addIfValid = (model: Model | null | undefined) => {
+			if (model && modelSupportsChat(model) && !seen.has(model.id)) {
+				seen.add(model.id);
+				candidates.push(model);
+			}
+		};
+
+		// Priority order: current chat -> vibe mode -> chat mode -> gpt-4o-mini
+		addIfValid(chatState.selectedModel);
+		addIfValid(preferencesSettings.vibeNewSessionModel);
+		addIfValid(preferencesSettings.newSessionModel);
+		addIfValid(persistedModelState.current.find((m) => m.id === FALLBACK_MODEL_ID));
+
+		return candidates;
 	}
 
 	async function handleDecompose() {
@@ -74,31 +83,36 @@
 			taskCount = 3;
 		}
 
-		const model = getCurrentModel();
-		if (!model) {
+		const candidates = getCandidateModels();
+		if (candidates.length === 0) {
 			toast.error(m.toast_no_model());
 			return;
 		}
 
-		const provider = getProviderForModel(model.id);
-
 		isDecomposing = true;
-		try {
-			const tasks = await decomposeTasks(requirement.trim(), taskCount, model, provider);
 
-			if (tasks.length > 0) {
-				toast.success(m.taskboard_auto_decompose_success({ count: tasks.length.toString() }));
-				onDecompose?.(tasks);
-				open = false;
-			} else {
-				toast.error(m.taskboard_auto_decompose_error());
+		for (const model of candidates) {
+			try {
+				const tasks = await decomposeTasks(
+					requirement.trim(),
+					taskCount,
+					model,
+					getProviderForModel(model.id),
+				);
+				if (tasks.length > 0) {
+					toast.success(m.taskboard_auto_decompose_success({ count: tasks.length.toString() }));
+					onDecompose?.(tasks);
+					open = false;
+					isDecomposing = false;
+					return;
+				}
+			} catch {
+				// Try next model
 			}
-		} catch (error) {
-			console.error("Failed to decompose tasks:", error);
-			toast.error(m.taskboard_auto_decompose_error());
-		} finally {
-			isDecomposing = false;
 		}
+
+		toast.error(m.taskboard_auto_decompose_error());
+		isDecomposing = false;
 	}
 
 	function handleClose() {
