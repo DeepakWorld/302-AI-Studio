@@ -93,7 +93,7 @@ export class CodeAgentTaskboardState {
 	stopExecution() {
 		this.taskboardStatus = "idle";
 		if (this.currentExecutingTaskId) {
-			this.#updateTaskStatus(this.currentExecutingTaskId, "pending");
+			this.#updateTaskStatus(this.currentExecutingTaskId, { status: "pending" });
 		}
 	}
 
@@ -334,12 +334,12 @@ export class CodeAgentTaskboardState {
 					// （用户可能在等待期间取消了）
 					if (this.taskboardStatus === "waiting_for_chat") {
 						this.taskboardStatus = "running";
-						this.#executeLoop(fn);
+						await this.#executeLoop(fn);
 					}
 				} else {
 					// 聊天未进行，直接开始执行
 					this.taskboardStatus = "running";
-					this.#executeLoop(fn);
+					await this.#executeLoop(fn);
 				}
 			});
 	}
@@ -390,7 +390,7 @@ export class CodeAgentTaskboardState {
 		const executed = Math.max(0, task.executedCount ?? 0);
 		const remaining = total - executed;
 		if (remaining <= 0) {
-			await this.#updateTaskStatus(task.id, "done");
+			await this.#updateTaskStatus(task.id, { status: "done" });
 			return;
 		}
 
@@ -413,9 +413,11 @@ export class CodeAgentTaskboardState {
 			while (this.#currentRetryCount < this.#MAX_RETRY_COUNT) {
 				const message =
 					this.#currentRetryCount === 0 ? task.content : `${m.text_continue()}: ${task.content}`;
+
+				const waitPromise = this.#waitForChatFinished();
 				await fn(message);
 
-				const success = await this.#waitForChatFinished();
+				const success = await waitPromise;
 
 				if (success) {
 					const [sandboxId, path] = [
@@ -428,13 +430,18 @@ export class CodeAgentTaskboardState {
 					if (isOk) {
 						currentTaskList = this.#sortTasks(tasks);
 						this.tasklist = currentTaskList;
+
+						console.log("[TaskBoard] Tasklist updated", currentTaskList);
 					}
 
 					const updatedTask = currentTaskList.find((t) => t.id === task.id);
 					const nextTotal = Math.min(99, Math.max(1, updatedTask?.number ?? total));
-					const nextExecuted = Math.max(0, updatedTask?.executedCount ?? executed + 1);
+					const nextExecuted = Math.max(updatedTask?.executedCount ?? 0, executed + 1);
 					const nextRemaining = nextTotal - nextExecuted;
-					await this.#updateTaskStatus(task.id, nextRemaining > 0 ? "pending" : "done");
+					await this.#updateTaskStatus(task.id, {
+						status: nextRemaining > 0 ? "pending" : "done",
+						executedCount: nextExecuted,
+					});
 					return;
 				}
 
@@ -531,10 +538,10 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
-	 * Updates the status of a single task.
+	 * Updates the status and other properties of a single task.
 	 */
-	async #updateTaskStatus(taskId: string, status: Task["status"]): Promise<void> {
-		const updatedList = this.tasklist.map((t) => (t.id === taskId ? { ...t, status } : t));
+	async #updateTaskStatus(taskId: string, updates: Partial<Task>): Promise<void> {
+		const updatedList = this.tasklist.map((t) => (t.id === taskId ? { ...t, ...updates } : t));
 		await this.updateTasklist(updatedList);
 	}
 }
