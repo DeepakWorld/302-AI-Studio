@@ -733,7 +733,7 @@
 	"sandbox_create_failed": "沙盒创建失败！",
 	"sandbox_already_exist": "当前会话的沙盒已存在",
 	"text_drag_files_here": "将文件拖到此区域",
-	"text_drag_files_subtitle": "最多可上传5个附件，每个文件不超过10M",
+	"text_drag_files_subtitle": "最多可上传{count}个附件，每个文件不超过10M",
 	"toast_file_count_exceeded": "最多只能上传{count}个文件",
 	"toast_file_size_exceeded": "文件大小不能超过{size}M",
 	"toast_max_attachments_reached": "已达到最大附件数量",

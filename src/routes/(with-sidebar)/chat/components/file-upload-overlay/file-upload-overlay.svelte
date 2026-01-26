@@ -1,6 +1,7 @@
 <script lang="ts">
 	import FileUploadIcon from "$lib/assets/icons/ai-application/File-Upload.svg";
 	import { m } from "$lib/paraglide/messages.js";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import {
 		MAX_ATTACHMENT_COUNT,
 		MAX_FILE_SIZE_BYTES,
@@ -18,6 +19,8 @@
 
 	let { onFilesAdded, currentAttachmentCount }: Props = $props();
 
+	let maxAttachmentLimit = $derived(codeAgentState.enabled ? 20 : MAX_ATTACHMENT_COUNT);
+
 	let showOverlay = $state(false);
 	let isReady = $state(false);
 
@@ -32,7 +35,7 @@
 
 	async function processFiles(files: File[]) {
 		for (const file of files) {
-			if (currentAttachmentCount >= MAX_ATTACHMENT_COUNT) {
+			if (currentAttachmentCount >= maxAttachmentLimit) {
 				toast.warning(m.toast_max_attachments_reached());
 				break;
 			}
@@ -140,8 +143,8 @@
 		const fileArray = Array.from(files);
 
 		// 验证文件数量
-		if (fileArray.length > MAX_ATTACHMENT_COUNT) {
-			toast.warning(m.toast_file_count_exceeded({ count: MAX_ATTACHMENT_COUNT }));
+		if (fileArray.length > maxAttachmentLimit) {
+			toast.warning(m.toast_file_count_exceeded({ count: maxAttachmentLimit }));
 			return;
 		}
 
@@ -192,7 +195,7 @@
 			<div class="space-y-2 text-center">
 				<h3 class="text-lg font-medium text-foreground">{m.text_drag_files_here()}</h3>
 				<p class="text-sm text-muted-foreground">
-					{m.text_drag_files_subtitle()}
+					{m.text_drag_files_subtitle({ count: maxAttachmentLimit })}
 				</p>
 			</div>
 		</div>
