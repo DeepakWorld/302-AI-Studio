@@ -243,23 +243,23 @@ class ClaudeCodeAgentState {
 		this.updateState({ skills });
 	}
 
-	async updateThinkingBudget(thinkingBudget: ThinkingBudgetType) {
+	updateThinkingBudget(thinkingBudget: ThinkingBudgetType) {
 		this.updateState({ thinkingBudget });
 
-		if (this.sandboxId) {
-			this.isUpdatingThinkingBudget = true;
-			try {
-				const { isOK } = await updateClaudeCodeSandboxThinkingBudget(
-					this.sandboxId,
-					THINKING_BUDGET_MAP[thinkingBudget],
-				);
-				if (!isOK) {
-					// toast.error("Failed to update thinking budget");
-				}
-			} finally {
-				this.isUpdatingThinkingBudget = false;
-			}
-		}
+		// if (this.sandboxId) {
+		// 	this.isUpdatingThinkingBudget = true;
+		// 	try {
+		// 		const { isOK } = await updateClaudeCodeSandboxThinkingBudget(
+		// 			this.sandboxId,
+		// 			THINKING_BUDGET_MAP[thinkingBudget],
+		// 		);
+		// 		if (!isOK) {
+		// 			// toast.error("Failed to update thinking budget");
+		// 		}
+		// 	} finally {
+		// 		this.isUpdatingThinkingBudget = false;
+		// 	}
+		// }
 	}
 
 	async handleAgentModeExecute(): Promise<{

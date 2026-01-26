@@ -6,7 +6,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { serve } from "@hono/node-server";
 import type { ModelProvider } from "@shared/storage/provider";
-import type { ChatMessage, McpServer, Skill } from "@shared/types";
+import type { ChatMessage, McpServer, Skill, ThinkingBudgetType } from "@shared/types";
 import {
 	ToolLoopAgent as Agent,
 	convertToModelMessages,
@@ -26,6 +26,7 @@ import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
+import { THINKING_BUDGET_MAP } from "./constant";
 import {
 	appendPromptToLastUserMessage,
 	appendPromptToSystemMessage,
@@ -69,6 +70,7 @@ export type RouterRequestBody = {
 	inPlanMode?: boolean;
 	inTaskOrchestrationMode?: boolean;
 	workspacePath?: string;
+	thinkingBudget?: ThinkingBudgetType;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1181,7 +1183,7 @@ function getTaskDecomposePrompt(count: number): string {
 JSON范例:
 {
   "tasks": [
-    { 
+    {
       "id": "1",
       "content": "具体的任务描述",
     },
@@ -1311,6 +1313,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		inPlanMode,
 		inTaskOrchestrationMode,
 		workspacePath,
+		thinkingBudget,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
@@ -1334,6 +1337,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			inPlanMode,
 			inTaskOrchestrationMode,
 			workspacePath,
+			thinkingBudget,
 		}),
 	);
 
@@ -1424,7 +1428,7 @@ Turn 1: Call AskUserQuestion → Wait for user response
 Turn 2: Process user's answer → Call AskUserQuestion (if needed) → Wait for user response
 Turn 3: Process user's answer → Create plan → Call ExitPlanMode
 
-IMPORTANT: 
+IMPORTANT:
 - If you see output "Answer questions?", this means the tool is working
 - Wait for the user's real answer
 - Do NOT try to call AskUserQuestion again in the same turn
@@ -1456,6 +1460,7 @@ CHECK BEFORE EVERY ACTION:
 		...(isCreateSkillMode ? { action: "create_skill" } : {}),
 		...(inPlanMode && !isCreateSkillMode ? { action: "plan" } : {}),
 		...(inTaskOrchestrationMode ? { action: "sync_tasks_json" } : {}),
+		...(thinkingBudget ? { max_thinking_token: THINKING_BUDGET_MAP[thinkingBudget] } : {}),
 	};
 
 	console.log("[302ai-code-agent] Messages:", JSON.stringify(requestBody.messages));

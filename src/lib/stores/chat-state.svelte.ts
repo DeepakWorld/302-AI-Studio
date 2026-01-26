@@ -1497,6 +1497,7 @@ export const chat = new Chat({
 				skills: codeAgentState.skills,
 				isCreateSkillMode: chatState.isCreateSkillMode,
 				inPlanMode: codeAgentEnabled && codeAgentState.inPlanMode,
+				thinkingBudget: codeAgentEnabled && codeAgentState.thinkingBudget,
 
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
