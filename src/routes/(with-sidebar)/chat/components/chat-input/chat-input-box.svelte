@@ -10,6 +10,7 @@
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { fileToBase64 } from "$lib/stores/code-agent/utils";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
@@ -30,6 +31,7 @@
 
 	// Get skills that have forceUse=true
 	const forcedSkills = $derived(codeAgentState.skills.filter((s) => s.forceUse));
+	const maxAttachmentLimit = $derived(codeAgentState.enabled ? 20 : MAX_ATTACHMENT_COUNT);
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 
@@ -204,9 +206,9 @@
 
 	async function processFiles(files: File[]) {
 		for (const file of files) {
-			if (chatState.attachments.length >= MAX_ATTACHMENT_COUNT) {
+			if (chatState.attachments.length >= maxAttachmentLimit) {
 				toast.warning(
-					m.toast_max_attachments_reached?.() || `已达到最大附件数量：${MAX_ATTACHMENT_COUNT}`,
+					m.toast_max_attachments_reached?.() || `已达到最大附件数量：${maxAttachmentLimit}`,
 				);
 				break;
 			}
@@ -230,13 +232,30 @@
 			// 标记为加载中
 			chatState.setAttachmentLoading(attachmentId, true);
 
-			// 异步生成预览（不阻塞UI）
-			generateFilePreview(file).then((preview) => {
-				// 更新附件的预览
-				chatState.updateAttachment(attachmentId, { preview });
+			const processFile = async () => {
+				const isAbsolutePath =
+					filePath.includes("/") || filePath.includes("\\") || /^[a-zA-Z]:/.test(filePath);
+
+				if (!isAbsolutePath) {
+					// 如果没有绝对路径，强制读取文件完整内容作为 preview
+					// 这样 code-agent-send-message-button-state.ts 就能使用这个内容上传
+					try {
+						const content = await fileToBase64(file);
+						chatState.updateAttachment(attachmentId, { preview: content });
+					} catch (e) {
+						console.error("Failed to read file content:", e);
+					}
+				} else {
+					// 正常的预览生成逻辑
+					const preview = await generateFilePreview(file);
+					chatState.updateAttachment(attachmentId, { preview });
+				}
+
 				// 标记加载完成
 				chatState.setAttachmentLoading(attachmentId, false);
-			});
+			};
+
+			processFile();
 		}
 	}
 
