@@ -140,7 +140,7 @@
 		input.value = "";
 	}
 
-	async function processFiles(files: File[]) {
+	async function processFiles(files: File[], fromPaste = false) {
 		for (const file of files) {
 			if (codeAgentTaskboardState.attachments.length >= MAX_ATTACHMENT_COUNT) {
 				toast.warning(`已达到最大附件数量：${MAX_ATTACHMENT_COUNT}`);
@@ -150,9 +150,14 @@
 			const attachmentId = nanoid();
 			const filePath = (file as File & { path?: string }).path || file.name;
 
+			// 为粘贴的文件添加时间戳以区分
+			const fileName = fromPaste
+				? generatePastedFileName(file.name || `file-${Date.now()}`)
+				: file.name || `file-${Date.now()}`;
+
 			const attachment: AttachmentFile = {
 				id: attachmentId,
-				name: file.name || `file-${Date.now()}`,
+				name: fileName,
 				type: file.type,
 				size: file.size,
 				file,
@@ -184,7 +189,18 @@
 
 		if (files.length === 0) return;
 		event.preventDefault();
-		await processFiles(files);
+		await processFiles(files, true);
+	}
+
+	function generatePastedFileName(originalName: string): string {
+		const timestamp = Date.now();
+		const lastDotIndex = originalName.lastIndexOf(".");
+		if (lastDotIndex === -1) {
+			return `${originalName}-${timestamp}`;
+		}
+		const name = originalName.slice(0, lastDotIndex);
+		const ext = originalName.slice(lastDotIndex);
+		return `${name}-${timestamp}${ext}`;
 	}
 </script>
 

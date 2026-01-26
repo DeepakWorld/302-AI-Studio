@@ -201,10 +201,21 @@
 
 		event.preventDefault();
 
-		processFiles(files);
+		processFiles(files, true);
 	}
 
-	async function processFiles(files: File[]) {
+	function generatePastedFileName(originalName: string): string {
+		const timestamp = Date.now();
+		const lastDotIndex = originalName.lastIndexOf(".");
+		if (lastDotIndex === -1) {
+			return `${originalName}-${timestamp}`;
+		}
+		const name = originalName.slice(0, lastDotIndex);
+		const ext = originalName.slice(lastDotIndex);
+		return `${name}-${timestamp}${ext}`;
+	}
+
+	async function processFiles(files: File[], fromPaste = false) {
 		for (const file of files) {
 			if (chatState.attachments.length >= maxAttachmentLimit) {
 				toast.warning(
@@ -216,10 +227,15 @@
 			const filePath = (file as File & { path?: string }).path || file.name;
 			const attachmentId = nanoid();
 
+			// 为粘贴的文件添加时间戳以区分
+			const fileName = fromPaste
+				? generatePastedFileName(file.name || `file-${Date.now()}`)
+				: file.name || `file-${Date.now()}`;
+
 			// 立即创建附件对象并添加到列表
 			const attachment: AttachmentFile = {
 				id: attachmentId,
-				name: file.name || `file-${Date.now()}`,
+				name: fileName,
 				type: file.type,
 				size: file.size,
 				file,
