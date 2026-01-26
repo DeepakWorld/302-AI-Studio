@@ -16,26 +16,81 @@ class CodeAgentSendMessageButtonState {
 	showLackOfDiskDialog = $state(false);
 	isChecking = $state(false);
 
-	async #attachmentToBase64(attachment: { file?: unknown; preview?: unknown; filePath?: unknown }) {
+	async #attachmentToBase64(attachment: {
+		file?: unknown;
+		preview?: unknown;
+		filePath?: unknown;
+		name?: string;
+	}): Promise<string | null> {
 		if (attachment.file instanceof Blob) {
 			return await fileToBase64(attachment.file as File);
 		}
 
+		if (typeof attachment.filePath === "string") {
+			// Check if filePath is an absolute path (contains path separators)
+			// If it's just a filename without path, it cannot be read via Electron
+			const isAbsolutePath =
+				attachment.filePath.includes("/") ||
+				attachment.filePath.includes("\\") ||
+				/^[a-zA-Z]:/.test(attachment.filePath);
+
+			if (isAbsolutePath) {
+				try {
+					const buffer = await window.electronAPI.appService.readFileAsBuffer(attachment.filePath);
+					let binary = "";
+					const bytes = new Uint8Array(buffer);
+					for (let i = 0; i < bytes.byteLength; i++) {
+						binary += String.fromCharCode(bytes[i]);
+					}
+
+					// Determine MIME type based on file extension
+					let mimeType = "application/octet-stream";
+					if (attachment.name) {
+						const ext = attachment.name.split(".").pop()?.toLowerCase();
+						switch (ext) {
+							case "png":
+								mimeType = "image/png";
+								break;
+							case "jpg":
+							case "jpeg":
+								mimeType = "image/jpeg";
+								break;
+							case "gif":
+								mimeType = "image/gif";
+								break;
+							case "webp":
+								mimeType = "image/webp";
+								break;
+							case "svg":
+								mimeType = "image/svg+xml";
+								break;
+							case "json":
+								mimeType = "application/json";
+								break;
+							case "txt":
+								mimeType = "text/plain";
+								break;
+							case "pdf":
+								mimeType = "application/pdf";
+								break;
+						}
+					}
+
+					return `data:${mimeType};base64,${window.btoa(binary)}`;
+				} catch (error) {
+					console.error("Failed to read file from path:", attachment.filePath, error);
+					// Fallback to preview if file read fails
+				}
+			}
+		}
+
+		// Prioritize using preview if it's a data URL (covers both image previews and our manual full-content reads)
 		if (typeof attachment.preview === "string" && attachment.preview.startsWith("data:")) {
 			return attachment.preview;
 		}
 
-		if (typeof attachment.filePath === "string") {
-			const buffer = await window.electronAPI.appService.readFileAsBuffer(attachment.filePath);
-			let binary = "";
-			const bytes = new Uint8Array(buffer);
-			for (let i = 0; i < bytes.byteLength; i++) {
-				binary += String.fromCharCode(bytes[i]);
-			}
-			return `data:application/octet-stream;base64,${window.btoa(binary)}`;
-		}
-
-		return "";
+		// Return null if no valid content source available
+		return null;
 	}
 
 	async *enableCodeAgentFlow(fn: () => void) {
@@ -84,30 +139,66 @@ class CodeAgentSendMessageButtonState {
 						);
 					filesToUpload.push({ content: base64Content, save_path: tasksFilePath });
 
-					if (codeAgentTaskboardState.pendingAttachments.length > 0) {
-						console.log("pending attachments", codeAgentTaskboardState.pendingAttachments);
-						const pendingAttachments = await Promise.all(
-							codeAgentTaskboardState.pendingAttachments.map(async (att) => ({
-								content: att.file ? await fileToBase64(att.file) : "",
-								save_path: `${workspacePath}/.302ai/attachments/${att.name}`,
-							})),
+					// 2. taskboard attachments
+					if (codeAgentTaskboardState.attachments.length > 0) {
+						const taskboardAttachmentResults = await Promise.all(
+							codeAgentTaskboardState.attachments.map(async (att) => {
+								const content = att.file ? await fileToBase64(att.file) : null;
+								return content
+									? { content, save_path: `${workspacePath}/.302ai/attachments/${att.name}` }
+									: null;
+							}),
 						);
-						filesToUpload.push(...pendingAttachments);
+						const validTaskboardAttachments = taskboardAttachmentResults.filter(
+							(item): item is { content: string; save_path: string } => item !== null,
+						);
+						filesToUpload.push(...validTaskboardAttachments);
+					}
+
+					// 3. pending attachments
+					if (codeAgentTaskboardState.pendingAttachments.length > 0) {
+						console.log(
+							"pending attachments count:",
+							codeAgentTaskboardState.pendingAttachments.length,
+						);
+						const pendingAttachmentResults = await Promise.all(
+							codeAgentTaskboardState.pendingAttachments.map(async (att) => {
+								const content = att.file ? await fileToBase64(att.file) : null;
+								if (!content) console.warn("Pending attachment content is null for:", att.name);
+								return content
+									? { content, save_path: `${workspacePath}/.302ai/attachments/${att.name}` }
+									: null;
+							}),
+						);
+						const validPendingAttachments = pendingAttachmentResults.filter(
+							(item): item is { content: string; save_path: string } => item !== null,
+						);
+						console.log("valid pending attachments:", validPendingAttachments.length);
+						filesToUpload.push(...validPendingAttachments);
 						codeAgentTaskboardState.clearPendingAttachments();
 					}
 
 					if (chatState.attachments.length > 0) {
-						const chatAttachments = await Promise.all(
-							chatState.attachments.map(async (att) => ({
-								content: await this.#attachmentToBase64(att),
-								save_path: `${workspacePath}/${att.name}`,
-							})),
+						console.log("chat attachments count:", chatState.attachments.length);
+						const chatAttachmentResults = await Promise.all(
+							chatState.attachments.map(async (att) => {
+								const content = await this.#attachmentToBase64(att);
+								if (!content)
+									console.warn("Chat attachment content is null for:", att.name, att.filePath);
+								return content ? { content, save_path: `${workspacePath}/${att.name}` } : null;
+							}),
 						);
-						filesToUpload.push(...chatAttachments);
+						// Filter out null results (attachments that couldn't be converted)
+						const validChatAttachments = chatAttachmentResults.filter(
+							(item): item is { content: string; save_path: string } => item !== null,
+						);
+						console.log("valid chat attachments:", validChatAttachments.length);
+						filesToUpload.push(...validChatAttachments);
 					}
 
 					// Upload all files in a single batch request
 					if (filesToUpload.length > 0) {
+						console.log("Total files to upload:", filesToUpload.length);
 						const response = await batchUploadFile({
 							sandbox_id: sandboxInfo.sandboxId,
 							file_list: filesToUpload,

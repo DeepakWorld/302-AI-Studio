@@ -1213,7 +1213,7 @@
 	"taskboard_bar_status_idle": "待执行",
 	"taskboard_bar_status_running": "正在执行",
 	"taskboard_bar_status_waiting_to_stop": "待结束",
-	"taskboard_bar_status_waiting_for_chat": "等待聊天",
+	"taskboard_bar_status_waiting_for_chat": "等待聊天完成",
 	"taskboard_bar_status_retry_exhausted": "已达最大重试次数",
 	"taskboard_bar_status_waiting_for_user_input": "等待回答",
 	"taskboard_bar_progress": "({current}/{total}）",
