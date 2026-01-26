@@ -4,7 +4,6 @@
 	import PreviewPanel from "$lib/components/html-preview/preview-panel.svelte";
 	import * as m from "$lib/paraglide/messages";
 	import { chatState } from "$lib/stores/chat-state.svelte";
-	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import {
 		htmlPreviewDeploymentsState,
 		type HtmlPreviewDeploymentRecord,
@@ -40,7 +39,6 @@
 		deploymentHistory.length > 0 ? deploymentHistory[deploymentHistory.length - 1] : null,
 	);
 	const deployedUrl = $derived(latestDeployment ? latestDeployment.url : null);
-	const isAgentMode = $derived(codeAgentState.enabled);
 
 	// Tabs definition - only show 2 tabs in HTML preview mode
 	const tabs: PreviewTab[] = [
@@ -292,7 +290,7 @@
 						value={htmlPreviewState.editedHtml}
 						language={htmlPreviewState.selectedLanguage}
 						onValueChange={handleValueChange}
-						readOnly={!isAgentMode}
+						readOnly={false}
 					/>
 				{/if}
 			</div>
