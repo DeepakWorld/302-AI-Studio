@@ -5,11 +5,11 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Input from "$lib/components/ui/input/input.svelte";
-	import { cn } from "$lib/utils";
 	import { m } from "$lib/paraglide/messages";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
+	import { cn } from "$lib/utils";
 	import { Plus, RefreshCw, Search, ShoppingBag, Star, Trash2, X, Zap } from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
 	import { toast } from "svelte-sonner";
@@ -341,7 +341,7 @@
 					)}
 			>
 				<ShoppingBag class="h-4 w-4" />
-				{m.skills_hub_link_text()}123
+				{m.skills_hub_link_text()}
 			</button>
 			{m.skills_hub_hint_suffix()}
 		</div>
