@@ -1,4 +1,4 @@
-import type { SheetWindowConfig } from "@shared/types";
+import type { SheetWindowConfig, TabType } from "@shared/types";
 import {
 	BrowserWindow,
 	nativeTheme,
@@ -327,6 +327,82 @@ export class WindowService {
 	// ******************************* IPC Methods ******************************* //
 	async handleOpenSettingsWindow(_event: IpcMainInvokeEvent, route?: string): Promise<void> {
 		await this.openSettingsWindow(route);
+	}
+
+	async handleNavigateToUrl(
+		_event: IpcMainInvokeEvent,
+		title: string,
+		type: TabType,
+		href: string,
+	): Promise<{
+		success: boolean;
+		windowId: string | null;
+		tabId: string | null;
+		action: "activated" | "created" | "failed";
+	}> {
+		// 1. 查找所有窗口中是否有该 href 或 type 的 tab
+		const tabState = await tabStorage.getItemInternal("tab-bar-state");
+		if (tabState) {
+			for (const [windowId, windowData] of Object.entries(tabState)) {
+				const existingTab = windowData.tabs.find(
+					(t) => t.href === href || (t.type === type && t.href),
+				);
+				if (existingTab) {
+					// 找到已存在的 tab，focus 到该窗口并激活
+					const numericWindowId = parseInt(windowId, 10);
+					const targetWindow = BrowserWindow.fromId(numericWindowId);
+
+					if (targetWindow && !targetWindow.isDestroyed()) {
+						if (targetWindow.isMinimized()) targetWindow.restore();
+						if (!targetWindow.isVisible()) targetWindow.show();
+						targetWindow.focus();
+
+						// 激活该 tab
+						tabService.focusTabInWindow(targetWindow, existingTab.id);
+
+						// 更新 storage 中的 active 状态
+						const updatedTabs = windowData.tabs.map((t) => ({
+							...t,
+							active: t.id === existingTab.id,
+						}));
+						tabState[windowId] = { tabs: updatedTabs };
+						await tabStorage.setItemInternal("tab-bar-state", tabState);
+
+						return {
+							success: true,
+							windowId,
+							tabId: existingTab.id,
+							action: "activated",
+						};
+					}
+				}
+			}
+		}
+
+		// 2. 没有找到已存在的 tab，需要创建新 tab
+		// 使用主窗口创建
+		const targetWindow = this.getMainWindow();
+
+		if (!targetWindow || targetWindow.isDestroyed()) {
+			return { success: false, windowId: null, tabId: null, action: "failed" };
+		}
+
+		// Focus 主窗口
+		if (targetWindow.isMinimized()) targetWindow.restore();
+		if (!targetWindow.isVisible()) targetWindow.show();
+		targetWindow.focus();
+
+		const targetWindowId = targetWindow.id.toString();
+
+		// 创建新 tab
+		const result = await tabService.createTabForUrl(targetWindow, title, type, href, true);
+
+		return {
+			success: true,
+			windowId: targetWindowId,
+			tabId: result?.tabId || null,
+			action: "created",
+		};
 	}
 
 	async focusWindow(_event: IpcMainInvokeEvent, windowId: string, tabId?: string): Promise<void> {

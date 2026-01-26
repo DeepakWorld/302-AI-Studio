@@ -568,6 +568,59 @@ export class TabService {
 		return { tabId: newTabId };
 	}
 
+	/**
+	 * Create a tab for an external URL (internal method for window-service)
+	 * @returns Tab ID if successful, null otherwise
+	 */
+	async createTabForUrl(
+		targetWindow: BrowserWindow,
+		title: string = "New Tab",
+		type: TabType = "aiApplications",
+		href: string,
+		active: boolean = true,
+	): Promise<{ tabId: string | null }> {
+		const windowId = targetWindow.id.toString();
+
+		const newTabId = nanoid();
+		const newThreadId = nanoid();
+		const newTab: Tab = {
+			id: newTabId,
+			title,
+			href,
+			type,
+			active,
+			threadId: newThreadId,
+		};
+
+		const view = await this.newWebContentsView(targetWindow.id, newTab);
+		this.attachViewToWindow(targetWindow, view);
+		this.switchActiveTab(targetWindow, newTab.id);
+
+		this.tabMap.set(newTab.id, newTab);
+
+		const windowViews = this.windowTabView.get(targetWindow.id) || [];
+		if (!windowViews.includes(view)) {
+			windowViews.push(view);
+			this.windowTabView.set(targetWindow.id, windowViews);
+		}
+
+		this.scheduleWindowResize(targetWindow);
+
+		// Add new tab to storage
+		const finalTabState = await tabStorage.getItemInternal("tab-bar-state");
+		if (!isNull(finalTabState)) {
+			const currentTabs = finalTabState[windowId]?.tabs || [];
+			const updatedTabs = active
+				? [...currentTabs.map((t) => ({ ...t, active: false })), newTab]
+				: [...currentTabs, newTab];
+			finalTabState[windowId] = { tabs: updatedTabs };
+			await tabStorage.setItemInternal("tab-bar-state", finalTabState);
+			console.log(`[TabService] Created tab ${newTabId} (${type}, ${href}) in window ${windowId}`);
+		}
+
+		return { tabId: newTabId };
+	}
+
 	// ******************************* IPC Methods ******************************* //
 	async handleNewTabWithThread(
 		event: IpcMainInvokeEvent,

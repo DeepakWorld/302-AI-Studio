@@ -92,6 +92,7 @@
 				builtinSkills={skillsData.builtin_skills}
 				{loading}
 				showUseButton={false}
+				showBorder={false}
 				onRefresh={loadSkills}
 			/>
 		{:else if skillsPanelState.currentView.type === "detail"}

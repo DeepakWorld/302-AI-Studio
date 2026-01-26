@@ -5,6 +5,7 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Input from "$lib/components/ui/input/input.svelte";
+	import { cn } from "$lib/utils";
 	import { m } from "$lib/paraglide/messages";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
@@ -21,6 +22,7 @@
 		loading?: boolean;
 		showUseButton?: boolean;
 		singleColumn?: boolean;
+		showBorder?: boolean;
 		onRefresh?: () => void;
 	}
 
@@ -30,6 +32,7 @@
 		loading = false,
 		showUseButton = true,
 		singleColumn = false,
+		showBorder = true,
 		onRefresh,
 	}: Props = $props();
 
@@ -302,7 +305,7 @@
 
 <div class="relative flex h-full flex-col">
 	<!-- Search and New Button - Fixed at top -->
-	<div class="shrink-0 border-b px-6 py-4">
+	<div class={cn("shrink-0 px-6 py-4", showBorder && "border-b")}>
 		<div class="flex items-center gap-3">
 			<div class="relative flex-1">
 				<Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -324,27 +327,24 @@
 				{m.skills_new()}
 			</Button>
 		</div>
-		{#if !window.location.pathname.startsWith("/settings")}
-			<!-- Skills Hub Link -->
-			<div class="mt-3 text-sm text-muted-foreground">
-				{m.skills_hub_hint_prefix()}
-				<button
-					type="button"
-					class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
-					onclick={() =>
-						window.electronAPI.tabService.handleNewTab(
-							"302 Skills Hub",
-							"skillsHub",
-							true,
-							"https://skills.302.ai",
-						)}
-				>
-					<ShoppingBag class="h-4 w-4" />
-					{m.skills_hub_link_text()}
-				</button>
-				{m.skills_hub_hint_suffix()}
-			</div>
-		{/if}
+		<!-- Skills Hub Link -->
+		<div class="mt-3 text-sm text-muted-foreground">
+			{m.skills_hub_hint_prefix()}
+			<button
+				type="button"
+				class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
+				onclick={() =>
+					window.electronAPI.windowService.handleNavigateToUrl(
+						"302 Skills Hub",
+						"skillsHub",
+						"https://skills.302.ai",
+					)}
+			>
+				<ShoppingBag class="h-4 w-4" />
+				{m.skills_hub_link_text()}123
+			</button>
+			{m.skills_hub_hint_suffix()}
+		</div>
 	</div>
 
 	<!-- Skills Grid - Scrollable -->
