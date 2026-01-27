@@ -255,6 +255,19 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos) =>
 		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos),
 	);
+	ipcMain.handle(
+		"codeAgentService:createThreadForSession",
+		(event, threadId, sandboxId, sessionId, sandboxRemark, llmModel, sessionNote) =>
+			codeAgentService.createThreadForSession(
+				event,
+				threadId,
+				sandboxId,
+				sessionId,
+				sandboxRemark,
+				llmModel,
+				sessionNote,
+			),
+	);
 	ipcMain.handle("codeAgentService:getThreadIdBySessionId", (event, sandboxId, sessionId) =>
 		codeAgentService.getThreadIdBySessionId(event, sandboxId, sessionId),
 	);
@@ -557,6 +570,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSession");
 	ipcMain.removeHandler("codeAgentService:findClaudeCodeSandboxWithValidDisk");
 	ipcMain.removeHandler("codeAgentService:addClaudeCodeSandboxMCP");
+	ipcMain.removeHandler("codeAgentService:createThreadForSession");
 	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
 	ipcMain.removeHandler("codeAgentService:setIsManualNoteBySession");
 	ipcMain.removeHandler("tabService:handleNewTabWithThread");

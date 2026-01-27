@@ -421,6 +421,111 @@ export class CodeAgentService {
 		}
 	}
 
+	/**
+	 * Create a code agent state entry for a new thread, linking it to an existing sandbox and session.
+	 * This is used when opening a session from settings that has no local thread data.
+	 * This method creates the complete thread setup including thread data, code agent config and state.
+	 */
+	async createThreadForSession(
+		_event: IpcMainInvokeEvent,
+		threadId: string,
+		sandboxId: string,
+		sessionId: string,
+		sandboxRemark: string,
+		llmModel: string,
+		sessionNote?: string,
+	): Promise<{ isOK: boolean }> {
+		try {
+			// First check if thread data already exists
+			const existingThread = await storageService.getItemInternal("app-thread:" + threadId);
+
+			// If thread data doesn't exist, create it
+			if (!existingThread) {
+				// Use sessionNote for title, fall back to sandboxRemark or default
+				const threadTitle = sessionNote || sandboxRemark || "Code Agent";
+				const newThread = {
+					id: threadId,
+					title: threadTitle,
+
+					temperature: null,
+					topP: null,
+					frequencyPenalty: null,
+					presencePenalty: null,
+					maxTokens: null,
+					inputValue: "",
+					attachments: [],
+					mcpServers: [],
+					mcpServerIds: [],
+					isThinkingActive: false,
+					isOnlineSearchActive: false,
+					isMCPActive: false,
+					selectedModel: {
+						id: llmModel,
+						name: llmModel,
+						providerId: "302AI", // Must match the registered provider ID
+						type: "chat",
+					},
+					isPrivateChatActive: false,
+					updatedAt: new Date(),
+				};
+				await storageService.setItemInternal("app-thread:" + threadId, newThread);
+
+				// Add an initial message to prevent "New Chat" state which causes session init conflicts
+				// Content is empty as requested by user
+				const initialMessage = {
+					id: crypto.randomUUID(),
+					role: "system",
+					content: "",
+					createdAt: new Date(),
+					parts: [],
+				};
+				await storageService.setItemInternal("app-chat-messages:" + threadId, [initialMessage]);
+
+				// Add thread to the sidebar thread list
+				const { threadStorage } = await import("../storage-service/thread-storage");
+				await threadStorage.addThread(threadId);
+
+				console.log("[createThreadForSession] Created thread data for:", threadId);
+			}
+
+			// Create the claude code agent state (sandbox/session link)
+			const stateKey = `claude-code-agent-state-${threadId}`;
+			// Include all required CodeAgentMetadata properties
+			const state = {
+				sandboxId,
+				sandboxRemark,
+				currentSessionId: sessionId,
+				model: llmModel,
+				isManualNote: false,
+				// Local agent properties (empty for remote sessions)
+				currentWorkspacePath: "",
+				workspacePaths: [],
+				variables: [],
+				skills: [],
+				thinkingBudget: "medium" as const,
+			};
+			await claudeCodeStorage.setItemInternal(stateKey, state);
+
+			// Also create the code agent config to enable code agent mode
+			const configKey = `code-agent-config-state-${threadId}`;
+			const config = {
+				enabled: true,
+				threadId,
+				type: "remote" as const, // Remote = Claude Code sandbox
+				currentAgentId: "claude-code",
+				isDeleted: false,
+				inPlanMode: false,
+			};
+			await codeAgentStorage.setItemInternal(configKey, config);
+
+			console.log("[createThreadForSession] Created complete setup for thread:", threadId);
+			return { isOK: true };
+		} catch (error) {
+			console.error("Error creating thread for session:", error);
+			return { isOK: false };
+		}
+	}
+
 	async getThreadIdBySessionId(
 		_event: IpcMainInvokeEvent,
 		sandboxId: string,

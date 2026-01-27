@@ -142,29 +142,74 @@
 		if (!sandbox || !session) return;
 		isOpeningSession = session.sessionId;
 
+		console.log(
+			"[handleOpenSession] Starting, sandbox:",
+			sandbox.sandboxId,
+			"session:",
+			session.sessionId,
+		);
+
 		try {
-			// Get threadId for this session
-			const { isOK, threadId } = await window.electronAPI.codeAgentService.getThreadIdBySessionId(
+			// Check if there's an existing thread with proper data for this session
+			const { isOK, threadId: existingThreadId } =
+				await window.electronAPI.codeAgentService.getThreadIdBySessionId(
+					sandbox.sandboxId,
+					session.sessionId,
+				);
+
+			console.log("[handleOpenSession] getThreadIdBySessionId result:", {
+				isOK,
+				threadId: existingThreadId,
+			});
+
+			// Try to navigate to existing thread first
+			if (isOK && existingThreadId) {
+				const result = await window.electronAPI.windowService.navigateToThread(existingThreadId);
+				console.log("[handleOpenSession] navigateToThread result:", result);
+
+				if (result.success) {
+					onClose();
+					return;
+				}
+				// Navigation failed - thread data might be missing, continue to create new
+				console.log(
+					"[handleOpenSession] Navigation to existing thread failed, will create new thread",
+				);
+			}
+
+			// Generate a new thread ID
+			const newThreadId = crypto.randomUUID();
+			console.log("[handleOpenSession] Generated new threadId:", newThreadId);
+
+			// Setup the thread with all configurations FIRST (thread data + code agent config + state)
+			const setupResult = await window.electronAPI.codeAgentService.createThreadForSession(
+				newThreadId,
 				sandbox.sandboxId,
 				session.sessionId,
+				sandbox.sandboxRemark || "",
+				sandbox.llmModel || "claude-sonnet-4-5-20250929",
+				session.note || "", // Pass session note as thread title
 			);
+			console.log("[handleOpenSession] createThreadForSession result:", setupResult);
 
-			if (!isOK || !threadId) {
-				toast.error(m.toast_thread_not_found());
+			if (!setupResult.isOK) {
+				console.error("[handleOpenSession] Failed to setup thread");
+				toast.error(m.toast_navigate_failed());
 				return;
 			}
 
-			// Navigate to the thread
-			const result = await window.electronAPI.windowService.navigateToThread(threadId);
+			// Now navigate to the thread in the main window (this will create a new tab there)
+			const navResult = await window.electronAPI.windowService.navigateToThread(newThreadId);
+			console.log("[handleOpenSession] navigateToThread result:", navResult);
 
-			if (result.success) {
-				// Close dialog on successful navigation
+			if (navResult.success) {
 				onClose();
 			} else {
+				console.error("[handleOpenSession] Failed to navigate to new thread");
 				toast.error(m.toast_navigate_failed());
 			}
 		} catch (error) {
-			console.error("Failed to open session:", error);
+			console.error("[handleOpenSession] Failed to open session:", error);
 			toast.error(m.toast_navigate_failed());
 		} finally {
 			isOpeningSession = "";
