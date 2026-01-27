@@ -15,6 +15,7 @@ import {
 	aiApplicationService,
 	appService,
 	dataService,
+	envService,
 	externalLinkService,
 	mcpService,
 	notificationService,
@@ -418,6 +419,9 @@ export function registerIpcHandlers() {
 			dataService.exportChatToFile(event, content, extension, filterName, defaultFileName),
 	);
 
+	// envService service registration
+	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
+
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
 		externalLinkService.openExternalLink(event, url),
@@ -618,6 +622,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
+	ipcMain.removeHandler("envService:validPodman");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");

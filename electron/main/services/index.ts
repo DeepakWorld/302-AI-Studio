@@ -5,6 +5,7 @@ import { BroadcastService, broadcastService } from "./broadcast-service";
 import { CodeAgentService, codeAgentService } from "./code-agent-service";
 import { DataService, dataService } from "./data-service";
 import { DeepLinkService, deepLinkService } from "./deep-link-service";
+import { EnvService, envService } from "./env-service";
 import { ExternalLinkService, externalLinkService } from "./external-link-service";
 import { GhostWindowService, ghostWindowService } from "./ghost-window-service";
 import { McpService, mcpService } from "./mcp-service";
@@ -31,6 +32,7 @@ export {
 	CodeAgentService,
 	DataService,
 	DeepLinkService,
+	EnvService,
 	ExternalLinkService,
 	GeneralSettingsService,
 	GhostWindowService,
@@ -58,6 +60,7 @@ export {
 	codeAgentService,
 	dataService,
 	deepLinkService,
+	envService,
 	externalLinkService,
 	generalSettingsService,
 	ghostWindowService,

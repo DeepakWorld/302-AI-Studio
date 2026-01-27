@@ -23,13 +23,11 @@
 </script>
 
 <script lang="ts">
-	import NoSupportIcon from "$lib/assets/icons/code-agent/not-support.svg";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import type { SelectOption } from "$lib/components/buss/settings/setting-select.svelte";
 	import SettingSelect from "$lib/components/buss/settings/setting-select.svelte";
 	import { Button } from "$lib/components/ui/button";
-	import * as Empty from "$lib/components/ui/empty/index.js";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
@@ -38,6 +36,7 @@
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import type { CodeAgentType } from "@shared/storage/code-agent";
 	import ClaudeCodePanel from "./claude-code-panel.svelte";
+	import LocalModePanel from "./local-mode-panel.svelte";
 
 	let { onClose }: Props = $props();
 
@@ -122,15 +121,7 @@
 				{/if}
 			{/if}
 			{#if codeAgentState.type === "local"}
-				<!-- TODO: local agent -->
-				<Empty.Root>
-					<Empty.Content class="h-[200px] flex flex-col gap-0 items-center justify-center">
-						<img src={NoSupportIcon} alt="Not supported" />
-						<Empty.Description>
-							{m.unsupport()}
-						</Empty.Description>
-					</Empty.Content>
-				</Empty.Root>
+				<LocalModePanel />
 			{/if}
 		</div>
 	</div>
