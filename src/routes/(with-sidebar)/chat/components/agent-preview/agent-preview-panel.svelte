@@ -330,6 +330,22 @@
 				});
 			}
 
+			// Handle file deletion: when file list is updated, check if the currently
+			// previewed file was deleted (directly or as part of a deleted folder)
+			// This must be checked for ALL sources (including self) to handle same-window deletions
+			if (message.type === "fileListUpdated" && fileViewer.selectedFile) {
+				const currentPath = fileViewer.selectedFile.path;
+				const fileStillExists = message.fileList.some((f) => f.path === currentPath);
+
+				if (!fileStillExists) {
+					// Clear preview state for deleted file
+					cleanupPreviewUrl();
+					fileViewer.selectedFile = null;
+					fileViewer.content = "";
+					fileViewer.previewType = "text";
+				}
+			}
+
 			// For other message types, only handle from other instances
 			if (message.sourceInstanceId === agentPreviewState.syncIdentifier) {
 				return;

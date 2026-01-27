@@ -462,6 +462,43 @@ export class FileTreeState {
 				this.treeNodes = [];
 				this.treeNodesCache = null;
 			}
+
+			// Recovery: if current directory was deleted, navigate to parent or root
+			// Detect directory deletion by checking error message patterns
+			const errorMsg = this.error || "";
+			const isDirectoryNotFound =
+				errorMsg.includes("path not found") ||
+				errorMsg.includes("no such file or directory") ||
+				errorMsg.includes("does not exist") ||
+				errorMsg.includes("Failed to list files");
+
+			if (isDirectoryNotFound && !isAtSystemRoot(this.currentDirectory)) {
+				// Try to navigate to parent directory
+				const parentPath = pathUtils.getParentDir(this.currentDirectory);
+				console.log(`[FileTree] Current directory deleted, navigating to parent: ${parentPath}`);
+
+				// Update currentDirectory and try loading parent
+				this.currentDirectory = parentPath;
+				this.error = null; // Clear error before retry
+
+				try {
+					await this.loadFiles(parentPath, false, true);
+				} catch (_retryError) {
+					// If parent also fails, fallback to workspace root
+					if (!isAtSystemRoot(parentPath)) {
+						console.log("[FileTree] Parent directory also invalid, falling back to workspace root");
+						this.currentDirectory = this.rootPath;
+						this.error = null;
+						await this.loadFiles(this.rootPath, false, true);
+					}
+				}
+			} else if (isDirectoryNotFound && isAtSystemRoot(this.currentDirectory)) {
+				// At system root and directory not found - reset to workspace path
+				console.log("[FileTree] At system root with error, resetting to workspace path");
+				this.currentDirectory = this.rootPath;
+				this.error = null;
+				await this.saveToStorage(); // Update storage with valid path
+			}
 		} finally {
 			this.loadingDirs = removeFromSet(this.loadingDirs, path);
 			if (!merge || force) {
