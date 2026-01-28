@@ -1,8 +1,35 @@
 <script lang="ts">
-	import NoSupportIcon from "$lib/assets/icons/code-agent/not-support.svg";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
+	import { Button } from "$lib/components/ui/button";
+	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
+	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import AgentWorkspaceConfig from "../../../../(settings-page)/settings/(center)/agent-settings/components/agent-workspace-config.svelte";
+	import PodmanCard from "../../../../(settings-page)/settings/(center)/agent-settings/components/podman-card.svelte";
+	import SandboxCard from "../../../../(settings-page)/settings/(center)/agent-settings/components/sandbox-card.svelte";
+
+	let { onClose }: { onClose?: () => void } = $props();
+
+	let isLoading = $state(false);
+
+	async function handleConfirm() {
+		isLoading = true;
+		try {
+			// TODO: Add business logic here (install podman, start sandbox, etc.)
+			// Mock delay for now
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			closePanel();
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	function handleCancel() {
+		closePanel();
+	}
+
+	function closePanel() {
+		onClose?.();
+	}
 
 	async function handleInstall() {
 		const result = await window.electronAPI.envService.validPodman();
@@ -10,12 +37,34 @@
 	}
 </script>
 
-<Empty.Root>
-	<Empty.Content class="h-[200px] flex flex-col gap-4 items-center justify-center">
-		<img src={NoSupportIcon} alt="Not supported" />
-		<Empty.Description>
-			{m.unsupport()}
-		</Empty.Description>
-		<Button onclick={handleInstall}>{m.code_agent_one_click_install()}</Button>
-	</Empty.Content>
-</Empty.Root>
+<div class="gap-settings-gap flex flex-col">
+	<!-- Section 1: Environment Monitoring -->
+	<section class="space-y-4">
+		<Label class="text-label-fg font-normal">{m.local_platform_environment_monitoring()}</Label>
+
+		<!-- Environment Cards Container -->
+		<div class="rounded-lg border p-4 space-y-4">
+			<PodmanCard isOpen={false} onInstall={handleInstall} />
+			<SandboxCard isOpen={false} />
+		</div>
+	</section>
+
+	<!-- Section 2: Agent Framework -->
+	<section class="space-y-4 mt-2">
+		<AgentWorkspaceConfig />
+	</section>
+
+	<!-- Footer with Cancel/Confirm buttons -->
+	<div class="flex flex-row justify-between">
+		<Button variant="secondary" onclick={handleCancel} disabled={isLoading}>
+			{m.common_cancel()}
+		</Button>
+		<Button onclick={handleConfirm} disabled={isLoading}>
+			{#if isLoading}
+				<LdrsLoader type="line-spinner" size={16} />
+			{:else}
+				{m.label_button_confirm()}
+			{/if}
+		</Button>
+	</div>
+</div>

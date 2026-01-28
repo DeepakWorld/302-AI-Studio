@@ -121,7 +121,9 @@
 				{/if}
 			{/if}
 			{#if codeAgentState.type === "local"}
-				<LocalModePanel />
+				<div class="max-h-[500px] overflow-y-auto pr-2">
+					<LocalModePanel {onClose} />
+				</div>
 			{/if}
 		</div>
 	</div>
