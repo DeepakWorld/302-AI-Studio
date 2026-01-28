@@ -29,6 +29,7 @@ export class EnvService {
 		command: string,
 		args: string[],
 		step: string,
+		useShell = true,
 	): Promise<{ isOk: boolean }> {
 		return new Promise((resolve) => {
 			broadcastService.broadcastChannelToAll("install-log", {
@@ -37,7 +38,7 @@ export class EnvService {
 				data: `Starting: ${step}`,
 			});
 
-			const proc = spawn(command, args, { shell: true });
+			const proc = spawn(command, args, { shell: useShell });
 
 			proc.stdout.on("data", (data) => {
 				broadcastService.broadcastChannelToAll("install-log", {
@@ -305,23 +306,19 @@ export class EnvService {
 	 * @returns { isOk: boolean } - isOk: operation success
 	 */
 	async installScoop(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
-		const policyResult = await this.runCommandWithBroadcast(
+		const scoopInstall = await this.runCommandWithBroadcast(
 			"powershell.exe",
-			["-Command", "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force"],
-			"scoop-policy",
-		);
-
-		if (!policyResult.isOk) {
-			return { isOk: false };
-		}
-
-		const installResult = await this.runCommandWithBroadcast(
-			"powershell.exe",
-			["-Command", "Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression"],
+			[
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression",
+			],
 			"scoop-install",
+			false,
 		);
 
-		return installResult;
+		return scoopInstall;
 	}
 
 	/**
@@ -449,19 +446,17 @@ export class EnvService {
 		// 2. Check and install Scoop
 		const scoopCheck = await this.checkScoop();
 		if (!scoopCheck.isValid) {
-			// Set execution policy
-			const policyResult = await this.runCommandWithBroadcast(
-				"powershell.exe",
-				["-Command", "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force"],
-				"scoop-policy",
-			);
-			if (!policyResult.isOk) return { isOk: false };
-
-			// Install Scoop
+			// Install Scoop with execution policy bypass (shell: false to avoid cmd.exe pipe interception)
 			const scoopInstall = await this.runCommandWithBroadcast(
 				"powershell.exe",
-				["-Command", "Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression"],
+				[
+					"-ExecutionPolicy",
+					"Bypass",
+					"-Command",
+					"Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression",
+				],
 				"scoop-install",
+				false,
 			);
 			if (!scoopInstall.isOk) return { isOk: false };
 		}
