@@ -40,8 +40,8 @@
 
 	function findSkill(name: string): Skill | undefined {
 		return (
-			skillsData.builtin_skills.find((s) => s.name === name) ||
-			skillsData.user_skills.find((s) => s.name === name)
+			skillsData.user_skills.find((s) => s.name === name) ||
+			skillsData.builtin_skills.find((s) => s.name === name)
 		);
 	}
 
