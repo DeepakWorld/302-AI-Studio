@@ -421,10 +421,9 @@ export function registerIpcHandlers() {
 
 	// envService service registration
 	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
-	ipcMain.handle("envService:validPodmanPrecondition", (event) =>
-		envService.validPodmanPrecondition(event),
-	);
-	ipcMain.handle("envService:checkPodmanHealth", (event) => envService.checkPodmanHealth(event));
+	ipcMain.handle("envService:installWSL", (event) => envService.installWSL(event));
+	ipcMain.handle("envService:installScoop", (event) => envService.installScoop(event));
+	ipcMain.handle("envService:installHomebrew", (event) => envService.installHomebrew(event));
 
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
@@ -627,8 +626,9 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
 	ipcMain.removeHandler("envService:validPodman");
-	ipcMain.removeHandler("envService:validPodmanPrecondition");
-	ipcMain.removeHandler("envService:checkPodmanHealth");
+	ipcMain.removeHandler("envService:installWSL");
+	ipcMain.removeHandler("envService:installScoop");
+	ipcMain.removeHandler("envService:installHomebrew");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");

@@ -13,6 +13,7 @@ import { NotificationService, notificationService } from "./notification-service
 import { PluginService, pluginService } from "./plugin-service";
 import { providerService, ProviderService } from "./provider-service";
 import { RegistryService, registryService } from "./registry-service";
+import { SchedulerService, schedulerService } from "./scheduler-service";
 import { GeneralSettingsService, generalSettingsService } from "./settings-service";
 import { ShortcutService, shortcutService } from "./shortcut-service";
 import { SsoService, ssoService } from "./sso-service";
@@ -41,6 +42,7 @@ export {
 	PluginService,
 	ProviderService,
 	RegistryService,
+	SchedulerService,
 	ShortcutService,
 	SsoService,
 	StorageService,
@@ -69,6 +71,7 @@ export {
 	pluginService,
 	providerService,
 	registryService,
+	schedulerService,
 	shortcutService,
 	ssoService,
 	storageService,

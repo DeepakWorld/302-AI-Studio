@@ -300,3 +300,7 @@ export async function batchUploadFile(
 	}
 	return validated;
 }
+
+export async function getLocalSandboxHealthStatus() {
+	// TODO: Implement local sandbox health check
+}

@@ -6,9 +6,7 @@
 
 	async function handleInstall() {
 		const result = await window.electronAPI.envService.validPodman();
-		const preconditionResult = await window.electronAPI.envService.validPodmanPrecondition();
 		console.log("Podman check result:", result);
-		console.log("Podman precondition check result:", preconditionResult);
 	}
 </script>
 
