@@ -62,6 +62,7 @@ type AgentPreviewSyncMessage =
 			sessionId: string;
 			fileList: SandboxFileInfo[];
 			selectedFilePath?: string;
+			fileTreeCurrentDirectory?: string;
 	  }
 	| {
 			type: "fileContentUpdated";
@@ -509,6 +510,7 @@ export class AgentPreviewState {
 		sessionId: string;
 		fileList: SandboxFileInfo[];
 		selectedFilePath?: string | null;
+		fileTreeCurrentDirectory?: string;
 	}): void {
 		const message: AgentPreviewSyncMessage = {
 			type: "fileListUpdated",
@@ -516,6 +518,7 @@ export class AgentPreviewState {
 			sessionId: params.sessionId,
 			fileList: params.fileList,
 			selectedFilePath: params.selectedFilePath ?? undefined,
+			fileTreeCurrentDirectory: params.fileTreeCurrentDirectory,
 		};
 		this.syncBus.publish(message);
 	}
@@ -557,6 +560,8 @@ export class AgentPreviewState {
 					...state,
 					fileList: envelope.fileList,
 					selectedFilePath: envelope.selectedFilePath ?? state.selectedFilePath,
+					fileTreeCurrentDirectory:
+						envelope.fileTreeCurrentDirectory ?? state.fileTreeCurrentDirectory,
 				}),
 				new SvelteDate(envelope.timestamp).toISOString(),
 			);
@@ -630,6 +635,7 @@ export class AgentPreviewState {
 			sessionId,
 			fileList: storage?.fileList || [],
 			selectedFilePath: storage?.selectedFilePath,
+			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
 		});
 	}
 

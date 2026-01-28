@@ -336,13 +336,37 @@
 			if (message.type === "fileListUpdated" && fileViewer.selectedFile) {
 				const currentPath = fileViewer.selectedFile.path;
 				const fileStillExists = message.fileList.some((f) => f.path === currentPath);
+				const syncDir = message.fileTreeCurrentDirectory;
 
+				// If file exists, we don't do anything (it's safe)
+				// If file is missing (!fileStillExists), we need to decide if it's actually deleted
+				// or just not in the current view (because we navigated to a different directory)
 				if (!fileStillExists) {
-					// Clear preview state for deleted file
-					cleanupPreviewUrl();
-					fileViewer.selectedFile = null;
-					fileViewer.content = "";
-					fileViewer.previewType = "text";
+					let shouldClear = false; // Default to FALSE (safer)
+
+					if (syncDir) {
+						// We have directory context
+						const normalizeSyncDir = syncDir.endsWith("/") ? syncDir : `${syncDir}/`;
+						const normalizeFileDir = currentPath.substring(0, currentPath.lastIndexOf("/") + 1);
+						const isDirectChild = normalizeFileDir === normalizeSyncDir;
+
+						if (isDirectChild) {
+							// If it WAS a direct child (should be in this list) and is missing, it is deleted.
+							shouldClear = true;
+						}
+					} else {
+						// No context.
+						console.warn("[PreviewSync] Missing syncDir context, skipping clear check.");
+					}
+
+					if (shouldClear) {
+						console.log("[PreviewSync] Clearing preview");
+						// Clear preview state for deleted file
+						cleanupPreviewUrl();
+						fileViewer.selectedFile = null;
+						fileViewer.content = "";
+						fileViewer.previewType = "text";
+					}
 				}
 			}
 

@@ -307,6 +307,7 @@ export class FileTreeState {
 				sessionId,
 				fileList: this.files,
 				selectedFilePath: updates?.selectedFilePath ?? this.selectedFile,
+				fileTreeCurrentDirectory: this.currentDirectory,
 			});
 		}
 	}
@@ -526,18 +527,26 @@ export class FileTreeState {
 			return;
 		}
 
+		// Set current directory BEFORE loading to ensure any broadcasts include the new context
+		this.currentDirectory = folderPath;
+
 		// Load folder contents first (always force refresh to ensure sync with server)
 		// merge=false: replace existing files to ensure deleted files are removed
 		// force=true: force API call even if locally cached
-		await this.loadFiles(folderPath, false, true);
-
-		// After loading completes, set the current directory to the target folder
-		this.currentDirectory = folderPath;
+		try {
+			await this.loadFiles(folderPath, false, true);
+		} catch (error) {
+			console.error("[FileTree] Failed to load folder:", error);
+			// If load fails, we might want to revert currentDirectory or handle error
+			// The loadFiles method already has recovery logic which updates currentDirectory if needed
+		}
 
 		// Rebuild tree to show the new directory contents
 		this.rebuildTree();
 
 		// Persist currentDirectory to storage for session continuity
+		// Note: loadFiles already calls saveToStorage if successful, but we call it here again
+		// to ensure consistency even if loadFiles partial logic ran or we need to ensure local state save
 		await this.saveToStorage();
 	}
 
