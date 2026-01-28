@@ -32,7 +32,7 @@
 	import type { Skill } from "@shared/types";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
-	import { SvelteSet } from "svelte/reactivity";
+	import { SvelteSet, SvelteMap } from "svelte/reactivity";
 	import SkillCard from "../skill-card.svelte";
 
 	interface Props {
@@ -119,7 +119,7 @@
 
 	// Calculate local skill counts for each category based on searchFilteredSkills
 	const categoryLocalCounts = $derived(() => {
-		const counts = new Map<string, number>();
+		const counts = new SvelteMap<string, number>();
 		let uncategorizedCount = 0;
 
 		for (const skill of searchFilteredSkills) {
@@ -517,7 +517,8 @@
 						onclick={() => handleCategorySelect(UNCATEGORIZED_SLUG)}
 					>
 						{m.skills_category_uncategorized?.() ?? "Uncategorized"}
-						<span class="ml-1 text-xs opacity-70">({categoryLocalCounts().uncategorizedCount})</span>
+						<span class="ml-1 text-xs opacity-70">({categoryLocalCounts().uncategorizedCount})</span
+						>
 					</button>
 				</div>
 			</ScrollArea>
