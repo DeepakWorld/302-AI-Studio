@@ -117,6 +117,23 @@
 		return sortedEntries;
 	});
 
+	// Calculate local skill counts for each category based on searchFilteredSkills
+	const categoryLocalCounts = $derived(() => {
+		const counts = new Map<string, number>();
+		let uncategorizedCount = 0;
+
+		for (const skill of searchFilteredSkills) {
+			const category = skillsCategoryState.getSkillCategory(skill.name);
+			if (category?.slug) {
+				counts.set(category.slug, (counts.get(category.slug) ?? 0) + 1);
+			} else {
+				uncategorizedCount++;
+			}
+		}
+
+		return { counts, uncategorizedCount };
+	});
+
 	// Load categories and skill category info on mount
 	onMount(() => {
 		loadCategoryData();
@@ -473,6 +490,7 @@
 					</button>
 					<!-- Category buttons -->
 					{#each categories as category (category.id)}
+						{@const localCount = categoryLocalCounts().counts.get(category.slug) ?? 0}
 						<button
 							type="button"
 							class={cn(
@@ -484,9 +502,7 @@
 							onclick={() => handleCategorySelect(category.slug)}
 						>
 							{category.name}
-							{#if category.skillCount !== undefined}
-								<span class="ml-1 text-xs opacity-70">({category.skillCount})</span>
-							{/if}
+							<span class="ml-1 text-xs opacity-70">({localCount})</span>
 						</button>
 					{/each}
 					<!-- Uncategorized button -->
@@ -501,6 +517,7 @@
 						onclick={() => handleCategorySelect(UNCATEGORIZED_SLUG)}
 					>
 						{m.skills_category_uncategorized?.() ?? "Uncategorized"}
+						<span class="ml-1 text-xs opacity-70">({categoryLocalCounts().uncategorizedCount})</span>
 					</button>
 				</div>
 			</ScrollArea>
