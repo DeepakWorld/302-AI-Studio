@@ -1282,5 +1282,7 @@
 	"local_platform_existing_work_directory": "Existing Work Directory",
 	"local_platform_session": "Session: {session}",
 	"local_platform_new_session_placeholder": "New session",
-	"local_platform_new_work_directory_placeholder": "New work directory"
+	"local_platform_new_work_directory_placeholder": "New work directory",
+	"local_platform_reinstall": "Reinstall",
+	"local_platform_checking": "Checking"
 }

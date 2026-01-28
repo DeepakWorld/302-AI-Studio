@@ -421,6 +421,9 @@ export function registerIpcHandlers() {
 
 	// envService service registration
 	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
+	ipcMain.handle("envService:startPodmanHealthCheck", (event) =>
+		envService.startPodmanHealthCheck(event),
+	);
 	ipcMain.handle("envService:installWSL", (event) => envService.installWSL(event));
 	ipcMain.handle("envService:installScoop", (event) => envService.installScoop(event));
 	ipcMain.handle("envService:installHomebrew", (event) => envService.installHomebrew(event));
@@ -627,6 +630,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
 	ipcMain.removeHandler("envService:validPodman");
+	ipcMain.removeHandler("envService:startPodmanHealthCheck");
 	ipcMain.removeHandler("envService:installWSL");
 	ipcMain.removeHandler("envService:installScoop");
 	ipcMain.removeHandler("envService:installHomebrew");

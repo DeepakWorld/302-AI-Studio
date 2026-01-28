@@ -87,6 +87,16 @@ declare global {
 			skill: {
 				onSkillImportRequested: (callback: (data: { url: string }) => void) => () => void;
 			};
+			onInstallLog: (
+				callback: (data: {
+					step: string;
+					type: "start" | "stdout" | "stderr" | "complete" | "error";
+					data: string;
+				}) => void,
+			) => () => void;
+			onPodmanHealthCheck: (
+				callback: (data: { isOk: boolean; isHealth: boolean; timestamp: number }) => void,
+			) => () => void;
 		};
 		windowId: string;
 		tab: Tab;

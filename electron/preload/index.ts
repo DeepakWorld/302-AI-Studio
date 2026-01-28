@@ -252,6 +252,34 @@ if (process.contextIsolated) {
 					return () => ipcRenderer.removeListener("skill:import-requested", listener);
 				},
 			},
+			onInstallLog: (
+				callback: (data: {
+					step: string;
+					type: "start" | "stdout" | "stderr" | "complete" | "error";
+					data: string;
+				}) => void,
+			) => {
+				const listener = (
+					_: unknown,
+					data: {
+						step: string;
+						type: "start" | "stdout" | "stderr" | "complete" | "error";
+						data: string;
+					},
+				) => callback(data);
+				ipcRenderer.on("install-log", listener);
+				return () => ipcRenderer.removeListener("install-log", listener);
+			},
+			onPodmanHealthCheck: (
+				callback: (data: { isOk: boolean; isHealth: boolean; timestamp: number }) => void,
+			) => {
+				const listener = (
+					_: unknown,
+					data: { isOk: boolean; isHealth: boolean; timestamp: number },
+				) => callback(data);
+				ipcRenderer.on("podman-health-check", listener);
+				return () => ipcRenderer.removeListener("podman-health-check", listener);
+			},
 		});
 
 		// Expose shell window ID from process arguments

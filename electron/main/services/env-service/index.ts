@@ -153,8 +153,10 @@ export class EnvService {
 	/**
 	 * Starts the periodic Podman health check (every 30 seconds)
 	 * Results are broadcast to all renderer processes via "podman-health" channel
+	 * @param _event The IPC main invoke event
+	 * @returns { isOk: boolean } - isOk: operation success
 	 */
-	async startPodmanHealthCheck(): Promise<{ isOk: boolean }> {
+	async startPodmanHealthCheck(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
 		const taskName = "podman-health-check";
 		const podmanHealthCheckJob = async () => {
 			const result = await this.checkPodmanHealth();
@@ -348,7 +350,7 @@ export class EnvService {
 
 		// Start health check after successful installation
 		if (result.isOk) {
-			await this.startPodmanHealthCheck();
+			await this.startPodmanHealthCheck(_event);
 		}
 
 		return result;
@@ -400,7 +402,7 @@ export class EnvService {
 		// 4. Initialize Podman Machine
 		const machineInit = await this.runCommandWithBroadcast(
 			"podman",
-			["machine", "init", "--provider", "wsl"],
+			["machine", "init", "ai302-machine"],
 			"init-podman",
 		);
 		return machineInit;
@@ -438,7 +440,7 @@ export class EnvService {
 		// 3. Initialize Podman Machine
 		const machineInit = await this.runCommandWithBroadcast(
 			"podman",
-			["machine", "init"],
+			["machine", "init", "ai302-machine"],
 			"init-podman",
 		);
 		return machineInit;
