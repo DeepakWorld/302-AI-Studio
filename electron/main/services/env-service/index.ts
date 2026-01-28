@@ -458,6 +458,67 @@ export class EnvService {
 		);
 		return podmanInstall;
 	}
+
+	/**
+	 * Private method to stop the local sandbox Podman machine
+	 * Executes `podman machine stop ai302-machine`
+	 * - Machine not existing or already stopped counts as success
+	 * - Command not found or other errors count as failure
+	 * On success, broadcasts non-healthy status via "podman-health" channel
+	 */
+	private async _stopLocalSandbox(): Promise<{ isOk: boolean }> {
+		try {
+			await execAsync("podman machine stop ai302-machine");
+
+			// Broadcast non-healthy status after successful stop
+			broadcastService.broadcastChannelToAll("podman-health", {
+				isOk: true,
+				isHealth: false,
+				timestamp: Date.now(),
+			});
+
+			return { isOk: true };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message.toLowerCase() : "";
+
+			// Command not found - Podman is not installed
+			if (isCommandNotFound(error)) {
+				return { isOk: false };
+			}
+
+			// Machine does not exist - counts as success (nothing to stop)
+			if (errorMessage.includes("does not exist")) {
+				return { isOk: true };
+			}
+
+			// Machine already stopped - counts as success
+			if (errorMessage.includes("is not running")) {
+				return { isOk: true };
+			}
+
+			// Other errors - counts as failure
+			return { isOk: false };
+		}
+	}
+
+	/**
+	 * IPC method to stop the local sandbox
+	 * Called from renderer process
+	 * @param _event The IPC main invoke event
+	 * @returns { isOk: boolean } - isOk: operation success
+	 */
+	async stopLocalSandboxByIpc(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
+		return this._stopLocalSandbox();
+	}
+
+	/**
+	 * Public method to stop the local sandbox
+	 * Used by client (main process) before closing
+	 * @returns { isOk: boolean } - isOk: operation success
+	 */
+	async stopLocalSandbox(): Promise<{ isOk: boolean }> {
+		return this._stopLocalSandbox();
+	}
 }
 
 export const envService = new EnvService();

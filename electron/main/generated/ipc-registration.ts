@@ -428,6 +428,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("envService:installScoop", (event) => envService.installScoop(event));
 	ipcMain.handle("envService:installHomebrew", (event) => envService.installHomebrew(event));
 	ipcMain.handle("envService:installPodman", (event) => envService.installPodman(event));
+	ipcMain.handle("envService:stopLocalSandboxByIpc", (event) =>
+		envService.stopLocalSandboxByIpc(event),
+	);
 
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
@@ -635,6 +638,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("envService:installScoop");
 	ipcMain.removeHandler("envService:installHomebrew");
 	ipcMain.removeHandler("envService:installPodman");
+	ipcMain.removeHandler("envService:stopLocalSandboxByIpc");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
