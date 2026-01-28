@@ -4,7 +4,6 @@
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
-	import { onMount, onDestroy } from "svelte";
 	import AgentWorkspaceConfig from "../../../../(settings-page)/settings/(center)/agent-settings/components/agent-workspace-config.svelte";
 	import PodmanCard from "../../../../(settings-page)/settings/(center)/agent-settings/components/podman-card.svelte";
 	import SandboxCard from "../../../../(settings-page)/settings/(center)/agent-settings/components/sandbox-card.svelte";
@@ -12,22 +11,6 @@
 	let { onClose }: { onClose?: () => void } = $props();
 
 	let isLoading = $state(false);
-
-	onMount(async () => {
-		// Start listening to broadcast channels
-		localEnvState.startListening();
-
-		// Refresh Podman installation status
-		await localEnvState.refreshPodmanStatus();
-
-		// Start health check if Podman is installed
-		await localEnvState.ensurePodmanHealthCheckStarted();
-	});
-
-	onDestroy(() => {
-		// Stop listening to broadcast channels to avoid memory leaks
-		localEnvState.stopListening();
-	});
 
 	async function handleConfirm() {
 		isLoading = true;

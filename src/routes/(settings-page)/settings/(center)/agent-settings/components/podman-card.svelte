@@ -4,6 +4,7 @@
 	import { m } from "$lib/paraglide/messages";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { Loader2 } from "@lucide/svelte";
+	import { onMount, onDestroy } from "svelte";
 	import LogDialog from "./log-dialog.svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
 	import StatusIndicator from "./status-indicator.svelte";
@@ -21,7 +22,6 @@
 
 	// Derived state from localEnvState
 	let podmanInstalled = $derived(localEnvState.podmanInstalled);
-	let podmanHealth = $derived(localEnvState.podmanHealth);
 	let isPodmanInstalling = $derived(localEnvState.installing);
 	let installFailed = $derived(localEnvState.installFailed);
 	let installLogs = $derived(localEnvState.installLogs);
@@ -40,21 +40,6 @@
 			return `${prefix} [${log.step}] ${log.data}`;
 		}),
 	);
-
-	// Determine health status indicator
-	let healthStatus = $derived.by((): "red" | "gray" | "green" => {
-		if (!podmanInstalled) return "gray";
-		if (podmanHealth === "healthy") return "green";
-		if (podmanHealth === "unhealthy") return "red";
-		return "gray"; // unknown
-	});
-
-	let healthText = $derived.by(() => {
-		if (!podmanInstalled) return m.local_platform_unhealthy();
-		if (podmanHealth === "healthy") return m.local_platform_healthy();
-		if (podmanHealth === "unhealthy") return m.local_platform_unhealthy();
-		return m.local_platform_checking();
-	});
 
 	// Primary button label logic
 	let primaryButtonLabel = $derived.by(() => {
@@ -78,6 +63,22 @@
 	function handleOpenLogs() {
 		isPodmanLogOpen = true;
 	}
+
+	onMount(async () => {
+		// Start listening to broadcast channels for install logs and health checks
+		localEnvState.startListening();
+
+		// Refresh Podman installation status on mount
+		await localEnvState.refreshPodmanStatus();
+
+		// Start health check if Podman is installed
+		await localEnvState.ensurePodmanHealthCheckStarted();
+	});
+
+	onDestroy(() => {
+		// Stop listening to broadcast channels to avoid memory leaks
+		localEnvState.stopListening();
+	});
 </script>
 
 <PlatformServiceCard title={m.local_platform_podman()} bind:isOpen>
@@ -91,18 +92,6 @@
 				<StatusIndicator
 					status={podmanInstalled ? "green" : "gray"}
 					text={podmanInstalled ? m.local_platform_installed() : m.local_platform_not_installed()}
-				/>
-			</div>
-			<!-- Health Status -->
-			<div class="flex items-center gap-3">
-				<Label class="text-muted-foreground min-w-16 font-normal"
-					>{m.local_platform_health_status()}</Label
-				>
-				<StatusIndicator
-					status={healthStatus}
-					text={healthText}
-					showWarning={podmanInstalled && podmanHealth === "unhealthy"}
-					warningTooltip={m.local_platform_try_restart()}
 				/>
 			</div>
 		</div>
