@@ -104,19 +104,18 @@ export class EnvService {
 	}
 
 	/**
-	 * Checks if podman is healthy (can run podman ps)
-	 * @returns { isOk: boolean; isHealth: boolean; timestamp?: number } - isOk: operation success, isHealth: podman health check result, timestamp when called via startPodmanHealthCheck
+	 * Checks if podman is healthy (ai302-machine exists)
+	 * @returns { isOk: boolean; isHealth: boolean; timestamp?: number } - isOk: operation success, isHealth: podman health check result (ai302-machine exists), timestamp when called via startPodmanHealthCheck
 	 */
 	private async checkPodmanHealth(): Promise<{
 		isOk: boolean;
 		isHealth: boolean;
 	}> {
-		try {
-			await execAsync("podman ps");
-			return { isOk: true, isHealth: true };
-		} catch (error) {
-			return { isOk: !isCommandNotFound(error), isHealth: false };
-		}
+		const machineCheck = await this.checkPodmanMachineExists();
+		return {
+			isOk: machineCheck.isOk,
+			isHealth: machineCheck.exists,
+		};
 	}
 
 	private async checkLocalSandboxHealth(): Promise<{
@@ -132,15 +131,44 @@ export class EnvService {
 	}
 
 	/**
-	 * Validates if podman is installed and accessible
+	 * Checks if the ai302-machine exists in podman machine list
+	 * @returns { isOk: boolean; exists: boolean } - isOk: operation success, exists: whether machine exists
+	 */
+	private async checkPodmanMachineExists(): Promise<{ isOk: boolean; exists: boolean }> {
+		try {
+			const { stdout } = await execAsync("podman machine list --format json");
+			const machines = JSON.parse(stdout) as Array<{ Name: string }>;
+			const exists = machines.some((machine) => machine.Name === "ai302-machine");
+			return { isOk: true, exists };
+		} catch (error) {
+			if (isCommandNotFound(error)) {
+				return { isOk: true, exists: false };
+			}
+			return { isOk: false, exists: false };
+		}
+	}
+
+	/**
+	 * Validates if podman is installed and accessible, and ai302-machine exists
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean; isValid: boolean } - isOk: operation success, isValid: podman installation check result
+	 * @returns { isOk: boolean; isValid: boolean } - isOk: operation success, isValid: podman installed AND machine exists
 	 */
 	async validPodman(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean; isValid: boolean }> {
 		try {
 			const { stdout } = await execAsync("podman --version");
-			const isValid = stdout.toLowerCase().includes("podman version");
-			return { isOk: true, isValid };
+			const podmanInstalled = stdout.toLowerCase().includes("podman version");
+
+			if (!podmanInstalled) {
+				return { isOk: true, isValid: false };
+			}
+
+			// Podman is installed, check if ai302-machine exists
+			const machineCheck = await this.checkPodmanMachineExists();
+			if (!machineCheck.isOk) {
+				return { isOk: false, isValid: false };
+			}
+
+			return { isOk: true, isValid: machineCheck.exists };
 		} catch (error) {
 			if (isCommandNotFound(error)) {
 				return { isOk: true, isValid: false };
@@ -323,12 +351,45 @@ export class EnvService {
 	}
 
 	/**
+	 * Initializes the ai302-machine if it doesn't already exist
+	 * Checks for existing machine before attempting init
+	 * @returns { isOk: boolean } - isOk: operation success
+	 */
+	private async _initPodmanMachine(): Promise<{ isOk: boolean }> {
+		// Check if machine already exists
+		const machineCheck = await this.checkPodmanMachineExists();
+		if (!machineCheck.isOk) {
+			return { isOk: false };
+		}
+
+		// Machine already exists, skip init
+		if (machineCheck.exists) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: "Machine 'ai302-machine' already exists, skipping initialization",
+			});
+			return { isOk: true };
+		}
+
+		// Initialize Podman Machine
+		const machineInit = await this.runCommandWithBroadcast(
+			"podman",
+			["machine", "init", "ai302-machine"],
+			"init-podman",
+		);
+		return machineInit;
+	}
+
+	/**
 	 * Installs Podman with platform-specific logic
 	 *
 	 * Platform flows:
-	 * - Windows: Check/install WSL → Check/install Scoop → Install Podman → Init machine with WSL provider
-	 * - macOS: Check/install Homebrew → Install Podman → Init machine
-	 * - Linux: Install Podman via apt-get
+	 * - Windows: Check/install WSL → Check/install Scoop → Install Podman (if needed) → Init machine with WSL provider
+	 * - macOS: Check/install Homebrew → Install Podman (if needed) → Init machine
+	 * - Linux: Install Podman via apt-get (if needed)
+	 *
+	 * If Podman is already installed but ai302-machine doesn't exist, only machine init will be performed.
 	 *
 	 * Broadcasts log events via "install-log" channel with step identifiers:
 	 * - install-wsl, scoop-policy, scoop-install, install-homebrew, install-podman, init-podman
@@ -360,10 +421,24 @@ export class EnvService {
 	 * Windows installation flow:
 	 * 1. Check/install WSL
 	 * 2. Check/install Scoop
-	 * 3. Install Podman via Scoop
-	 * 4. Initialize Podman machine with WSL provider
+	 * 3. Install Podman (if not already installed)
+	 * 4. Initialize Podman Machine with WSL provider (if not already exists)
 	 */
 	private async _installPodmanWindows(): Promise<{ isOk: boolean }> {
+		// Check if Podman is already installed and machine exists
+		const podmanCheck = await this.checkCommand("podman --version");
+		const machineCheck = await this.checkPodmanMachineExists();
+
+		if (podmanCheck.isValid && machineCheck.exists) {
+			// Both podman and machine exist, nothing to do
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: "Podman and ai302-machine already exist, skipping installation",
+			});
+			return { isOk: true };
+		}
+
 		// 1. Check and install WSL
 		const wslCheck = await this.checkWSL();
 		if (!wslCheck.isValid) {
@@ -391,30 +466,47 @@ export class EnvService {
 			if (!scoopInstall.isOk) return { isOk: false };
 		}
 
-		// 3. Install Podman
-		const podmanInstall = await this.runCommandWithBroadcast(
-			"scoop",
-			["install", "podman"],
-			"install-podman",
-		);
-		if (!podmanInstall.isOk) return { isOk: false };
+		// 3. Install Podman (only if not already installed)
+		if (!podmanCheck.isValid) {
+			const podmanInstall = await this.runCommandWithBroadcast(
+				"scoop",
+				["install", "podman"],
+				"install-podman",
+			);
+			if (!podmanInstall.isOk) return { isOk: false };
+		} else {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman",
+				type: "stdout",
+				data: "Podman already installed, skipping installation",
+			});
+		}
 
-		// 4. Initialize Podman Machine
-		const machineInit = await this.runCommandWithBroadcast(
-			"podman",
-			["machine", "init", "ai302-machine"],
-			"init-podman",
-		);
-		return machineInit;
+		// 4. Initialize Podman Machine (only if not already exists)
+		return this._initPodmanMachine();
 	}
 
 	/**
 	 * macOS installation flow:
 	 * 1. Check/install Homebrew
-	 * 2. Install Podman via Homebrew
-	 * 3. Initialize Podman machine
+	 * 2. Install Podman via Homebrew (if not already installed)
+	 * 3. Initialize Podman machine (if not already exists)
 	 */
 	private async _installPodmanMacOS(): Promise<{ isOk: boolean }> {
+		// Check if Podman is already installed and machine exists
+		const podmanCheck = await this.checkCommand("podman --version");
+		const machineCheck = await this.checkPodmanMachineExists();
+
+		if (podmanCheck.isValid && machineCheck.exists) {
+			// Both podman and machine exist, nothing to do
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: "Podman and ai302-machine already exist, skipping installation",
+			});
+			return { isOk: true };
+		}
+
 		// 1. Check and install Homebrew
 		const brewCheck = await this.checkHomebrew();
 		if (!brewCheck.isValid) {
@@ -429,28 +521,43 @@ export class EnvService {
 			if (!brewInstall.isOk) return { isOk: false };
 		}
 
-		// 2. Install Podman
-		const podmanInstall = await this.runCommandWithBroadcast(
-			"brew",
-			["install", "podman"],
-			"install-podman",
-		);
-		if (!podmanInstall.isOk) return { isOk: false };
+		// 2. Install Podman (only if not already installed)
+		if (!podmanCheck.isValid) {
+			const podmanInstall = await this.runCommandWithBroadcast(
+				"brew",
+				["install", "podman"],
+				"install-podman",
+			);
+			if (!podmanInstall.isOk) return { isOk: false };
+		} else {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman",
+				type: "stdout",
+				data: "Podman already installed, skipping installation",
+			});
+		}
 
-		// 3. Initialize Podman Machine
-		const machineInit = await this.runCommandWithBroadcast(
-			"podman",
-			["machine", "init", "ai302-machine"],
-			"init-podman",
-		);
-		return machineInit;
+		// 3. Initialize Podman Machine (only if not already exists)
+		return this._initPodmanMachine();
 	}
 
 	/**
 	 * Linux installation flow (Ubuntu/Debian):
-	 * 1. Install Podman via apt-get
+	 * 1. Install Podman via apt-get (if not already installed)
 	 */
 	private async _installPodmanLinux(): Promise<{ isOk: boolean }> {
+		// Check if Podman is already installed
+		const podmanCheck = await this.checkCommand("podman --version");
+
+		if (podmanCheck.isValid) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman",
+				type: "stdout",
+				data: "Podman already installed, skipping installation",
+			});
+			return { isOk: true };
+		}
+
 		const podmanInstall = await this.runCommandWithBroadcast(
 			"sudo",
 			["apt-get", "-y", "install", "podman"],
