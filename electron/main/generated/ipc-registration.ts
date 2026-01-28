@@ -424,6 +424,7 @@ export function registerIpcHandlers() {
 	ipcMain.handle("envService:installWSL", (event) => envService.installWSL(event));
 	ipcMain.handle("envService:installScoop", (event) => envService.installScoop(event));
 	ipcMain.handle("envService:installHomebrew", (event) => envService.installHomebrew(event));
+	ipcMain.handle("envService:installPodman", (event) => envService.installPodman(event));
 
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
@@ -629,6 +630,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("envService:installWSL");
 	ipcMain.removeHandler("envService:installScoop");
 	ipcMain.removeHandler("envService:installHomebrew");
+	ipcMain.removeHandler("envService:installPodman");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");

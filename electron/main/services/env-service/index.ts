@@ -3,6 +3,7 @@ import { broadcastService } from "@electron/main/services/broadcast-service";
 import { isCommandNotFound } from "@electron/main/utils/cmd";
 import { exec, spawn } from "child_process";
 import type { IpcMainInvokeEvent } from "electron";
+import { match } from "ts-pattern";
 import { promisify } from "util";
 import { CRON_EXPRESSION, schedulerService } from "../scheduler-service";
 
@@ -317,6 +318,143 @@ export class EnvService {
 			"homebrew",
 		);
 		return result;
+	}
+
+	/**
+	 * Installs Podman with platform-specific logic
+	 *
+	 * Platform flows:
+	 * - Windows: Check/install WSL → Check/install Scoop → Install Podman → Init machine with WSL provider
+	 * - macOS: Check/install Homebrew → Install Podman → Init machine
+	 * - Linux: Install Podman via apt-get
+	 *
+	 * Broadcasts log events via "install-log" channel with step identifiers:
+	 * - install-wsl, scoop-policy, scoop-install, install-homebrew, install-podman, init-podman
+	 *
+	 * @param _event The IPC main invoke event
+	 * @returns { isOk: boolean } - isOk: operation success
+	 */
+	async installPodman(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
+		const platform = process.platform;
+
+		const result = await match(platform)
+			.with("win32", () => this._installPodmanWindows())
+			.with("darwin", () => this._installPodmanMacOS())
+			.with("linux", () => this._installPodmanLinux())
+			.otherwise(() => {
+				console.error(`[EnvService] Unsupported platform: ${platform}`);
+				return { isOk: false };
+			});
+
+		// Start health check after successful installation
+		if (result.isOk) {
+			await this.startPodmanHealthCheck();
+		}
+
+		return result;
+	}
+
+	/**
+	 * Windows installation flow:
+	 * 1. Check/install WSL
+	 * 2. Check/install Scoop
+	 * 3. Install Podman via Scoop
+	 * 4. Initialize Podman machine with WSL provider
+	 */
+	private async _installPodmanWindows(): Promise<{ isOk: boolean }> {
+		// 1. Check and install WSL
+		const wslCheck = await this.checkWSL();
+		if (!wslCheck.isValid) {
+			const wslInstall = await this.runCommandWithBroadcast("wsl", ["--install"], "install-wsl");
+			if (!wslInstall.isOk) return { isOk: false };
+		}
+
+		// 2. Check and install Scoop
+		const scoopCheck = await this.checkScoop();
+		if (!scoopCheck.isValid) {
+			// Set execution policy
+			const policyResult = await this.runCommandWithBroadcast(
+				"powershell.exe",
+				["-Command", "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force"],
+				"scoop-policy",
+			);
+			if (!policyResult.isOk) return { isOk: false };
+
+			// Install Scoop
+			const scoopInstall = await this.runCommandWithBroadcast(
+				"powershell.exe",
+				["-Command", "Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression"],
+				"scoop-install",
+			);
+			if (!scoopInstall.isOk) return { isOk: false };
+		}
+
+		// 3. Install Podman
+		const podmanInstall = await this.runCommandWithBroadcast(
+			"scoop",
+			["install", "podman"],
+			"install-podman",
+		);
+		if (!podmanInstall.isOk) return { isOk: false };
+
+		// 4. Initialize Podman Machine
+		const machineInit = await this.runCommandWithBroadcast(
+			"podman",
+			["machine", "init", "--provider", "wsl"],
+			"init-podman",
+		);
+		return machineInit;
+	}
+
+	/**
+	 * macOS installation flow:
+	 * 1. Check/install Homebrew
+	 * 2. Install Podman via Homebrew
+	 * 3. Initialize Podman machine
+	 */
+	private async _installPodmanMacOS(): Promise<{ isOk: boolean }> {
+		// 1. Check and install Homebrew
+		const brewCheck = await this.checkHomebrew();
+		if (!brewCheck.isValid) {
+			const brewInstall = await this.runCommandWithBroadcast(
+				"/bin/bash",
+				[
+					"-c",
+					'sudo -v && NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+				],
+				"install-homebrew",
+			);
+			if (!brewInstall.isOk) return { isOk: false };
+		}
+
+		// 2. Install Podman
+		const podmanInstall = await this.runCommandWithBroadcast(
+			"brew",
+			["install", "podman"],
+			"install-podman",
+		);
+		if (!podmanInstall.isOk) return { isOk: false };
+
+		// 3. Initialize Podman Machine
+		const machineInit = await this.runCommandWithBroadcast(
+			"podman",
+			["machine", "init"],
+			"init-podman",
+		);
+		return machineInit;
+	}
+
+	/**
+	 * Linux installation flow (Ubuntu/Debian):
+	 * 1. Install Podman via apt-get
+	 */
+	private async _installPodmanLinux(): Promise<{ isOk: boolean }> {
+		const podmanInstall = await this.runCommandWithBroadcast(
+			"sudo",
+			["apt-get", "-y", "install", "podman"],
+			"install-podman",
+		);
+		return podmanInstall;
 	}
 }
 
