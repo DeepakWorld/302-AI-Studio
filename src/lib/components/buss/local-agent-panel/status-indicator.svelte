@@ -1,15 +1,17 @@
-<script lang="ts">
-	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
-	import { cn } from "$lib/utils";
-	import { AlertTriangle } from "@lucide/svelte";
-
-	interface Props {
+<script lang="ts" module>
+	export interface Props {
 		status: "gray" | "green" | "red";
 		text: string;
 		showWarning?: boolean;
 		warningTooltip?: string;
 		className?: string; // Allow custom class
 	}
+</script>
+
+<script lang="ts">
+	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+	import { cn } from "$lib/utils";
+	import { TriangleAlert } from "@lucide/svelte";
 
 	let { status, text, showWarning = false, warningTooltip, className }: Props = $props();
 
@@ -36,7 +38,7 @@
 	{#if showWarning}
 		<Tooltip.Root>
 			<Tooltip.Trigger>
-				<AlertTriangle class="size-4 text-yellow-500" />
+				<TriangleAlert class="size-4 text-yellow-500" />
 			</Tooltip.Trigger>
 			{#if warningTooltip}
 				<Tooltip.Content>

@@ -1,36 +1,19 @@
+<script lang="ts" module>
+	export interface Props {
+		onClose?: () => void;
+	}
+</script>
+
 <script lang="ts">
+	import AgentWorkspaceConfig from "$lib/components/buss/local-agent-panel/agent-workspace-config.svelte";
+	import PodmanCard from "$lib/components/buss/local-agent-panel/podman-card.svelte";
+	import SandboxCard from "$lib/components/buss/local-agent-panel/sandbox-card.svelte";
 	import { Button } from "$lib/components/ui/button";
-	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
-	import AgentWorkspaceConfig from "../../../../(settings-page)/settings/(center)/agent-settings/components/agent-workspace-config.svelte";
-	import PodmanCard from "../../../../(settings-page)/settings/(center)/agent-settings/components/podman-card.svelte";
-	import SandboxCard from "../../../../(settings-page)/settings/(center)/agent-settings/components/sandbox-card.svelte";
 
-	let { onClose }: { onClose?: () => void } = $props();
-
-	let isLoading = $state(false);
-
-	async function handleConfirm() {
-		isLoading = true;
-		try {
-			// TODO: Add business logic here (install podman, start sandbox, etc.)
-			// Mock delay for now
-			await new Promise((resolve) => setTimeout(resolve, 500));
-			closePanel();
-		} finally {
-			isLoading = false;
-		}
-	}
-
-	function handleCancel() {
-		closePanel();
-	}
-
-	function closePanel() {
-		onClose?.();
-	}
+	let { onClose }: Props = $props();
 
 	async function handleInstall() {
 		await localEnvState.installPodman();
@@ -56,15 +39,11 @@
 
 	<!-- Footer with Cancel/Confirm buttons -->
 	<div class="flex flex-row justify-between">
-		<Button variant="secondary" onclick={handleCancel} disabled={isLoading}>
+		<Button variant="secondary" onclick={onClose}>
 			{m.common_cancel()}
 		</Button>
-		<Button onclick={handleConfirm} disabled={isLoading}>
-			{#if isLoading}
-				<LdrsLoader type="line-spinner" size={16} />
-			{:else}
-				{m.label_button_confirm()}
-			{/if}
+		<Button onclick={onClose}>
+			{m.label_button_confirm()}
 		</Button>
 	</div>
 </div>

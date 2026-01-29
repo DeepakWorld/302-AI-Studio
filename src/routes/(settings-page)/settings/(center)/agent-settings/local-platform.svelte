@@ -1,8 +1,13 @@
 <script lang="ts">
+	import PodmanCard from "$lib/components/buss/local-agent-panel/podman-card.svelte";
+	import SandboxCard from "$lib/components/buss/local-agent-panel/sandbox-card.svelte";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
-	import PodmanCard from "./components/podman-card.svelte";
-	import SandboxCard from "./components/sandbox-card.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
+
+	async function handleInstall() {
+		await localEnvState.installPodman();
+	}
 </script>
 
 <div class="gap-settings-gap flex flex-col">
@@ -12,7 +17,7 @@
 
 		<!-- Environment Cards Container -->
 		<div class="rounded-lg border p-4 space-y-4">
-			<PodmanCard />
+			<PodmanCard isOpen={false} onInstall={handleInstall} />
 			<SandboxCard />
 		</div>
 	</section>

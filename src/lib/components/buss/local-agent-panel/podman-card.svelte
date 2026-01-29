@@ -1,21 +1,22 @@
+<script lang="ts" module>
+	export interface Props {
+		isOpen: boolean;
+		onInstall: () => Promise<void> | void;
+	}
+</script>
+
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
-	import { Loader2 } from "@lucide/svelte";
-	import { onMount, onDestroy } from "svelte";
+	import { LoaderCircle } from "@lucide/svelte";
+	import { onDestroy, onMount } from "svelte";
 	import LogDialog from "./log-dialog.svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
 	import StatusIndicator from "./status-indicator.svelte";
 
-	let {
-		isOpen = $bindable(true),
-		onInstall,
-	}: {
-		isOpen?: boolean;
-		onInstall?: () => Promise<void> | void;
-	} = $props();
+	let { isOpen = $bindable(true), onInstall }: Props = $props();
 
 	// Local UI state for log dialog
 	let isPodmanLogOpen = $state(false);
@@ -54,10 +55,7 @@
 	);
 
 	async function handleInstallPodman() {
-		// Call parent's install handler if provided
-		if (onInstall) {
-			await onInstall();
-		}
+		await onInstall();
 	}
 
 	function handleOpenLogs() {
@@ -109,7 +107,7 @@
 					class="min-w-[80px]"
 				>
 					{#if isPodmanInstalling}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
 					{primaryButtonLabel}
 				</Button>

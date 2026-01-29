@@ -38,23 +38,28 @@ export class EnvService {
 				data: `Starting: ${step}`,
 			});
 
-			const proc = spawn(command, args, { shell: useShell });
-
-			proc.stdout.on("data", (data) => {
-				broadcastService.broadcastChannelToAll("install-log", {
-					step,
-					type: "stdout",
-					data: data.toString(),
-				});
+			const proc = spawn(command, args, {
+				shell: useShell,
+				windowsHide: true,
 			});
 
-			proc.stderr.on("data", (data) => {
-				broadcastService.broadcastChannelToAll("install-log", {
-					step,
-					type: "stderr",
-					data: data.toString(),
-				});
-			});
+			// Helper to process output data (handles \r progress bars)
+			const processOutput = (data: Buffer, type: "stdout" | "stderr") => {
+				const text = data.toString();
+				// Replace \r with \n to ensure progress bars are shown as separate lines
+				// Some tools use \r to overwrite the same line for progress animation
+				const normalized = text.replace(/\r/g, "\n").replace(/\n+/g, "\n");
+				if (normalized.trim()) {
+					broadcastService.broadcastChannelToAll("install-log", {
+						step,
+						type,
+						data: normalized,
+					});
+				}
+			};
+
+			proc.stdout.on("data", (data) => processOutput(data, "stdout"));
+			proc.stderr.on("data", (data) => processOutput(data, "stderr"));
 
 			proc.on("close", (code) => {
 				broadcastService.broadcastChannelToAll("install-log", {
@@ -203,7 +208,7 @@ export class EnvService {
 
 			const success = schedulerService.addTask(
 				taskName,
-				CRON_EXPRESSION.EVERY_30_SECONDS,
+				CRON_EXPRESSION.EVERY_10_SECONDS,
 				podmanHealthCheckJob,
 			);
 
