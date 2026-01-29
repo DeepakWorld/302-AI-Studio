@@ -483,7 +483,7 @@ export function prependPromptToFirstUserMessage(messages: any[], prompt: string)
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function appendPromptToLastUserMessage(messages: any[], prompt: string): void {
-	const EXCLUDE_PREFIX = ["/commands", "/deploy", "/model", "/max_thinking_token"];
+	const EXCLUDE_PREFIX = ["/commands", "/deploy", "/model", "/max_thinking_token", "/plugin"];
 
 	// Find the last user message and append the prompt
 	for (let i = messages.length - 1; i >= 0; i--) {

@@ -32,7 +32,7 @@
 	import type { Skill } from "@shared/types";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
-	import { SvelteSet } from "svelte/reactivity";
+	import { SvelteSet, SvelteMap } from "svelte/reactivity";
 	import SkillCard from "../skill-card.svelte";
 
 	interface Props {
@@ -115,6 +115,23 @@
 			return (a.category?.name ?? "").localeCompare(b.category?.name ?? "");
 		});
 		return sortedEntries;
+	});
+
+	// Calculate local skill counts for each category based on searchFilteredSkills
+	const categoryLocalCounts = $derived(() => {
+		const counts = new SvelteMap<string, number>();
+		let uncategorizedCount = 0;
+
+		for (const skill of searchFilteredSkills) {
+			const category = skillsCategoryState.getSkillCategory(skill.name);
+			if (category?.slug) {
+				counts.set(category.slug, (counts.get(category.slug) ?? 0) + 1);
+			} else {
+				uncategorizedCount++;
+			}
+		}
+
+		return { counts, uncategorizedCount };
 	});
 
 	// Load categories and skill category info on mount
@@ -473,6 +490,7 @@
 					</button>
 					<!-- Category buttons -->
 					{#each categories as category (category.id)}
+						{@const localCount = categoryLocalCounts().counts.get(category.slug) ?? 0}
 						<button
 							type="button"
 							class={cn(
@@ -484,9 +502,7 @@
 							onclick={() => handleCategorySelect(category.slug)}
 						>
 							{category.name}
-							{#if category.skillCount !== undefined}
-								<span class="ml-1 text-xs opacity-70">({category.skillCount})</span>
-							{/if}
+							<span class="ml-1 text-xs opacity-70">({localCount})</span>
 						</button>
 					{/each}
 					<!-- Uncategorized button -->
@@ -501,6 +517,8 @@
 						onclick={() => handleCategorySelect(UNCATEGORIZED_SLUG)}
 					>
 						{m.skills_category_uncategorized?.() ?? "Uncategorized"}
+						<span class="ml-1 text-xs opacity-70">({categoryLocalCounts().uncategorizedCount})</span
+						>
 					</button>
 				</div>
 			</ScrollArea>

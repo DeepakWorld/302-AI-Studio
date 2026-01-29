@@ -307,6 +307,7 @@ export class FileTreeState {
 				sessionId,
 				fileList: this.files,
 				selectedFilePath: updates?.selectedFilePath ?? this.selectedFile,
+				fileTreeCurrentDirectory: this.currentDirectory,
 			});
 		}
 	}
@@ -462,6 +463,43 @@ export class FileTreeState {
 				this.treeNodes = [];
 				this.treeNodesCache = null;
 			}
+
+			// Recovery: if current directory was deleted, navigate to parent or root
+			// Detect directory deletion by checking error message patterns
+			const errorMsg = this.error || "";
+			const isDirectoryNotFound =
+				errorMsg.includes("path not found") ||
+				errorMsg.includes("no such file or directory") ||
+				errorMsg.includes("does not exist") ||
+				errorMsg.includes("Failed to list files");
+
+			if (isDirectoryNotFound && !isAtSystemRoot(this.currentDirectory)) {
+				// Try to navigate to parent directory
+				const parentPath = pathUtils.getParentDir(this.currentDirectory);
+				console.log(`[FileTree] Current directory deleted, navigating to parent: ${parentPath}`);
+
+				// Update currentDirectory and try loading parent
+				this.currentDirectory = parentPath;
+				this.error = null; // Clear error before retry
+
+				try {
+					await this.loadFiles(parentPath, false, true);
+				} catch (_retryError) {
+					// If parent also fails, fallback to workspace root
+					if (!isAtSystemRoot(parentPath)) {
+						console.log("[FileTree] Parent directory also invalid, falling back to workspace root");
+						this.currentDirectory = this.rootPath;
+						this.error = null;
+						await this.loadFiles(this.rootPath, false, true);
+					}
+				}
+			} else if (isDirectoryNotFound && isAtSystemRoot(this.currentDirectory)) {
+				// At system root and directory not found - reset to workspace path
+				console.log("[FileTree] At system root with error, resetting to workspace path");
+				this.currentDirectory = this.rootPath;
+				this.error = null;
+				await this.saveToStorage(); // Update storage with valid path
+			}
 		} finally {
 			this.loadingDirs = removeFromSet(this.loadingDirs, path);
 			if (!merge || force) {
@@ -489,18 +527,26 @@ export class FileTreeState {
 			return;
 		}
 
+		// Set current directory BEFORE loading to ensure any broadcasts include the new context
+		this.currentDirectory = folderPath;
+
 		// Load folder contents first (always force refresh to ensure sync with server)
 		// merge=false: replace existing files to ensure deleted files are removed
 		// force=true: force API call even if locally cached
-		await this.loadFiles(folderPath, false, true);
-
-		// After loading completes, set the current directory to the target folder
-		this.currentDirectory = folderPath;
+		try {
+			await this.loadFiles(folderPath, false, true);
+		} catch (error) {
+			console.error("[FileTree] Failed to load folder:", error);
+			// If load fails, we might want to revert currentDirectory or handle error
+			// The loadFiles method already has recovery logic which updates currentDirectory if needed
+		}
 
 		// Rebuild tree to show the new directory contents
 		this.rebuildTree();
 
 		// Persist currentDirectory to storage for session continuity
+		// Note: loadFiles already calls saveToStorage if successful, but we call it here again
+		// to ensure consistency even if loadFiles partial logic ran or we need to ensure local state save
 		await this.saveToStorage();
 	}
 

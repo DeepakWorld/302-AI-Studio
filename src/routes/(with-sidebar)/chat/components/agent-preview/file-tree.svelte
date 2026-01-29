@@ -111,8 +111,11 @@
 			createFilePath = null;
 			createFileInputValue = "";
 
-			// Auto select the new file
-			handleFileClick(newFile);
+			// Trigger file select callback to download the new file content
+			// Note: We call onFileSelect directly instead of handleFileClick because
+			// createFile() has already set selectedFile, which would cause handleFileClick
+			// to skip the callback (due to the "already selected" early return check)
+			onFileSelect?.(newFile);
 		}
 	}
 
