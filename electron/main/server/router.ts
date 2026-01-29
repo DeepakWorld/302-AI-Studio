@@ -20,6 +20,7 @@ import {
 } from "ai";
 import getPort from "get-port";
 import { Hono, type Context } from "hono";
+import { getSkillContent, getSkillDetails } from "../apis/code-agent";
 import { codeAgentService, ssoService, tabService } from "../services";
 import { chatParametersService } from "../services/chat-parameters-service";
 import { mcpService } from "../services/mcp-service";
@@ -31,9 +32,10 @@ import {
 	appendPromptToLastUserMessage,
 	appendPromptToSystemMessage,
 	convertAiSdkMessagesToOpenAiMessages,
+	createForcedSkillModelMessages,
 	createUIMessageStreamFromGenerator,
+	injectForcedSkillModelMessages,
 	isStreamingSupported,
-	prependPromptToFirstUserMessage,
 	sendStreamError,
 	uploadAttachmentsFromMessages,
 } from "./utils";
@@ -1355,25 +1357,9 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			return acc;
 		}, []) ?? [];
 
-	// Only include skills that have forceUse=true in the prompt
-	// Prepend to first user message with EXTREMELY_IMPORTANT format to ensure it's triggered
+	// Collect forced skills for later injection (after message conversion)
+	// Using OpenCode-style forced tool call results instead of prompt injection
 	const forcedSkills = skills?.filter((skill) => skill.forceUse) ?? [];
-	if (forcedSkills.length > 0) {
-		const skillPrompts = forcedSkills
-			.map((skill) => {
-				// Builtin skills: /home/user/.claude/skills/{skillName}/SKILL.md
-				// Project skills: {workspacePath}/.claude/skills/{skillName}/SKILL.md
-				const skillPath = skill.isBuiltin
-					? `/home/user/.claude/skills/${skill.name}/SKILL.md`
-					: `${workspacePath}/.claude/skills/${skill.name}/SKILL.md`;
-				return language === "zh"
-					? `<EXTREMELY_IMPORTANT>\n你拥有 **${skill.name}** skill。\n**立即阅读**: @${skillPath}\n</EXTREMELY_IMPORTANT>`
-					: `<EXTREMELY_IMPORTANT>\nYou have **${skill.name}** skill.\n**RIGHT NOW, go read**: @${skillPath}\n</EXTREMELY_IMPORTANT>`;
-			})
-			.join("\n\n");
-
-		prependPromptToFirstUserMessage(messages, skillPrompts + "\n\n");
-	}
 
 	if (inTaskOrchestrationMode) {
 		const taskOrchestrationPrompt =
@@ -1444,10 +1430,88 @@ CHECK BEFORE EVERY ACTION:
 
 	// Build request body for 302.AI Claude Code API
 	const convertedMessages = await convertToModelMessages(enhanceMessagesWithFeedback(messages));
-	const lastAiSdkModelMessage = convertedMessages.at(-1);
-	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(
-		lastAiSdkModelMessage ? [lastAiSdkModelMessage] : [],
+	console.log(
+		"[302ai-code-agent] After convertToModelMessages:",
+		JSON.stringify(convertedMessages, null, 2),
 	);
+
+	// Inject forced skill ModelMessages AFTER convertToModelMessages but BEFORE convertAiSdkMessagesToOpenAiMessages
+	// This creates a pair of messages: assistant (tool-call) + tool (tool-result)
+	// This simulates the model having already called and received skill content (OpenCode style)
+	if (forcedSkills.length > 0) {
+		console.log(
+			`[302ai-code-agent] Processing ${forcedSkills.length} forced skills:`,
+			forcedSkills.map((s) => ({ name: s.name, isBuiltin: s.isBuiltin, hasContent: !!s.content })),
+		);
+
+		// Fetch skill content for skills that don't have content
+		const skillsWithContent = await Promise.all(
+			forcedSkills.map(async (skill) => {
+				if (skill.content) {
+					console.log(`[302ai-code-agent] Skill ${skill.name} already has content`);
+					return skill;
+				}
+
+				// First try to get skill details (view mode)
+				console.log(`[302ai-code-agent] Fetching content for skill: ${skill.name}`);
+				const details = await getSkillDetails(skill.name, skill.isBuiltin ?? false);
+
+				if (details?.content) {
+					console.log(
+						`[302ai-code-agent] Got content from view mode for ${skill.name}: length = ${details.content.length}`,
+					);
+					return {
+						...skill,
+						content: details.content,
+					};
+				}
+
+				// If view mode doesn't have content, try edit mode (download zip and extract SKILL.md)
+				console.log(
+					`[302ai-code-agent] View mode has no content, trying edit mode for ${skill.name}`,
+				);
+				const content = await getSkillContent(skill.name, skill.isBuiltin ?? false);
+
+				if (content) {
+					console.log(
+						`[302ai-code-agent] Got content from edit mode for ${skill.name}: length = ${content.length}`,
+					);
+					return {
+						...skill,
+						content,
+					};
+				}
+
+				console.log(`[302ai-code-agent] Failed to get content for skill: ${skill.name}`);
+				return skill;
+			}),
+		);
+
+		// Create and inject ModelMessage format skill messages (after convertToModelMessages)
+		const skillModelMessages = createForcedSkillModelMessages(
+			skillsWithContent,
+			workspacePath ?? "",
+		);
+		console.log(
+			"[302ai-code-agent] Created skill ModelMessages:",
+			JSON.stringify(skillModelMessages, null, 2),
+		);
+		injectForcedSkillModelMessages(convertedMessages, skillModelMessages);
+		console.log(
+			"[302ai-code-agent] After injection:",
+			JSON.stringify(convertedMessages, null, 2),
+		);
+	}
+
+	// Convert messages to OpenAI format
+	// If we have forced skills, send all messages (including the injected skill messages)
+	// Otherwise, only send the last message (incremental update for 302.AI session)
+	const messagesToConvert =
+		forcedSkills.length > 0
+			? convertedMessages // Send all messages including skill messages
+			: convertedMessages.slice(-1); // Only last message for incremental updates
+
+	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(messagesToConvert);
 
 	const requestBody = {
 		model: sandboxId,
@@ -1517,10 +1581,15 @@ CHECK BEFORE EVERY ACTION:
 			try {
 				const response = await responsePromise;
 
+				console.log("[302ai-code-agent] Response status:", response.status, response.statusText);
+				console.log("[302ai-code-agent] Response headers:", Object.fromEntries(response.headers.entries()));
 				if (!response.ok) {
 					const errorText = await response.text();
-					console.error("[302ai-code-agent] API error:", response.status, errorText);
-					sendStreamError(controller, errorText);
+					console.error("[302ai-code-agent] API error:", response.status, response.statusText);
+					console.error("[302ai-code-agent] Error response body:", errorText || "(empty)");
+					console.error("[302ai-code-agent] Request that caused error:");
+					console.error(JSON.stringify(requestBody, null, 2));
+					sendStreamError(controller, errorText || `HTTP ${response.status}: ${response.statusText}`);
 					return;
 				}
 

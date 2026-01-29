@@ -318,7 +318,7 @@
 
 		md.use(texmath, {
 			engine: katex,
-			delimiters: "dollars",
+			delimiters: ["dollars", "brackets"],
 			katexOptions: {
 				throwOnError: false,
 				errorColor: "#cc0000",

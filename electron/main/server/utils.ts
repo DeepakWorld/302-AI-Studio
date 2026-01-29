@@ -43,11 +43,25 @@ export type OpenAIChatContentPartImage = {
 	};
 };
 
+/**
+ * OpenAI tool call format (for assistant messages).
+ */
+export type OpenAIToolCall = {
+	id: string;
+	type: "function";
+	function: {
+		name: string;
+		arguments: string;
+	};
+};
+
 export type OpenAIChatMessage = {
 	role: "system" | "user" | "assistant" | "tool";
-	content: string | Array<OpenAIChatContentPartText | OpenAIChatContentPartImage>;
+	content: string | null | Array<OpenAIChatContentPartText | OpenAIChatContentPartImage>;
 	name?: string;
 	tool_call_id?: string;
+	/** Tool calls for assistant messages */
+	tool_calls?: OpenAIToolCall[];
 };
 
 type AiSdkIntermediateTextPart = {
@@ -63,7 +77,25 @@ type AiSdkIntermediateFilePart = {
 	data?: string;
 };
 
-type AiSdkIntermediatePart = AiSdkIntermediateTextPart | AiSdkIntermediateFilePart;
+type AiSdkToolCallPart = {
+	type: "tool-call";
+	toolCallId: string;
+	toolName: string;
+	args: unknown;
+};
+
+type AiSdkToolResultPart = {
+	type: "tool-result";
+	toolCallId: string;
+	toolName: string;
+	output: unknown;
+};
+
+type AiSdkIntermediatePart =
+	| AiSdkIntermediateTextPart
+	| AiSdkIntermediateFilePart
+	| AiSdkToolCallPart
+	| AiSdkToolResultPart;
 
 type AiSdkIntermediateMessage = {
 	role: "system" | "user" | "assistant" | "tool";
@@ -286,6 +318,43 @@ export function createUIMessageStreamFromText(
 	return createUIMessageStreamFromGenerator(() => Promise.resolve(content), model, provider);
 }
 
+// Type guards for tool-call and tool-result parts
+function isToolCallPart(part: unknown): part is AiSdkToolCallPart {
+	return (
+		typeof part === "object" &&
+		part !== null &&
+		(part as AiSdkToolCallPart).type === "tool-call" &&
+		typeof (part as AiSdkToolCallPart).toolCallId === "string" &&
+		typeof (part as AiSdkToolCallPart).toolName === "string"
+	);
+}
+
+function isToolResultPart(part: unknown): part is AiSdkToolResultPart {
+	return (
+		typeof part === "object" &&
+		part !== null &&
+		(part as AiSdkToolResultPart).type === "tool-result" &&
+		typeof (part as AiSdkToolResultPart).toolCallId === "string"
+	);
+}
+
+function extractToolResultContent(output: unknown): string {
+	if (typeof output === "string") {
+		return output;
+	}
+	if (output && typeof output === "object") {
+		// Handle { type: "text", value: string } format
+		if ("type" in output && output.type === "text" && "value" in output) {
+			return String((output as { type: "text"; value: string }).value);
+		}
+		// Handle { type: "json", value: unknown } format
+		if ("type" in output && output.type === "json" && "value" in output) {
+			return JSON.stringify((output as { type: "json"; value: unknown }).value);
+		}
+	}
+	return JSON.stringify(output);
+}
+
 export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIChatMessage[] {
 	if (!Array.isArray(messages)) {
 		return [];
@@ -298,6 +367,16 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
 
 		const { role, name, tool_call_id } = message;
 		const content = (message as AiSdkIntermediateMessage).content;
+
+		// Debug: Log message structure
+		console.log("[convertAiSdkMessagesToOpenAiMessages] Processing message:", {
+			role,
+			contentType: typeof content,
+			isArray: Array.isArray(content),
+			content: Array.isArray(content)
+				? content.map((p) => ({ type: (p as { type?: string }).type }))
+				: content,
+		});
 
 		if (typeof content === "string") {
 			const msg: OpenAIChatMessage = {
@@ -317,6 +396,50 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
 				...(tool_call_id ? { tool_call_id } : {}),
 			};
 			return [msg];
+		}
+
+		// Check for tool-call parts (assistant message with tool calls)
+		const toolCallParts = content.filter((p): p is AiSdkToolCallPart => isToolCallPart(p));
+		console.log(
+			"[convertAiSdkMessagesToOpenAiMessages] toolCallParts found:",
+			toolCallParts.length,
+			"for role:",
+			role,
+		);
+		if (toolCallParts.length > 0 && role === "assistant") {
+			const toolCalls: OpenAIToolCall[] = toolCallParts.map((part) => ({
+				id: part.toolCallId,
+				type: "function" as const,
+				function: {
+					name: part.toolName,
+					arguments: typeof part.args === "string" ? part.args : JSON.stringify(part.args),
+				},
+			}));
+
+			return [
+				{
+					role: "assistant",
+					content: "",
+					tool_calls: toolCalls,
+				},
+			];
+		}
+
+		// Check for tool-result parts (tool message with results)
+		const toolResultParts = content.filter((p): p is AiSdkToolResultPart => isToolResultPart(p));
+		console.log(
+			"[convertAiSdkMessagesToOpenAiMessages] toolResultParts found:",
+			toolResultParts.length,
+			"for role:",
+			role,
+		);
+		if (toolResultParts.length > 0 && role === "tool") {
+			// Each tool result becomes a separate message
+			return toolResultParts.map((part) => ({
+				role: "tool" as const,
+				tool_call_id: part.toolCallId,
+				content: extractToolResultContent(part.output),
+			}));
 		}
 
 		const parts: Array<OpenAIChatContentPartText | OpenAIChatContentPartImage> = [];
@@ -380,6 +503,169 @@ export function convertAiSdkMessagesToOpenAiMessages(messages: unknown): OpenAIC
 		};
 		return [msg];
 	});
+}
+
+/**
+ * Skill type for forced skill injection.
+ */
+export type SkillForInjection = {
+	name: string;
+	isBuiltin?: boolean;
+	content?: string;
+};
+
+/**
+ * AI SDK ModelMessage ToolCallPart format.
+ */
+export type ToolCallPart = {
+	type: "tool-call";
+	toolCallId: string;
+	toolName: string;
+	args: unknown;
+};
+
+/**
+ * AI SDK ModelMessage ToolResultPart format.
+ */
+export type ToolResultPart = {
+	type: "tool-result";
+	toolCallId: string;
+	toolName: string;
+	output: { type: "text"; value: string };
+};
+
+/**
+ * AI SDK AssistantModelMessage with tool calls.
+ */
+export type AssistantModelMessage = {
+	role: "assistant";
+	content: ToolCallPart[];
+};
+
+/**
+ * AI SDK ToolModelMessage with tool results.
+ */
+export type ToolModelMessage = {
+	role: "tool";
+	content: ToolResultPart[];
+};
+
+/**
+ * Creates forced skill ModelMessages in AI SDK format (OpenCode style).
+ * This creates a pair of messages:
+ * 1. An assistant message with tool-call parts
+ * 2. A tool message with tool-result parts
+ *
+ * This simulates the model having already called and received skill content.
+ *
+ * @param skills Array of skills to inject
+ * @param workspacePath Workspace path for project-level skills
+ * @returns A tuple of [AssistantModelMessage, ToolModelMessage] or null
+ */
+export function createForcedSkillModelMessages(
+	skills: SkillForInjection[],
+	workspacePath: string,
+): [AssistantModelMessage, ToolModelMessage] | null {
+	if (skills.length === 0) return null;
+
+	const toolCalls: ToolCallPart[] = [];
+	const toolResults: ToolResultPart[] = [];
+
+	skills.forEach((skill, index) => {
+		const toolCallId = `forced-skill-${skill.name}-${Date.now()}-${index}`;
+
+		// Builtin skills: /home/user/.claude/skills/{skillName}/SKILL.md
+		// Project skills: {workspacePath}/.claude/skills/{skillName}/SKILL.md
+		const skillPath = skill.isBuiltin
+			? `/home/user/.claude/skills/${skill.name}/SKILL.md`
+			: `${workspacePath}/.claude/skills/${skill.name}/SKILL.md`;
+
+		const baseDirectory = skillPath.substring(0, skillPath.lastIndexOf("/"));
+
+		// Build skill content
+		const fullContent = `## Skill: ${skill.name}\n\n**Base directory**: ${baseDirectory}\n\n${skill.content ?? ""}`;
+
+		// Create tool call (assistant asking for skill)
+		toolCalls.push({
+			type: "tool-call",
+			toolCallId,
+			toolName: "skill",
+			args: { skillName: skill.name },
+		});
+
+		// Create tool result (skill content)
+		toolResults.push({
+			type: "tool-result",
+			toolCallId,
+			toolName: "skill",
+			output: { type: "text", value: fullContent },
+		});
+	});
+
+	const assistantMessage: AssistantModelMessage = {
+		role: "assistant",
+		content: toolCalls,
+	};
+
+	const toolMessage: ToolModelMessage = {
+		role: "tool",
+		content: toolResults,
+	};
+
+	return [assistantMessage, toolMessage];
+}
+
+/**
+ * Placeholder user message to precede the skill tool call.
+ * Required because OpenAI API expects conversations to start with user/system, not assistant.
+ */
+export type PlaceholderUserMessage = {
+	role: "user";
+	content: [{ type: "text"; text: string }];
+};
+
+/**
+ * Injects forced skill ModelMessages into the converted messages array.
+ * The messages are inserted before the first user message.
+ *
+ * This approach (inspired by OpenCode) uses fake tool results instead
+ * of system prompts, which can be more effective for skill activation.
+ *
+ * Note: A placeholder user message is added before the assistant message
+ * because OpenAI API requires conversations to start with user/system, not assistant.
+ *
+ * @param messages The list of ModelMessages (mutable array)
+ * @param skillMessages The forced skill message pair [assistant, tool]
+ */
+export function injectForcedSkillModelMessages(
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	messages: any[],
+	skillMessages: [AssistantModelMessage, ToolModelMessage] | null,
+): void {
+	if (!skillMessages) return;
+
+	const [assistantMessage, toolMessage] = skillMessages;
+
+	// Create placeholder user message to initiate the skill request
+	// This is required because OpenAI API expects conversations to start with user/system
+	const placeholderUserMessage: PlaceholderUserMessage = {
+		role: "user",
+		content: [{ type: "text", text: "Load enabled skills." }],
+	};
+
+	// Find the first user message position
+	const firstUserIndex = messages.findIndex(
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(msg: any) => msg.role === "user",
+	);
+
+	if (firstUserIndex === -1) {
+		// No user message found, append to the end
+		messages.push(placeholderUserMessage, assistantMessage, toolMessage);
+	} else {
+		// Insert before the first user message
+		messages.splice(firstUserIndex, 0, placeholderUserMessage, assistantMessage, toolMessage);
+	}
 }
 
 /**
