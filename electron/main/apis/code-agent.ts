@@ -1,9 +1,12 @@
 import {
 	createClaudeCodeSandboxResponse,
+	skill,
 	type CreateClaudeCodeSandboxRequest,
 	type CreateClaudeCodeSandboxResponse,
+	type Skill,
 } from "@shared/storage/code-agent";
 import { type } from "arktype";
+import JSZip from "jszip";
 import ky from "ky";
 import { _302AIKy } from "./core/_302ai-ky";
 
@@ -300,7 +303,103 @@ export async function batchUploadFile(
 	}
 	return validated;
 }
-
 export async function getLocalSandboxHealthStatus() {
 	// TODO: Implement local sandbox health check
+}
+
+// Skill Details API
+export const skillDetailsResponseSchema = type({
+	success: "boolean",
+	skill: skill,
+});
+export type SkillDetailsResponse = typeof skillDetailsResponseSchema.infer;
+
+/**
+ * Get skill details including content
+ * @param skillName - The name of the skill
+ * @param builtin - Whether the skill is a builtin skill
+ * @returns The skill details with content
+ */
+export async function getSkillDetails(
+	skillName: string,
+	builtin: boolean = false,
+): Promise<Skill | null> {
+	try {
+		console.log(`[getSkillDetails] Fetching skill: ${skillName}, builtin: ${builtin}`);
+		const response = await _302AIKy
+			.get("302/claude-code/skills/detail", {
+				searchParams: {
+					name: skillName,
+					mode: "view",
+					builtin,
+				},
+			})
+			.json();
+
+		console.log(`[getSkillDetails] Response:`, JSON.stringify(response, null, 2));
+
+		const validated = skillDetailsResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate skill details response:", validated.summary);
+			return null;
+		}
+		console.log(`[getSkillDetails] Skill content length: ${validated.skill.content?.length ?? 0}`);
+		return validated.skill;
+	} catch (error) {
+		console.error("Failed to get skill details:", error);
+		return null;
+	}
+}
+
+/**
+ * Get skill content by downloading the skill zip and extracting SKILL.md
+ * This is used when the view API doesn't return content
+ * @param skillName - The name of the skill
+ * @param builtin - Whether the skill is a builtin skill
+ * @returns The skill content (SKILL.md) or null if failed
+ */
+export async function getSkillContent(
+	skillName: string,
+	builtin: boolean = false,
+): Promise<string | null> {
+	try {
+		console.log(`[getSkillContent] Fetching skill zip: ${skillName}, builtin: ${builtin}`);
+
+		// Use edit mode to get the zip file
+		const response = await _302AIKy.get("302/claude-code/skills/detail", {
+			searchParams: {
+				name: skillName,
+				mode: "edit",
+				builtin,
+			},
+		});
+
+		const blob = await response.blob();
+		console.log(`[getSkillContent] Got zip blob, size: ${blob.size}`);
+
+		// Extract SKILL.md from the zip
+		const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+
+		// Look for SKILL.md in the zip (could be at root or in a folder)
+		let skillMdContent: string | null = null;
+
+		for (const [path, file] of Object.entries(zip.files)) {
+			if (path.endsWith("SKILL.md") && !file.dir) {
+				skillMdContent = await file.async("string");
+				console.log(
+					`[getSkillContent] Found SKILL.md at: ${path}, length: ${skillMdContent.length}`,
+				);
+				break;
+			}
+		}
+
+		if (!skillMdContent) {
+			console.warn(`[getSkillContent] SKILL.md not found in zip for skill: ${skillName}`);
+		}
+
+		return skillMdContent;
+	} catch (error) {
+		console.error(`[getSkillContent] Failed to get skill content for ${skillName}:`, error);
+		return null;
+	}
 }
