@@ -1,0 +1,5 @@
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80" # 左边是宿主机端口(大于1024)，右边是容器内端口

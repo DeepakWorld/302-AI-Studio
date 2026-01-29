@@ -2,27 +2,26 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { Loader2 } from "@lucide/svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
 	import StatusIndicator from "./status-indicator.svelte";
 
 	let { isOpen = $bindable(true) }: { isOpen?: boolean } = $props();
 
-	// Sandbox Logic
-	let sandboxRunning = $state(false);
-	let isSandboxLoading = $state(false); // Loading state
+	// Sandbox Logic - use derived state from localEnvState
+	let sandboxRunning = $derived(localEnvState.sandboxRunning);
+	let isSandboxLoading = $derived(localEnvState.sandboxStarting);
+	let podmanInstalled = $derived(localEnvState.podmanInstalled);
 	let fileDirectory = $state("/home/<username>/ai302");
 
-	function handleStartSandbox() {
-		if (!sandboxRunning) {
-			isSandboxLoading = true;
-			// Simulate start
-			setTimeout(() => {
-				sandboxRunning = true;
-				isSandboxLoading = false;
-			}, 2000);
+	async function handleStartSandbox() {
+		if (sandboxRunning) {
+			// Stop sandbox
+			await localEnvState.stopSandbox();
 		} else {
-			sandboxRunning = false;
+			// Start sandbox
+			await localEnvState.startSandbox();
 		}
 	}
 
@@ -75,11 +74,11 @@
 			size="sm"
 			variant={sandboxRunning ? "destructive" : "default"}
 			onclick={handleStartSandbox}
-			disabled={isSandboxLoading}
+			disabled={isSandboxLoading || !podmanInstalled}
 		>
 			{#if isSandboxLoading}
 				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{m.local_platform_starting()}
+				{sandboxRunning ? m.local_platform_stopping() : m.local_platform_starting()}
 			{:else}
 				{sandboxRunning ? m.local_platform_close() : m.local_platform_one_click_start()}
 			{/if}

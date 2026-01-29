@@ -431,6 +431,7 @@ export function registerIpcHandlers() {
 	ipcMain.handle("envService:stopLocalSandboxByIpc", (event) =>
 		envService.stopLocalSandboxByIpc(event),
 	);
+	ipcMain.handle("envService:startPodmanMachine", (event) => envService.startPodmanMachine(event));
 
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
@@ -639,6 +640,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("envService:installHomebrew");
 	ipcMain.removeHandler("envService:installPodman");
 	ipcMain.removeHandler("envService:stopLocalSandboxByIpc");
+	ipcMain.removeHandler("envService:startPodmanMachine");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");

@@ -1272,6 +1272,7 @@
 	"local_platform_file_directory": "文件目录",
 	"local_platform_open_folder": "打开文件夹",
 	"local_platform_starting": "启动中",
+	"local_platform_stopping": "停止中",
 	"local_platform_close": "关闭",
 	"local_platform_one_click_start": "一键启动",
 	"local_platform_agent_framework": "Agent框架",

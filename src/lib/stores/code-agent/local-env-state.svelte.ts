@@ -30,9 +30,13 @@ class LocalEnvState {
 	// Loading states
 	checking = $state(false);
 	installing = $state(false);
+	sandboxStarting = $state(false);
 
 	// Installation result
 	installFailed = $state(false);
+
+	// Sandbox running status (independent of podman health)
+	sandboxRunning = $state(false);
 
 	// Installation logs
 	installLogs = $state<InstallLogEntry[]>([]);
@@ -49,6 +53,14 @@ class LocalEnvState {
 		try {
 			const result = await window.electronAPI.envService.validPodman();
 			this.podmanInstalled = result.isOk && result.isValid;
+
+			// Print command output
+			if (result.output) {
+				console.log("[Local Vibe] validPodman:", result.output);
+			}
+			if (result.error) {
+				console.error("[Local Vibe] validPodman error:", result.error);
+			}
 		} catch (error) {
 			console.error("[LocalEnvState] Failed to check Podman status:", error);
 			this.podmanInstalled = false;
@@ -97,6 +109,81 @@ class LocalEnvState {
 			this.installFailed = true;
 		} finally {
 			this.installing = false;
+		}
+	}
+
+	/**
+	 * Start Podman machine (sandbox)
+	 * Calls envService.startPodmanMachine() and prints output with [Local Vibe] prefix
+	 */
+	async startSandbox(): Promise<boolean> {
+		if (!this.podmanInstalled) {
+			console.error("[LocalEnvState] Cannot start sandbox: Podman not installed");
+			return false;
+		}
+
+		this.sandboxStarting = true;
+		try {
+			const result = await window.electronAPI.envService.startPodmanMachine();
+
+			// Print Podman machine output
+			if (result.output) {
+				console.log("[Local Vibe] startPodmanMachine:", result.output);
+			}
+			if (result.error) {
+				console.error("[Local Vibe] startPodmanMachine error:", result.error);
+			}
+
+			// Print docker-compose output
+			if (result.composeOutput) {
+				console.log("[Local Vibe] docker-compose up:", result.composeOutput);
+			}
+			if (result.composeError) {
+				console.error("[Local Vibe] docker-compose error:", result.composeError);
+			}
+
+			// Toggle sandbox running state on success
+			if (result.isOk) {
+				this.sandboxRunning = true;
+			}
+
+			return result.isOk;
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to start sandbox:", error);
+			return false;
+		} finally {
+			this.sandboxStarting = false;
+		}
+	}
+
+	/**
+	 * Stop Podman machine (sandbox)
+	 * Calls envService.stopLocalSandboxByIpc() and prints output with [Local Vibe] prefix
+	 */
+	async stopSandbox(): Promise<boolean> {
+		this.sandboxStarting = true;
+		try {
+			const result = await window.electronAPI.envService.stopLocalSandboxByIpc();
+
+			// Print command output with [Local Vibe] prefix
+			if (result.output) {
+				console.log("[Local Vibe] stopLocalSandboxByIpc:", result.output);
+			}
+			if (result.error) {
+				console.error("[Local Vibe] stopLocalSandboxByIpc error:", result.error);
+			}
+
+			// Toggle sandbox running state on success
+			if (result.isOk) {
+				this.sandboxRunning = false;
+			}
+
+			return result.isOk;
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to stop sandbox:", error);
+			return false;
+		} finally {
+			this.sandboxStarting = false;
 		}
 	}
 

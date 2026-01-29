@@ -1272,6 +1272,7 @@
 	"local_platform_file_directory": "File Directory",
 	"local_platform_open_folder": "Open Folder",
 	"local_platform_starting": "Starting",
+	"local_platform_stopping": "Stopping",
 	"local_platform_close": "Close",
 	"local_platform_one_click_start": "One-Click Start",
 	"local_platform_agent_framework": "Agent Framework",

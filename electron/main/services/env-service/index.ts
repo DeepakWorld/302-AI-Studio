@@ -3,7 +3,8 @@ import { broadcastService } from "@electron/main/services/broadcast-service";
 import { generalSettingsService } from "@electron/main/services/settings-service/general-settings-service";
 import { isCommandNotFound } from "@electron/main/utils/cmd";
 import { exec, spawn } from "child_process";
-import type { IpcMainInvokeEvent } from "electron";
+import { app, type IpcMainInvokeEvent } from "electron";
+import path from "path";
 import { match } from "ts-pattern";
 import { promisify } from "util";
 import { CRON_EXPRESSION, schedulerService } from "../scheduler-service";
@@ -15,6 +16,78 @@ export class EnvService {
 	private async t(zh: string, en: string): Promise<string> {
 		const language = await generalSettingsService.getLanguage();
 		return language === "zh" ? zh : en;
+	}
+
+	/**
+	 * Get the path to docker-compose.yml
+	 * In development: static/docker-compose.yml in project root
+	 * In production: docker-compose.yml in app resources directory
+	 */
+	private getDockerComposePath(): string {
+		if (app.isPackaged) {
+			return path.join(process.resourcesPath, "docker-compose.yml");
+		}
+		return path.join(process.cwd(), "static", "docker-compose.yml");
+	}
+
+	/**
+	 * Execute docker-compose up -d
+	 * Runs docker-compose in detached mode to start services
+	 * Sets DOCKER_HOST to use Podman socket
+	 * @returns { isOk: boolean; output?: string; error?: string }
+	 */
+	private async runDockerComposeUp(): Promise<{ isOk: boolean; output?: string; error?: string }> {
+		try {
+			const composePath = this.getDockerComposePath();
+			const composeDir = path.dirname(composePath);
+
+			// Execute: docker-compose -f <path> up -d
+			// Set DOCKER_HOST to use Podman socket
+			const { stdout, stderr } = await execAsync(
+				`DOCKER_HOST='unix:///var/run/docker.sock' docker-compose -f "${composePath}" up -d`,
+				{ cwd: composeDir },
+			);
+			const output = `${stdout}\n${stderr}`;
+
+			console.log("[Local Vibe] docker-compose up -d:", output);
+			return { isOk: true, output };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[Local Vibe] docker-compose up -d error:", errorMessage);
+			return { isOk: false, error: errorMessage };
+		}
+	}
+
+	/**
+	 * Execute docker-compose stop
+	 * Stops containers without removing them, allowing fast restart with docker-compose up
+	 * Sets DOCKER_HOST to use Podman socket
+	 * @returns { isOk: boolean; output?: string; error?: string }
+	 */
+	private async runDockerComposeStop(): Promise<{
+		isOk: boolean;
+		output?: string;
+		error?: string;
+	}> {
+		try {
+			const composePath = this.getDockerComposePath();
+			const composeDir = path.dirname(composePath);
+
+			// Execute: docker-compose -f <path> stop
+			// Set DOCKER_HOST to use Podman socket
+			const { stdout, stderr } = await execAsync(
+				`DOCKER_HOST='unix:///var/run/docker.sock' docker-compose -f "${composePath}" stop`,
+				{ cwd: composeDir },
+			);
+			const output = `${stdout}\n${stderr}`;
+
+			console.log("[Local Vibe] docker-compose stop:", output);
+			return { isOk: true, output };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[Local Vibe] docker-compose stop error:", errorMessage);
+			return { isOk: false, error: errorMessage };
+		}
 	}
 
 	private async checkCommand(command: string): Promise<{
@@ -303,30 +376,34 @@ export class EnvService {
 	/**
 	 * Validates if podman is installed and accessible, and ai302-machine exists
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean; isValid: boolean } - isOk: operation success, isValid: podman installed AND machine exists
+	 * @returns { isOk: boolean; isValid: boolean; output?: string; error?: string } - isOk: operation success, isValid: podman installed AND machine exists, output: command output, error: error message if failed
 	 */
-	async validPodman(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean; isValid: boolean }> {
+	async validPodman(
+		_event: IpcMainInvokeEvent,
+	): Promise<{ isOk: boolean; isValid: boolean; output?: string; error?: string }> {
 		try {
-			const { stdout } = await execAsync("podman --version");
+			const { stdout, stderr } = await execAsync("podman --version");
 			const podmanInstalled = stdout.toLowerCase().includes("podman version");
 
 			if (!podmanInstalled) {
-				return { isOk: true, isValid: false };
+				return { isOk: true, isValid: false, output: `${stdout}\n${stderr}` };
 			}
 
 			// Podman is installed, check if ai302-machine exists
 			const machineCheck = await this.checkPodmanMachineExists();
 			if (!machineCheck.isOk) {
-				return { isOk: false, isValid: false };
+				return { isOk: false, isValid: false, error: "Failed to check machine list" };
 			}
 
-			return { isOk: true, isValid: machineCheck.exists };
+			return { isOk: true, isValid: machineCheck.exists, output: stdout };
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
 			if (isCommandNotFound(error)) {
-				return { isOk: true, isValid: false };
+				return { isOk: true, isValid: false, error: errorMessage };
 			}
 
-			return { isOk: false, isValid: false };
+			return { isOk: false, isValid: false, error: errorMessage };
 		}
 	}
 
@@ -738,14 +815,28 @@ export class EnvService {
 
 	/**
 	 * Private method to stop the local sandbox Podman machine
+	 * First runs docker-compose stop to stop containers (without removing them), then stops the Podman machine
 	 * Executes `podman machine stop ai302-machine`
 	 * - Machine not existing or already stopped counts as success
 	 * - Command not found or other errors count as failure
 	 * On success, broadcasts non-healthy status via "podman-health" channel
 	 */
-	private async _stopLocalSandbox(): Promise<{ isOk: boolean }> {
+	private async _stopLocalSandbox(): Promise<{ isOk: boolean; output?: string; error?: string }> {
 		try {
-			await execAsync("podman machine stop ai302-machine");
+			// First, stop docker-compose services (keeps containers for fast restart)
+			const composeResult = await this.runDockerComposeStop();
+			if (composeResult.output) {
+				console.log(
+					"[Local Vibe] docker-compose stop before stopping machine:",
+					composeResult.output,
+				);
+			}
+			if (composeResult.error) {
+				console.error("[Local Vibe] docker-compose stop error (non-fatal):", composeResult.error);
+			}
+
+			// Then stop the Podman machine
+			const { stdout, stderr } = await execAsync("podman machine stop ai302-machine");
 
 			// Broadcast non-healthy status after successful stop
 			broadcastService.broadcastChannelToAll("podman-health", {
@@ -754,27 +845,28 @@ export class EnvService {
 				timestamp: Date.now(),
 			});
 
-			return { isOk: true };
+			return { isOk: true, output: `${stdout}\n${stderr}` };
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message.toLowerCase() : "";
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessageLower = errorMessage.toLowerCase();
 
 			// Command not found - Podman is not installed
 			if (isCommandNotFound(error)) {
-				return { isOk: false };
+				return { isOk: false, error: errorMessage };
 			}
 
 			// Machine does not exist - counts as success (nothing to stop)
-			if (errorMessage.includes("does not exist")) {
-				return { isOk: true };
+			if (errorMessageLower.includes("does not exist")) {
+				return { isOk: true, output: errorMessage };
 			}
 
 			// Machine already stopped - counts as success
-			if (errorMessage.includes("is not running")) {
-				return { isOk: true };
+			if (errorMessageLower.includes("is not running")) {
+				return { isOk: true, output: errorMessage };
 			}
 
 			// Other errors - counts as failure
-			return { isOk: false };
+			return { isOk: false, error: errorMessage };
 		}
 	}
 
@@ -782,19 +874,83 @@ export class EnvService {
 	 * IPC method to stop the local sandbox
 	 * Called from renderer process
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean } - isOk: operation success
+	 * @returns { isOk: boolean; output?: string; error?: string } - isOk: operation success, output: command output, error: error message if failed
 	 */
-	async stopLocalSandboxByIpc(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
+	async stopLocalSandboxByIpc(
+		_event: IpcMainInvokeEvent,
+	): Promise<{ isOk: boolean; output?: string; error?: string }> {
 		return this._stopLocalSandbox();
 	}
 
 	/**
 	 * Public method to stop the local sandbox
 	 * Used by client (main process) before closing
-	 * @returns { isOk: boolean } - isOk: operation success
+	 * @returns { isOk: boolean; output?: string; error?: string } - isOk: operation success, output: command output, error: error message if failed
 	 */
-	async stopLocalSandbox(): Promise<{ isOk: boolean }> {
+	async stopLocalSandbox(): Promise<{ isOk: boolean; output?: string; error?: string }> {
 		return this._stopLocalSandbox();
+	}
+
+	/**
+	 * Starts the ai302-machine Podman machine
+	 * Executes `export DOCKER_HOST='unix:///var/run/docker.sock' && podman machine start ai302-machine`
+	 * Checks output for success message or already started state
+	 * After successful start, automatically runs docker-compose up -d
+	 * @param _event The IPC main invoke event
+	 * @returns { isOk: boolean; alreadyStarted?: boolean; output?: string; error?: string; composeOutput?: string; composeError?: string } - isOk: operation success, alreadyStarted: machine was already running, output: command output, error: error message if failed, composeOutput: docker-compose output, composeError: docker-compose error
+	 */
+	async startPodmanMachine(_event: IpcMainInvokeEvent): Promise<{
+		isOk: boolean;
+		alreadyStarted?: boolean;
+		output?: string;
+		error?: string;
+		composeOutput?: string;
+		composeError?: string;
+	}> {
+		try {
+			// Set DOCKER_HOST environment variable before starting the machine
+			// Both commands must run in the same shell session to preserve the environment variable
+			const { stdout, stderr } = await execAsync(
+				"export DOCKER_HOST='unix:///var/run/docker.sock' && podman machine start ai302-machine",
+			);
+			const output = `${stdout}\n${stderr}`;
+
+			// Check for success message
+			const isSuccess = output.includes('Machine "ai302-machine" started successfully');
+			const alreadyStarted = false;
+
+			// Execute docker-compose up -d after successful start
+			let composeResult;
+			if (isSuccess || alreadyStarted) {
+				composeResult = await this.runDockerComposeUp();
+			}
+
+			return {
+				isOk: true,
+				alreadyStarted,
+				output,
+				composeOutput: composeResult?.output,
+				composeError: composeResult?.error,
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			// Machine already started is considered success
+			if (errorMessage.includes("already started") || errorMessage.includes("is already running")) {
+				// Execute docker-compose even if machine was already running
+				const composeResult = await this.runDockerComposeUp();
+
+				return {
+					isOk: true,
+					alreadyStarted: true,
+					output: errorMessage,
+					composeOutput: composeResult?.output,
+					composeError: composeResult?.error,
+				};
+			}
+
+			return { isOk: false, error: errorMessage };
+		}
 	}
 }
 

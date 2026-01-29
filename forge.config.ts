@@ -99,6 +99,7 @@ const getPackagerConfig = () => {
 		icon: "static/icon",
 		executableName: "302-ai-studio",
 		appBundleId: "com.302ai.302aistudio",
+		extraResource: ["static/docker-compose.yml"],
 	};
 
 	if (process.platform === "darwin" && process.env.NODE_ENV === "production") {
