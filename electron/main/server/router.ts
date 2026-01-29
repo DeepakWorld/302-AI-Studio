@@ -1497,10 +1497,7 @@ CHECK BEFORE EVERY ACTION:
 			JSON.stringify(skillModelMessages, null, 2),
 		);
 		injectForcedSkillModelMessages(convertedMessages, skillModelMessages);
-		console.log(
-			"[302ai-code-agent] After injection:",
-			JSON.stringify(convertedMessages, null, 2),
-		);
+		console.log("[302ai-code-agent] After injection:", JSON.stringify(convertedMessages, null, 2));
 	}
 
 	// Convert messages to OpenAI format
@@ -1582,14 +1579,20 @@ CHECK BEFORE EVERY ACTION:
 				const response = await responsePromise;
 
 				console.log("[302ai-code-agent] Response status:", response.status, response.statusText);
-				console.log("[302ai-code-agent] Response headers:", Object.fromEntries(response.headers.entries()));
+				console.log(
+					"[302ai-code-agent] Response headers:",
+					Object.fromEntries(response.headers.entries()),
+				);
 				if (!response.ok) {
 					const errorText = await response.text();
 					console.error("[302ai-code-agent] API error:", response.status, response.statusText);
 					console.error("[302ai-code-agent] Error response body:", errorText || "(empty)");
 					console.error("[302ai-code-agent] Request that caused error:");
 					console.error(JSON.stringify(requestBody, null, 2));
-					sendStreamError(controller, errorText || `HTTP ${response.status}: ${response.statusText}`);
+					sendStreamError(
+						controller,
+						errorText || `HTTP ${response.status}: ${response.statusText}`,
+					);
 					return;
 				}
 
