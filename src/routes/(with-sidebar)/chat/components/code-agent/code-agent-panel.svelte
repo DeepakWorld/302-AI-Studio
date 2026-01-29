@@ -24,6 +24,7 @@
 
 <script lang="ts">
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
+	import UnsupportPanel from "$lib/components/buss/local-agent-panel/unsupport-panel.svelte";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import type { SelectOption } from "$lib/components/buss/settings/setting-select.svelte";
 	import SettingSelect from "$lib/components/buss/settings/setting-select.svelte";
@@ -34,6 +35,7 @@
 	import { persistedClaudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { isMac } from "$lib/utils/platform";
 	import type { CodeAgentType } from "@shared/storage/code-agent";
 	import ClaudeCodePanel from "./claude-code-panel.svelte";
 	import LocalModePanel from "./local-mode-panel.svelte";
@@ -121,9 +123,15 @@
 				{/if}
 			{/if}
 			{#if codeAgentState.type === "local"}
-				<div class="max-h-[500px] overflow-y-auto pr-2">
-					<LocalModePanel {onClose} />
-				</div>
+				{#if isMac}
+					<div class="max-h-[500px] overflow-y-auto pr-2">
+						<LocalModePanel {onClose} />
+					</div>
+				{:else}
+					<div class="max-h-[500px] overflow-y-auto pr-2">
+						<UnsupportPanel />
+					</div>
+				{/if}
 			{/if}
 		</div>
 	</div>
