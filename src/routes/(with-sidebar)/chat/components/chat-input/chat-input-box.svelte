@@ -2,9 +2,12 @@
 	import sendMessageIcon from "$lib/assets/send-message.svg";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { ModelSelect } from "$lib/components/buss/model-select";
+	import { QuickPromptPanel } from "$lib/components/buss/quick-prompt";
 	import { Button } from "$lib/components/ui/button";
+	import * as Popover from "$lib/components/ui/popover";
 	import { Separator } from "$lib/components/ui/separator";
 	import { Textarea } from "$lib/components/ui/textarea";
+	import type { QuickPrompt } from "$lib/datas/quick-prompts";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
@@ -13,6 +16,7 @@
 	import { fileToBase64 } from "$lib/stores/code-agent/utils";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+	import { quickPromptState } from "$lib/stores/quick-prompt-state.svelte";
 	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
 	import { cn } from "$lib/utils";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
@@ -305,6 +309,13 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.isComposing) return;
 
+		// Close quick prompt panel on Escape
+		if (e.key === "Escape" && quickPromptState.isOpen) {
+			e.preventDefault();
+			quickPromptState.close();
+			return;
+		}
+
 		const sendMessageShortcut = shortcutSettings.getShortcut("sendMessage");
 		const keys = sendMessageShortcut?.keys ?? ["Enter"];
 		const isEnterSend = keys.length === 1 && keys[0].toLowerCase() === "enter";
@@ -313,6 +324,58 @@
 		if (isEnterSend && e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
 		}
+	}
+
+	// Handle input to detect slash command trigger
+	function handleInput(e: Event) {
+		const target = e.target as HTMLTextAreaElement;
+		const value = target.value;
+		const cursorPos = target.selectionStart ?? 0;
+
+		// Check if "/" was just typed at the start or after whitespace
+		if (value.length > 0 && cursorPos > 0) {
+			const charBeforeCursor = value[cursorPos - 1];
+			const charBeforeSlash = cursorPos > 1 ? value[cursorPos - 2] : "";
+
+			// Trigger if "/" is typed at the very start or after a space/newline
+			if (
+				charBeforeCursor === "/" &&
+				(cursorPos === 1 || charBeforeSlash === " " || charBeforeSlash === "\n")
+			) {
+				quickPromptState.open();
+			}
+		}
+	}
+
+	// Handle quick prompt selection
+	function handleQuickPromptSelect(prompt: QuickPrompt) {
+		// Remove the trailing "/" that triggered the panel
+		let newValue = chatState.inputValue;
+		const lastSlashIndex = newValue.lastIndexOf("/");
+		if (lastSlashIndex !== -1) {
+			// Check if it's at the end or followed only by whitespace
+			const afterSlash = newValue.slice(lastSlashIndex + 1).trim();
+			if (afterSlash === "") {
+				newValue = newValue.slice(0, lastSlashIndex);
+			}
+		}
+
+		// Set the prompt content (trimmed to remove trailing newlines)
+		chatState.inputValue = prompt.prompt.trim();
+
+		// Focus back to textarea
+		setTimeout(() => {
+			textareaRef?.focus();
+			// Move cursor to end
+			if (textareaRef) {
+				textareaRef.selectionStart = textareaRef.selectionEnd = chatState.inputValue.length;
+			}
+		}, 50);
+	}
+
+	function handleQuickPromptClose() {
+		quickPromptState.close();
+		textareaRef?.focus();
 	}
 
 	onMount(() => {
@@ -332,6 +395,20 @@
 	<div class={cn("absolute left-0 right-0 -top-14 z-10", shouldShowTaskboardStatus && "-top-30")}>
 		<StreamingIndicator />
 	</div>
+
+	<!-- Quick Prompt Panel Popover -->
+	<Popover.Root bind:open={quickPromptState.isOpen}>
+		<Popover.Trigger class="sr-only">Quick Prompt Trigger</Popover.Trigger>
+		<Popover.Content
+			class="w-auto p-0 border-0 shadow-none bg-transparent"
+			side="top"
+			align="start"
+			sideOffset={8}
+		>
+			<QuickPromptPanel onSelect={handleQuickPromptSelect} onClose={handleQuickPromptClose} />
+		</Popover.Content>
+	</Popover.Root>
+
 	<div
 		class={cn(
 			"transition-[color,box-shadow]",
@@ -354,6 +431,7 @@
 					bind:value={chatState.inputValue}
 					placeholder={placeholderText}
 					onkeydown={handleKeydown}
+					oninput={handleInput}
 					oncompositionend={() => (compositionEndTime = Date.now())}
 					onpaste={handlePaste}
 					disabled={codeAgentState.isDeleted}

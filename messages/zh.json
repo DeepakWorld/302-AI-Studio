@@ -1251,5 +1251,18 @@
 	"notification_vibe_taskboard_completed_title": "Vibe 任务看板完成",
 	"notification_vibe_taskboard_completed_body": "{count} 个任务已完成",
 	"toast_exit_plan_mode_first": "请退出 Plan 模式后再执行任务",
-	"toast_stop_taskboard_first": "请停止任务板执行后再进入 Plan 模式"
+	"toast_stop_taskboard_first": "请停止任务板执行后再进入 Plan 模式",
+	"quick_prompt_panel_title": "快捷提示词",
+	"quick_prompt_search_placeholder": "搜索提示词...",
+	"quick_prompt_category_all": "全部",
+	"quick_prompt_category_translation": "翻译",
+	"quick_prompt_category_programming": "编程",
+	"quick_prompt_category_writing": "写作",
+	"quick_prompt_category_education": "教育",
+	"quick_prompt_category_career": "职业",
+	"quick_prompt_category_lifestyle": "生活",
+	"quick_prompt_category_roleplay": "角色扮演",
+	"quick_prompt_category_tools": "工具",
+	"quick_prompt_no_results": "没有找到匹配的提示词",
+	"quick_prompt_hint": "输入 / 可快速调用提示词"
 }
