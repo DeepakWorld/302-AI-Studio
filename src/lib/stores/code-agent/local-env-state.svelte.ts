@@ -125,6 +125,8 @@ class LocalEnvState {
 				} else {
 					this.podmanHealth = "unknown";
 				}
+
+				console.log("[LocalEnvState] Podman health check:", this.podmanHealth);
 			},
 		);
 	}

@@ -23,6 +23,7 @@
 
 	// Derived state from localEnvState
 	let podmanInstalled = $derived(localEnvState.podmanInstalled);
+	let podmanHealth = $derived(localEnvState.podmanHealth);
 	let isPodmanInstalling = $derived(localEnvState.installing);
 	let installFailed = $derived(localEnvState.installFailed);
 	let installLogs = $derived(localEnvState.installLogs);
@@ -92,6 +93,28 @@
 					text={podmanInstalled ? m.local_platform_installed() : m.local_platform_not_installed()}
 				/>
 			</div>
+			<!-- Health Status -->
+			{#if podmanInstalled}
+				<div class="flex items-center gap-3">
+					<Label class="text-muted-foreground min-w-16 font-normal"
+						>{m.local_platform_health_status()}</Label
+					>
+					<StatusIndicator
+						status={podmanHealth === "healthy"
+							? "green"
+							: podmanHealth === "unhealthy"
+								? "red"
+								: "gray"}
+						text={podmanHealth === "healthy"
+							? m.local_platform_healthy()
+							: podmanHealth === "unhealthy"
+								? m.local_platform_unhealthy()
+								: m.local_platform_checking()}
+						showWarning={podmanHealth === "unhealthy"}
+						warningTooltip={m.local_platform_try_restart()}
+					/>
+				</div>
+			{/if}
 		</div>
 		<div class="flex gap-2">
 			{#if showLogButton}

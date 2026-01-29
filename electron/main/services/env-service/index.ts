@@ -1,5 +1,6 @@
 import { getLocalSandboxHealthStatus } from "@electron/main/apis/code-agent";
 import { broadcastService } from "@electron/main/services/broadcast-service";
+import { generalSettingsService } from "@electron/main/services/settings-service/general-settings-service";
 import { isCommandNotFound } from "@electron/main/utils/cmd";
 import { exec, spawn } from "child_process";
 import type { IpcMainInvokeEvent } from "electron";
@@ -10,6 +11,12 @@ import { CRON_EXPRESSION, schedulerService } from "../scheduler-service";
 const execAsync = promisify(exec);
 
 export class EnvService {
+	// Localization helper method
+	private async t(zh: string, en: string): Promise<string> {
+		const language = await generalSettingsService.getLanguage();
+		return language === "zh" ? zh : en;
+	}
+
 	private async checkCommand(command: string): Promise<{
 		isOk: boolean;
 		isValid: boolean;
@@ -55,6 +62,145 @@ export class EnvService {
 						type,
 						data: normalized,
 					});
+				}
+			};
+
+			proc.stdout.on("data", (data) => processOutput(data, "stdout"));
+			proc.stderr.on("data", (data) => processOutput(data, "stderr"));
+
+			proc.on("close", (code) => {
+				broadcastService.broadcastChannelToAll("install-log", {
+					step,
+					type: "complete",
+					data: `Process exited with code ${code}`,
+				});
+				resolve({ isOk: code === 0 });
+			});
+
+			proc.on("error", (error) => {
+				broadcastService.broadcastChannelToAll("install-log", {
+					step,
+					type: "error",
+					data: error.message,
+				});
+				resolve({ isOk: false });
+			});
+		});
+	}
+
+	/**
+	 * Shows password input dialog via AppleScript
+	 */
+	private async getSudoPasswordViaAppleScript(step: string): Promise<{
+		success: boolean;
+		password?: string;
+		wasCancelled?: boolean;
+		error?: string;
+	}> {
+		try {
+			const title = await this.t("需要管理员权限", "Administrator Password Required");
+			const message = await this.t(
+				`安装 ${step} 需要管理员权限。请输入您的 macOS 用户密码。`,
+				`Installing ${step} requires administrator privileges. Please enter your macOS user password.`,
+			);
+			const buttonOk = await this.t("确定", "OK");
+			const buttonCancel = await this.t("取消", "Cancel");
+
+			// Use heredoc to avoid escaping issues
+			const appleScript = `display dialog "${message}" with title "${title}" default answer "" buttons {"${buttonCancel}", "${buttonOk}"} default button "${buttonOk}" with hidden answer`;
+			const { stdout, stderr } = await execAsync(`osascript -e '${appleScript}'`);
+
+			// AppleScript might output to stdout or stderr
+			const output = stdout || stderr || "";
+
+			// Parse result: "button returned:OK, text returned:password" (AppleScript format)
+			// Try multiple patterns to be more robust
+			const patterns = [
+				/text returned:(.+?)(?:,|$)/m, // text returned:password,
+				/text returned:"(.+?)"/m, // text returned:"password"
+				/text returned:'(.+?)'/m, // text returned:'password'
+				/text returned:(.+)/m, // text returned:password (last resort)
+			];
+
+			for (const pattern of patterns) {
+				const match = output.match(pattern);
+				if (match && match[1]) {
+					const password = match[1].trim();
+					console.log("[EnvService] Extracted password (length):", password.length);
+					return { success: true, password };
+				}
+			}
+
+			console.error(
+				"[EnvService] Failed to parse AppleScript output. stdout:",
+				stdout,
+				"stderr:",
+				stderr,
+			);
+			return { success: false, error: await this.t("无法获取密码", "Failed to get password") };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[EnvService] AppleScript error:", errorMessage);
+
+			// User cancelled - check various possible error messages
+			if (
+				errorMessage.includes("User cancelled") ||
+				errorMessage.includes("-128") ||
+				errorMessage.includes("cancel")
+			) {
+				return {
+					success: false,
+					wasCancelled: true,
+					error: await this.t("用户取消", "User cancelled"),
+				};
+			}
+
+			return { success: false, error: errorMessage };
+		}
+	}
+
+	/**
+	 * Runs command with sudo using AppleScript to get password
+	 */
+	private async runSudoCommandWithBroadcast(
+		command: string,
+		args: string[],
+		step: string,
+	): Promise<{ isOk: boolean; wasCancelled?: boolean }> {
+		// Get password
+		const passwordResult = await this.getSudoPasswordViaAppleScript(step);
+
+		if (!passwordResult.success) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step,
+				type: "error",
+				data:
+					passwordResult.error || (await this.t("用户取消操作", "User cancelled the operation")),
+			});
+			return { isOk: false, wasCancelled: passwordResult.wasCancelled };
+		}
+
+		return new Promise((resolve) => {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step,
+				type: "start",
+				data: `Starting: ${step}`,
+			});
+
+			// Use sudo -S to read password from stdin
+			const proc = spawn("sudo", ["-S", command, ...args], {
+				shell: false,
+				windowsHide: true,
+			});
+
+			// Write password
+			proc.stdin.write(`${passwordResult.password}\n`);
+			proc.stdin.end();
+
+			const processOutput = (data: Buffer, type: "stdout" | "stderr") => {
+				const text = data.toString().replace(/\r/g, "\n").replace(/\n+/g, "\n");
+				if (text.trim()) {
+					broadcastService.broadcastChannelToAll("install-log", { step, type, data: text });
 				}
 			};
 
@@ -538,7 +684,31 @@ export class EnvService {
 		}
 
 		// 3. Initialize Podman Machine (only if not already exists)
-		return this._initPodmanMachine();
+		const machineInit = await this._initPodmanMachine();
+		if (!machineInit.isOk) return { isOk: false };
+
+		// 4. Install podman-mac-helper for better performance
+		const helperInstall = await this.runSudoCommandWithBroadcast(
+			"/opt/homebrew/Cellar/podman/5.7.1/bin/podman-mac-helper",
+			["install"],
+			"install-podman-mac-helper",
+		);
+
+		if (helperInstall.wasCancelled) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman-mac-helper",
+				type: "stdout",
+				data: await this.t(
+					"用户跳过了 podman-mac-helper 安装",
+					"User skipped podman-mac-helper installation",
+				),
+			});
+			return { isOk: true };
+		}
+
+		if (!helperInstall.isOk) return { isOk: false };
+
+		return machineInit;
 	}
 
 	/**
