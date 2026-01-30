@@ -4,6 +4,7 @@ import {
 	quickPrompts,
 	QUICK_PROMPT_CATEGORIES,
 } from "$lib/datas/quick-prompts";
+import { SvelteMap } from "svelte/reactivity";
 
 class QuickPromptState {
 	isOpen = $state(false);
@@ -36,7 +37,7 @@ class QuickPromptState {
 
 	/** Get prompts grouped by category */
 	promptsByCategory = $derived.by(() => {
-		const grouped = new Map<QuickPromptCategory, QuickPrompt[]>();
+		const grouped = new SvelteMap<QuickPromptCategory, QuickPrompt[]>();
 
 		for (const category of this.categories) {
 			grouped.set(category, []);
@@ -54,7 +55,7 @@ class QuickPromptState {
 
 	/** Count of prompts per category */
 	categoryCounts = $derived.by(() => {
-		const counts = new Map<QuickPromptCategory, number>();
+		const counts = new SvelteMap<QuickPromptCategory, number>();
 		for (const [category, prompts] of this.promptsByCategory) {
 			counts.set(category, prompts.length);
 		}

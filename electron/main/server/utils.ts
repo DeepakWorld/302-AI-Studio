@@ -986,7 +986,7 @@ export async function uploadAttachmentsFromMessages(
 
 				return {
 					content: base64Content,
-					save_path: `${workspacePath}/${att.name}`,
+					save_path: `${workspacePath}/.302ai/attachments/${att.name}`,
 				};
 			}),
 		);

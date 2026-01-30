@@ -81,7 +81,6 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
 	class="flex flex-col overflow-hidden rounded-lg border bg-popover shadow-lg"
 	style="width: min(500px, calc(100vw - 2rem)); max-height: min(400px, 50vh);"
@@ -127,7 +126,7 @@
 				>
 					{m.quick_prompt_category_all()}
 				</button>
-				{#each quickPromptState.categories as category}
+				{#each quickPromptState.categories as category (category)}
 					{@const count = quickPromptState.categoryCounts.get(category) ?? 0}
 					<button
 						type="button"
