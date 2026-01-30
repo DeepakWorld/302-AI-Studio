@@ -10,12 +10,12 @@ import {
 	shortcutService,
 	windowService,
 	deepLinkService,
+	envService,
 	codeAgentService,
 	tabService,
 	aiApplicationService,
 	appService,
 	dataService,
-	envService,
 	externalLinkService,
 	mcpService,
 	notificationService,
@@ -210,6 +210,20 @@ export function registerIpcHandlers() {
 	ipcMain.handle("deepLinkService:simulateDeepLink", (event, url) =>
 		deepLinkService.simulateDeepLink(event, url),
 	);
+
+	// envService service registration
+	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
+	ipcMain.handle("envService:startPodmanHealthCheck", (event) =>
+		envService.startPodmanHealthCheck(event),
+	);
+	ipcMain.handle("envService:installWSL", (event) => envService.installWSL(event));
+	ipcMain.handle("envService:installScoop", (event) => envService.installScoop(event));
+	ipcMain.handle("envService:installHomebrew", (event) => envService.installHomebrew(event));
+	ipcMain.handle("envService:installPodman", (event) => envService.installPodman(event));
+	ipcMain.handle("envService:stopLocalSandboxByIpc", (event) =>
+		envService.stopLocalSandboxByIpc(event),
+	);
+	ipcMain.handle("envService:startPodmanMachine", (event) => envService.startPodmanMachine(event));
 
 	// codeAgentService service registration
 	ipcMain.handle(
@@ -419,20 +433,6 @@ export function registerIpcHandlers() {
 			dataService.exportChatToFile(event, content, extension, filterName, defaultFileName),
 	);
 
-	// envService service registration
-	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
-	ipcMain.handle("envService:startPodmanHealthCheck", (event) =>
-		envService.startPodmanHealthCheck(event),
-	);
-	ipcMain.handle("envService:installWSL", (event) => envService.installWSL(event));
-	ipcMain.handle("envService:installScoop", (event) => envService.installScoop(event));
-	ipcMain.handle("envService:installHomebrew", (event) => envService.installHomebrew(event));
-	ipcMain.handle("envService:installPodman", (event) => envService.installPodman(event));
-	ipcMain.handle("envService:stopLocalSandboxByIpc", (event) =>
-		envService.stopLocalSandboxByIpc(event),
-	);
-	ipcMain.handle("envService:startPodmanMachine", (event) => envService.startPodmanMachine(event));
-
 	// externalLinkService service registration
 	ipcMain.handle("externalLinkService:openExternalLink", (event, url) =>
 		externalLinkService.openExternalLink(event, url),
@@ -573,6 +573,14 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
 	ipcMain.removeHandler("windowService:navigateToThread");
 	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
+	ipcMain.removeHandler("envService:validPodman");
+	ipcMain.removeHandler("envService:startPodmanHealthCheck");
+	ipcMain.removeHandler("envService:installWSL");
+	ipcMain.removeHandler("envService:installScoop");
+	ipcMain.removeHandler("envService:installHomebrew");
+	ipcMain.removeHandler("envService:installPodman");
+	ipcMain.removeHandler("envService:stopLocalSandboxByIpc");
+	ipcMain.removeHandler("envService:startPodmanMachine");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxModel");
 	ipcMain.removeHandler("codeAgentService:checkClaudeCodeSandbox");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxesByIpc");
@@ -633,14 +641,6 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
-	ipcMain.removeHandler("envService:validPodman");
-	ipcMain.removeHandler("envService:startPodmanHealthCheck");
-	ipcMain.removeHandler("envService:installWSL");
-	ipcMain.removeHandler("envService:installScoop");
-	ipcMain.removeHandler("envService:installHomebrew");
-	ipcMain.removeHandler("envService:installPodman");
-	ipcMain.removeHandler("envService:stopLocalSandboxByIpc");
-	ipcMain.removeHandler("envService:startPodmanMachine");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");

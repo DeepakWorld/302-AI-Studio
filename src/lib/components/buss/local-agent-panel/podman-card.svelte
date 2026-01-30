@@ -65,7 +65,7 @@
 
 	onMount(async () => {
 		// Start listening to broadcast channels for install logs and health checks
-		localEnvState.startListening();
+		localEnvState.startPodmanListening();
 
 		// Refresh Podman installation status on mount
 		await localEnvState.refreshPodmanStatus();
@@ -76,7 +76,7 @@
 
 	onDestroy(() => {
 		// Stop listening to broadcast channels to avoid memory leaks
-		localEnvState.stopListening();
+		localEnvState.stopPodmanListening();
 	});
 </script>
 
@@ -109,7 +109,7 @@
 							? m.local_platform_healthy()
 							: podmanHealth === "unhealthy"
 								? m.local_platform_unhealthy()
-								: m.local_platform_checking()}
+								: m.local_platform_unknown()}
 						showWarning={podmanHealth === "unhealthy"}
 						warningTooltip={m.local_platform_try_restart()}
 					/>

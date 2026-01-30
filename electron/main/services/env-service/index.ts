@@ -1,9 +1,12 @@
 import { getLocalSandboxHealthStatus } from "@electron/main/apis/code-agent";
 import { broadcastService } from "@electron/main/services/broadcast-service";
 import { generalSettingsService } from "@electron/main/services/settings-service/general-settings-service";
+import { providerStorage } from "@electron/main/services/storage-service/provider-storage";
 import { isCommandNotFound } from "@electron/main/utils/cmd";
 import { exec, spawn } from "child_process";
 import { app, type IpcMainInvokeEvent } from "electron";
+import fs from "fs";
+import getPort from "get-port";
 import path from "path";
 import { match } from "ts-pattern";
 import { promisify } from "util";
@@ -11,11 +14,24 @@ import { CRON_EXPRESSION, schedulerService } from "../scheduler-service";
 
 const execAsync = promisify(exec);
 
+/** Default port for local sandbox API */
+export const DEFAULT_SANDBOX_PORT = 8123;
+
 export class EnvService {
+	/** Default port for local sandbox API */
+	private runtimePort: number | null = null;
+
 	// Localization helper method
 	private async t(zh: string, en: string): Promise<string> {
 		const language = await generalSettingsService.getLanguage();
 		return language === "zh" ? zh : en;
+	}
+
+	/**
+	 * Get the runtime port
+	 */
+	public getRuntimePort(): number | null {
+		return this.runtimePort;
 	}
 
 	/**
@@ -31,14 +47,88 @@ export class EnvService {
 	}
 
 	/**
+	 * Get the runtime compose directory
+	 * In development: <project-root>/ai302
+	 * In production: <userData>/ai302
+	 */
+	private getRuntimeComposeDir(): string {
+		if (app.isPackaged) {
+			return path.join(app.getPath("userData"), "ai302");
+		}
+		return path.join(process.cwd(), "ai302");
+	}
+
+	/**
+	 * Get the runtime compose file path
+	 */
+	private getRuntimeComposePath(): string {
+		return path.join(this.getRuntimeComposeDir(), "docker-compose.yml");
+	}
+
+	/**
+	 * Prepare runtime environment for docker-compose
+	 * - Copies template compose to runtime directory
+	 * - Detects available port (starting from DEFAULT_SANDBOX_PORT)
+	 * - Writes .env file with AI302_API_KEY, HOST_DATA_PATH, and HOST_PORT
+	 * @param apiKey The API key to inject
+	 * @returns The allocated host port
+	 */
+	private async prepareRuntimeCompose(apiKey: string): Promise<number> {
+		const templatePath = this.getDockerComposePath();
+		const runtimeDir = this.getRuntimeComposeDir();
+		const runtimeComposePath = this.getRuntimeComposePath();
+		const envFilePath = path.join(runtimeDir, ".env");
+
+		// Ensure runtime directory exists
+		fs.mkdirSync(runtimeDir, { recursive: true });
+
+		// Copy template compose to runtime directory
+		fs.copyFileSync(templatePath, runtimeComposePath);
+
+		// Find available port (starting from default, will find next available if occupied)
+		const hostPort = await getPort({ port: DEFAULT_SANDBOX_PORT });
+
+		// Store the allocated port
+		this.runtimePort = hostPort;
+
+		// Write .env file with runtime values
+		const envContent = [
+			`AI302_API_KEY=${apiKey}`,
+			`HOST_DATA_PATH=${runtimeDir}`,
+			`HOST_PORT=${hostPort}`,
+		].join("\n");
+		fs.writeFileSync(envFilePath, envContent, "utf-8");
+
+		console.log("[Local Vibe] Runtime compose prepared at:", runtimeDir);
+		console.log("[Local Vibe] Allocated host port:", hostPort);
+
+		return hostPort;
+	}
+
+	/**
 	 * Execute docker-compose up -d
 	 * Runs docker-compose in detached mode to start services
 	 * Sets DOCKER_HOST to use Podman socket
-	 * @returns { isOk: boolean; output?: string; error?: string }
+	 * Prepares runtime compose with .env file before starting
+	 * @returns { isOk: boolean; port?: number; output?: string; error?: string }
 	 */
-	private async runDockerComposeUp(): Promise<{ isOk: boolean; output?: string; error?: string }> {
+	private async runDockerComposeUp(): Promise<{
+		isOk: boolean;
+		port?: number;
+		output?: string;
+		error?: string;
+	}> {
 		try {
-			const composePath = this.getDockerComposePath();
+			// Get API key from provider storage
+			const { valid, apiKey } = await providerStorage.validate302AIProvider();
+			if (!valid || !apiKey) {
+				console.warn("[Local Vibe] No valid 302AI API key found, proceeding without injection");
+			}
+
+			// Prepare runtime compose with .env file (includes port detection)
+			const hostPort = await this.prepareRuntimeCompose(apiKey);
+
+			const composePath = this.getRuntimeComposePath();
 			const composeDir = path.dirname(composePath);
 
 			// Execute: docker-compose -f <path> up -d
@@ -50,7 +140,7 @@ export class EnvService {
 			const output = `${stdout}\n${stderr}`;
 
 			console.log("[Local Vibe] docker-compose up -d:", output);
-			return { isOk: true, output };
+			return { isOk: true, port: hostPort, output };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.error("[Local Vibe] docker-compose up -d error:", errorMessage);
@@ -62,6 +152,7 @@ export class EnvService {
 	 * Execute docker-compose stop
 	 * Stops containers without removing them, allowing fast restart with docker-compose up
 	 * Sets DOCKER_HOST to use Podman socket
+	 * Uses runtime compose if exists, falls back to template compose
 	 * @returns { isOk: boolean; output?: string; error?: string }
 	 */
 	private async runDockerComposeStop(): Promise<{
@@ -70,7 +161,9 @@ export class EnvService {
 		error?: string;
 	}> {
 		try {
-			const composePath = this.getDockerComposePath();
+			// Use runtime compose if exists, otherwise fall back to template
+			const runtimePath = this.getRuntimeComposePath();
+			const composePath = fs.existsSync(runtimePath) ? runtimePath : this.getDockerComposePath();
 			const composeDir = path.dirname(composePath);
 
 			// Execute: docker-compose -f <path> stop
@@ -346,12 +439,15 @@ export class EnvService {
 	private async checkLocalSandboxHealth(): Promise<{
 		isOk: boolean;
 		isHealth: boolean;
+		error?: string;
 	}> {
 		try {
 			await getLocalSandboxHealthStatus();
 			return { isOk: true, isHealth: true };
 		} catch (error) {
-			return { isOk: !isCommandNotFound(error), isHealth: false };
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[EnvService] Local sandbox health check failed:", errorMessage);
+			return { isOk: true, isHealth: false, error: errorMessage };
 		}
 	}
 
@@ -475,7 +571,7 @@ export class EnvService {
 
 			const success = schedulerService.addTask(
 				taskName,
-				CRON_EXPRESSION.EVERY_30_SECONDS,
+				CRON_EXPRESSION.EVERY_10_SECONDS,
 				localSandboxHealthCheckJob,
 			);
 
@@ -493,6 +589,22 @@ export class EnvService {
 			return { isOk: true };
 		} catch (error) {
 			console.error("[EnvService] Failed to start Local Sandbox health check:", error);
+			return { isOk: false };
+		}
+	}
+
+	/**
+	 * Stops the periodic Local Sandbox health check
+	 */
+	async stopLocalSandboxHealthCheck(): Promise<{ isOk: boolean }> {
+		const taskName = "local-sandbox-health-check";
+		try {
+			if (schedulerService.hasTask(taskName)) {
+				schedulerService.removeTask(taskName);
+			}
+			return { isOk: true };
+		} catch (error) {
+			console.error("[EnvService] Failed to stop Local Sandbox health check:", error);
 			return { isOk: false };
 		}
 	}
@@ -823,6 +935,9 @@ export class EnvService {
 	 */
 	private async _stopLocalSandbox(): Promise<{ isOk: boolean; output?: string; error?: string }> {
 		try {
+			// Stop local sandbox health check
+			await this.stopLocalSandboxHealthCheck();
+
 			// First, stop docker-compose services (keeps containers for fast restart)
 			const composeResult = await this.runDockerComposeStop();
 			if (composeResult.output) {
@@ -897,11 +1012,12 @@ export class EnvService {
 	 * Checks output for success message or already started state
 	 * After successful start, automatically runs docker-compose up -d
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean; alreadyStarted?: boolean; output?: string; error?: string; composeOutput?: string; composeError?: string } - isOk: operation success, alreadyStarted: machine was already running, output: command output, error: error message if failed, composeOutput: docker-compose output, composeError: docker-compose error
+	 * @returns { isOk: boolean; alreadyStarted?: boolean; port?: number; output?: string; error?: string; composeOutput?: string; composeError?: string } - isOk: operation success, alreadyStarted: machine was already running, port: allocated host port, output: command output, error: error message if failed, composeOutput: docker-compose output, composeError: docker-compose error
 	 */
 	async startPodmanMachine(_event: IpcMainInvokeEvent): Promise<{
 		isOk: boolean;
 		alreadyStarted?: boolean;
+		port?: number;
 		output?: string;
 		error?: string;
 		composeOutput?: string;
@@ -915,19 +1031,17 @@ export class EnvService {
 			);
 			const output = `${stdout}\n${stderr}`;
 
-			// Check for success message
-			const isSuccess = output.includes('Machine "ai302-machine" started successfully');
-			const alreadyStarted = false;
-
 			// Execute docker-compose up -d after successful start
-			let composeResult;
-			if (isSuccess || alreadyStarted) {
-				composeResult = await this.runDockerComposeUp();
-			}
+			const composeResult = await this.runDockerComposeUp();
+
+			// Start local sandbox health check
+			await new Promise((resolve) => setTimeout(resolve, 3000));
+			await this.startLocalSandboxHealthCheck();
 
 			return {
 				isOk: true,
-				alreadyStarted,
+				alreadyStarted: false,
+				port: composeResult?.port,
 				output,
 				composeOutput: composeResult?.output,
 				composeError: composeResult?.error,
@@ -935,14 +1049,20 @@ export class EnvService {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 
-			// Machine already started is considered success
-			if (errorMessage.includes("already started") || errorMessage.includes("is already running")) {
+			// Machine already running is considered success
+			// Based on actual Podman error: "Error: unable to start "ai302-machine": already running"
+			if (errorMessage.includes("already running")) {
 				// Execute docker-compose even if machine was already running
 				const composeResult = await this.runDockerComposeUp();
+
+				// Start local sandbox health check
+				await new Promise((resolve) => setTimeout(resolve, 3000));
+				await this.startLocalSandboxHealthCheck();
 
 				return {
 					isOk: true,
 					alreadyStarted: true,
+					port: composeResult?.port,
 					output: errorMessage,
 					composeOutput: composeResult?.output,
 					composeError: composeResult?.error,

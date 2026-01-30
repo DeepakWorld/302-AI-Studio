@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	export interface Props {
-		status: "gray" | "green" | "red";
+		status: "gray" | "green" | "red" | "yellow";
 		text: string;
 		showWarning?: boolean;
 		warningTooltip?: string;
@@ -17,15 +17,23 @@
 
 	// Derived classes for status dot
 	const statusColorClass = $derived(
-		status === "green" ? "bg-green-500" : status === "red" ? "bg-red-500" : "bg-muted-foreground", // gray
+		status === "green"
+			? "bg-green-500"
+			: status === "red"
+				? "bg-red-500"
+				: status === "yellow"
+					? "bg-yellow-500"
+					: "bg-muted-foreground", // gray
 	);
 
 	const statusIconClass = $derived(
 		status === "green"
 			? "text-green-600"
 			: status === "red"
-				? "text-red-600"
-				: "text-muted-foreground",
+				? "text-destructive"
+				: status === "yellow"
+					? "text-yellow-600"
+					: "text-muted-foreground",
 	);
 </script>
 
@@ -38,10 +46,10 @@
 	{#if showWarning}
 		<Tooltip.Root>
 			<Tooltip.Trigger>
-				<TriangleAlert class="size-4 text-yellow-500" />
+				<TriangleAlert class="size-4 text-destructive" />
 			</Tooltip.Trigger>
 			{#if warningTooltip}
-				<Tooltip.Content>
+				<Tooltip.Content class="bg-overlay text-overlay-foreground">
 					<p>{warningTooltip}</p>
 				</Tooltip.Content>
 			{/if}

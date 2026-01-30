@@ -1285,5 +1285,6 @@
 	"local_platform_new_session_placeholder": "新建会话",
 	"local_platform_new_work_directory_placeholder": "新建工作目录",
 	"local_platform_reinstall": "重新安装",
-	"local_platform_checking": "检测中"
+	"local_platform_checking": "检测中",
+	"local_platform_unknown": "未知"
 }

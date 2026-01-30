@@ -97,6 +97,14 @@ declare global {
 			onPodmanHealthCheck: (
 				callback: (data: { isOk: boolean; isHealth: boolean; timestamp: number }) => void,
 			) => () => void;
+			onLocalSandboxHealthCheck: (
+				callback: (data: {
+					isOk: boolean;
+					isHealth: boolean;
+					error?: string;
+					timestamp: number;
+				}) => void,
+			) => () => void;
 		};
 		windowId: string;
 		tab: Tab;

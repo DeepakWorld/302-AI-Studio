@@ -6,6 +6,7 @@
  */
 
 export type PodmanHealthStatus = "unknown" | "healthy" | "unhealthy";
+export type SandboxHealthStatus = "unknown" | "checking" | "healthy" | "unhealthy";
 
 export interface InstallLogEntry {
 	step: string;
@@ -38,12 +39,16 @@ class LocalEnvState {
 	// Sandbox running status (independent of podman health)
 	sandboxRunning = $state(false);
 
+	// Sandbox health status
+	sandboxHealthStatus = $state<SandboxHealthStatus>("unknown");
+
 	// Installation logs
 	installLogs = $state<InstallLogEntry[]>([]);
 
 	// Unsubscribe functions for broadcast listeners
 	private unsubscribeInstallLog: (() => void) | null = null;
 	private unsubscribeHealthCheck: (() => void) | null = null;
+	private unsubscribeSandboxHealth: (() => void) | null = null;
 
 	/**
 	 * Refresh Podman installation status by calling envService.validPodman()
@@ -123,6 +128,7 @@ class LocalEnvState {
 		}
 
 		this.sandboxStarting = true;
+		this.sandboxHealthStatus = "checking";
 		try {
 			const result = await window.electronAPI.envService.startPodmanMachine();
 
@@ -145,6 +151,7 @@ class LocalEnvState {
 			// Toggle sandbox running state on success
 			if (result.isOk) {
 				this.sandboxRunning = true;
+				this.sandboxHealthStatus = "checking";
 			}
 
 			return result.isOk;
@@ -176,6 +183,7 @@ class LocalEnvState {
 			// Toggle sandbox running state on success
 			if (result.isOk) {
 				this.sandboxRunning = false;
+				this.sandboxHealthStatus = "unknown";
 			}
 
 			return result.isOk;
@@ -188,40 +196,44 @@ class LocalEnvState {
 	}
 
 	/**
-	 * Start listening to broadcast channels for install logs and health checks
+	 * Start listening to Podman-related broadcast channels (install logs and health checks)
 	 */
-	startListening(): void {
+	startPodmanListening(): void {
 		// Subscribe to install-log channel
-		this.unsubscribeInstallLog = window.electronAPI.onInstallLog(
-			(data: Omit<InstallLogEntry, "ts">) => {
-				this.installLogs = [
-					...this.installLogs,
-					{
-						...data,
-						ts: Date.now(),
-					},
-				];
-			},
-		);
+		if (!this.unsubscribeInstallLog) {
+			this.unsubscribeInstallLog = window.electronAPI.onInstallLog(
+				(data: Omit<InstallLogEntry, "ts">) => {
+					this.installLogs = [
+						...this.installLogs,
+						{
+							...data,
+							ts: Date.now(),
+						},
+					];
+				},
+			);
+		}
 
 		// Subscribe to podman-health-check channel
-		this.unsubscribeHealthCheck = window.electronAPI.onPodmanHealthCheck(
-			(data: PodmanHealthCheckData) => {
-				if (data.isOk) {
-					this.podmanHealth = data.isHealth ? "healthy" : "unhealthy";
-				} else {
-					this.podmanHealth = "unknown";
-				}
+		if (!this.unsubscribeHealthCheck) {
+			this.unsubscribeHealthCheck = window.electronAPI.onPodmanHealthCheck(
+				(data: PodmanHealthCheckData) => {
+					if (data.isOk) {
+						this.podmanHealth = data.isHealth ? "healthy" : "unhealthy";
+					} else {
+						this.podmanHealth = "unknown";
+					}
 
-				console.log("[LocalEnvState] Podman health check:", this.podmanHealth);
-			},
-		);
+					console.log("[LocalEnvState] Podman health check:", this.podmanHealth);
+				},
+			);
+		}
 	}
 
 	/**
-	 * Stop listening to broadcast channels
+	 * Stop listening to Podman-related broadcast channels
 	 */
-	stopListening(): void {
+	stopPodmanListening(): void {
 		if (this.unsubscribeInstallLog) {
 			this.unsubscribeInstallLog();
 			this.unsubscribeInstallLog = null;
@@ -230,6 +242,43 @@ class LocalEnvState {
 		if (this.unsubscribeHealthCheck) {
 			this.unsubscribeHealthCheck();
 			this.unsubscribeHealthCheck = null;
+		}
+	}
+
+	/**
+	 * Start listening to Sandbox-related broadcast channels
+	 */
+	startSandboxListening(): void {
+		// Subscribe to local-sandbox-health-check channel
+		if (!this.unsubscribeSandboxHealth) {
+			this.unsubscribeSandboxHealth = window.electronAPI.onLocalSandboxHealthCheck(
+				(data: { isOk: boolean; isHealth: boolean; error?: string; timestamp: number }) => {
+					if (data.isOk) {
+						if (data.isHealth) {
+							this.sandboxHealthStatus = "healthy";
+						} else {
+							this.sandboxHealthStatus = "unhealthy";
+						}
+					} else {
+						this.sandboxHealthStatus = "unknown";
+					}
+					console.log(
+						"[LocalEnvState] Sandbox health check:",
+						this.sandboxHealthStatus,
+						data.error,
+					);
+				},
+			);
+		}
+	}
+
+	/**
+	 * Stop listening to Sandbox-related broadcast channels
+	 */
+	stopSandboxListening(): void {
+		if (this.unsubscribeSandboxHealth) {
+			this.unsubscribeSandboxHealth();
+			this.unsubscribeSandboxHealth = null;
 		}
 	}
 

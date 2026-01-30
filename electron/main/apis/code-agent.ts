@@ -9,6 +9,7 @@ import { type } from "arktype";
 import JSZip from "jszip";
 import ky from "ky";
 import { _302AIKy } from "./core/_302ai-ky";
+import { localCodeAgentKy } from "./core/code-agent-ky";
 
 export const sessionInfoSchema = type({
 	session_id: "string",
@@ -303,9 +304,6 @@ export async function batchUploadFile(
 	}
 	return validated;
 }
-export async function getLocalSandboxHealthStatus() {
-	// TODO: Implement local sandbox health check
-}
 
 // Skill Details API
 export const skillDetailsResponseSchema = type({
@@ -401,5 +399,27 @@ export async function getSkillContent(
 	} catch (error) {
 		console.error(`[getSkillContent] Failed to get skill content for ${skillName}:`, error);
 		return null;
+	}
+}
+
+export const localSandboxHealthResponseSchema = type({
+	success: "boolean",
+	status: "string",
+});
+export type LocalSandboxHealthResponse = typeof localSandboxHealthResponseSchema.infer;
+
+export async function getLocalSandboxHealthStatus(): Promise<LocalSandboxHealthResponse> {
+	try {
+		const response = await localCodeAgentKy.get("302/claude-code/sandbox/health").json();
+		console.log("[getLocalSandboxHealthStatus] Health check response:", response);
+		const validated = localSandboxHealthResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate health check response:", validated.summary);
+			throw new Error(`Invalid health check response: ${validated.summary}`);
+		}
+		return validated;
+	} catch (error) {
+		console.error("[getLocalSandboxHealthStatus] Health check failed:", error);
+		throw error;
 	}
 }

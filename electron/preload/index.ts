@@ -280,6 +280,21 @@ if (process.contextIsolated) {
 				ipcRenderer.on("podman-health-check", listener);
 				return () => ipcRenderer.removeListener("podman-health-check", listener);
 			},
+			onLocalSandboxHealthCheck: (
+				callback: (data: {
+					isOk: boolean;
+					isHealth: boolean;
+					error?: string;
+					timestamp: number;
+				}) => void,
+			) => {
+				const listener = (
+					_: unknown,
+					data: { isOk: boolean; isHealth: boolean; error?: string; timestamp: number },
+				) => callback(data);
+				ipcRenderer.on("local-sandbox-health-check", listener);
+				return () => ipcRenderer.removeListener("local-sandbox-health-check", listener);
+			},
 		});
 
 		// Expose shell window ID from process arguments

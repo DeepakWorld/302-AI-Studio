@@ -2,8 +2,12 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
-	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
+	import {
+		localEnvState,
+		type SandboxHealthStatus,
+	} from "$lib/stores/code-agent/local-env-state.svelte";
 	import { Loader2 } from "@lucide/svelte";
+	import { onDestroy, onMount } from "svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
 	import StatusIndicator from "./status-indicator.svelte";
 
@@ -13,7 +17,28 @@
 	let sandboxRunning = $derived(localEnvState.sandboxRunning);
 	let isSandboxLoading = $derived(localEnvState.sandboxStarting);
 	let podmanInstalled = $derived(localEnvState.podmanInstalled);
+	let healthStatus = $derived(localEnvState.sandboxHealthStatus);
 	let fileDirectory = $state("/home/<username>/ai302");
+
+	// Helper to get status indicator props
+	function getHealthStatusProps(status: SandboxHealthStatus) {
+		switch (status) {
+			case "checking":
+				return { status: "yellow" as const, text: m.local_platform_checking() };
+			case "healthy":
+				return { status: "green" as const, text: m.local_platform_healthy() };
+			case "unhealthy":
+				return { status: "red" as const, text: m.local_platform_unhealthy() };
+			default:
+				return { status: "gray" as const, text: m.local_platform_unknown() };
+		}
+	}
+
+	let healthProps = $derived(
+		!sandboxRunning
+			? { status: "gray" as const, text: m.local_platform_unknown() }
+			: getHealthStatusProps(healthStatus),
+	);
 
 	async function handleStartSandbox() {
 		if (sandboxRunning) {
@@ -29,6 +54,14 @@
 		console.log("Opening directory:", fileDirectory);
 		// Logic to open folder would go here via Electron IPC
 	}
+
+	onMount(async () => {
+		localEnvState.startSandboxListening();
+	});
+
+	onDestroy(() => {
+		localEnvState.stopSandboxListening();
+	});
 </script>
 
 <PlatformServiceCard title={m.local_platform_local_sandbox()} bind:isOpen>
@@ -50,9 +83,9 @@
 					>{m.local_platform_health_status()}</Label
 				>
 				<StatusIndicator
-					status={sandboxRunning ? "green" : "red"}
-					text={sandboxRunning ? m.local_platform_healthy() : m.local_platform_unhealthy()}
-					showWarning={!sandboxRunning}
+					status={healthProps.status}
+					text={healthProps.text}
+					showWarning={healthStatus === "unhealthy"}
 					warningTooltip={m.local_platform_try_restart()}
 				/>
 			</div>
