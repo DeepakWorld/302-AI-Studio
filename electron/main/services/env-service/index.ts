@@ -106,13 +106,12 @@ export class EnvService {
 	}
 
 	/**
-	 * Execute docker-compose up -d
-	 * Runs docker-compose in detached mode to start services
-	 * Sets DOCKER_HOST to use Podman socket
+	 * Execute podman compose up -d
+	 * Runs podman compose in detached mode to start services
 	 * Prepares runtime compose with .env file before starting
 	 * @returns { isOk: boolean; port?: number; output?: string; error?: string }
 	 */
-	private async runDockerComposeUp(): Promise<{
+	private async runPodmanComposeUp(): Promise<{
 		isOk: boolean;
 		port?: number;
 		output?: string;
@@ -131,31 +130,52 @@ export class EnvService {
 			const composePath = this.getRuntimeComposePath();
 			const composeDir = path.dirname(composePath);
 
-			// Execute: docker-compose -f <path> up -d
-			// Set DOCKER_HOST to use Podman socket
-			const { stdout, stderr } = await execAsync(
-				`DOCKER_HOST='unix:///var/run/docker.sock' docker-compose -f "${composePath}" up -d`,
-				{ cwd: composeDir },
-			);
+			// Execute: podman compose -f <path> up -d
+			const { stdout, stderr } = await execAsync(`podman compose -f "${composePath}" up -d`, {
+				cwd: composeDir,
+			});
 			const output = `${stdout}\n${stderr}`;
 
-			console.log("[Local Vibe] docker-compose up -d:", output);
+			console.log("[Local Vibe] podman compose up -d:", output);
 			return { isOk: true, port: hostPort, output };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error("[Local Vibe] docker-compose up -d error:", errorMessage);
+
+			// Check if podman command is not found
+			if (isCommandNotFound(error)) {
+				const notInstalledMsg = await this.t(
+					"Podman 未安装。请先安装 Podman。",
+					"Podman is not installed. Please install Podman first.",
+				);
+				console.error("[Local Vibe] podman compose up -d error:", notInstalledMsg);
+				return { isOk: false, error: notInstalledMsg };
+			}
+
+			// Check if podman compose subcommand is not available (older Podman versions)
+			if (
+				errorMessage.includes("unknown command") ||
+				errorMessage.includes("compose: command not found")
+			) {
+				const upgradeMsg = await this.t(
+					"Podman 版本过旧，不支持 compose 命令。请升级 Podman 到 3.0 或更高版本。",
+					"Podman version is too old and does not support the compose command. Please upgrade Podman to version 3.0 or higher.",
+				);
+				console.error("[Local Vibe] podman compose up -d error:", upgradeMsg);
+				return { isOk: false, error: upgradeMsg };
+			}
+
+			console.error("[Local Vibe] podman compose up -d error:", errorMessage);
 			return { isOk: false, error: errorMessage };
 		}
 	}
 
 	/**
-	 * Execute docker-compose stop
-	 * Stops containers without removing them, allowing fast restart with docker-compose up
-	 * Sets DOCKER_HOST to use Podman socket
+	 * Execute podman compose stop
+	 * Stops containers without removing them, allowing fast restart with podman compose up
 	 * Uses runtime compose if exists, falls back to template compose
 	 * @returns { isOk: boolean; output?: string; error?: string }
 	 */
-	private async runDockerComposeStop(): Promise<{
+	private async runPodmanComposeStop(): Promise<{
 		isOk: boolean;
 		output?: string;
 		error?: string;
@@ -166,19 +186,24 @@ export class EnvService {
 			const composePath = fs.existsSync(runtimePath) ? runtimePath : this.getDockerComposePath();
 			const composeDir = path.dirname(composePath);
 
-			// Execute: docker-compose -f <path> stop
-			// Set DOCKER_HOST to use Podman socket
-			const { stdout, stderr } = await execAsync(
-				`DOCKER_HOST='unix:///var/run/docker.sock' docker-compose -f "${composePath}" stop`,
-				{ cwd: composeDir },
-			);
+			// Execute: podman compose -f <path> stop
+			const { stdout, stderr } = await execAsync(`podman compose -f "${composePath}" stop`, {
+				cwd: composeDir,
+			});
 			const output = `${stdout}\n${stderr}`;
 
-			console.log("[Local Vibe] docker-compose stop:", output);
+			console.log("[Local Vibe] podman compose stop:", output);
 			return { isOk: true, output };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error("[Local Vibe] docker-compose stop error:", errorMessage);
+
+			// Check if podman command is not found - treat as non-fatal for stop
+			if (isCommandNotFound(error)) {
+				console.warn("[Local Vibe] podman compose stop: podman not found (non-fatal)");
+				return { isOk: true, output: "Podman not installed, nothing to stop" };
+			}
+
+			console.error("[Local Vibe] podman compose stop error:", errorMessage);
 			return { isOk: false, error: errorMessage };
 		}
 	}
@@ -927,30 +952,47 @@ export class EnvService {
 
 	/**
 	 * Private method to stop the local sandbox Podman machine
-	 * First runs docker-compose stop to stop containers (without removing them), then stops the Podman machine
+	 * First runs podman compose stop to stop containers (without removing them)
+	 * Then stops the Podman machine (macOS/Windows only - Linux runs rootless)
 	 * Executes `podman machine stop ai302-machine`
 	 * - Machine not existing or already stopped counts as success
 	 * - Command not found or other errors count as failure
 	 * On success, broadcasts non-healthy status via "podman-health" channel
 	 */
 	private async _stopLocalSandbox(): Promise<{ isOk: boolean; output?: string; error?: string }> {
+		const platform = process.platform;
+
 		try {
 			// Stop local sandbox health check
 			await this.stopLocalSandboxHealthCheck();
 
-			// First, stop docker-compose services (keeps containers for fast restart)
-			const composeResult = await this.runDockerComposeStop();
+			// First, stop podman compose services (keeps containers for fast restart)
+			const composeResult = await this.runPodmanComposeStop();
 			if (composeResult.output) {
 				console.log(
-					"[Local Vibe] docker-compose stop before stopping machine:",
+					"[Local Vibe] podman compose stop before stopping machine:",
 					composeResult.output,
 				);
 			}
 			if (composeResult.error) {
-				console.error("[Local Vibe] docker-compose stop error (non-fatal):", composeResult.error);
+				console.error("[Local Vibe] podman compose stop error (non-fatal):", composeResult.error);
 			}
 
-			// Then stop the Podman machine
+			// On Linux, Podman runs rootless without a VM - skip machine stop
+			if (platform === "linux") {
+				console.log("[Local Vibe] Linux detected, skipping machine stop (rootless mode)");
+
+				// Broadcast non-healthy status
+				broadcastService.broadcastChannelToAll("podman-health", {
+					isOk: true,
+					isHealth: false,
+					timestamp: Date.now(),
+				});
+
+				return { isOk: true, output: "Linux rootless mode - no machine to stop" };
+			}
+
+			// macOS/Windows: Stop the Podman machine
 			const { stdout, stderr } = await execAsync("podman machine stop ai302-machine");
 
 			// Broadcast non-healthy status after successful stop
@@ -1007,12 +1049,13 @@ export class EnvService {
 	}
 
 	/**
-	 * Starts the ai302-machine Podman machine
-	 * Executes `export DOCKER_HOST='unix:///var/run/docker.sock' && podman machine start ai302-machine`
+	 * Starts the ai302-machine Podman machine (macOS/Windows only)
+	 * On Linux, Podman runs rootless without a VM, so machine start is skipped
+	 * Executes `podman machine start ai302-machine`
 	 * Checks output for success message or already started state
-	 * After successful start, automatically runs docker-compose up -d
+	 * After successful start, automatically runs podman compose up -d
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean; alreadyStarted?: boolean; port?: number; output?: string; error?: string; composeOutput?: string; composeError?: string } - isOk: operation success, alreadyStarted: machine was already running, port: allocated host port, output: command output, error: error message if failed, composeOutput: docker-compose output, composeError: docker-compose error
+	 * @returns { isOk: boolean; alreadyStarted?: boolean; port?: number; output?: string; error?: string; composeOutput?: string; composeError?: string } - isOk: operation success, alreadyStarted: machine was already running, port: allocated host port, output: command output, error: error message if failed, composeOutput: podman compose output, composeError: podman compose error
 	 */
 	async startPodmanMachine(_event: IpcMainInvokeEvent): Promise<{
 		isOk: boolean;
@@ -1023,16 +1066,43 @@ export class EnvService {
 		composeOutput?: string;
 		composeError?: string;
 	}> {
+		const platform = process.platform;
+
+		// On Linux, Podman runs rootless without a VM - skip machine start
+		if (platform === "linux") {
+			console.log("[Local Vibe] Linux detected, skipping machine start (rootless mode)");
+
+			// Execute podman compose up -d directly
+			const composeResult = await this.runPodmanComposeUp();
+
+			if (!composeResult.isOk) {
+				return {
+					isOk: false,
+					error: composeResult.error,
+				};
+			}
+
+			// Start local sandbox health check
+			await new Promise((resolve) => setTimeout(resolve, 3000));
+			await this.startLocalSandboxHealthCheck();
+
+			return {
+				isOk: true,
+				alreadyStarted: false,
+				port: composeResult.port,
+				output: "Linux rootless mode - no machine needed",
+				composeOutput: composeResult.output,
+				composeError: composeResult.error,
+			};
+		}
+
+		// macOS/Windows: Start the Podman machine first
 		try {
-			// Set DOCKER_HOST environment variable before starting the machine
-			// Both commands must run in the same shell session to preserve the environment variable
-			const { stdout, stderr } = await execAsync(
-				"export DOCKER_HOST='unix:///var/run/docker.sock' && podman machine start ai302-machine",
-			);
+			const { stdout, stderr } = await execAsync("podman machine start ai302-machine");
 			const output = `${stdout}\n${stderr}`;
 
-			// Execute docker-compose up -d after successful start
-			const composeResult = await this.runDockerComposeUp();
+			// Execute podman compose up -d after successful start
+			const composeResult = await this.runPodmanComposeUp();
 
 			// Start local sandbox health check
 			await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -1052,8 +1122,8 @@ export class EnvService {
 			// Machine already running is considered success
 			// Based on actual Podman error: "Error: unable to start "ai302-machine": already running"
 			if (errorMessage.includes("already running")) {
-				// Execute docker-compose even if machine was already running
-				const composeResult = await this.runDockerComposeUp();
+				// Execute podman compose even if machine was already running
+				const composeResult = await this.runPodmanComposeUp();
 
 				// Start local sandbox health check
 				await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -1067,6 +1137,15 @@ export class EnvService {
 					composeOutput: composeResult?.output,
 					composeError: composeResult?.error,
 				};
+			}
+
+			// Check if podman command is not found
+			if (isCommandNotFound(error)) {
+				const notInstalledMsg = await this.t(
+					"Podman 未安装。请先安装 Podman。",
+					"Podman is not installed. Please install Podman first.",
+				);
+				return { isOk: false, error: notInstalledMsg };
 			}
 
 			return { isOk: false, error: errorMessage };
