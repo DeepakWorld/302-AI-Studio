@@ -328,6 +328,9 @@
 
 	// Handle input to detect slash command trigger
 	function handleInput(e: Event) {
+		// Only trigger quick prompt in chat mode, not in vibe mode
+		if (codeAgentState.enabled) return;
+
 		const target = e.target as HTMLTextAreaElement;
 		const value = target.value;
 		const cursorPos = target.selectionStart ?? 0;
