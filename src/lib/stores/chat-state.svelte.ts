@@ -33,6 +33,7 @@ import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.s
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { claudeCodeSandboxState, codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
 import { codeAgentTaskboardState } from "./code-agent/code-agent-taskboard-state.svelte";
+import { localEnvState } from "./code-agent/local-env-state.svelte";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -797,6 +798,26 @@ class ChatState {
 		if (!this.canRegenerate) {
 			console.warn("Cannot regenerate: chat is not ready or no model selected");
 			return;
+		}
+
+		// For local mode, ensure sandbox is running before regenerating
+		if (codeAgentState.enabled && codeAgentState.type === "local") {
+			// Show starting toast
+			toast.info(m.code_agent_local_sandbox_starting());
+
+			const result = await localEnvState.ensureSandboxRunning();
+			if (!result.isOk) {
+				toast.error(result.error ?? m.code_agent_local_sandbox_start_failed());
+				return;
+			}
+			// Update localBaseUrl with the port
+			if (result.port) {
+				codeAgentState.localBaseUrl = `http://localhost:${result.port}/v1`;
+			}
+			// Show success toast only when actually started (not already running)
+			if (!result.wasAlreadyRunning) {
+				toast.success(m.code_agent_local_sandbox_started());
+			}
 		}
 
 		// Cancel any pending suggestions generation to avoid race conditions

@@ -13,6 +13,7 @@
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { fileToBase64 } from "$lib/stores/code-agent/utils";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
@@ -36,6 +37,11 @@
 	// Get skills that have forceUse=true
 	const forcedSkills = $derived(codeAgentState.skills.filter((s) => s.forceUse));
 	const maxAttachmentLimit = $derived(codeAgentState.enabled ? 20 : MAX_ATTACHMENT_COUNT);
+
+	// Check if local sandbox is starting (for disabling send button)
+	const isLocalSandboxStarting = $derived(
+		codeAgentState.type === "local" && localEnvState.sandboxStarting,
+	);
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 
@@ -183,6 +189,14 @@
 
 		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
 			await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+		} else if (codeAgentState.enabled && codeAgentState.type === "local") {
+			// For local mode in non-fresh tabs, only ensure sandbox is running
+			const localSandboxResult = await codeAgentSendMessageButtonState.ensureLocalSandboxReady();
+			if (!localSandboxResult.isOk) {
+				toast.error(localSandboxResult.error ?? m.code_agent_local_sandbox_start_failed());
+				return;
+			}
+			fn();
 		} else {
 			fn();
 		}
@@ -523,7 +537,7 @@
 						<SendMessageButton onClick={handleSendMessage} />
 					{:else}
 						<button
-							disabled={!chatState.sendMessageEnabled}
+							disabled={!chatState.sendMessageEnabled || isLocalSandboxStarting}
 							class={cn(
 								"shrink-0 flex size-9 items-center cursor-pointer justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
 								"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",

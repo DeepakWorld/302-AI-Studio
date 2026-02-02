@@ -24,6 +24,8 @@
 
 <script lang="ts">
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
+	import PodmanCard from "$lib/components/buss/local-agent-panel/podman-card.svelte";
+	import SandboxCard from "$lib/components/buss/local-agent-panel/sandbox-card.svelte";
 	import UnsupportPanel from "$lib/components/buss/local-agent-panel/unsupport-panel.svelte";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import type { SelectOption } from "$lib/components/buss/settings/setting-select.svelte";
@@ -32,6 +34,7 @@
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { persistedClaudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
@@ -92,6 +95,10 @@
 		if (!tempSessionRemark || !isSessionRemarkChanged) return;
 		await codeAgentState.updateSessionRemark(tempSessionRemark);
 	}
+
+	async function handleInstall() {
+		await localEnvState.installPodman();
+	}
 </script>
 
 {#snippet initializePanel()}
@@ -140,6 +147,13 @@
 {#snippet configurationPanel()}
 	<div class="w-[500px]">
 		<div class="flex flex-col gap-y-4 rounded-[10px] bg-background p-4">
+			{#if codeAgentState.type === "local"}
+				<div class="rounded-lg border p-4 space-y-4">
+					<PodmanCard isOpen={false} onInstall={handleInstall} />
+					<SandboxCard isOpen={false} />
+				</div>
+			{/if}
+
 			<div class="gap-settings-gap flex flex-col">
 				<Label class="text-label-fg">{m.title_sandbox_remark()}</Label>
 				<div class="flex flex-row gap-2">

@@ -4,6 +4,7 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentSendMessageButtonState, codeAgentState } from "$lib/stores/code-agent";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";
@@ -20,6 +21,11 @@
 	);
 	const taskContent = $derived(codeAgentTaskboardState.activeTask?.content ?? "—");
 	const buttonText = $derived(codeAgentTaskboardState.buttonText);
+
+	// Check if local sandbox is starting (for disabling run button)
+	const isLocalSandboxStarting = $derived(
+		codeAgentState.type === "local" && localEnvState.sandboxStarting,
+	);
 
 	const hasConfiguredProviders = $derived(() => {
 		return persistedProviderState.current.some(
@@ -84,6 +90,14 @@
 		codeAgentTaskboardState.startAutoExecution(async (content) => {
 			if (codeAgentState.enabled && codeAgentState.isFreshTab) {
 				await codeAgentSendMessageButtonState.handleCodeAgentFlow(() => fn(content));
+			} else if (codeAgentState.enabled && codeAgentState.type === "local") {
+				// For local mode in non-fresh tabs, only ensure sandbox is running
+				const localSandboxResult = await codeAgentSendMessageButtonState.ensureLocalSandboxReady();
+				if (!localSandboxResult.isOk) {
+					toast.error(localSandboxResult.error ?? m.code_agent_local_sandbox_start_failed());
+					return;
+				}
+				await fn(content);
 			} else {
 				await fn(content);
 			}
@@ -146,7 +160,10 @@
 						!isWaitingToStop &&
 						!isWaitingForChat &&
 						!currentTask) ||
-						(!isRunning && !isWaitingToStop && !isWaitingForChat && codeAgentState.isChecking)}
+						(!isRunning &&
+							!isWaitingToStop &&
+							!isWaitingForChat &&
+							(codeAgentState.isChecking || isLocalSandboxStarting))}
 					onclick={handleRun}
 				>
 					{buttonText}

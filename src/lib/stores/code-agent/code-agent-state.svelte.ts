@@ -60,6 +60,7 @@ class CodeAgentState {
 	isLoadingSkills = $state(false);
 	isUpdatingSandboxRemark = $state(false);
 	isUpdatingSessionRemark = $state(false);
+	localBaseUrl = $state("");
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
 	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
@@ -72,6 +73,17 @@ class CodeAgentState {
 	isFreshTab = $derived(!chatState.hasMessages);
 	inCodeAgentMode = $derived(!this.isFreshTab && this.enabled);
 	isChecking = $derived(codeAgentSendMessageButtonState.isChecking);
+
+	async refreshLocalBaseUrl() {
+		try {
+			const url = await window.electronAPI.envService.getLocalBaseUrl();
+			if (url) {
+				this.localBaseUrl = url + "/v1";
+			}
+		} catch (error) {
+			console.error("[CodeAgentState] Failed to refresh local base URL:", error);
+		}
+	}
 
 	sandboxStatus = $derived.by<CodeAgentSandboxStatus>(() => {
 		return match(this.currentAgentId)
@@ -218,15 +230,6 @@ class CodeAgentState {
 		this.updateState({ inPlanMode });
 	}
 
-	getCodeAgentCfgs(): CodeAgentCfgs {
-		return match(this.currentAgentId)
-			.with("claude-code", () => ({
-				baseUrl: claudeCodeAgentState.baseUrl,
-				model: claudeCodeAgentState.sandboxId,
-			}))
-			.otherwise(() => ({ baseUrl: "", model: "" }));
-	}
-
 	async executeCodeAgentMode(): Promise<{ isOK: boolean; sandboxInfo?: ClaudeCodeSandboxInfo }> {
 		if (this.currentAgentId === "claude-code") {
 			return claudeCodeAgentState.handleAgentModeExecute();
@@ -242,10 +245,18 @@ class CodeAgentState {
 
 	get codeAgentCfgs(): CodeAgentCfgs {
 		return match(this.currentAgentId)
-			.with("claude-code", () => ({
-				baseUrl: claudeCodeAgentState.baseUrl,
-				model: claudeCodeAgentState.sandboxId,
-			}))
+			.with("claude-code", () => {
+				if (this.type === "local") {
+					return {
+						baseUrl: this.localBaseUrl,
+						model: claudeCodeAgentState.model,
+					};
+				}
+				return {
+					baseUrl: claudeCodeAgentState.baseUrl,
+					model: claudeCodeAgentState.sandboxId,
+				};
+			})
 			.otherwise(() => ({ baseUrl: "", model: "" }));
 	}
 

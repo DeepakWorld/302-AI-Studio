@@ -218,6 +218,7 @@ export function registerIpcHandlers() {
 	ipcMain.handle("envService:openComposeDirectory", (event) =>
 		envService.openComposeDirectory(event),
 	);
+	ipcMain.handle("envService:getLocalBaseUrl", (event) => envService.getLocalBaseUrl(event));
 	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
 	ipcMain.handle("envService:startPodmanHealthCheck", (event) =>
 		envService.startPodmanHealthCheck(event),
@@ -228,6 +229,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("envService:installPodman", (event) => envService.installPodman(event));
 	ipcMain.handle("envService:stopLocalSandboxByIpc", (event) =>
 		envService.stopLocalSandboxByIpc(event),
+	);
+	ipcMain.handle("envService:ensureLocalSandboxRunning", (event) =>
+		envService.ensureLocalSandboxRunning(event),
 	);
 	ipcMain.handle("envService:startPodmanMachine", (event) => envService.startPodmanMachine(event));
 
@@ -581,6 +585,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
 	ipcMain.removeHandler("envService:getComposeDirectory");
 	ipcMain.removeHandler("envService:openComposeDirectory");
+	ipcMain.removeHandler("envService:getLocalBaseUrl");
 	ipcMain.removeHandler("envService:validPodman");
 	ipcMain.removeHandler("envService:startPodmanHealthCheck");
 	ipcMain.removeHandler("envService:installWSL");
@@ -588,6 +593,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("envService:installHomebrew");
 	ipcMain.removeHandler("envService:installPodman");
 	ipcMain.removeHandler("envService:stopLocalSandboxByIpc");
+	ipcMain.removeHandler("envService:ensureLocalSandboxRunning");
 	ipcMain.removeHandler("envService:startPodmanMachine");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxModel");
 	ipcMain.removeHandler("codeAgentService:checkClaudeCodeSandbox");

@@ -296,6 +296,68 @@ class LocalEnvState {
 		this.podmanHealth = "unknown";
 		this.installFailed = false;
 	}
+
+	/**
+	 * Ensures the local sandbox is running, starting it if necessary.
+	 * This is an idempotent operation - safe to call multiple times.
+	 * Shares state with SandboxCard via sandboxStarting flag.
+	 * @returns { isOk: boolean; port?: number; error?: string; wasAlreadyRunning: boolean }
+	 */
+	async ensureSandboxRunning(): Promise<{
+		isOk: boolean;
+		port?: number;
+		error?: string;
+		wasAlreadyRunning: boolean;
+	}> {
+		// If already starting, wait for completion (prevent concurrent starts)
+		if (this.sandboxStarting) {
+			// Wait for the current start operation to complete
+			await new Promise<void>((resolve) => {
+				const checkInterval = setInterval(() => {
+					if (!this.sandboxStarting) {
+						clearInterval(checkInterval);
+						resolve();
+					}
+				}, 100);
+			});
+			// Return current state after waiting
+			return {
+				isOk: this.sandboxRunning,
+				wasAlreadyRunning: true,
+			};
+		}
+
+		// Check if already running and healthy
+		if (this.sandboxRunning && this.sandboxHealthStatus === "healthy") {
+			return { isOk: true, wasAlreadyRunning: true };
+		}
+
+		// Call IPC method to ensure sandbox is running
+		// This sets sandboxStarting internally via startSandbox flow
+		this.sandboxStarting = true;
+		this.sandboxHealthStatus = "checking";
+
+		try {
+			const result = await window.electronAPI.envService.ensureLocalSandboxRunning();
+
+			if (result.isOk) {
+				this.sandboxRunning = true;
+			}
+
+			return {
+				isOk: result.isOk,
+				port: result.port,
+				error: result.error,
+				wasAlreadyRunning: result.wasAlreadyRunning,
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[LocalEnvState] Failed to ensure sandbox running:", errorMessage);
+			return { isOk: false, error: errorMessage, wasAlreadyRunning: false };
+		} finally {
+			this.sandboxStarting = false;
+		}
+	}
 }
 
 export const localEnvState = new LocalEnvState();

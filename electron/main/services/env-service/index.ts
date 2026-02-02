@@ -91,6 +91,15 @@ export class EnvService {
 	}
 
 	/**
+	 * Get the local base URL for the runtime via IPC
+	 */
+	async getLocalBaseUrl(_event: IpcMainInvokeEvent): Promise<string | null> {
+		const port = this.getRuntimePort();
+		if (!port) return null;
+		return `http://localhost:${port}`;
+	}
+
+	/**
 	 * Prepare runtime environment for docker-compose
 	 * - Copies template compose to runtime directory
 	 * - Detects available port (starting from DEFAULT_SANDBOX_PORT)
@@ -154,6 +163,13 @@ export class EnvService {
 
 			const composePath = this.getRuntimeComposePath();
 
+			// Auto-pull latest images before starting
+			// This ensures we have the correct platform (linux/amd64) and latest version
+			const pullResult = await this.runPodmanComposePull();
+			if (!pullResult.isOk) {
+				console.warn("[Local Vibe] Auto-pull failed, trying to start anyway:", pullResult.error);
+			}
+
 			// Execute: podman-compose -f <path> up -d
 			// Use broadcast to show progress
 			const result = await this.runCommandWithBroadcast(
@@ -183,6 +199,46 @@ export class EnvService {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.error("[Local Vibe] podman-compose up -d error:", errorMessage);
+			return { isOk: false, error: errorMessage };
+		}
+	}
+
+	/**
+	 * Execute podman-compose pull
+	 * Pulls the latest images defined in the compose file
+	 * @returns { isOk: boolean; output?: string; error?: string }
+	 */
+	private async runPodmanComposePull(): Promise<{
+		isOk: boolean;
+		output?: string;
+		error?: string;
+	}> {
+		try {
+			const composePath = this.getRuntimeComposePath();
+
+			// If file doesn't exist, we can't pull.
+			// Usually this is called after prepareRuntimeCompose, so it should exist.
+			if (!fs.existsSync(composePath)) {
+				return { isOk: false, error: "Runtime compose file not found." };
+			}
+
+			// Execute: podman-compose -f <path> --podman-pull-args "--platform linux/amd64" pull
+			const result = await this.runCommandWithBroadcast(
+				"podman-compose",
+				["-f", composePath, "--podman-pull-args", '"--platform linux/amd64"', "pull"],
+				"podman-compose-pull",
+			);
+
+			if (!result.isOk) {
+				console.error("[Local Vibe] podman-compose pull error:", result.output);
+				return { isOk: false, error: result.output };
+			}
+
+			console.log("[Local Vibe] podman-compose pull:", result.output);
+			return { isOk: true, output: result.output };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[Local Vibe] podman-compose pull error:", errorMessage);
 			return { isOk: false, error: errorMessage };
 		}
 	}
@@ -1202,6 +1258,53 @@ export class EnvService {
 	 */
 	async stopLocalSandbox(): Promise<{ isOk: boolean; output?: string; error?: string }> {
 		return this._stopLocalSandbox();
+	}
+
+	/**
+	 * Ensures the local sandbox is running, starting it if necessary
+	 * This is an idempotent operation - safe to call multiple times
+	 * @param _event The IPC main invoke event
+	 * @returns { isOk: boolean; port?: number; error?: string; wasAlreadyRunning: boolean }
+	 */
+	async ensureLocalSandboxRunning(_event: IpcMainInvokeEvent): Promise<{
+		isOk: boolean;
+		port?: number;
+		error?: string;
+		wasAlreadyRunning: boolean;
+	}> {
+		try {
+			// First check if local sandbox is already healthy
+			const healthCheck = await this.checkLocalSandboxHealth();
+
+			if (healthCheck.isHealth) {
+				// Sandbox is already running
+				const port = this.getRuntimePort() ?? DEFAULT_SANDBOX_PORT;
+				console.log("[Local Vibe] Local sandbox already running on port:", port);
+				return { isOk: true, port, wasAlreadyRunning: true };
+			}
+
+			// Sandbox is not running, start it
+			console.log("[Local Vibe] Local sandbox not running, starting...");
+			const startResult = await this.startPodmanMachine(_event);
+
+			if (!startResult.isOk) {
+				return {
+					isOk: false,
+					error: startResult.error,
+					wasAlreadyRunning: false,
+				};
+			}
+
+			return {
+				isOk: true,
+				port: startResult.port,
+				wasAlreadyRunning: startResult.alreadyStarted ?? false,
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[Local Vibe] Failed to ensure local sandbox running:", errorMessage);
+			return { isOk: false, error: errorMessage, wasAlreadyRunning: false };
+		}
 	}
 
 	/**
