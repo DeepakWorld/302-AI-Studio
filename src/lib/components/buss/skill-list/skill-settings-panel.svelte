@@ -40,8 +40,8 @@
 
 	function findSkill(name: string): Skill | undefined {
 		return (
-			skillsData.builtin_skills.find((s) => s.name === name) ||
-			skillsData.user_skills.find((s) => s.name === name)
+			skillsData.user_skills.find((s) => s.name === name) ||
+			skillsData.builtin_skills.find((s) => s.name === name)
 		);
 	}
 
@@ -92,6 +92,7 @@
 				builtinSkills={skillsData.builtin_skills}
 				{loading}
 				showUseButton={false}
+				showBorder={false}
 				onRefresh={loadSkills}
 			/>
 		{:else if skillsPanelState.currentView.type === "detail"}

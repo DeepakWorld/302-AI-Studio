@@ -5,14 +5,34 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import Input from "$lib/components/ui/input/input.svelte";
+	import ScrollArea from "$lib/components/ui/scroll-area/scroll-area.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import {
+		skillsCategoryState,
+		UNCATEGORIZED_SLUG,
+	} from "$lib/stores/skills-category-state.svelte";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
-	import { Plus, RefreshCw, Search, ShoppingBag, Star, Trash2, X, Zap } from "@lucide/svelte";
+	import { cn } from "$lib/utils";
+	import {
+		ChevronRight,
+		FolderOpen,
+		Grid3x3,
+		LayoutGrid,
+		Plus,
+		RefreshCw,
+		Search,
+		ShoppingBag,
+		Star,
+		Trash2,
+		X,
+		Zap,
+	} from "@lucide/svelte";
 	import type { Skill } from "@shared/types";
+	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
-	import { SvelteSet } from "svelte/reactivity";
+	import { SvelteSet, SvelteMap } from "svelte/reactivity";
 	import SkillCard from "../skill-card.svelte";
 
 	interface Props {
@@ -21,6 +41,7 @@
 		loading?: boolean;
 		showUseButton?: boolean;
 		singleColumn?: boolean;
+		showBorder?: boolean;
 		onRefresh?: () => void;
 	}
 
@@ -30,6 +51,7 @@
 		loading = false,
 		showUseButton = true,
 		singleColumn = false,
+		showBorder = true,
 		onRefresh,
 	}: Props = $props();
 
@@ -44,10 +66,21 @@
 	let isSyncing = $state(false);
 	let downloadingSkills = new SvelteSet<string>();
 
+	// Category states
+	const categories = $derived(skillsCategoryState.categories);
+	const selectedCategorySlug = $derived(skillsCategoryState.selectedCategorySlug);
+	const isLoadingCategories = $derived(
+		skillsCategoryState.isLoadingCategories || skillsCategoryState.isLoadingSkillCategories,
+	);
+
+	// View mode: 'flat' (no category grouping) or 'grouped' (group by category)
+	let viewMode = $state<"flat" | "grouped">("flat");
+
 	// Combine skills: user skills first, then builtin skills
 	const allSkills = $derived<Skill[]>([...userSkills, ...builtinSkills]);
 
-	const filteredSkills = $derived(
+	// Filter by search query
+	const searchFilteredSkills = $derived(
 		allSkills.filter(
 			(item) =>
 				item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,12 +88,89 @@
 		),
 	);
 
+	// Filter by selected category
+	const filteredSkills = $derived(() => {
+		if (!selectedCategorySlug) {
+			return searchFilteredSkills;
+		}
+		return searchFilteredSkills.filter((skill) => {
+			const category = skillsCategoryState.getSkillCategory(skill.name);
+			if (selectedCategorySlug === UNCATEGORIZED_SLUG) {
+				return category === null || category === undefined;
+			}
+			return category?.slug === selectedCategorySlug;
+		});
+	});
+
+	// Group skills by category for grouped view
+	const groupedSkills = $derived(() => {
+		if (viewMode !== "grouped" || selectedCategorySlug) {
+			return null;
+		}
+		const groups = skillsCategoryState.groupSkillsByCategory(searchFilteredSkills);
+		// Sort groups: categorized first (alphabetically), uncategorized last
+		const sortedEntries = Array.from(groups.entries()).sort(([slugA, a], [slugB, b]) => {
+			if (slugA === UNCATEGORIZED_SLUG) return 1;
+			if (slugB === UNCATEGORIZED_SLUG) return -1;
+			return (a.category?.name ?? "").localeCompare(b.category?.name ?? "");
+		});
+		return sortedEntries;
+	});
+
+	// Calculate local skill counts for each category based on searchFilteredSkills
+	const categoryLocalCounts = $derived(() => {
+		const counts = new SvelteMap<string, number>();
+		let uncategorizedCount = 0;
+
+		for (const skill of searchFilteredSkills) {
+			const category = skillsCategoryState.getSkillCategory(skill.name);
+			if (category?.slug) {
+				counts.set(category.slug, (counts.get(category.slug) ?? 0) + 1);
+			} else {
+				uncategorizedCount++;
+			}
+		}
+
+		return { counts, uncategorizedCount };
+	});
+
+	// Load categories and skill category info on mount
+	onMount(() => {
+		loadCategoryData();
+	});
+
+	// Reload when skills change
+	$effect(() => {
+		if (allSkills.length > 0) {
+			skillsCategoryState.fetchSkillCategories(allSkills);
+		}
+	});
+
+	async function loadCategoryData() {
+		await Promise.all([
+			skillsCategoryState.fetchCategories(),
+			skillsCategoryState.fetchSkillCategories(allSkills),
+		]);
+	}
+
+	function handleCategorySelect(slug: string | null) {
+		skillsCategoryState.selectCategory(slug);
+	}
+
+	function toggleViewMode() {
+		viewMode = viewMode === "flat" ? "grouped" : "flat";
+		// Clear category filter when switching to grouped view
+		if (viewMode === "grouped") {
+			skillsCategoryState.clearCategoryFilter();
+		}
+	}
+
 	// Multi-selection state (must be after filteredSkills)
 	let selectedSkills = new SvelteSet<string>();
 	const isSelectionMode = $derived(selectedSkills.size > 0);
-	const selectedSkillsList = $derived(filteredSkills.filter((s) => selectedSkills.has(s.name)));
+	const selectedSkillsList = $derived(filteredSkills().filter((s) => selectedSkills.has(s.name)));
 	const isAllSelected = $derived(
-		filteredSkills.length > 0 && selectedSkills.size === filteredSkills.length,
+		filteredSkills().length > 0 && selectedSkills.size === filteredSkills().length,
 	);
 	// Check if any selected skill can be deleted (non-builtin)
 	const canDeleteSelected = $derived(selectedSkillsList.some((s) => !s.isBuiltin));
@@ -183,7 +293,7 @@
 	}
 
 	function selectAll() {
-		for (const skill of filteredSkills) {
+		for (const skill of filteredSkills()) {
 			selectedSkills.add(skill.name);
 		}
 	}
@@ -302,7 +412,7 @@
 
 <div class="relative flex h-full flex-col">
 	<!-- Search and New Button - Fixed at top -->
-	<div class="shrink-0 border-b px-6 py-4">
+	<div class={cn("shrink-0 px-6 py-4", showBorder && "border-b")}>
 		<div class="flex items-center gap-3">
 			<div class="relative flex-1">
 				<Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -313,6 +423,22 @@
 					bind:value={searchQuery}
 				/>
 			</div>
+			<!-- View mode toggle -->
+			<Button
+				variant="outline"
+				size="icon"
+				class="shrink-0"
+				onclick={toggleViewMode}
+				title={viewMode === "flat"
+					? (m.skills_view_grouped?.() ?? "Group by category")
+					: (m.skills_view_flat?.() ?? "Show all")}
+			>
+				{#if viewMode === "flat"}
+					<LayoutGrid class="h-4 w-4" />
+				{:else}
+					<Grid3x3 class="h-4 w-4" />
+				{/if}
+			</Button>
 			{#if currentSandboxId}
 				<Button variant="outline" class="gap-2" onclick={handleSync} disabled={isSyncing}>
 					<RefreshCw class="h-4 w-4 {isSyncing ? 'animate-spin' : ''}" />
@@ -324,42 +450,156 @@
 				{m.skills_new()}
 			</Button>
 		</div>
-		{#if !window.location.pathname.startsWith("/settings")}
-			<!-- Skills Hub Link -->
-			<div class="mt-3 text-sm text-muted-foreground">
-				{m.skills_hub_hint_prefix()}
-				<button
-					type="button"
-					class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
-					onclick={() =>
-						window.electronAPI.tabService.handleNewTab(
-							"302 Skills Hub",
-							"skillsHub",
-							true,
-							"https://skills.302.ai",
-						)}
-				>
-					<ShoppingBag class="h-4 w-4" />
-					{m.skills_hub_link_text()}
-				</button>
-				{m.skills_hub_hint_suffix()}
-			</div>
-		{/if}
+		<!-- Skills Hub Link -->
+		<div class="mt-3 text-sm text-muted-foreground">
+			{m.skills_hub_hint_prefix()}
+			<button
+				type="button"
+				class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
+				onclick={() =>
+					window.electronAPI.windowService.handleNavigateToUrl(
+						"302 Skills Hub",
+						"skillsHub",
+						"https://skills.302.ai",
+					)}
+			>
+				<ShoppingBag class="h-4 w-4" />
+				{m.skills_hub_link_text()}
+			</button>
+			{m.skills_hub_hint_suffix()}
+		</div>
 	</div>
+
+	<!-- Category Filter Tabs -->
+	{#if categories.length > 0 && viewMode === "flat"}
+		<div class="shrink-0 border-b">
+			<ScrollArea orientation="horizontal" class="w-full">
+				<div class="flex items-center gap-1 px-6 py-2">
+					<!-- All categories button -->
+					<button
+						type="button"
+						class={cn(
+							"shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer",
+							selectedCategorySlug === null
+								? "bg-primary text-primary-foreground"
+								: "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
+						)}
+						onclick={() => handleCategorySelect(null)}
+					>
+						{m.skills_category_all?.() ?? "All"}
+					</button>
+					<!-- Category buttons -->
+					{#each categories as category (category.id)}
+						{@const localCount = categoryLocalCounts().counts.get(category.slug) ?? 0}
+						<button
+							type="button"
+							class={cn(
+								"shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap",
+								selectedCategorySlug === category.slug
+									? "bg-primary text-primary-foreground"
+									: "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
+							)}
+							onclick={() => handleCategorySelect(category.slug)}
+						>
+							{category.name}
+							<span class="ml-1 text-xs opacity-70">({localCount})</span>
+						</button>
+					{/each}
+					<!-- Uncategorized button -->
+					<button
+						type="button"
+						class={cn(
+							"shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap",
+							selectedCategorySlug === UNCATEGORIZED_SLUG
+								? "bg-primary text-primary-foreground"
+								: "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
+						)}
+						onclick={() => handleCategorySelect(UNCATEGORIZED_SLUG)}
+					>
+						{m.skills_category_uncategorized?.() ?? "Uncategorized"}
+						<span class="ml-1 text-xs opacity-70">({categoryLocalCounts().uncategorizedCount})</span
+						>
+					</button>
+				</div>
+			</ScrollArea>
+		</div>
+	{/if}
 
 	<!-- Skills Grid - Scrollable -->
 	<div class="flex-1 overflow-y-auto min-h-0 px-6 py-4 @container">
-		{#if loading}
+		{#if loading || isLoadingCategories}
 			<div class="flex h-48 items-center justify-center text-primary">
 				<LdrsLoader type="dot-pulse" size={40} />
 			</div>
+		{:else if viewMode === "grouped" && groupedSkills()}
+			<!-- Grouped view -->
+			{@const groups = groupedSkills()}
+			{#if groups && groups.length > 0}
+				<div class="space-y-6">
+					{#each groups as [slug, group] (slug)}
+						{@const categoryName =
+							group.category?.name ?? m.skills_category_uncategorized?.() ?? "Uncategorized"}
+						<div class="space-y-3">
+							<!-- Category Header -->
+							<div class="flex items-center gap-2">
+								<FolderOpen class="h-4 w-4 text-muted-foreground" />
+								<h3 class="text-sm font-semibold text-foreground">{categoryName}</h3>
+								<span class="text-xs text-muted-foreground">({group.skills.length})</span>
+								<button
+									type="button"
+									class="ml-auto flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
+									onclick={() => handleCategorySelect(slug)}
+								>
+									{m.skills_view_category?.() ?? "View all"}
+									<ChevronRight class="h-3 w-3" />
+								</button>
+							</div>
+							<!-- Skills Grid -->
+							<div
+								class="grid gap-4 {singleColumn
+									? 'grid-cols-1'
+									: 'grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3'}"
+							>
+								{#each group.skills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
+									{@const usedSkill = usedSkills.find((s) => s.name === item.name)}
+									<SkillCard
+										skill={usedSkill ?? item}
+										isBuiltin={!!item.isBuiltin}
+										isUsed={!!usedSkill}
+										selectable={true}
+										selected={selectedSkills.has(item.name)}
+										onSelect={handleSelectSkill}
+										onSelectionChange={handleSelectionChange}
+										onUse={showUseButton ? handleUse : undefined}
+										onRemove={showUseButton ? handleRemove : undefined}
+										onEdit={handleEdit}
+										onDownload={handleDownload}
+										onDelete={handleDelete}
+										downloading={downloadingSkills.has(item.name)}
+										onForceUseToggle={showUseButton ? handleForceUseToggle : undefined}
+									/>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<!-- Empty State -->
+				<div
+					class="text-muted-foreground flex flex-col items-center justify-center py-12 text-center"
+				>
+					<p>{m.no_search_results()}</p>
+				</div>
+			{/if}
 		{:else}
+			<!-- Flat view -->
+			{@const skills = filteredSkills()}
 			<div
 				class="grid gap-4 {singleColumn
 					? 'grid-cols-1'
 					: 'grid-cols-1 @lg:grid-cols-2 @3xl:grid-cols-3'}"
 			>
-				{#each filteredSkills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
+				{#each skills as item, index (`${item.name}-${item.isBuiltin ? "builtin" : "user"}-${index}`)}
 					{@const usedSkill = usedSkills.find((s) => s.name === item.name)}
 					<SkillCard
 						skill={usedSkill ?? item}
@@ -380,7 +620,7 @@
 				{/each}
 			</div>
 			<!-- Empty State -->
-			{#if filteredSkills.length === 0}
+			{#if skills.length === 0}
 				<div
 					class="text-muted-foreground flex flex-col items-center justify-center py-12 text-center"
 				>
@@ -419,7 +659,7 @@
 					{/if}
 				</div>
 				<span class="text-sm font-semibold tabular-nums"
-					>{selectedSkills.size}/{filteredSkills.length}</span
+					>{selectedSkills.size}/{filteredSkills().length}</span
 				>
 			</button>
 

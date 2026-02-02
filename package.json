@@ -3,7 +3,7 @@
 	"productName": "302 AI Studio",
 	"description": "302 AI Studio",
 	"private": true,
-	"version": "26.3.6",
+	"version": "26.5.1",
 	"type": "module",
 	"main": ".vite/build/main/index.js",
 	"author": {
@@ -170,6 +170,7 @@
 		"mammoth": "^1.11.0",
 		"markdown-it": "^14.1.0",
 		"markdown-it-texmath": "^1.0.0",
+		"mermaid": "^11.12.2",
 		"mitt": "^3.0.1",
 		"mode-watcher": "^1.1.0",
 		"modern-screenshot": "^4.6.7",

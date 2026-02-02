@@ -184,6 +184,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("windowService:handleOpenSettingsWindow", (event, route) =>
 		windowService.handleOpenSettingsWindow(event, route),
 	);
+	ipcMain.handle("windowService:handleNavigateToUrl", (event, title, type, href) =>
+		windowService.handleNavigateToUrl(event, title, type, href),
+	);
 	ipcMain.handle("windowService:focusWindow", (event, windowId, tabId) =>
 		windowService.focusWindow(event, windowId, tabId),
 	);
@@ -251,6 +254,19 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos) =>
 		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos),
+	);
+	ipcMain.handle(
+		"codeAgentService:createThreadForSession",
+		(event, threadId, sandboxId, sessionId, sandboxRemark, llmModel, sessionNote) =>
+			codeAgentService.createThreadForSession(
+				event,
+				threadId,
+				sandboxId,
+				sessionId,
+				sandboxRemark,
+				llmModel,
+				sessionNote,
+			),
 	);
 	ipcMain.handle("codeAgentService:getThreadIdBySessionId", (event, sandboxId, sessionId) =>
 		codeAgentService.getThreadIdBySessionId(event, sandboxId, sessionId),
@@ -535,6 +551,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("shortcutService:getConflicts");
 	ipcMain.removeHandler("shortcutService:getSyncInfo");
 	ipcMain.removeHandler("windowService:handleOpenSettingsWindow");
+	ipcMain.removeHandler("windowService:handleNavigateToUrl");
 	ipcMain.removeHandler("windowService:focusWindow");
 	ipcMain.removeHandler("windowService:handleDropAtPointer");
 	ipcMain.removeHandler("windowService:handleSplitShellWindow");
@@ -553,6 +570,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:deleteClaudeCodeSession");
 	ipcMain.removeHandler("codeAgentService:findClaudeCodeSandboxWithValidDisk");
 	ipcMain.removeHandler("codeAgentService:addClaudeCodeSandboxMCP");
+	ipcMain.removeHandler("codeAgentService:createThreadForSession");
 	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
 	ipcMain.removeHandler("codeAgentService:setIsManualNoteBySession");
 	ipcMain.removeHandler("tabService:handleNewTabWithThread");

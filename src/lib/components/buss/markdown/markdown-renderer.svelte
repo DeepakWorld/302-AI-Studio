@@ -122,7 +122,7 @@
 		// Add comprehensive math support with multiple delimiters and enhanced features
 		instance.use(texmath, {
 			engine: katex,
-			delimiters: "dollars", // Supports: $...$ (inline), $$...$$ (display)
+			delimiters: ["dollars", "brackets"], // Supports: $...$ \(...\) (inline), $$...$$ \[...\] (display)
 			katexOptions: {
 				// Error handling - show error message instead of throwing
 				throwOnError: false,

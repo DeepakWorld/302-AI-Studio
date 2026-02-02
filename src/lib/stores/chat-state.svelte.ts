@@ -9,6 +9,10 @@ import {
 } from "$lib/transport/dynamic-chat-transport";
 import type { ChatMessage, MessageMetadata } from "$lib/types/chat";
 import {
+	addAttachmentReference,
+	removeAttachmentReference,
+} from "$lib/utils/attachment-text-utils";
+import {
 	convertAttachmentsToMessageParts,
 	type MessagePart,
 } from "$lib/utils/attachment-converter";
@@ -1316,10 +1320,18 @@ class ChatState {
 
 	addAttachment(attachment: AttachmentFile) {
 		this.attachments = [...this.attachments, attachment];
+		if (codeAgentState.enabled) {
+			this.inputValue = addAttachmentReference(this.inputValue, attachment.name);
+		}
 	}
 
 	addAttachments(attachments: AttachmentFile[]) {
 		this.attachments = [...this.attachments, ...attachments];
+		if (codeAgentState.enabled) {
+			for (const attachment of attachments) {
+				this.inputValue = addAttachmentReference(this.inputValue, attachment.name);
+			}
+		}
 	}
 
 	updateAttachment(id: string, updates: Partial<AttachmentFile>) {
@@ -1329,6 +1341,12 @@ class ChatState {
 	}
 
 	removeAttachment(id: string) {
+		if (codeAgentState.enabled) {
+			const attachment = this.attachments.find((att) => att.id === id);
+			if (attachment) {
+				this.inputValue = removeAttachmentReference(this.inputValue, attachment.name);
+			}
+		}
 		this.attachments = this.attachments.filter((att) => att.id !== id);
 		// Also remove from loading state if present
 		this.loadingAttachmentIds.delete(id);
@@ -1497,6 +1515,7 @@ export const chat = new Chat({
 				skills: codeAgentState.skills,
 				isCreateSkillMode: chatState.isCreateSkillMode,
 				inPlanMode: codeAgentEnabled && codeAgentState.inPlanMode,
+				thinkingBudget: codeAgentEnabled && codeAgentState.thinkingBudget,
 
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",

@@ -178,10 +178,9 @@
 						type="button"
 						class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
 						onclick={() =>
-							window.electronAPI.tabService.handleNewTab(
+							window.electronAPI.windowService.handleNavigateToUrl(
 								"302 Skills Hub",
 								"skillsHub",
-								true,
 								"https://skills.302.ai",
 							)}
 					>

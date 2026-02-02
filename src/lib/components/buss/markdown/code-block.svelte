@@ -6,7 +6,15 @@
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { persistedThemeState } from "$lib/stores/theme.state.svelte";
-	import { ChevronDown, CodeXml, Download, ImagePlay, MonitorPlay } from "@lucide/svelte";
+	import {
+		ChevronDown,
+		CodeXml,
+		Download,
+		GitBranch,
+		ImagePlay,
+		MonitorPlay,
+	} from "@lucide/svelte";
+	import mermaid from "mermaid";
 	import type { GrammarState, ThemedToken } from "@shikijs/types";
 	import { onMount } from "svelte";
 	import { SvelteMap } from "svelte/reactivity";
@@ -52,6 +60,10 @@
 	let showSvgPreview = $state(false);
 	let isSvgCode = $state(false);
 	let isHtmlCode = $state(false);
+	let isMermaidCode = $state(false);
+	let showMermaidPreview = $state(false);
+	let mermaidSvg = $state("");
+	let mermaidError = $state<string | null>(null);
 
 	const FONT_STYLE = {
 		Italic: 1,
@@ -160,12 +172,78 @@
 		return htmlTagRegex.test(trimmed);
 	};
 
+	const detectMermaid = (code: string, language: string | null): boolean => {
+		if (language?.toLowerCase() === "mermaid") return true;
+
+		// If language is explicitly specified and is not mermaid, don't detect from content
+		if (language && language !== "plaintext") {
+			return false;
+		}
+
+		const trimmed = code.trim().toLowerCase();
+		const mermaidKeywords = [
+			"graph ",
+			"flowchart ",
+			"sequencediagram",
+			"classdiagram",
+			"statediagram",
+			"erdiagram",
+			"journey",
+			"gantt",
+			"pie",
+			"requirementdiagram",
+			"gitgraph",
+			"mindmap",
+			"timeline",
+			"c4context",
+			"c4container",
+			"c4component",
+			"c4dynamic",
+			"c4deployment",
+		];
+		return mermaidKeywords.some((kw) => trimmed.startsWith(kw));
+	};
+
+	const renderMermaid = async (code: string) => {
+		if (!code.trim()) {
+			mermaidSvg = "";
+			return;
+		}
+
+		try {
+			mermaidError = null;
+			// Initialize mermaid with theme based on current app theme
+			const isDark = persistedThemeState.current.shouldUseDarkColors;
+			mermaid.initialize({
+				startOnLoad: false,
+				theme: isDark ? "dark" : "default",
+				securityLevel: "strict",
+			});
+
+			// Generate unique ID for this render
+			const id = `mermaid-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+			const { svg } = await mermaid.render(id, code);
+			mermaidSvg = svg;
+		} catch (error) {
+			console.error("Mermaid render error:", error);
+			mermaidError = error instanceof Error ? error.message : "Failed to render diagram";
+			mermaidSvg = "";
+		}
+	};
+
 	const toggleCollapse = () => {
 		isCollapsed = !isCollapsed;
 	};
 
 	const toggleSvgPreview = () => {
 		showSvgPreview = !showSvgPreview;
+	};
+
+	const toggleMermaidPreview = () => {
+		showMermaidPreview = !showMermaidPreview;
+		if (showMermaidPreview && isMermaidCode) {
+			void renderMermaid(props.code);
+		}
 	};
 
 	const toggleHtmlPreview = () => {
@@ -447,6 +525,14 @@
 	$effect(() => {
 		isSvgCode = detectSvg(props.code, props.language);
 		isHtmlCode = detectHtml(props.code, props.language);
+		isMermaidCode = detectMermaid(props.code, props.language);
+	});
+
+	$effect(() => {
+		// Re-render mermaid when theme changes
+		if (showMermaidPreview && isMermaidCode && props.code) {
+			void renderMermaid(props.code);
+		}
 	});
 </script>
 
@@ -456,7 +542,9 @@
 			<div
 				class="flex justify-between items-center px-4 py-2 bg-muted border-b border-border min-h-10"
 			>
-				<span class="text-sm font-medium text-muted-foreground select-none">Text</span>
+				<span class="text-sm font-medium text-muted-foreground select-none">
+					{formatLanguageName(props.language ?? "plaintext")}
+				</span>
 				<div class="flex items-center gap-1">
 					<CopyButton content={props.code} position="bottom" />
 					<ButtonWithTooltip
@@ -521,6 +609,20 @@
 						{/if}
 					</ButtonWithTooltip>
 				{/if}
+				{#if isMermaidCode}
+					<ButtonWithTooltip
+						class="text-muted-foreground hover:!bg-chat-action-hover"
+						tooltip={showMermaidPreview ? "Show code" : "Preview diagram"}
+						tooltipSide="bottom"
+						onclick={toggleMermaidPreview}
+					>
+						{#if showMermaidPreview}
+							<CodeXml class="" />
+						{:else}
+							<GitBranch class="" />
+						{/if}
+					</ButtonWithTooltip>
+				{/if}
 				{#if isHtmlCode && props.messageId !== undefined && props.messagePartIndex !== undefined}
 					<ButtonWithTooltip
 						class="text-muted-foreground hover:!bg-chat-action-hover"
@@ -546,6 +648,21 @@
 		{#if showSvgPreview && isSvgCode}
 			<div class="p-4 bg-background flex items-center justify-center min-h-[200px]">
 				{@html props.code}
+			</div>
+		{:else if showMermaidPreview && isMermaidCode}
+			<div class="p-4 bg-background flex items-center justify-center min-h-[200px] overflow-auto">
+				{#if mermaidError}
+					<div class="text-destructive text-sm">
+						<p class="font-medium">Failed to render diagram:</p>
+						<p>{mermaidError}</p>
+					</div>
+				{:else if mermaidSvg}
+					<div class="mermaid-diagram">
+						{@html mermaidSvg}
+					</div>
+				{:else}
+					<div class="text-muted-foreground">Loading diagram...</div>
+				{/if}
 			</div>
 		{:else}
 			<pre

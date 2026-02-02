@@ -2,16 +2,21 @@
 	import sendMessageIcon from "$lib/assets/send-message.svg";
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import { ModelSelect } from "$lib/components/buss/model-select";
+	import { QuickPromptPanel } from "$lib/components/buss/quick-prompt";
 	import { Button } from "$lib/components/ui/button";
+	import * as Popover from "$lib/components/ui/popover";
 	import { Separator } from "$lib/components/ui/separator";
 	import { Textarea } from "$lib/components/ui/textarea";
+	import type { QuickPrompt } from "$lib/datas/quick-prompts";
 	import { m } from "$lib/paraglide/messages.js";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { fileToBase64 } from "$lib/stores/code-agent/utils";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+	import { quickPromptState } from "$lib/stores/quick-prompt-state.svelte";
 	import { shortcutSettings } from "$lib/stores/shortcut-settings.state.svelte";
 	import { cn } from "$lib/utils";
 	import { generateFilePreview, MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
@@ -30,6 +35,7 @@
 
 	// Get skills that have forceUse=true
 	const forcedSkills = $derived(codeAgentState.skills.filter((s) => s.forceUse));
+	const maxAttachmentLimit = $derived(codeAgentState.enabled ? 20 : MAX_ATTACHMENT_COUNT);
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 
@@ -199,14 +205,25 @@
 
 		event.preventDefault();
 
-		processFiles(files);
+		processFiles(files, true);
 	}
 
-	async function processFiles(files: File[]) {
+	function generatePastedFileName(originalName: string): string {
+		const timestamp = Date.now();
+		const lastDotIndex = originalName.lastIndexOf(".");
+		if (lastDotIndex === -1) {
+			return `${originalName}-${timestamp}`;
+		}
+		const name = originalName.slice(0, lastDotIndex);
+		const ext = originalName.slice(lastDotIndex);
+		return `${name}-${timestamp}${ext}`;
+	}
+
+	async function processFiles(files: File[], fromPaste = false) {
 		for (const file of files) {
-			if (chatState.attachments.length >= MAX_ATTACHMENT_COUNT) {
+			if (chatState.attachments.length >= maxAttachmentLimit) {
 				toast.warning(
-					m.toast_max_attachments_reached?.() || `已达到最大附件数量：${MAX_ATTACHMENT_COUNT}`,
+					m.toast_max_attachments_reached?.() || `已达到最大附件数量：${maxAttachmentLimit}`,
 				);
 				break;
 			}
@@ -214,10 +231,15 @@
 			const filePath = (file as File & { path?: string }).path || file.name;
 			const attachmentId = nanoid();
 
+			// 为粘贴的文件添加时间戳以区分
+			const fileName = fromPaste
+				? generatePastedFileName(file.name || `file-${Date.now()}`)
+				: file.name || `file-${Date.now()}`;
+
 			// 立即创建附件对象并添加到列表
 			const attachment: AttachmentFile = {
 				id: attachmentId,
-				name: file.name || `file-${Date.now()}`,
+				name: fileName,
 				type: file.type,
 				size: file.size,
 				file,
@@ -230,13 +252,30 @@
 			// 标记为加载中
 			chatState.setAttachmentLoading(attachmentId, true);
 
-			// 异步生成预览（不阻塞UI）
-			generateFilePreview(file).then((preview) => {
-				// 更新附件的预览
-				chatState.updateAttachment(attachmentId, { preview });
+			const processFile = async () => {
+				const isAbsolutePath =
+					filePath.includes("/") || filePath.includes("\\") || /^[a-zA-Z]:/.test(filePath);
+
+				if (!isAbsolutePath) {
+					// 如果没有绝对路径，强制读取文件完整内容作为 preview
+					// 这样 code-agent-send-message-button-state.ts 就能使用这个内容上传
+					try {
+						const content = await fileToBase64(file);
+						chatState.updateAttachment(attachmentId, { preview: content });
+					} catch (e) {
+						console.error("Failed to read file content:", e);
+					}
+				} else {
+					// 正常的预览生成逻辑
+					const preview = await generateFilePreview(file);
+					chatState.updateAttachment(attachmentId, { preview });
+				}
+
 				// 标记加载完成
 				chatState.setAttachmentLoading(attachmentId, false);
-			});
+			};
+
+			processFile();
 		}
 	}
 
@@ -270,6 +309,13 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.isComposing) return;
 
+		// Close quick prompt panel on Escape
+		if (e.key === "Escape" && quickPromptState.isOpen) {
+			e.preventDefault();
+			quickPromptState.close();
+			return;
+		}
+
 		const sendMessageShortcut = shortcutSettings.getShortcut("sendMessage");
 		const keys = sendMessageShortcut?.keys ?? ["Enter"];
 		const isEnterSend = keys.length === 1 && keys[0].toLowerCase() === "enter";
@@ -278,6 +324,61 @@
 		if (isEnterSend && e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
 		}
+	}
+
+	// Handle input to detect slash command trigger
+	function handleInput(e: Event) {
+		// Only trigger quick prompt in chat mode, not in vibe mode
+		if (codeAgentState.enabled) return;
+
+		const target = e.target as HTMLTextAreaElement;
+		const value = target.value;
+		const cursorPos = target.selectionStart ?? 0;
+
+		// Check if "/" was just typed at the start or after whitespace
+		if (value.length > 0 && cursorPos > 0) {
+			const charBeforeCursor = value[cursorPos - 1];
+			const charBeforeSlash = cursorPos > 1 ? value[cursorPos - 2] : "";
+
+			// Trigger if "/" is typed at the very start or after a space/newline
+			if (
+				charBeforeCursor === "/" &&
+				(cursorPos === 1 || charBeforeSlash === " " || charBeforeSlash === "\n")
+			) {
+				quickPromptState.open();
+			}
+		}
+	}
+
+	// Handle quick prompt selection
+	function handleQuickPromptSelect(prompt: QuickPrompt) {
+		// Remove the trailing "/" that triggered the panel
+		let newValue = chatState.inputValue;
+		const lastSlashIndex = newValue.lastIndexOf("/");
+		if (lastSlashIndex !== -1) {
+			// Check if it's at the end or followed only by whitespace
+			const afterSlash = newValue.slice(lastSlashIndex + 1).trim();
+			if (afterSlash === "") {
+				newValue = newValue.slice(0, lastSlashIndex);
+			}
+		}
+
+		// Set the prompt content (trimmed to remove trailing newlines)
+		chatState.inputValue = prompt.prompt.trim();
+
+		// Focus back to textarea
+		setTimeout(() => {
+			textareaRef?.focus();
+			// Move cursor to end
+			if (textareaRef) {
+				textareaRef.selectionStart = textareaRef.selectionEnd = chatState.inputValue.length;
+			}
+		}, 50);
+	}
+
+	function handleQuickPromptClose() {
+		quickPromptState.close();
+		textareaRef?.focus();
 	}
 
 	onMount(() => {
@@ -297,6 +398,20 @@
 	<div class={cn("absolute left-0 right-0 -top-14 z-10", shouldShowTaskboardStatus && "-top-30")}>
 		<StreamingIndicator />
 	</div>
+
+	<!-- Quick Prompt Panel Popover -->
+	<Popover.Root bind:open={quickPromptState.isOpen}>
+		<Popover.Trigger class="sr-only">Quick Prompt Trigger</Popover.Trigger>
+		<Popover.Content
+			class="w-auto p-0 border-0 shadow-none bg-transparent"
+			side="top"
+			align="start"
+			sideOffset={8}
+		>
+			<QuickPromptPanel onSelect={handleQuickPromptSelect} onClose={handleQuickPromptClose} />
+		</Popover.Content>
+	</Popover.Root>
+
 	<div
 		class={cn(
 			"transition-[color,box-shadow]",
@@ -319,6 +434,7 @@
 					bind:value={chatState.inputValue}
 					placeholder={placeholderText}
 					onkeydown={handleKeydown}
+					oninput={handleInput}
 					oncompositionend={() => (compositionEndTime = Date.now())}
 					onpaste={handlePaste}
 					disabled={codeAgentState.isDeleted}
