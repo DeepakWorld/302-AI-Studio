@@ -24,6 +24,12 @@ All 11 v1 requirements map cleanly to three phases matching the natural streamin
 
 **Dependencies:** None
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md - Fix 302.AI Code Agent stream lifecycle with safeClose pattern and [DONE] markers
+- [ ] 01-02-PLAN.md - Add stream completion logging to all standard streaming endpoints
+
 **Requirements:**
 - BACK-01: ReadableStream closes properly via controller.close() in finally blocks for all stream paths
 - BACK-02: Error events are handled with proper cleanup - no orphaned streams
