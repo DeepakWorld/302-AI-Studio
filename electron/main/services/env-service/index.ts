@@ -4,7 +4,7 @@ import { generalSettingsService } from "@electron/main/services/settings-service
 import { providerStorage } from "@electron/main/services/storage-service/provider-storage";
 import { isCommandNotFound } from "@electron/main/utils/cmd";
 import { exec, spawn } from "child_process";
-import { app, type IpcMainInvokeEvent } from "electron";
+import { app, shell, type IpcMainInvokeEvent } from "electron";
 import fs from "fs";
 import getPort from "get-port";
 import path from "path";
@@ -63,6 +63,31 @@ export class EnvService {
 	 */
 	private getRuntimeComposePath(): string {
 		return path.join(this.getRuntimeComposeDir(), "docker-compose.yml");
+	}
+
+	/**
+	 * Get the runtime compose directory path via IPC
+	 */
+	async getComposeDirectory(_event: IpcMainInvokeEvent): Promise<string> {
+		return this.getRuntimeComposeDir();
+	}
+
+	/**
+	 * Open the runtime compose directory in system explorer via IPC
+	 */
+	async openComposeDirectory(_event: IpcMainInvokeEvent): Promise<boolean> {
+		const dir = this.getRuntimeComposeDir();
+		try {
+			// Ensure directory exists
+			if (!fs.existsSync(dir)) {
+				fs.mkdirSync(dir, { recursive: true });
+			}
+			const error = await shell.openPath(dir);
+			return error === "";
+		} catch (error) {
+			console.error("[EnvService] Failed to open compose directory:", error);
+			return false;
+		}
 	}
 
 	/**

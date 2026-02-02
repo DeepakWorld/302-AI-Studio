@@ -18,7 +18,7 @@
 	let isSandboxLoading = $derived(localEnvState.sandboxStarting);
 	let podmanInstalled = $derived(localEnvState.podmanInstalled);
 	let healthStatus = $derived(localEnvState.sandboxHealthStatus);
-	let fileDirectory = $state("/home/<username>/ai302");
+	let fileDirectory = $state("");
 
 	// Helper to get status indicator props
 	function getHealthStatusProps(status: SandboxHealthStatus) {
@@ -50,13 +50,17 @@
 		}
 	}
 
-	function handleOpenDirectory() {
-		console.log("Opening directory:", fileDirectory);
-		// Logic to open folder would go here via Electron IPC
+	async function handleOpenDirectory() {
+		await window.electronAPI.envService.openComposeDirectory();
 	}
 
 	onMount(async () => {
 		localEnvState.startSandboxListening();
+		try {
+			fileDirectory = await window.electronAPI.envService.getComposeDirectory();
+		} catch (error) {
+			console.error("Failed to get compose directory:", error);
+		}
 	});
 
 	onDestroy(() => {
@@ -90,12 +94,12 @@
 				/>
 			</div>
 			<!-- File Directory -->
-			<div class="flex items-center gap-3">
+			<div class="flex items-baseline gap-3">
 				<Label class="text-muted-foreground min-w-16 font-normal"
 					>{m.local_platform_file_directory()}</Label
 				>
 				<button
-					class="text-sm font-mono hover:underline cursor-pointer focus:outline-none"
+					class="text-sm hover:underline cursor-pointer focus:outline-none text-left break-all text-primary"
 					onclick={handleOpenDirectory}
 					aria-label={m.local_platform_open_folder()}
 				>

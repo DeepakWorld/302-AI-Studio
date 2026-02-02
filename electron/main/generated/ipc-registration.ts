@@ -212,6 +212,12 @@ export function registerIpcHandlers() {
 	);
 
 	// envService service registration
+	ipcMain.handle("envService:getComposeDirectory", (event) =>
+		envService.getComposeDirectory(event),
+	);
+	ipcMain.handle("envService:openComposeDirectory", (event) =>
+		envService.openComposeDirectory(event),
+	);
 	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
 	ipcMain.handle("envService:startPodmanHealthCheck", (event) =>
 		envService.startPodmanHealthCheck(event),
@@ -573,6 +579,8 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
 	ipcMain.removeHandler("windowService:navigateToThread");
 	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
+	ipcMain.removeHandler("envService:getComposeDirectory");
+	ipcMain.removeHandler("envService:openComposeDirectory");
 	ipcMain.removeHandler("envService:validPodman");
 	ipcMain.removeHandler("envService:startPodmanHealthCheck");
 	ipcMain.removeHandler("envService:installWSL");
