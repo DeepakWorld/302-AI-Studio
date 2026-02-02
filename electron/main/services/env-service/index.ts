@@ -140,11 +140,7 @@ export class EnvService {
 			if (!result.isOk) {
 				const errorMessage = result.output;
 				// Check if podman-compose command is not found
-				if (
-					errorMessage.includes("command not found") ||
-					errorMessage.includes("is not recognized") ||
-					errorMessage.includes("ENOENT")
-				) {
+				if (isCommandNotFound(errorMessage)) {
 					const notInstalledMsg = await this.t(
 						"podman-compose 未安装。请先安装 podman-compose。",
 						"podman-compose is not installed. Please install podman-compose first.",
@@ -192,11 +188,7 @@ export class EnvService {
 			if (!result.isOk) {
 				const errorMessage = result.output;
 				// Check if podman-compose command is not found - treat as non-fatal for stop
-				if (
-					errorMessage.includes("command not found") ||
-					errorMessage.includes("is not recognized") ||
-					errorMessage.includes("ENOENT")
-				) {
+				if (isCommandNotFound(errorMessage)) {
 					console.warn("[Local Vibe] podman-compose stop: podman-compose not found (non-fatal)");
 					return { isOk: true, output: "podman-compose not installed, nothing to stop" };
 				}
@@ -1252,11 +1244,7 @@ export class EnvService {
 			// Based on actual Podman error: "Error: unable to start "ai302-machine": already running"
 			if (errorMessage.includes("already running")) {
 				alreadyStarted = true;
-			} else if (
-				errorMessage.includes("command not found") ||
-				errorMessage.includes("is not recognized") ||
-				errorMessage.includes("ENOENT")
-			) {
+			} else if (isCommandNotFound(errorMessage)) {
 				// Check if podman command is not found
 				const notInstalledMsg = await this.t(
 					"Podman 未安装。请先安装 Podman。",

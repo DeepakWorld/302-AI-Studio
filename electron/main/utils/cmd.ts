@@ -34,43 +34,49 @@ interface ExtendedExecError extends Error {
  * Supports Windows, macOS, Linux
  */
 export function isCommandNotFound(error: unknown): boolean {
+	const isCommandNotFoundMessage = (message: string) => {
+		const lowerMsg = message.toLowerCase();
+		if (lowerMsg.includes("enoent")) return true;
+
+		return match(PLATFORM)
+			.with({ IS_WINDOWS: true }, () =>
+				match(lowerMsg)
+					.when(
+						(m) => m.includes("is not recognized"),
+						() => true,
+					)
+					.when(
+						(m) => m.includes("cannot find the path"),
+						() => true,
+					)
+					.otherwise(() => false),
+			)
+			.with({ IS_MAC: true }, { IS_LINUX: true }, () =>
+				match(lowerMsg)
+					.when(
+						(m) => m.includes("command not found"),
+						() => true,
+					)
+					.when(
+						(m) => m.includes("no such file or directory"),
+						() => true,
+					)
+					.otherwise(() => false),
+			)
+			.otherwise(() => false);
+	};
+
 	return match(error)
 		.when(
 			(err): err is ExtendedExecError => err instanceof Error,
 			(err) => {
-				const message = err.message.toLowerCase();
-
-				return match(PLATFORM)
-					.with({ IS_WINDOWS: true }, () =>
-						match(message)
-							.when(
-								(m) => m.includes("is not recognized"),
-								() => true,
-							)
-							.when(
-								(m) => m.includes("cannot find the path"),
-								() => true,
-							)
-							.otherwise(() => false),
-					)
-					.with({ IS_MAC: true }, { IS_LINUX: true }, () =>
-						match(message)
-							.when(
-								(m) => m.includes("command not found"),
-								() => true,
-							)
-							.when(
-								(m) => m.includes("no such file or directory"),
-								() => true,
-							)
-							.otherwise(() => false),
-					)
-					.otherwise(() =>
-						match(err.code)
-							.with("ENOENT", () => true)
-							.otherwise(() => err.status === 127),
-					);
+				if (err.code === "ENOENT" || err.status === 127) return true;
+				return isCommandNotFoundMessage(err.message);
 			},
+		)
+		.when(
+			(err): err is string => typeof err === "string",
+			(err) => isCommandNotFoundMessage(err),
 		)
 		.otherwise(() => false);
 }
