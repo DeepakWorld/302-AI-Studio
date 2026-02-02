@@ -128,50 +128,47 @@ export class EnvService {
 			const hostPort = await this.prepareRuntimeCompose(apiKey);
 
 			const composePath = this.getRuntimeComposePath();
-			const composeDir = path.dirname(composePath);
 
-			// Execute: podman compose -f <path> up -d
-			const { stdout, stderr } = await execAsync(`podman compose -f "${composePath}" up -d`, {
-				cwd: composeDir,
-			});
-			const output = `${stdout}\n${stderr}`;
+			// Execute: podman-compose -f <path> up -d
+			// Use broadcast to show progress
+			const result = await this.runCommandWithBroadcast(
+				"podman-compose",
+				["-f", composePath, "up", "-d"],
+				"podman-compose-up",
+			);
 
-			console.log("[Local Vibe] podman compose up -d:", output);
-			return { isOk: true, port: hostPort, output };
+			if (!result.isOk) {
+				const errorMessage = result.output;
+				// Check if podman-compose command is not found
+				if (
+					errorMessage.includes("command not found") ||
+					errorMessage.includes("is not recognized") ||
+					errorMessage.includes("ENOENT")
+				) {
+					const notInstalledMsg = await this.t(
+						"podman-compose 未安装。请先安装 podman-compose。",
+						"podman-compose is not installed. Please install podman-compose first.",
+					);
+					console.error("[Local Vibe] podman-compose up -d error:", notInstalledMsg);
+					return { isOk: false, error: notInstalledMsg };
+				}
+
+				console.error("[Local Vibe] podman-compose up -d error:", errorMessage);
+				return { isOk: false, error: errorMessage };
+			}
+
+			console.log("[Local Vibe] podman-compose up -d:", result.output);
+			return { isOk: true, port: hostPort, output: result.output };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			// Check if podman command is not found
-			if (isCommandNotFound(error)) {
-				const notInstalledMsg = await this.t(
-					"Podman 未安装。请先安装 Podman。",
-					"Podman is not installed. Please install Podman first.",
-				);
-				console.error("[Local Vibe] podman compose up -d error:", notInstalledMsg);
-				return { isOk: false, error: notInstalledMsg };
-			}
-
-			// Check if podman compose subcommand is not available (older Podman versions)
-			if (
-				errorMessage.includes("unknown command") ||
-				errorMessage.includes("compose: command not found")
-			) {
-				const upgradeMsg = await this.t(
-					"Podman 版本过旧，不支持 compose 命令。请升级 Podman 到 3.0 或更高版本。",
-					"Podman version is too old and does not support the compose command. Please upgrade Podman to version 3.0 or higher.",
-				);
-				console.error("[Local Vibe] podman compose up -d error:", upgradeMsg);
-				return { isOk: false, error: upgradeMsg };
-			}
-
-			console.error("[Local Vibe] podman compose up -d error:", errorMessage);
+			console.error("[Local Vibe] podman-compose up -d error:", errorMessage);
 			return { isOk: false, error: errorMessage };
 		}
 	}
 
 	/**
-	 * Execute podman compose stop
-	 * Stops containers without removing them, allowing fast restart with podman compose up
+	 * Execute podman-compose stop
+	 * Stops containers without removing them, allowing fast restart with podman-compose up
 	 * Uses runtime compose if exists, falls back to template compose
 	 * @returns { isOk: boolean; output?: string; error?: string }
 	 */
@@ -184,26 +181,35 @@ export class EnvService {
 			// Use runtime compose if exists, otherwise fall back to template
 			const runtimePath = this.getRuntimeComposePath();
 			const composePath = fs.existsSync(runtimePath) ? runtimePath : this.getDockerComposePath();
-			const composeDir = path.dirname(composePath);
 
-			// Execute: podman compose -f <path> stop
-			const { stdout, stderr } = await execAsync(`podman compose -f "${composePath}" stop`, {
-				cwd: composeDir,
-			});
-			const output = `${stdout}\n${stderr}`;
+			// Execute: podman-compose -f <path> stop
+			const result = await this.runCommandWithBroadcast(
+				"podman-compose",
+				["-f", composePath, "stop"],
+				"podman-compose-stop",
+			);
 
-			console.log("[Local Vibe] podman compose stop:", output);
-			return { isOk: true, output };
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			if (!result.isOk) {
+				const errorMessage = result.output;
+				// Check if podman-compose command is not found - treat as non-fatal for stop
+				if (
+					errorMessage.includes("command not found") ||
+					errorMessage.includes("is not recognized") ||
+					errorMessage.includes("ENOENT")
+				) {
+					console.warn("[Local Vibe] podman-compose stop: podman-compose not found (non-fatal)");
+					return { isOk: true, output: "podman-compose not installed, nothing to stop" };
+				}
 
-			// Check if podman command is not found - treat as non-fatal for stop
-			if (isCommandNotFound(error)) {
-				console.warn("[Local Vibe] podman compose stop: podman not found (non-fatal)");
-				return { isOk: true, output: "Podman not installed, nothing to stop" };
+				console.error("[Local Vibe] podman-compose stop error:", errorMessage);
+				return { isOk: false, error: errorMessage };
 			}
 
-			console.error("[Local Vibe] podman compose stop error:", errorMessage);
+			console.log("[Local Vibe] podman-compose stop:", result.output);
+			return { isOk: true, output: result.output };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[Local Vibe] podman-compose stop error:", errorMessage);
 			return { isOk: false, error: errorMessage };
 		}
 	}
@@ -228,8 +234,10 @@ export class EnvService {
 		args: string[],
 		step: string,
 		useShell = true,
-	): Promise<{ isOk: boolean }> {
+	): Promise<{ isOk: boolean; output: string }> {
 		return new Promise((resolve) => {
+			let output = "";
+
 			broadcastService.broadcastChannelToAll("install-log", {
 				step,
 				type: "start",
@@ -244,6 +252,7 @@ export class EnvService {
 			// Helper to process output data (handles \r progress bars)
 			const processOutput = (data: Buffer, type: "stdout" | "stderr") => {
 				const text = data.toString();
+				output += text;
 				// Replace \r with \n to ensure progress bars are shown as separate lines
 				// Some tools use \r to overwrite the same line for progress animation
 				const normalized = text.replace(/\r/g, "\n").replace(/\n+/g, "\n");
@@ -265,16 +274,18 @@ export class EnvService {
 					type: "complete",
 					data: `Process exited with code ${code}`,
 				});
-				resolve({ isOk: code === 0 });
+				resolve({ isOk: code === 0, output });
 			});
 
 			proc.on("error", (error) => {
+				const errorMsg = error.message;
+				output += `\nError: ${errorMsg}`;
 				broadcastService.broadcastChannelToAll("install-log", {
 					step,
 					type: "error",
-					data: error.message,
+					data: errorMsg,
 				});
-				resolve({ isOk: false });
+				resolve({ isOk: false, output });
 			});
 		});
 	}
@@ -447,6 +458,17 @@ export class EnvService {
 	}
 
 	/**
+	 * Checks if podman-compose is installed and accessible
+	 * @returns { isOk: boolean; isValid: boolean } - isOk: operation success, isValid: podman-compose is available
+	 */
+	private async checkPodmanCompose(): Promise<{
+		isOk: boolean;
+		isValid: boolean;
+	}> {
+		return this.checkCommand("podman-compose --version");
+	}
+
+	/**
 	 * Checks if podman is healthy (ai302-machine exists)
 	 * @returns { isOk: boolean; isHealth: boolean; timestamp?: number } - isOk: operation success, isHealth: podman health check result (ai302-machine exists), timestamp when called via startPodmanHealthCheck
 	 */
@@ -496,8 +518,9 @@ export class EnvService {
 
 	/**
 	 * Validates if podman is installed and accessible, and ai302-machine exists
+	 * Also checks if podman-compose is available
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean; isValid: boolean; output?: string; error?: string } - isOk: operation success, isValid: podman installed AND machine exists, output: command output, error: error message if failed
+	 * @returns { isOk: boolean; isValid: boolean; output?: string; error?: string } - isOk: operation success, isValid: podman installed AND machine exists AND podman-compose available, output: command output, error: error message if failed
 	 */
 	async validPodman(
 		_event: IpcMainInvokeEvent,
@@ -514,6 +537,19 @@ export class EnvService {
 			const machineCheck = await this.checkPodmanMachineExists();
 			if (!machineCheck.isOk) {
 				return { isOk: false, isValid: false, error: "Failed to check machine list" };
+			}
+
+			// Check if podman-compose is available
+			const composeCheck = await this.checkPodmanCompose();
+			if (!composeCheck.isOk) {
+				return { isOk: false, isValid: false, error: "Failed to check podman-compose" };
+			}
+			if (!composeCheck.isValid) {
+				const composeError = await this.t(
+					"podman-compose 未安装。请先安装 podman-compose。",
+					"podman-compose is not installed. Please install podman-compose first.",
+				);
+				return { isOk: true, isValid: false, error: composeError };
 			}
 
 			return { isOk: true, isValid: machineCheck.exists, output: stdout };
@@ -713,6 +749,56 @@ export class EnvService {
 	}
 
 	/**
+	 * Installs podman-compose on the current platform
+	 *
+	 * Platform-specific installation:
+	 * - Windows: pip install podman-compose
+	 * - macOS: brew install podman-compose
+	 * - Linux: pip3 install podman-compose or apt-get install podman-compose
+	 *
+	 * Broadcasts log events via "install-log" channel with step: "install-podman-compose"
+	 *
+	 * @returns { isOk: boolean } - isOk: operation success
+	 */
+	private async installPodmanCompose(): Promise<{ isOk: boolean }> {
+		const platform = process.platform;
+
+		if (platform === "win32") {
+			// Windows: Install via pip (podman is installed via scoop which includes pip)
+			return this.runCommandWithBroadcast(
+				"pip",
+				["install", "podman-compose"],
+				"install-podman-compose",
+			);
+		} else if (platform === "darwin") {
+			// macOS: Install via Homebrew
+			return this.runCommandWithBroadcast(
+				"brew",
+				["install", "podman-compose"],
+				"install-podman-compose",
+			);
+		} else if (platform === "linux") {
+			// Linux: Try pip first, fallback to apt-get
+			const pipResult = await this.runCommandWithBroadcast(
+				"pip3",
+				["install", "podman-compose"],
+				"install-podman-compose",
+			);
+			if (pipResult.isOk) {
+				return pipResult;
+			}
+			// Fallback to apt-get
+			return this.runCommandWithBroadcast(
+				"sudo",
+				["apt-get", "install", "-y", "podman-compose"],
+				"install-podman-compose",
+			);
+		}
+
+		return { isOk: false };
+	}
+
+	/**
 	 * Initializes the ai302-machine if it doesn't already exist
 	 * Checks for existing machine before attempting init
 	 * @returns { isOk: boolean } - isOk: operation success
@@ -747,14 +833,14 @@ export class EnvService {
 	 * Installs Podman with platform-specific logic
 	 *
 	 * Platform flows:
-	 * - Windows: Check/install WSL → Check/install Scoop → Install Podman (if needed) → Init machine with WSL provider
-	 * - macOS: Check/install Homebrew → Install Podman (if needed) → Init machine
-	 * - Linux: Install Podman via apt-get (if needed)
+	 * - Windows: Check/install WSL → Check/install Scoop → Install Podman (if needed) → Install podman-compose (if needed) → Init machine with WSL provider
+	 * - macOS: Check/install Homebrew → Install Podman (if needed) → Install podman-compose (if needed) → Init machine
+	 * - Linux: Install Podman via apt-get (if needed) → Install podman-compose (if needed)
 	 *
 	 * If Podman is already installed but ai302-machine doesn't exist, only machine init will be performed.
 	 *
 	 * Broadcasts log events via "install-log" channel with step identifiers:
-	 * - install-wsl, scoop-policy, scoop-install, install-homebrew, install-podman, init-podman
+	 * - install-wsl, scoop-policy, scoop-install, install-homebrew, install-podman, install-podman-compose, init-podman
 	 *
 	 * @param _event The IPC main invoke event
 	 * @returns { isOk: boolean } - isOk: operation success
@@ -784,19 +870,21 @@ export class EnvService {
 	 * 1. Check/install WSL
 	 * 2. Check/install Scoop
 	 * 3. Install Podman (if not already installed)
-	 * 4. Initialize Podman Machine with WSL provider (if not already exists)
+	 * 4. Install podman-compose (if not already installed)
+	 * 5. Initialize Podman Machine with WSL provider (if not already exists)
 	 */
 	private async _installPodmanWindows(): Promise<{ isOk: boolean }> {
 		// Check if Podman is already installed and machine exists
 		const podmanCheck = await this.checkCommand("podman --version");
 		const machineCheck = await this.checkPodmanMachineExists();
+		const composeCheck = await this.checkPodmanCompose();
 
-		if (podmanCheck.isValid && machineCheck.exists) {
-			// Both podman and machine exist, nothing to do
+		if (podmanCheck.isValid && machineCheck.exists && composeCheck.isValid) {
+			// Podman, machine and podman-compose exist, nothing to do
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "init-podman",
 				type: "stdout",
-				data: "Podman and ai302-machine already exist, skipping installation",
+				data: "Podman, ai302-machine and podman-compose already exist, skipping installation",
 			});
 			return { isOk: true };
 		}
@@ -842,7 +930,19 @@ export class EnvService {
 			});
 		}
 
-		// 4. Initialize Podman Machine (only if not already exists)
+		// 4. Install podman-compose (only if not already installed)
+		if (!composeCheck.isValid) {
+			const composeInstall = await this.installPodmanCompose();
+			if (!composeInstall.isOk) return { isOk: false };
+		} else {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman-compose",
+				type: "stdout",
+				data: "podman-compose already installed, skipping installation",
+			});
+		}
+
+		// 5. Initialize Podman Machine (only if not already exists)
 		return this._initPodmanMachine();
 	}
 
@@ -850,19 +950,21 @@ export class EnvService {
 	 * macOS installation flow:
 	 * 1. Check/install Homebrew
 	 * 2. Install Podman via Homebrew (if not already installed)
-	 * 3. Initialize Podman machine (if not already exists)
+	 * 3. Install podman-compose (if not already installed)
+	 * 4. Initialize Podman machine (if not already exists)
 	 */
 	private async _installPodmanMacOS(): Promise<{ isOk: boolean }> {
 		// Check if Podman is already installed and machine exists
 		const podmanCheck = await this.checkCommand("podman --version");
 		const machineCheck = await this.checkPodmanMachineExists();
+		const composeCheck = await this.checkPodmanCompose();
 
-		if (podmanCheck.isValid && machineCheck.exists) {
-			// Both podman and machine exist, nothing to do
+		if (podmanCheck.isValid && machineCheck.exists && composeCheck.isValid) {
+			// Podman, machine and podman-compose exist, nothing to do
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "init-podman",
 				type: "stdout",
-				data: "Podman and ai302-machine already exist, skipping installation",
+				data: "Podman, ai302-machine and podman-compose already exist, skipping installation",
 			});
 			return { isOk: true };
 		}
@@ -897,11 +999,23 @@ export class EnvService {
 			});
 		}
 
-		// 3. Initialize Podman Machine (only if not already exists)
+		// 3. Install podman-compose (only if not already installed)
+		if (!composeCheck.isValid) {
+			const composeInstall = await this.installPodmanCompose();
+			if (!composeInstall.isOk) return { isOk: false };
+		} else {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman-compose",
+				type: "stdout",
+				data: "podman-compose already installed, skipping installation",
+			});
+		}
+
+		// 4. Initialize Podman Machine (only if not already exists)
 		const machineInit = await this._initPodmanMachine();
 		if (!machineInit.isOk) return { isOk: false };
 
-		// 4. Install podman-mac-helper for better performance
+		// 5. Install podman-mac-helper for better performance
 		const helperInstall = await this.runSudoCommandWithBroadcast(
 			"/opt/homebrew/Cellar/podman/5.7.1/bin/podman-mac-helper",
 			["install"],
@@ -928,26 +1042,51 @@ export class EnvService {
 	/**
 	 * Linux installation flow (Ubuntu/Debian):
 	 * 1. Install Podman via apt-get (if not already installed)
+	 * 2. Install podman-compose (if not already installed)
 	 */
 	private async _installPodmanLinux(): Promise<{ isOk: boolean }> {
 		// Check if Podman is already installed
 		const podmanCheck = await this.checkCommand("podman --version");
+		const composeCheck = await this.checkPodmanCompose();
 
-		if (podmanCheck.isValid) {
+		if (podmanCheck.isValid && composeCheck.isValid) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman",
+				type: "stdout",
+				data: "Podman and podman-compose already installed, skipping installation",
+			});
+			return { isOk: true };
+		}
+
+		// 1. Install Podman (only if not already installed)
+		if (!podmanCheck.isValid) {
+			const podmanInstall = await this.runCommandWithBroadcast(
+				"sudo",
+				["apt-get", "-y", "install", "podman"],
+				"install-podman",
+			);
+			if (!podmanInstall.isOk) return { isOk: false };
+		} else {
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "install-podman",
 				type: "stdout",
 				data: "Podman already installed, skipping installation",
 			});
-			return { isOk: true };
 		}
 
-		const podmanInstall = await this.runCommandWithBroadcast(
-			"sudo",
-			["apt-get", "-y", "install", "podman"],
-			"install-podman",
-		);
-		return podmanInstall;
+		// 2. Install podman-compose (only if not already installed)
+		if (!composeCheck.isValid) {
+			const composeInstall = await this.installPodmanCompose();
+			if (!composeInstall.isOk) return { isOk: false };
+		} else {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "install-podman-compose",
+				type: "stdout",
+				data: "podman-compose already installed, skipping installation",
+			});
+		}
+
+		return { isOk: true };
 	}
 
 	/**
@@ -1097,59 +1236,54 @@ export class EnvService {
 		}
 
 		// macOS/Windows: Start the Podman machine first
-		try {
-			const { stdout, stderr } = await execAsync("podman machine start ai302-machine");
-			const output = `${stdout}\n${stderr}`;
+		const startResult = await this.runCommandWithBroadcast(
+			"podman",
+			["machine", "start", "ai302-machine"],
+			"podman-machine-start",
+		);
 
-			// Execute podman compose up -d after successful start
-			const composeResult = await this.runPodmanComposeUp();
+		const output = startResult.output;
+		let alreadyStarted = false;
 
-			// Start local sandbox health check
-			await new Promise((resolve) => setTimeout(resolve, 3000));
-			await this.startLocalSandboxHealthCheck();
+		if (!startResult.isOk) {
+			const errorMessage = startResult.output;
 
-			return {
-				isOk: true,
-				alreadyStarted: false,
-				port: composeResult?.port,
-				output,
-				composeOutput: composeResult?.output,
-				composeError: composeResult?.error,
-			};
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			// Machine already running is considered success
+			// Check if already running
 			// Based on actual Podman error: "Error: unable to start "ai302-machine": already running"
 			if (errorMessage.includes("already running")) {
-				// Execute podman compose even if machine was already running
-				const composeResult = await this.runPodmanComposeUp();
-
-				// Start local sandbox health check
-				await new Promise((resolve) => setTimeout(resolve, 3000));
-				await this.startLocalSandboxHealthCheck();
-
-				return {
-					isOk: true,
-					alreadyStarted: true,
-					port: composeResult?.port,
-					output: errorMessage,
-					composeOutput: composeResult?.output,
-					composeError: composeResult?.error,
-				};
-			}
-
-			// Check if podman command is not found
-			if (isCommandNotFound(error)) {
+				alreadyStarted = true;
+			} else if (
+				errorMessage.includes("command not found") ||
+				errorMessage.includes("is not recognized") ||
+				errorMessage.includes("ENOENT")
+			) {
+				// Check if podman command is not found
 				const notInstalledMsg = await this.t(
 					"Podman 未安装。请先安装 Podman。",
 					"Podman is not installed. Please install Podman first.",
 				);
 				return { isOk: false, error: notInstalledMsg };
+			} else {
+				// Other errors
+				return { isOk: false, error: errorMessage };
 			}
-
-			return { isOk: false, error: errorMessage };
 		}
+
+		// Execute podman compose up -d after successful start (or if already running)
+		const composeResult = await this.runPodmanComposeUp();
+
+		// Start local sandbox health check
+		await new Promise((resolve) => setTimeout(resolve, 3000));
+		await this.startLocalSandboxHealthCheck();
+
+		return {
+			isOk: true,
+			alreadyStarted,
+			port: composeResult?.port,
+			output,
+			composeOutput: composeResult?.output,
+			composeError: composeResult?.error,
+		};
 	}
 }
 
