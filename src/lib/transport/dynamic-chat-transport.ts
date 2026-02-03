@@ -2,6 +2,9 @@ import type { ChatMessage, ResultMetadata } from "$lib/types/chat";
 import type { HttpChatTransportInitOptions } from "ai";
 import { DefaultChatTransport } from "ai";
 
+// Debug mode for transport layer logging (TRANS-01, TRANS-02, TRANS-03)
+const DEBUG_TRANSPORT = import.meta.env.DEV;
+
 // Store for pending result metadata (will be merged into message on finish)
 export let pendingResultMetadata: ResultMetadata | null = null;
 
@@ -53,6 +56,10 @@ export class DynamicChatTransport<
 								while (true) {
 									const { done, value } = await reader.read();
 									if (done) {
+										// TRANS-03: Connection close detection
+										if (DEBUG_TRANSPORT) {
+											console.log("[DynamicChatTransport] Stream connection closed");
+										}
 										if (buffer) {
 											controller.enqueue(encoder.encode(buffer));
 										}
@@ -67,6 +74,24 @@ export class DynamicChatTransport<
 									buffer = lines.pop() || "";
 
 									for (const line of lines) {
+										// TRANS-01: Finish event detection logging
+										if (DEBUG_TRANSPORT && line.includes('"type":"finish"')) {
+											console.log("[DynamicChatTransport] FINISH event received:", {
+												timestamp: new Date().toISOString(),
+												line: line.substring(0, 200),
+											});
+										}
+
+										// TRANS-02: [DONE] marker validation
+										if (line.includes("[DONE]")) {
+											if (DEBUG_TRANSPORT) {
+												console.log("[DynamicChatTransport] [DONE] marker received");
+											}
+											// Forward [DONE] marker unchanged - critical for AI SDK stream termination
+											controller.enqueue(encoder.encode(line + "\n"));
+											continue;
+										}
+
 										// Handle message-metadata event (from 302.AI Claude Code result)
 										if (line.includes('"type":"message-metadata"')) {
 											try {
@@ -131,6 +156,9 @@ export class DynamicChatTransport<
 									}
 								}
 							} catch (error) {
+								if (DEBUG_TRANSPORT) {
+									console.error("[DynamicChatTransport] Stream error:", error);
+								}
 								controller.error(error);
 							}
 						},
