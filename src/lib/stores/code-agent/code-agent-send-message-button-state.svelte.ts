@@ -32,6 +32,7 @@ class CodeAgentSendMessageButtonState {
 			return { isOk: true };
 		}
 
+		this.isChecking = true;
 		try {
 			const result = await localEnvState.ensureSandboxRunning();
 
@@ -55,6 +56,8 @@ class CodeAgentSendMessageButtonState {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.error("[CodeAgent] Failed to ensure local sandbox ready:", errorMessage);
 			return { isOk: false, error: errorMessage };
+		} finally {
+			this.isChecking = false;
 		}
 	}
 
@@ -277,7 +280,7 @@ class CodeAgentSendMessageButtonState {
 					const infos = mcpState.getMCPInfosByIds(chatState.mcpServerIds);
 					if (infos.length > 0) {
 						try {
-							await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, infos);
+							await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, infos, codeAgentState.type);
 						} catch (error) {
 							console.error("Failed to add MCP servers:", error);
 						}

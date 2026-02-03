@@ -1318,12 +1318,11 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		thinkingBudget,
 	} = await c.req.json<RouterRequestBody>();
 
+	const { data: codeAgentConfig } = await codeAgentService.getCodeAgentConfig(threadId);
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
 
 	// Notify the frontend that sandbox is ready (triggers preview panel to open)
-	if (sandboxId) {
-		tabService.notifySandboxCreated(threadId, sandboxId);
-	}
+	tabService.notifySandboxCreated(threadId, sandboxId);
 
 	console.log(
 		"[302ai-code-agent] Received request",
@@ -1511,7 +1510,7 @@ CHECK BEFORE EVERY ACTION:
 	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(messagesToConvert);
 
 	const requestBody = {
-		model: sandboxId,
+		model: codeAgentConfig.type === "remote" ? sandboxId : model,
 		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
@@ -1565,14 +1564,22 @@ CHECK BEFORE EVERY ACTION:
 
 			// Upload attachments after sending start event (non-blocking UX)
 			// This allows the UI to show "AI is typing" immediately while upload happens in background
-			if (sandboxId && workspacePath) {
-				try {
-					await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
-				} catch (uploadError) {
-					console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
-					sendStreamError(controller, "Failed to upload attachments");
-					return;
-				}
+			// if (sandboxId && workspacePath) {
+			// 	try {
+			// 		await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
+			// 	} catch (uploadError) {
+			// 		console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
+			// 		sendStreamError(controller, "Failed to upload attachments");
+			// 		return;
+			// 	}
+			// }
+
+			try {
+				await uploadAttachmentsFromMessages(sandboxId, workspacePath ?? "", messages);
+			} catch (uploadError) {
+				console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
+				sendStreamError(controller, "Failed to upload attachments");
+				return;
 			}
 
 			try {

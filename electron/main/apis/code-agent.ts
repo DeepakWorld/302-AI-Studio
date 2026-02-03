@@ -235,16 +235,20 @@ export type AddMcpSchema = typeof addMcpSchemaResponse.infer;
 export async function addClaudeCodeSandboxMCP(
 	sandboxId: string,
 	MCPInfos: { url: string; name: string }[],
+	mode: string,
 ): Promise<AddMcpSchema> {
 	const commands = MCPInfos.map(
 		(info) => `claude mcp add --transport http ${info.name} ${info.url}`,
 	);
 	try {
-		const response = await _302AIKy
-			.post("302/claude-code/sandbox/mcp/add", {
-				json: { sandbox_id: sandboxId, mcp_servers: commands },
-			})
-			.json();
+		const response =
+			mode === "remote"
+				? _302AIKy
+				: localCodeAgentKy
+						.post("302/claude-code/sandbox/mcp/add", {
+							json: { sandbox_id: sandboxId, mcp_servers: commands },
+						})
+						.json();
 
 		const validated = addMcpSchemaResponse(response);
 		if (validated instanceof type.errors) {

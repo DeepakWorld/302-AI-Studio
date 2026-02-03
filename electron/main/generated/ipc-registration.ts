@@ -278,8 +278,8 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:findClaudeCodeSandboxWithValidDisk", (event, threadId) =>
 		codeAgentService.findClaudeCodeSandboxWithValidDisk(event, threadId),
 	);
-	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos) =>
-		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos),
+	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos, mode) =>
+		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos, mode),
 	);
 	ipcMain.handle(
 		"codeAgentService:createThreadForSession",

@@ -69,7 +69,7 @@
 			if (sandboxId) {
 				addingMCP = true;
 				const infos = mcpState.getMCPInfosByIds(selectedIds);
-				await addClaudeCodeSandboxMCP(sandboxId, infos);
+				await addClaudeCodeSandboxMCP(sandboxId, infos, codeAgentState.type);
 				addingMCP = false;
 			}
 		}

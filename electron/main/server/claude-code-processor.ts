@@ -222,8 +222,9 @@ class ClaudeCodeProcessor {
 		try {
 			const data = JSON.parse(jsonStr) as ClaudeCodeEvent;
 			return this.transformEvent(data);
-		} catch {
-			// If JSON parsing fails, skip
+		} catch (e) {
+			// If JSON parsing fails, log and skip
+			console.log("[ClaudeCodeProcessor] JSON parse failed for:", jsonStr, "Error:", e);
 			return null;
 		}
 	}
@@ -277,6 +278,12 @@ class ClaudeCodeProcessor {
 			return this.transformAnthropicEvent(data.event);
 		}
 
+		console.log(
+			"[ClaudeCodeProcessor] Unhandled event type:",
+			data.type,
+			"data:",
+			JSON.stringify(data).slice(0, 200),
+		);
 		return null;
 	}
 
@@ -908,13 +915,13 @@ function interceptSSEResponse(response: Response, processor: ClaudeCodeProcessor
 					const chunk = decoder.decode(value, { stream: true });
 
 					// Debug: Log raw SSE chunk
-					console.debug("[ClaudeCodeProcessor] Raw SSE chunk:", chunk);
+					console.log("[ClaudeCodeProcessor] Raw SSE chunk:", chunk);
 
 					const processedChunk = processor.processSSEChunk(chunk);
 
 					if (processedChunk) {
 						// Debug: Log processed SSE chunk
-						console.debug("[ClaudeCodeProcessor] Processed SSE chunk:", processedChunk);
+						console.log("[ClaudeCodeProcessor] Processed SSE chunk:", processedChunk);
 						try {
 							controller.enqueue(encoder.encode(processedChunk));
 						} catch (_error) {
