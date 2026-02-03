@@ -17,3 +17,7 @@ yarn.lock
 
 # Static assets
 /static/
+
+# Planning and Claude config (external tooling)
+.claude/
+.planning/
