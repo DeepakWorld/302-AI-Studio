@@ -9,10 +9,10 @@ Requirements for this fix cycle. Each maps to roadmap phases.
 
 ### Backend Stream Lifecycle
 
-- [ ] **BACK-01**: ReadableStream closes properly via controller.close() in finally blocks for all stream paths
-- [ ] **BACK-02**: Error events are handled with proper cleanup - no orphaned streams
-- [ ] **BACK-03**: Stream completion signals include explicit [DONE] marker per AI SDK protocol
-- [ ] **BACK-04**: All AI providers (OpenAI, Anthropic, Google, 302AI) send proper completion events
+- [x] **BACK-01**: ReadableStream closes properly via controller.close() in finally blocks for all stream paths
+- [x] **BACK-02**: Error events are handled with proper cleanup - no orphaned streams
+- [x] **BACK-03**: Stream completion signals include explicit [DONE] marker per AI SDK protocol
+- [x] **BACK-04**: All AI providers (OpenAI, Anthropic, Google, 302AI) send proper completion events
 
 ### Transport Layer
 
@@ -58,10 +58,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BACK-01 | Phase 1 | Pending |
-| BACK-02 | Phase 1 | Pending |
-| BACK-03 | Phase 1 | Pending |
-| BACK-04 | Phase 1 | Pending |
+| BACK-01 | Phase 1 | Complete |
+| BACK-02 | Phase 1 | Complete |
+| BACK-03 | Phase 1 | Complete |
+| BACK-04 | Phase 1 | Complete |
 | TRANS-01 | Phase 2 | Pending |
 | TRANS-02 | Phase 2 | Pending |
 | TRANS-03 | Phase 2 | Pending |
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after roadmap creation*
+*Last updated: 2026-02-03 after Phase 1 completion*
