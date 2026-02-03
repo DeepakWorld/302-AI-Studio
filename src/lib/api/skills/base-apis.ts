@@ -1,6 +1,15 @@
 import { skill } from "@shared/types";
 import { type } from "arktype";
-import { codeAgentKy } from "../core/code-agent-ky";
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+import { _302AIKy } from "../core/_302ai-ky";
+import { localCodeAgentKy } from "../core/local-code-agent-ky";
+
+/**
+ * Get the appropriate ky instance based on code agent mode
+ */
+function getCodeAgentKy() {
+	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
+}
 
 export const listSkillsRequestSchema = type({
 	sandboxId: "string?",
@@ -19,13 +28,24 @@ export type ListSkillsResponse = typeof listSkillsResponseSchema.infer;
 export async function _listSkills(request: ListSkillsRequest): Promise<ListSkillsResponse> {
 	const { sandboxId, sessionId, projectPath } = request;
 	try {
-		const response = await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const searchParams =
+			codeAgentState.type === "local"
+				? {
+						session_id: sessionId,
+						project_path: projectPath,
+					}
+				: {
+						sandbox_id: sandboxId,
+						session_id: sessionId,
+						project_path: projectPath,
+					};
+
+		const response = await kyInstance
 			.get("302/claude-code/skills/list", {
-				searchParams: {
-					sandbox_id: sandboxId,
-					session_id: sessionId,
-					project_path: projectPath,
-				},
+				searchParams,
 			})
 			.json();
 
@@ -57,7 +77,8 @@ export async function checkSkillDetails(
 ): Promise<CheckSkillDetailsResponse> {
 	const { skillName, builtin } = request;
 	try {
-		const response = await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+		const response = await kyInstance
 			.get("302/claude-code/skills/detail", {
 				searchParams: {
 					name: skillName,
@@ -82,7 +103,8 @@ export async function checkSkillDetails(
 export async function _editSkillDetails(request: SkillDetailsRequest): Promise<Blob> {
 	const { skillName, builtin } = request;
 	try {
-		const response = await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+		const response = await kyInstance
 			.get("302/claude-code/skills/detail", {
 				searchParams: {
 					name: skillName,
@@ -125,10 +147,11 @@ export type CreateSkillResponse = typeof createSkillResponseSchema.infer;
 
 export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> {
 	try {
+		const kyInstance = getCodeAgentKy();
 		const formData = new FormData();
 		formData.append("file", zipFile);
 
-		const response = await codeAgentKy
+		const response = await kyInstance
 			.post("302/claude-code/skills", {
 				body: formData,
 				timeout: 120000,
@@ -149,10 +172,11 @@ export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> 
 
 export async function _createSkillFromGitHub(githubUrl: string): Promise<CreateSkillResponse> {
 	try {
+		const kyInstance = getCodeAgentKy();
 		const formData = new FormData();
 		formData.append("github_url", githubUrl);
 
-		const response = await codeAgentKy
+		const response = await kyInstance
 			.post("302/claude-code/skills", {
 				body: formData,
 				timeout: 120000,
@@ -198,7 +222,8 @@ export type DeleteSkillResponse = typeof deleteSkillResponseSchema.infer;
 
 export async function deleteSkill(request: DeleteSkillRequest): Promise<DeleteSkillResponse> {
 	try {
-		const response = await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+		const response = await kyInstance
 			.delete("302/claude-code/skills", {
 				json: request,
 			})
@@ -241,9 +266,19 @@ export type SyncSkillsResponse = typeof syncSkillsResponseSchema.infer;
  */
 export async function syncSkills(request: SyncSkillsRequest): Promise<SyncSkillsResponse> {
 	try {
-		const response = await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						session_id: request.session_id,
+					}
+				: request;
+
+		const response = await kyInstance
 			.post("302/claude-code/skills/sync", {
-				json: request,
+				json: requestBody,
 				timeout: 120000,
 			})
 			.json();

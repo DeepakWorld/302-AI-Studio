@@ -12,7 +12,7 @@ services:
       - ROOT_SAVE_PATH=/home/user
       # set these as needed
       - ANTHROPIC_BASE_URL=https://api.302.ai
-      - ANTHROPIC_AUTH_TOKEN=
+      - ANTHROPIC_AUTH_TOKEN=${AI302_API_KEY}
       - ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.2
       # injected from .env file at runtime
       - AI302_API_KEY=${AI302_API_KEY}

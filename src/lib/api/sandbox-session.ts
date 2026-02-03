@@ -4,7 +4,16 @@
  */
 
 import { type } from "arktype";
-import { codeAgentKy } from "./core/code-agent-ky";
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+import { _302AIKy } from "./core/_302ai-ky";
+import { localCodeAgentKy } from "./core/local-code-agent-ky";
+
+/**
+ * Get the appropriate ky instance based on code agent mode
+ */
+function getCodeAgentKy() {
+	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
+}
 
 export interface UpdateSessionNoteRequest {
 	/**
@@ -45,9 +54,20 @@ export async function _updateSessionNote(
 	request: _UpdateSessionNoteRequest,
 ): Promise<_UpdateSessionNoteResponse> {
 	try {
-		const response = await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						note: request.note,
+						session_id: request.session_id,
+					}
+				: request;
+
+		const response = await kyInstance
 			.post("302/claude-code/sandbox/session", {
-				json: request,
+				json: requestBody,
 			})
 			.json();
 
@@ -110,9 +130,20 @@ export async function updateSessionNote(
 	request: UpdateSessionNoteRequest,
 ): Promise<UpdateSessionNoteResult> {
 	try {
-		const data = (await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						note: request.note,
+						session_id: request.session_id,
+					}
+				: request;
+
+		const data = (await kyInstance
 			.post("302/claude-code/sandbox/session", {
-				json: request,
+				json: requestBody,
 			})
 			.json()) as UpdateSessionNoteResponse;
 
@@ -153,12 +184,22 @@ export async function updateSessionNote(
  */
 export async function deleteSession(request: DeleteSessionRequest): Promise<DeleteSessionResult> {
 	try {
-		const data = (await codeAgentKy
+		const kyInstance = getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const searchParams =
+			codeAgentState.type === "local"
+				? {
+						session_id: request.session_id,
+					}
+				: {
+						sandbox_id: request.sandbox_id,
+						session_id: request.session_id,
+					};
+
+		const data = (await kyInstance
 			.delete("302/claude-code/sandbox/session", {
-				searchParams: {
-					sandbox_id: request.sandbox_id,
-					session_id: request.session_id,
-				},
+				searchParams,
 			})
 			.json()) as DeleteSessionResponse;
 
