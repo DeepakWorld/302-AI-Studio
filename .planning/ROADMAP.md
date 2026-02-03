@@ -50,6 +50,11 @@ Plans:
 
 **Dependencies:** Phase 1
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md - Add debug logging for finish events, [DONE] markers, and connection close
+
 **Requirements:**
 - TRANS-01: Finish event detection logs at transport layer for debugging
 - TRANS-02: SSE protocol validation confirms [DONE] marker delivery
@@ -87,8 +92,8 @@ Plans:
 
 | Phase | Status | Requirements | Completion |
 |-------|--------|--------------|------------|
-| 1 - Backend Stream Lifecycle | ✓ Complete | 4/4 mapped | 100% |
-| 2 - Transport Layer Validation | Pending | 3/3 mapped | 0% |
+| 1 - Backend Stream Lifecycle | Complete | 4/4 mapped | 100% |
+| 2 - Transport Layer Validation | Planned | 3/3 mapped | 0% |
 | 3 - Frontend State Synchronization | Pending | 4/4 mapped | 0% |
 
 **Overall:** 4/11 requirements complete (36%)
@@ -99,9 +104,9 @@ Plans:
 
 ```
 Phase 1: Backend Stream Lifecycle
-    ↓
+    |
 Phase 2: Transport Layer Validation
-    ↓
+    |
 Phase 3: Frontend State Synchronization
 ```
 
