@@ -170,7 +170,8 @@ export type BroadcastEvent =
 	| "show-toast"
 	| "sidebar-state-changed"
 	| "apply-default-model"
-	| "models-deleted";
+	| "models-deleted"
+	| "local-sandbox-state-changed";
 
 export interface BroadcastEventData {
 	broadcastEvent: BroadcastEvent;

@@ -20,6 +20,7 @@ export const DEFAULT_SANDBOX_PORT = 8123;
 export class EnvService {
 	/** Default port for local sandbox API */
 	private runtimePort: number | null = null;
+	private isOperating = false;
 
 	// Localization helper method
 	private async t(zh: string, en: string): Promise<string> {
@@ -100,6 +101,18 @@ export class EnvService {
 	}
 
 	/**
+	 * Get the current sandbox status via IPC
+	 * Used by new renderer windows to sync their state
+	 */
+	async getSandboxStatus(_event: IpcMainInvokeEvent): Promise<{
+		isRunning: boolean;
+		isOperating: boolean;
+	}> {
+		const result = await this.checkLocalSandboxHealth();
+		return { isRunning: result.isHealth, isOperating: this.isOperating };
+	}
+
+	/**
 	 * Prepare runtime environment for docker-compose
 	 * - Copies template compose to runtime directory
 	 * - Detects available port (starting from DEFAULT_SANDBOX_PORT)
@@ -170,11 +183,11 @@ export class EnvService {
 				console.warn("[Local Vibe] Auto-pull failed, trying to start anyway:", pullResult.error);
 			}
 
-			// Execute: podman-compose -f <path> up -d
+			// Execute: podman-compose -f <path> up -d --force-recreate
 			// Use broadcast to show progress
 			const result = await this.runCommandWithBroadcast(
 				"podman-compose",
-				["-f", composePath, "up", "-d"],
+				["-f", composePath, "up", "-d", "--force-recreate"],
 				"podman-compose-up",
 			);
 
@@ -566,7 +579,11 @@ export class EnvService {
 			return { isOk: true, isHealth: true };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error("[EnvService] Local sandbox health check failed:", errorMessage);
+			// Suppress error logging if operating (starting/stopping) or if it's a connection error
+			// unexpected errors should still be logged
+			if (!this.isOperating) {
+				console.error("[EnvService] Local sandbox health check failed:", errorMessage);
+			}
 			return { isOk: true, isHealth: false, error: errorMessage };
 		}
 	}
@@ -1173,6 +1190,7 @@ export class EnvService {
 	 */
 	private async _stopLocalSandbox(): Promise<{ isOk: boolean; output?: string; error?: string }> {
 		const platform = process.platform;
+		this.isOperating = true;
 
 		try {
 			// Stop local sandbox health check
@@ -1236,6 +1254,8 @@ export class EnvService {
 
 			// Other errors - counts as failure
 			return { isOk: false, error: errorMessage };
+		} finally {
+			this.isOperating = false;
 		}
 	}
 
@@ -1326,20 +1346,69 @@ export class EnvService {
 		composeError?: string;
 	}> {
 		const platform = process.platform;
+		this.isOperating = true;
 
-		// On Linux, Podman runs rootless without a VM - skip machine start
-		if (platform === "linux") {
-			console.log("[Local Vibe] Linux detected, skipping machine start (rootless mode)");
+		try {
+			// On Linux, Podman runs rootless without a VM - skip machine start
+			if (platform === "linux") {
+				console.log("[Local Vibe] Linux detected, skipping machine start (rootless mode)");
 
-			// Execute podman compose up -d directly
-			const composeResult = await this.runPodmanComposeUp();
+				// Execute podman compose up -d directly
+				const composeResult = await this.runPodmanComposeUp();
 
-			if (!composeResult.isOk) {
+				if (!composeResult.isOk) {
+					return {
+						isOk: false,
+						error: composeResult.error,
+					};
+				}
+
+				// Start local sandbox health check
+				await new Promise((resolve) => setTimeout(resolve, 3000));
+				await this.startLocalSandboxHealthCheck();
+
 				return {
-					isOk: false,
-					error: composeResult.error,
+					isOk: true,
+					alreadyStarted: false,
+					port: composeResult.port,
+					output: "Linux rootless mode - no machine needed",
+					composeOutput: composeResult.output,
+					composeError: composeResult.error,
 				};
 			}
+
+			// macOS/Windows: Start the Podman machine first
+			const startResult = await this.runCommandWithBroadcast(
+				"podman",
+				["machine", "start", "ai302-machine"],
+				"podman-machine-start",
+			);
+
+			const output = startResult.output;
+			let alreadyStarted = false;
+
+			if (!startResult.isOk) {
+				const errorMessage = startResult.output;
+
+				// Check if already running
+				// Based on actual Podman error: "Error: unable to start "ai302-machine": already running"
+				if (errorMessage.includes("already running")) {
+					alreadyStarted = true;
+				} else if (isCommandNotFound(errorMessage)) {
+					// Check if podman command is not found
+					const notInstalledMsg = await this.t(
+						"Podman 未安装。请先安装 Podman。",
+						"Podman is not installed. Please install Podman first.",
+					);
+					return { isOk: false, error: notInstalledMsg };
+				} else {
+					// Other errors
+					return { isOk: false, error: errorMessage };
+				}
+			}
+
+			// Execute podman compose up -d after successful start (or if already running)
+			const composeResult = await this.runPodmanComposeUp();
 
 			// Start local sandbox health check
 			await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -1347,59 +1416,15 @@ export class EnvService {
 
 			return {
 				isOk: true,
-				alreadyStarted: false,
-				port: composeResult.port,
-				output: "Linux rootless mode - no machine needed",
-				composeOutput: composeResult.output,
-				composeError: composeResult.error,
+				alreadyStarted,
+				port: composeResult?.port,
+				output,
+				composeOutput: composeResult?.output,
+				composeError: composeResult?.error,
 			};
+		} finally {
+			this.isOperating = false;
 		}
-
-		// macOS/Windows: Start the Podman machine first
-		const startResult = await this.runCommandWithBroadcast(
-			"podman",
-			["machine", "start", "ai302-machine"],
-			"podman-machine-start",
-		);
-
-		const output = startResult.output;
-		let alreadyStarted = false;
-
-		if (!startResult.isOk) {
-			const errorMessage = startResult.output;
-
-			// Check if already running
-			// Based on actual Podman error: "Error: unable to start "ai302-machine": already running"
-			if (errorMessage.includes("already running")) {
-				alreadyStarted = true;
-			} else if (isCommandNotFound(errorMessage)) {
-				// Check if podman command is not found
-				const notInstalledMsg = await this.t(
-					"Podman 未安装。请先安装 Podman。",
-					"Podman is not installed. Please install Podman first.",
-				);
-				return { isOk: false, error: notInstalledMsg };
-			} else {
-				// Other errors
-				return { isOk: false, error: errorMessage };
-			}
-		}
-
-		// Execute podman compose up -d after successful start (or if already running)
-		const composeResult = await this.runPodmanComposeUp();
-
-		// Start local sandbox health check
-		await new Promise((resolve) => setTimeout(resolve, 3000));
-		await this.startLocalSandboxHealthCheck();
-
-		return {
-			isOk: true,
-			alreadyStarted,
-			port: composeResult?.port,
-			output,
-			composeOutput: composeResult?.output,
-			composeError: composeResult?.error,
-		};
 	}
 }
 

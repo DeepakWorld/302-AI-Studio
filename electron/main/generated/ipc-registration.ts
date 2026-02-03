@@ -219,6 +219,7 @@ export function registerIpcHandlers() {
 		envService.openComposeDirectory(event),
 	);
 	ipcMain.handle("envService:getLocalBaseUrl", (event) => envService.getLocalBaseUrl(event));
+	ipcMain.handle("envService:getSandboxStatus", (event) => envService.getSandboxStatus(event));
 	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
 	ipcMain.handle("envService:startPodmanHealthCheck", (event) =>
 		envService.startPodmanHealthCheck(event),
@@ -586,6 +587,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("envService:getComposeDirectory");
 	ipcMain.removeHandler("envService:openComposeDirectory");
 	ipcMain.removeHandler("envService:getLocalBaseUrl");
+	ipcMain.removeHandler("envService:getSandboxStatus");
 	ipcMain.removeHandler("envService:validPodman");
 	ipcMain.removeHandler("envService:startPodmanHealthCheck");
 	ipcMain.removeHandler("envService:installWSL");

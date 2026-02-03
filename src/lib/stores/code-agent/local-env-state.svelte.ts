@@ -6,7 +6,7 @@
  */
 
 export type PodmanHealthStatus = "unknown" | "healthy" | "unhealthy";
-export type SandboxHealthStatus = "unknown" | "checking" | "healthy" | "unhealthy";
+export type SandboxHealthStatus = "unknown" | "healthy" | "unhealthy";
 
 export interface InstallLogEntry {
 	step: string;
@@ -49,6 +49,10 @@ class LocalEnvState {
 	private unsubscribeInstallLog: (() => void) | null = null;
 	private unsubscribeHealthCheck: (() => void) | null = null;
 	private unsubscribeSandboxHealth: (() => void) | null = null;
+	private unsubscribeSandboxState: (() => void) | null = null;
+
+	// Health check resolvers for waiting on first health check after start
+	private healthCheckResolvers: Array<() => void> = [];
 
 	/**
 	 * Refresh Podman installation status by calling envService.validPodman()
@@ -128,7 +132,8 @@ class LocalEnvState {
 		}
 
 		this.sandboxStarting = true;
-		this.sandboxHealthStatus = "checking";
+		this.broadcastSandboxState({ starting: true });
+		this.sandboxHealthStatus = "unknown";
 		try {
 			const result = await window.electronAPI.envService.startPodmanMachine();
 
@@ -151,7 +156,11 @@ class LocalEnvState {
 			// Toggle sandbox running state on success
 			if (result.isOk) {
 				this.sandboxRunning = true;
-				this.sandboxHealthStatus = "checking";
+				this.broadcastSandboxState({ running: true });
+				this.sandboxHealthStatus = "unknown";
+
+				// Wait for the first health check result
+				await this.waitForHealthCheck(100);
 			}
 
 			return result.isOk;
@@ -160,6 +169,7 @@ class LocalEnvState {
 			return false;
 		} finally {
 			this.sandboxStarting = false;
+			this.broadcastSandboxState({ starting: false });
 		}
 	}
 
@@ -169,6 +179,7 @@ class LocalEnvState {
 	 */
 	async stopSandbox(): Promise<boolean> {
 		this.sandboxStarting = true;
+		this.broadcastSandboxState({ starting: true });
 		try {
 			const result = await window.electronAPI.envService.stopLocalSandboxByIpc();
 
@@ -183,6 +194,7 @@ class LocalEnvState {
 			// Toggle sandbox running state on success
 			if (result.isOk) {
 				this.sandboxRunning = false;
+				this.broadcastSandboxState({ running: false });
 				this.sandboxHealthStatus = "unknown";
 			}
 
@@ -192,6 +204,7 @@ class LocalEnvState {
 			return false;
 		} finally {
 			this.sandboxStarting = false;
+			this.broadcastSandboxState({ starting: false });
 		}
 	}
 
@@ -246,9 +259,74 @@ class LocalEnvState {
 	}
 
 	/**
+	 * Broadcast sandbox state change to all tabs
+	 */
+	private broadcastSandboxState(state: { starting?: boolean; running?: boolean }): void {
+		window.electronAPI.broadcastService.broadcastToAll("local-sandbox-state-changed", state);
+	}
+
+	/**
+	 * Wait for the first health check result after starting the sandbox
+	 * @param timeout Timeout in milliseconds (default: 10000ms)
+	 * @returns Promise that resolves when health check arrives or timeout occurs
+	 */
+	private async waitForHealthCheck(timeout: number = 10000): Promise<void> {
+		// If already healthy, return immediately
+		if (this.sandboxHealthStatus === "healthy") {
+			return;
+		}
+
+		return new Promise((resolve) => {
+			const timeoutId = setTimeout(() => {
+				// Remove this resolver from the array
+				const index = this.healthCheckResolvers.indexOf(wrappedResolve);
+				if (index > -1) {
+					this.healthCheckResolvers.splice(index, 1);
+				}
+				console.warn("[LocalEnvState] Health check timeout, proceeding anyway");
+				resolve();
+			}, timeout);
+
+			// Wrapped resolve that clears timeout
+			const wrappedResolve = () => {
+				clearTimeout(timeoutId);
+				resolve();
+			};
+
+			// Add to waiting list
+			this.healthCheckResolvers.push(wrappedResolve);
+		});
+	}
+
+	/**
+	 * Sync initial state from main process
+	 * Used when a new tab is opened to check if sandbox is already running
+	 */
+	async syncInitialState(): Promise<void> {
+		try {
+			const status = (await window.electronAPI.envService.getSandboxStatus()) as {
+				isRunning: boolean;
+				isOperating: boolean;
+			};
+			if (status.isRunning) {
+				this.sandboxRunning = true;
+				this.sandboxHealthStatus = "healthy";
+			}
+			if (status.isOperating) {
+				this.sandboxStarting = true;
+			}
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to sync initial state:", error);
+		}
+	}
+
+	/**
 	 * Start listening to Sandbox-related broadcast channels
 	 */
 	startSandboxListening(): void {
+		// Sync initial state first
+		this.syncInitialState();
+
 		// Subscribe to local-sandbox-health-check channel
 		if (!this.unsubscribeSandboxHealth) {
 			this.unsubscribeSandboxHealth = window.electronAPI.onLocalSandboxHealthCheck(
@@ -256,6 +334,13 @@ class LocalEnvState {
 					if (data.isOk) {
 						if (data.isHealth) {
 							this.sandboxHealthStatus = "healthy";
+							// When sandbox is healthy, also set running state to true
+							// so that new tabs can correctly display sandbox as started
+							this.sandboxRunning = true;
+
+							// Trigger all waiting health check resolvers
+							this.healthCheckResolvers.forEach((resolve) => resolve());
+							this.healthCheckResolvers = [];
 						} else {
 							this.sandboxHealthStatus = "unhealthy";
 						}
@@ -270,6 +355,22 @@ class LocalEnvState {
 				},
 			);
 		}
+
+		// Subscribe to local-sandbox-state-changed channel
+		if (!this.unsubscribeSandboxState) {
+			this.unsubscribeSandboxState = window.electronAPI.onLocalSandboxStateChanged(
+				(data: { starting?: boolean; running?: boolean }) => {
+					if (data.starting !== undefined) {
+						this.sandboxStarting = data.starting;
+						console.log("[LocalEnvState] Sandbox starting state changed:", data.starting);
+					}
+					if (data.running !== undefined) {
+						this.sandboxRunning = data.running;
+						console.log("[LocalEnvState] Sandbox running state changed:", data.running);
+					}
+				},
+			);
+		}
 	}
 
 	/**
@@ -279,6 +380,11 @@ class LocalEnvState {
 		if (this.unsubscribeSandboxHealth) {
 			this.unsubscribeSandboxHealth();
 			this.unsubscribeSandboxHealth = null;
+		}
+
+		if (this.unsubscribeSandboxState) {
+			this.unsubscribeSandboxState();
+			this.unsubscribeSandboxState = null;
 		}
 	}
 
@@ -335,7 +441,8 @@ class LocalEnvState {
 		// Call IPC method to ensure sandbox is running
 		// This sets sandboxStarting internally via startSandbox flow
 		this.sandboxStarting = true;
-		this.sandboxHealthStatus = "checking";
+		this.broadcastSandboxState({ starting: true });
+		this.sandboxHealthStatus = "unknown";
 
 		try {
 			const result = await window.electronAPI.envService.ensureLocalSandboxRunning();
@@ -356,6 +463,7 @@ class LocalEnvState {
 			return { isOk: false, error: errorMessage, wasAlreadyRunning: false };
 		} finally {
 			this.sandboxStarting = false;
+			this.broadcastSandboxState({ starting: false });
 		}
 	}
 }

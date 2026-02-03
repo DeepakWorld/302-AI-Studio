@@ -89,7 +89,7 @@
 
 	const handleScreenshot = async () => {
 		if (tab.type === "chat" && tab.threadId) {
-			await window.electronAPI?.broadcastService?.broadcastToAll("trigger-screenshot", {
+			await window.electronAPI?.broadcastService.broadcastToAll("trigger-screenshot", {
 				threadId: tab.threadId,
 			});
 		}

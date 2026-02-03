@@ -295,6 +295,17 @@ if (process.contextIsolated) {
 				ipcRenderer.on("local-sandbox-health-check", listener);
 				return () => ipcRenderer.removeListener("local-sandbox-health-check", listener);
 			},
+			onLocalSandboxStateChanged: (
+				callback: (data: { starting?: boolean; running?: boolean }) => void,
+			) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "local-sandbox-state-changed") {
+						callback(eventData.data as { starting?: boolean; running?: boolean });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
 		});
 
 		// Expose shell window ID from process arguments

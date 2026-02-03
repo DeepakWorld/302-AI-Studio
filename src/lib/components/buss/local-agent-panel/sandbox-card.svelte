@@ -23,8 +23,6 @@
 	// Helper to get status indicator props
 	function getHealthStatusProps(status: SandboxHealthStatus) {
 		switch (status) {
-			case "checking":
-				return { status: "yellow" as const, text: m.local_platform_checking() };
 			case "healthy":
 				return { status: "green" as const, text: m.local_platform_healthy() };
 			case "unhealthy":
@@ -64,7 +62,8 @@
 	});
 
 	onDestroy(() => {
-		localEnvState.stopSandboxListening();
+		// Keep listeners alive across tabs; localEnvState is shared and stopSandboxListening()
+		// would unsubscribe for all tabs.
 	});
 </script>
 

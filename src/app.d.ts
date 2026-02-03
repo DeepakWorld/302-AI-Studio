@@ -105,6 +105,9 @@ declare global {
 					timestamp: number;
 				}) => void,
 			) => () => void;
+			onLocalSandboxStateChanged: (
+				callback: (data: { starting?: boolean; running?: boolean }) => void,
+			) => () => void;
 		};
 		windowId: string;
 		tab: Tab;
