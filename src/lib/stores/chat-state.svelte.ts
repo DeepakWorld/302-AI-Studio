@@ -1557,6 +1557,9 @@ export const chat = new Chat({
 		console.error("[Chat onError]", error);
 	},
 	onFinish: async ({ messages, isAbort, isDisconnect, isError }) => {
+		const onFinishStartTime = performance.now();
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		console.log("[onFinish] Stream completion received at:", new Date().toISOString());
 		console.log("更新完成", $state.snapshot(messages));
 		console.debug("[onFinish] messages", JSON.stringify($state.snapshot(messages), null, 2));
 		console.log("[onFinish] isAbort:", isAbort, "isDisconnect:", isDisconnect, "isError:", isError);
@@ -1642,6 +1645,11 @@ export const chat = new Chat({
 			canDeploy: codeAgentEnabled && (codeAgentGlobalConfigsState.autoDeploy || isDeployCommand),
 			lastMessage: messages[messages.length - 1],
 		});
+		console.log(
+			"[onFinish] CHAT_FINISHED emitted, elapsed:",
+			(performance.now() - onFinishStartTime).toFixed(2),
+			"ms",
+		);
 
 		persistedMessagesState.current = messages;
 
@@ -1918,5 +1926,10 @@ export const chat = new Chat({
 					});
 			}
 		}
+		console.log(
+			"[onFinish] Callback complete, total elapsed:",
+			(performance.now() - onFinishStartTime).toFixed(2),
+			"ms",
+		);
 	},
 });
