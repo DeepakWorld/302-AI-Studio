@@ -20,6 +20,7 @@ import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-
 import { codeAgentGlobalConfigsState } from "./code-agent-global-configs-state.svelte";
 import { codeAgentSendMessageButtonState } from "./code-agent-send-message-button-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
+import { localEnvState } from "./local-env-state.svelte";
 import { withLoadingState } from "./utils";
 
 const tab = window.tab ?? null;
@@ -78,7 +79,7 @@ class CodeAgentState {
 		try {
 			const url = await window.electronAPI.envService.getLocalBaseUrl();
 			if (url) {
-				this.localBaseUrl = url + "/v1";
+				this.localBaseUrl = url + "/api/v1";
 			}
 		} catch (error) {
 			console.error("[CodeAgentState] Failed to refresh local base URL:", error);
@@ -404,4 +405,25 @@ $effect.root(() => {
 			};
 		}
 	});
+
+	// Auto-refresh local baseUrl when mode is local and sandbox is running
+	// This handles both scenarios:
+	// 1. Current tab: when sandbox state changes from not running to running
+	// 2. New tab: when the tab opens and sandbox is already running
+	$effect(() => {
+		if (codeAgentState.type === "local" && localEnvState.sandboxRunning) {
+			codeAgentState.refreshLocalBaseUrl();
+		}
+	});
+
+	// Listen to local sandbox state changes, refresh baseUrl when sandbox is running
+	const offLocalSandboxState = window.electronAPI.onLocalSandboxStateChanged((data) => {
+		if (data.running && codeAgentState.type === "local") {
+			codeAgentState.refreshLocalBaseUrl();
+		}
+	});
+
+	return () => {
+		offLocalSandboxState();
+	};
 });

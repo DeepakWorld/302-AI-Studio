@@ -32,9 +32,6 @@ class CodeAgentSendMessageButtonState {
 			return { isOk: true };
 		}
 
-		// Show starting toast
-		toast.info(m.code_agent_local_sandbox_starting());
-
 		try {
 			const result = await localEnvState.ensureSandboxRunning();
 
@@ -44,7 +41,7 @@ class CodeAgentSendMessageButtonState {
 
 			// Update localBaseUrl with the port
 			if (result.port) {
-				codeAgentState.localBaseUrl = `http://localhost:${result.port}/v1`;
+				codeAgentState.localBaseUrl = `http://localhost:${result.port}/api/v1`;
 			}
 
 			// Show success toast only when actually started (not already running)

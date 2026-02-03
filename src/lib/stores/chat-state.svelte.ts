@@ -9,13 +9,13 @@ import {
 } from "$lib/transport/dynamic-chat-transport";
 import type { ChatMessage, MessageMetadata } from "$lib/types/chat";
 import {
-	addAttachmentReference,
-	removeAttachmentReference,
-} from "$lib/utils/attachment-text-utils";
-import {
 	convertAttachmentsToMessageParts,
 	type MessagePart,
 } from "$lib/utils/attachment-converter";
+import {
+	addAttachmentReference,
+	removeAttachmentReference,
+} from "$lib/utils/attachment-text-utils";
 import { clone } from "$lib/utils/clone";
 import { ChatErrorHandler, type ChatError } from "$lib/utils/error-handler";
 import { replaceCodeBlockAt } from "$lib/utils/markdown-code-block";
@@ -802,9 +802,6 @@ class ChatState {
 
 		// For local mode, ensure sandbox is running before regenerating
 		if (codeAgentState.enabled && codeAgentState.type === "local") {
-			// Show starting toast
-			toast.info(m.code_agent_local_sandbox_starting());
-
 			const result = await localEnvState.ensureSandboxRunning();
 			if (!result.isOk) {
 				toast.error(result.error ?? m.code_agent_local_sandbox_start_failed());
@@ -812,7 +809,7 @@ class ChatState {
 			}
 			// Update localBaseUrl with the port
 			if (result.port) {
-				codeAgentState.localBaseUrl = `http://localhost:${result.port}/v1`;
+				codeAgentState.localBaseUrl = `http://localhost:${result.port}/api/v1`;
 			}
 			// Show success toast only when actually started (not already running)
 			if (!result.wasAlreadyRunning) {
