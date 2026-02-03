@@ -73,6 +73,12 @@ Plans:
 
 **Dependencies:** Phase 2
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md - Add race condition guards to title generation with AbortController pattern
+- [ ] 03-02-PLAN.md - Verify frontend state synchronization fixes (human verification checkpoint)
+
 **Requirements:**
 - FRONT-01: Race conditions fixed between onFinish callback and async operations
 - FRONT-02: Loading spinner clears instantly (<100ms) when stream completes
@@ -92,9 +98,9 @@ Plans:
 
 | Phase | Status | Requirements | Completion |
 |-------|--------|--------------|------------|
-| 1 - Backend Stream Lifecycle | ✓ Complete | 4/4 mapped | 100% |
-| 2 - Transport Layer Validation | ✓ Complete | 3/3 mapped | 100% |
-| 3 - Frontend State Synchronization | Pending | 4/4 mapped | 0% |
+| 1 - Backend Stream Lifecycle | Complete | 4/4 mapped | 100% |
+| 2 - Transport Layer Validation | Complete | 3/3 mapped | 100% |
+| 3 - Frontend State Synchronization | Planned | 4/4 mapped | 0% |
 
 **Overall:** 7/11 requirements complete (64%)
 
