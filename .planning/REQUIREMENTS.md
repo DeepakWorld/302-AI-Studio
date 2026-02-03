@@ -16,9 +16,9 @@ Requirements for this fix cycle. Each maps to roadmap phases.
 
 ### Transport Layer
 
-- [ ] **TRANS-01**: Finish event detection logs at transport layer for debugging
-- [ ] **TRANS-02**: SSE protocol validation confirms [DONE] marker delivery
-- [ ] **TRANS-03**: Connection close events are detected and forwarded to frontend
+- [x] **TRANS-01**: Finish event detection logs at transport layer for debugging
+- [x] **TRANS-02**: SSE protocol validation confirms [DONE] marker delivery
+- [x] **TRANS-03**: Connection close events are detected and forwarded to frontend
 
 ### Frontend State
 
@@ -62,9 +62,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BACK-02 | Phase 1 | Complete |
 | BACK-03 | Phase 1 | Complete |
 | BACK-04 | Phase 1 | Complete |
-| TRANS-01 | Phase 2 | Pending |
-| TRANS-02 | Phase 2 | Pending |
-| TRANS-03 | Phase 2 | Pending |
+| TRANS-01 | Phase 2 | Complete |
+| TRANS-02 | Phase 2 | Complete |
+| TRANS-03 | Phase 2 | Complete |
 | FRONT-01 | Phase 3 | Pending |
 | FRONT-02 | Phase 3 | Pending |
 | FRONT-03 | Phase 3 | Pending |
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-03 after Phase 1 completion*
+*Last updated: 2026-02-03 after Phase 2 completion*
