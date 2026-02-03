@@ -217,7 +217,7 @@ class ClaudeCodeSandboxState {
 			return false;
 		}
 
-		const result = await deleteSession(providerResult.provider, {
+		const result = await deleteSession({
 			sandbox_id: sandboxId,
 			session_id: sessionId,
 		});

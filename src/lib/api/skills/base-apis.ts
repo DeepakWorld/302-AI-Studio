@@ -1,6 +1,6 @@
 import { skill } from "@shared/types";
 import { type } from "arktype";
-import { _302AIKy } from "../core/_302ai-ky";
+import { codeAgentKy } from "../core/code-agent-ky";
 
 export const listSkillsRequestSchema = type({
 	sandboxId: "string?",
@@ -19,7 +19,7 @@ export type ListSkillsResponse = typeof listSkillsResponseSchema.infer;
 export async function _listSkills(request: ListSkillsRequest): Promise<ListSkillsResponse> {
 	const { sandboxId, sessionId, projectPath } = request;
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.get("302/claude-code/skills/list", {
 				searchParams: {
 					sandbox_id: sandboxId,
@@ -57,7 +57,7 @@ export async function checkSkillDetails(
 ): Promise<CheckSkillDetailsResponse> {
 	const { skillName, builtin } = request;
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.get("302/claude-code/skills/detail", {
 				searchParams: {
 					name: skillName,
@@ -82,7 +82,7 @@ export async function checkSkillDetails(
 export async function _editSkillDetails(request: SkillDetailsRequest): Promise<Blob> {
 	const { skillName, builtin } = request;
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.get("302/claude-code/skills/detail", {
 				searchParams: {
 					name: skillName,
@@ -128,7 +128,7 @@ export async function _createSkill(zipFile: File): Promise<CreateSkillResponse> 
 		const formData = new FormData();
 		formData.append("file", zipFile);
 
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/skills", {
 				body: formData,
 				timeout: 120000,
@@ -152,7 +152,7 @@ export async function _createSkillFromGitHub(githubUrl: string): Promise<CreateS
 		const formData = new FormData();
 		formData.append("github_url", githubUrl);
 
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/skills", {
 				body: formData,
 				timeout: 120000,
@@ -198,7 +198,7 @@ export type DeleteSkillResponse = typeof deleteSkillResponseSchema.infer;
 
 export async function deleteSkill(request: DeleteSkillRequest): Promise<DeleteSkillResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.delete("302/claude-code/skills", {
 				json: request,
 			})
@@ -241,7 +241,7 @@ export type SyncSkillsResponse = typeof syncSkillsResponseSchema.infer;
  */
 export async function syncSkills(request: SyncSkillsRequest): Promise<SyncSkillsResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/skills/sync", {
 				json: request,
 				timeout: 120000,

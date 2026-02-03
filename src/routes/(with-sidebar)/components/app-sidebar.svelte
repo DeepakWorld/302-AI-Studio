@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { updateSessionNote } from "$lib/api/sandbox-session";
-	import { validate302Provider } from "$lib/api/webserve-deploy";
 	import * as Collapsible from "$lib/components/ui/collapsible";
 	import { Input } from "$lib/components/ui/input";
 	import * as Sidebar from "$lib/components/ui/sidebar";
 	import { m } from "$lib/paraglide/messages";
 	import { persistedClaudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
-	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { sidebarSearchState } from "$lib/stores/sidebar-search-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { threadsState } from "$lib/stores/threads-state.svelte";
@@ -369,14 +367,11 @@
 			const isManualNote = claudeState?.isManualNote ?? false;
 
 			if (!isManualNote) {
-				const providerResult = validate302Provider(persistedProviderState.current);
-				if (providerResult.valid && providerResult.provider) {
-					updateSessionNote(providerResult.provider, {
-						note: trimmedName,
-						sandbox_id: agentInfo.sandboxId,
-						session_id: agentInfo.sessionId,
-					});
-				}
+				updateSessionNote({
+					note: trimmedName,
+					sandbox_id: agentInfo.sandboxId,
+					session_id: agentInfo.sessionId,
+				});
 			}
 		}
 

@@ -1,5 +1,6 @@
 import { type } from "arktype";
-import { _302AIKy } from "../core/_302ai-ky";
+import { codeAgentKy } from "../core/code-agent-ky";
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 
 export const executeCommandRequestSchema = type({
 	sandboxId: "string",
@@ -28,7 +29,7 @@ export async function executeCommand(
 	request: ExecuteCommandRequest,
 ): Promise<ExecuteCommandResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/commands", {
 				json: {
 					sandbox_id: request.sandboxId,
@@ -83,7 +84,7 @@ export async function uploadFileToSandbox(
 			formData.append("auto_unzip", "true");
 		}
 
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/file/upload", {
 				body: formData,
 			})
@@ -117,13 +118,22 @@ export type InitProjectResponse = typeof initProjectResponseSchema.infer;
 
 export async function initProject(request: InitProjectRequest): Promise<InitProjectResponse> {
 	try {
-		const response = await _302AIKy
+		// Local mode only needs session_id + workspace_path, remote mode needs sandbox_id too
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						session_id: request.sessionId,
+						workspace_path: request.workspacePath ?? "",
+					}
+				: {
+						sandbox_id: request.sandboxId,
+						session_id: request.sessionId,
+						workspace_path: request.workspacePath ?? "",
+					};
+
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/project/init", {
-				json: {
-					sandbox_id: request.sandboxId,
-					session_id: request.sessionId,
-					workspace_path: request.workspacePath ?? "",
-				},
+				json: requestBody,
 			})
 			.json();
 
@@ -170,7 +180,7 @@ export async function batchUploadFile(
 	request: BatchUploadFileRequest,
 ): Promise<BatchUploadFileResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/file/upload/batch", {
 				json: request,
 				timeout: 300000,
@@ -218,7 +228,7 @@ export async function downloadFilesFromSandbox(
 ): Promise<DownloadFilesResponse> {
 	const { sandboxId, path, format } = request;
 	try {
-		const response = await _302AIKy
+		const response = await codeAgentKy
 			.post("302/claude-code/sandbox/file/download", {
 				json: {
 					sandbox_id: sandboxId,
