@@ -2,8 +2,8 @@ import { getLocalSandboxHealthStatus } from "@electron/main/apis/code-agent";
 import { broadcastService } from "@electron/main/services/broadcast-service";
 import { generalSettingsService } from "@electron/main/services/settings-service/general-settings-service";
 import { providerStorage } from "@electron/main/services/storage-service/provider-storage";
-import { isCommandNotFound } from "@electron/main/utils/cmd";
-import { exec, spawn } from "child_process";
+import { isCommandNotFound, isWSLError } from "@electron/main/utils/cmd";
+import { exec, spawn, type SpawnOptions } from "child_process";
 import { app, shell, type IpcMainInvokeEvent } from "electron";
 import fs from "fs";
 import getPort from "get-port";
@@ -113,6 +113,30 @@ export class EnvService {
 	}
 
 	/**
+	 * Trigger system restart (Windows only)
+	 * Called when WSL enablement requires a system restart
+	 */
+	async triggerSystemRestart(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
+		if (process.platform !== "win32") {
+			console.log("[EnvService] System restart not supported on this platform");
+			return { isOk: false };
+		}
+
+		try {
+			console.log("[EnvService] Triggering system restart in 10 seconds...");
+			// Use shutdown command to restart after 10 seconds
+			// /r = restart, /t 10 = 10 second delay
+			await execAsync("shutdown /r /t 10");
+			console.log("[EnvService] System restart scheduled");
+			return { isOk: true };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[EnvService] Failed to trigger system restart:", errorMessage);
+			return { isOk: false };
+		}
+	}
+
+	/**
 	 * Prepare runtime environment for docker-compose
 	 * - Copies template compose to runtime directory
 	 * - Detects available port (starting from DEFAULT_SANDBOX_PORT)
@@ -175,6 +199,7 @@ export class EnvService {
 			const hostPort = await this.prepareRuntimeCompose(apiKey);
 
 			const composePath = this.getRuntimeComposePath();
+			const runtimeDir = this.getRuntimeComposeDir();
 
 			// Auto-pull latest images before starting
 			// This ensures we have the correct platform (linux/amd64) and latest version
@@ -185,10 +210,13 @@ export class EnvService {
 
 			// Execute: podman-compose -f <path> up -d --force-recreate
 			// Use broadcast to show progress
+			// Set cwd to runtimeDir so podman-compose can read the .env file
 			const result = await this.runCommandWithBroadcast(
 				"podman-compose",
 				["-f", composePath, "up", "-d", "--force-recreate"],
 				"podman-compose-up",
+				true,
+				runtimeDir,
 			);
 
 			if (!result.isOk) {
@@ -273,10 +301,13 @@ export class EnvService {
 			const composePath = fs.existsSync(runtimePath) ? runtimePath : this.getDockerComposePath();
 
 			// Execute: podman-compose -f <path> stop
+			// Set cwd to runtimeDir so podman-compose can read the .env file
 			const result = await this.runCommandWithBroadcast(
 				"podman-compose",
 				["-f", composePath, "stop"],
 				"podman-compose-stop",
+				true,
+				path.dirname(composePath),
 			);
 
 			if (!result.isOk) {
@@ -320,6 +351,7 @@ export class EnvService {
 		args: string[],
 		step: string,
 		useShell = true,
+		cwd?: string,
 	): Promise<{ isOk: boolean; output: string }> {
 		return new Promise((resolve) => {
 			let output = "";
@@ -330,10 +362,15 @@ export class EnvService {
 				data: `Starting: ${step}`,
 			});
 
-			const proc = spawn(command, args, {
+			const spawnOptions: SpawnOptions = {
 				shell: useShell,
 				windowsHide: true,
-			});
+			};
+			if (cwd) {
+				spawnOptions.cwd = cwd;
+			}
+
+			const proc = spawn(command, args, spawnOptions);
 
 			// Helper to process output data (handles \r progress bars)
 			const processOutput = (data: Buffer, type: "stdout" | "stderr") => {
@@ -351,8 +388,8 @@ export class EnvService {
 				}
 			};
 
-			proc.stdout.on("data", (data) => processOutput(data, "stdout"));
-			proc.stderr.on("data", (data) => processOutput(data, "stderr"));
+			proc.stdout?.on("data", (data) => processOutput(data, "stdout"));
+			proc.stderr?.on("data", (data) => processOutput(data, "stderr"));
 
 			proc.on("close", (code) => {
 				broadcastService.broadcastChannelToAll("install-log", {
@@ -529,6 +566,228 @@ export class EnvService {
 		return this.checkCommand("wsl --version");
 	}
 
+	/**
+	 * Checks if WSL has any Linux distributions installed
+	 * @returns { isOk: boolean; hasDistributions: boolean } - isOk: operation success, hasDistributions: whether WSL has any distros installed
+	 */
+	private async checkWSLDistributions(): Promise<{
+		isOk: boolean;
+		hasDistributions: boolean;
+	}> {
+		try {
+			const { stdout } = await execAsync("wsl --list --verbose");
+			// Check if output indicates no distributions
+			// Chinese: "适用于 Linux 的 Windows 子系统没有已安装的分发。"
+			// English: "Windows Subsystem for Linux has no installed distributions."
+			const hasDistro =
+				!stdout.includes("没有已安装的分发") &&
+				!stdout.toLowerCase().includes("has no installed distributions") &&
+				stdout.trim().length > 0;
+			return { isOk: true, hasDistributions: hasDistro };
+		} catch (_error) {
+			// If command fails, assume no distributions
+			return { isOk: true, hasDistributions: false };
+		}
+	}
+
+	/**
+	 * Checks the Windows feature state of WSL using DISM
+	 * @returns { isOk: boolean; state: 'disabled' | 'enabled' | 'enabled-pending-reboot'; error?: string }
+	 */
+	private async checkWSLFeatureState(): Promise<{
+		isOk: boolean;
+		state: "disabled" | "enabled" | "enabled-pending-reboot";
+		error?: string;
+	}> {
+		if (process.platform !== "win32") {
+			return { isOk: true, state: "enabled" };
+		}
+
+		try {
+			const { stdout } = await execAsync(
+				"dism /online /get-featureinfo /featurename:Microsoft-Windows-Subsystem-Linux",
+			);
+
+			const isEnabled = stdout.includes("State : Enabled") || stdout.includes("状态: 已启用");
+			const needsReboot = stdout.includes("Restart Required") || stdout.includes("需要重启");
+
+			if (isEnabled && needsReboot) {
+				return { isOk: true, state: "enabled-pending-reboot" };
+			} else if (isEnabled) {
+				return { isOk: true, state: "enabled" };
+			} else {
+				return { isOk: true, state: "disabled" };
+			}
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.log(
+				"[EnvService] DISM check failed (likely permission issue), falling back to WSL status check:",
+				errorMessage,
+			);
+
+			// DISM requires admin privileges. If it fails, fall back to wsl --status
+			// wsl --status will fail if WSL is not enabled/installed
+			try {
+				const { stdout: statusOutput } = await execAsync("wsl --status");
+				// If wsl --status works, WSL is enabled
+				console.log("[EnvService] WSL status check succeeded:", statusOutput);
+				return { isOk: true, state: "enabled" };
+			} catch (statusError) {
+				const statusErrorMsg =
+					statusError instanceof Error ? statusError.message : String(statusError);
+				console.log("[EnvService] WSL status check failed:", statusErrorMsg);
+
+				// wsl --status failed, check if it's because WSL is not enabled
+				// Error messages like "The Windows Subsystem for Linux optional component is not enabled"
+				if (
+					statusErrorMsg.toLowerCase().includes("not enabled") ||
+					statusErrorMsg.toLowerCase().includes("not installed") ||
+					statusErrorMsg.includes("0xffffffff") ||
+					statusErrorMsg.includes("未启用") ||
+					statusErrorMsg.includes("未安装")
+				) {
+					console.log("[EnvService] WSL is not enabled");
+					return { isOk: true, state: "disabled" };
+				}
+
+				// Check if it's a command not found error
+				if (isCommandNotFound(statusError)) {
+					console.log("[EnvService] WSL command not found - WSL not installed");
+					return { isOk: true, state: "disabled" };
+				}
+
+				// For any other error, assume WSL is disabled (safer to attempt enablement)
+				console.log("[EnvService] Unknown WSL error, assuming disabled");
+				return { isOk: true, state: "disabled" };
+			}
+		}
+	}
+
+	/**
+	 * Enables WSL feature using DISM with administrator privileges
+	 * @returns { isOk: boolean; needsReboot?: boolean; wasCancelled?: boolean; error?: string }
+	 */
+	private async enableWSLFeature(): Promise<{
+		isOk: boolean;
+		needsReboot?: boolean;
+		wasCancelled?: boolean;
+		error?: string;
+	}> {
+		if (process.platform !== "win32") {
+			return { isOk: true, needsReboot: false };
+		}
+
+		try {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "enable-wsl",
+				type: "start",
+				data: await this.t("正在启用 WSL 功能...", "Enabling WSL feature..."),
+			});
+
+			// Use wsl --install which automatically enables WSL feature
+			// --no-distribution: don't install a Linux distribution, just enable WSL
+			const result = await this.runCommandWithBroadcast(
+				"wsl",
+				["--install", "--no-distribution"],
+				"enable-wsl",
+			);
+
+			if (!result.isOk) {
+				// Check if user needs to run as administrator
+				const errorMsg = result.output || "";
+				if (
+					errorMsg.toLowerCase().includes("administrator") ||
+					errorMsg.toLowerCase().includes("管理员")
+				) {
+					broadcastService.broadcastChannelToAll("install-log", {
+						step: "enable-wsl",
+						type: "error",
+						data: await this.t(
+							"需要管理员权限来启用 WSL。请以管理员身份运行应用。",
+							"Administrator privileges required to enable WSL. Please run the application as administrator.",
+						),
+					});
+					return { isOk: false, error: errorMsg };
+				}
+
+				return { isOk: false, error: errorMsg };
+			}
+
+			// wsl --install succeeded, need reboot
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "enable-wsl",
+				type: "complete",
+				data: await this.t(
+					"WSL 功能已启用，需要重启系统",
+					"WSL feature enabled successfully, system restart required",
+				),
+			});
+			return { isOk: true, needsReboot: true };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[EnvService] Failed to enable WSL feature:", errorMessage);
+
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "enable-wsl",
+				type: "error",
+				data: errorMessage,
+			});
+
+			return { isOk: false, error: errorMessage };
+		}
+	}
+
+	/**
+	 * Comprehensive WSL status check combining feature state and operational state
+	 * @returns { isOk: boolean; featureState: string; isOperational: boolean; requiresRestart: boolean; error?: string }
+	 */
+	private async checkWSLStatus(): Promise<{
+		isOk: boolean;
+		featureState: "disabled" | "enabled" | "enabled-pending-reboot";
+		isOperational: boolean;
+		requiresRestart: boolean;
+		error?: string;
+	}> {
+		const featureCheck = await this.checkWSLFeatureState();
+
+		if (!featureCheck.isOk) {
+			return {
+				isOk: false,
+				featureState: "disabled",
+				isOperational: false,
+				requiresRestart: false,
+				error: featureCheck.error,
+			};
+		}
+
+		if (featureCheck.state === "enabled-pending-reboot") {
+			return {
+				isOk: true,
+				featureState: "enabled-pending-reboot",
+				isOperational: false,
+				requiresRestart: true,
+			};
+		}
+
+		if (featureCheck.state === "disabled") {
+			return {
+				isOk: true,
+				featureState: "disabled",
+				isOperational: false,
+				requiresRestart: false,
+			};
+		}
+
+		const operationalCheck = await this.checkWSL();
+
+		return {
+			isOk: true,
+			featureState: "enabled",
+			isOperational: operationalCheck.isValid,
+			requiresRestart: false,
+		};
+	}
+
 	private async checkHomebrew(): Promise<{
 		isOk: boolean;
 		isValid: boolean;
@@ -541,6 +800,52 @@ export class EnvService {
 		isValid: boolean;
 	}> {
 		return this.checkCommand("apt-get --version");
+	}
+
+	/**
+	 * Wait for Podman to be ready by polling `podman ps` command
+	 * This is needed on Windows/WSL where machine startup can take time
+	 * @param timeoutMs Maximum time to wait in milliseconds
+	 * @returns boolean indicating if Podman is ready
+	 */
+	private async waitForPodmanReady(timeoutMs: number): Promise<boolean> {
+		const startTime = Date.now();
+		const pollInterval = 2000; // Check every 2 seconds
+
+		console.log("[Local Vibe] Starting Podman readiness check...");
+
+		while (Date.now() - startTime < timeoutMs) {
+			try {
+				await execAsync("podman ps");
+				console.log("[Local Vibe] Podman is ready");
+				return true;
+			} catch (error) {
+				// Podman not ready yet, log error and wait
+				const errorMsg = error instanceof Error ? error.message : String(error);
+				console.log("[Local Vibe] Podman not ready yet:", errorMsg.substring(0, 100));
+
+				// Check for WSL connection issues (Windows only)
+				if (
+					process.platform === "win32" &&
+					(errorMsg.includes("Cannot connect to Podman") ||
+						errorMsg.includes("verify your connection"))
+				) {
+					console.log("[Local Vibe] WSL connection issue detected, attempting to fix...");
+					// Try to set ai302-machine as default for this session
+					try {
+						await execAsync("podman system connection default ai302-machine");
+						console.log("[Local Vibe] Set ai302-machine as default connection");
+					} catch (_error) {
+						console.log("[Local Vibe] Failed to set default connection，, will retry...");
+					}
+				}
+
+				await new Promise((resolve) => setTimeout(resolve, pollInterval));
+			}
+		}
+
+		console.error(`[Local Vibe] Podman readiness check timed out after ${timeoutMs}ms`);
+		return false;
 	}
 
 	/**
@@ -590,13 +895,45 @@ export class EnvService {
 
 	/**
 	 * Checks if the ai302-machine exists in podman machine list
-	 * @returns { isOk: boolean; exists: boolean } - isOk: operation success, exists: whether machine exists
+	 * Also checks WSL distributions on Windows as fallback (for state inconsistency cases)
+	 * @returns { isOk: boolean; exists: boolean; existsInWSL?: boolean } - isOk: operation success, exists: whether machine exists in podman, existsInWSL: whether machine exists in WSL (Windows only)
 	 */
-	private async checkPodmanMachineExists(): Promise<{ isOk: boolean; exists: boolean }> {
+	private async checkPodmanMachineExists(): Promise<{
+		isOk: boolean;
+		exists: boolean;
+		existsInWSL?: boolean;
+	}> {
 		try {
 			const { stdout } = await execAsync("podman machine list --format json");
-			const machines = JSON.parse(stdout) as Array<{ Name: string }>;
+			const machines = JSON.parse(stdout) as Array<{
+				Name: string;
+				Running?: boolean;
+				State?: string;
+			}>;
 			const exists = machines.some((machine) => machine.Name === "ai302-machine");
+
+			// On Windows, also check WSL for orphaned podman machines
+			if (!exists && process.platform === "win32") {
+				try {
+					// WSL outputs UTF-16 encoded text, use chcp 65001 to get UTF-8
+					const { stdout: wslOutput } = await execAsync("chcp 65001 >nul && wsl --list --quiet", {
+						encoding: "utf8",
+					});
+					// Remove null characters that may appear in UTF-16 to UTF-8 conversion
+					const cleanOutput = wslOutput.replace(/\0/g, "").toLowerCase();
+					const existsInWSL =
+						cleanOutput.includes("podman-ai302-machine") ||
+						cleanOutput.includes("podman-machine-ai302-machine");
+					if (existsInWSL) {
+						console.log("[EnvService] Machine not in Podman list but exists in WSL distributions");
+					}
+					return { isOk: true, exists, existsInWSL };
+				} catch (_wslError) {
+					// WSL check failed, ignore
+					return { isOk: true, exists };
+				}
+			}
+
 			return { isOk: true, exists };
 		} catch (error) {
 			if (isCommandNotFound(error)) {
@@ -607,47 +944,109 @@ export class EnvService {
 	}
 
 	/**
+	 * Checks if the ai302-machine is currently running
+	 * @returns { isOk: boolean; isRunning: boolean } - isOk: operation success, isRunning: whether machine is running
+	 */
+	private async checkPodmanMachineRunning(): Promise<{ isOk: boolean; isRunning: boolean }> {
+		try {
+			const { stdout } = await execAsync("podman machine list --format json");
+			const machines = JSON.parse(stdout) as Array<{
+				Name: string;
+				Running?: boolean;
+				State?: string;
+			}>;
+			const machine = machines.find((m) => m.Name === "ai302-machine");
+			if (!machine) {
+				return { isOk: true, isRunning: false };
+			}
+			// Check both Running field and State field
+			const isRunning = machine.Running === true || machine.State === "running";
+			return { isOk: true, isRunning };
+		} catch (error) {
+			if (isCommandNotFound(error)) {
+				return { isOk: true, isRunning: false };
+			}
+			return { isOk: false, isRunning: false };
+		}
+	}
+
+	/**
 	 * Validates if podman is installed and accessible, and ai302-machine exists
 	 * Also checks if podman-compose is available
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean; isValid: boolean; output?: string; error?: string } - isOk: operation success, isValid: podman installed AND machine exists AND podman-compose available, output: command output, error: error message if failed
+	 * @returns { isOk: boolean; isValid: boolean; output?: string; error?: string; details?: { podmanInstalled: boolean; machineExists: boolean; composeInstalled: boolean } } - isOk: operation success, isValid: podman installed AND machine exists AND podman-compose available, output: command output, error: error message if failed, details: detailed component status
 	 */
-	async validPodman(
-		_event: IpcMainInvokeEvent,
-	): Promise<{ isOk: boolean; isValid: boolean; output?: string; error?: string }> {
+	async validPodman(_event: IpcMainInvokeEvent): Promise<{
+		isOk: boolean;
+		isValid: boolean;
+		output?: string;
+		error?: string;
+		details?: { podmanInstalled: boolean; machineExists: boolean; composeInstalled: boolean };
+	}> {
 		try {
 			const { stdout, stderr } = await execAsync("podman --version");
 			const podmanInstalled = stdout.toLowerCase().includes("podman version");
 
 			if (!podmanInstalled) {
-				return { isOk: true, isValid: false, output: `${stdout}\n${stderr}` };
+				return {
+					isOk: true,
+					isValid: false,
+					output: `${stdout}\n${stderr}`,
+					details: { podmanInstalled: false, machineExists: false, composeInstalled: false },
+				};
 			}
 
 			// Podman is installed, check if ai302-machine exists
 			const machineCheck = await this.checkPodmanMachineExists();
 			if (!machineCheck.isOk) {
-				return { isOk: false, isValid: false, error: "Failed to check machine list" };
+				return {
+					isOk: false,
+					isValid: false,
+					error: "Failed to check machine list",
+					details: { podmanInstalled: true, machineExists: false, composeInstalled: false },
+				};
 			}
 
 			// Check if podman-compose is available
 			const composeCheck = await this.checkPodmanCompose();
 			if (!composeCheck.isOk) {
-				return { isOk: false, isValid: false, error: "Failed to check podman-compose" };
+				return {
+					isOk: false,
+					isValid: false,
+					error: "Failed to check podman-compose",
+					details: {
+						podmanInstalled: true,
+						machineExists: machineCheck.exists,
+						composeInstalled: false,
+					},
+				};
 			}
+
+			const details = {
+				podmanInstalled: true,
+				machineExists: machineCheck.exists,
+				composeInstalled: composeCheck.isValid,
+			};
+
 			if (!composeCheck.isValid) {
 				const composeError = await this.t(
 					"podman-compose 未安装。请先安装 podman-compose。",
 					"podman-compose is not installed. Please install podman-compose first.",
 				);
-				return { isOk: true, isValid: false, error: composeError };
+				return { isOk: true, isValid: false, error: composeError, details };
 			}
 
-			return { isOk: true, isValid: machineCheck.exists, output: stdout };
+			return { isOk: true, isValid: machineCheck.exists, output: stdout, details };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 
 			if (isCommandNotFound(error)) {
-				return { isOk: true, isValid: false, error: errorMessage };
+				return {
+					isOk: true,
+					isValid: false,
+					error: errorMessage,
+					details: { podmanInstalled: false, machineExists: false, composeInstalled: false },
+				};
 			}
 
 			return { isOk: false, isValid: false, error: errorMessage };
@@ -891,6 +1290,7 @@ export class EnvService {
 	/**
 	 * Initializes the ai302-machine if it doesn't already exist
 	 * Checks for existing machine before attempting init
+	 * Handles orphaned WSL distributions by cleaning them up first
 	 * @returns { isOk: boolean } - isOk: operation success
 	 */
 	private async _initPodmanMachine(): Promise<{ isOk: boolean }> {
@@ -900,7 +1300,7 @@ export class EnvService {
 			return { isOk: false };
 		}
 
-		// Machine already exists, skip init
+		// Machine already exists in Podman, skip init
 		if (machineCheck.exists) {
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "init-podman",
@@ -910,12 +1310,53 @@ export class EnvService {
 			return { isOk: true };
 		}
 
+		// Handle orphaned WSL distribution (exists in WSL but not in Podman list)
+		if (machineCheck.existsInWSL && process.platform === "win32") {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: await this.t(
+					"检测到孤立的 WSL 分发，正在清理...",
+					"Detected orphaned WSL distribution, cleaning up...",
+				),
+			});
+
+			// Try to unregister the orphaned WSL distribution
+			try {
+				await execAsync("wsl --unregister podman-ai302-machine");
+				broadcastService.broadcastChannelToAll("install-log", {
+					step: "init-podman",
+					type: "stdout",
+					data: await this.t("WSL 分发清理完成", "WSL distribution cleaned up"),
+				});
+			} catch (_cleanupError) {
+				// Try alternative name format
+				try {
+					await execAsync("wsl --unregister podman-machine-ai302-machine");
+				} catch (_altCleanupError) {
+					console.log("[EnvService] Could not clean up orphaned WSL distribution");
+				}
+			}
+		}
+
 		// Initialize Podman Machine
 		const machineInit = await this.runCommandWithBroadcast(
 			"podman",
 			["machine", "init", "ai302-machine"],
 			"init-podman",
 		);
+
+		// Handle case where machine already exists on hypervisor level
+		// This can happen if machine exists in WSL but not in Podman's registry
+		if (!machineInit.isOk && machineInit.output?.includes("already exists")) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: "Machine 'ai302-machine' already exists on hypervisor, treating as success",
+			});
+			return { isOk: true };
+		}
+
 		return machineInit;
 	}
 
@@ -979,12 +1420,126 @@ export class EnvService {
 			return { isOk: true };
 		}
 
-		// 1. Check and install WSL
-		const wslCheck = await this.checkWSL();
-		if (!wslCheck.isValid) {
-			const wslInstall = await this.runCommandWithBroadcast("wsl", ["--install"], "install-wsl");
-			if (!wslInstall.isOk) return { isOk: false };
+		// 1. Check WSL status comprehensively (feature state + operational state)
+		broadcastService.broadcastChannelToAll("install-log", {
+			step: "check-wsl",
+			type: "start",
+			data: await this.t("检查 WSL 状态...", "Checking WSL status..."),
+		});
+
+		const wslStatus = await this.checkWSLStatus();
+
+		if (!wslStatus.isOk) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "check-wsl",
+				type: "error",
+				data: wslStatus.error || (await this.t("WSL 状态检查失败", "WSL status check failed")),
+			});
+			return { isOk: false };
 		}
+
+		// Handle WSL not enabled
+		if (wslStatus.featureState === "disabled") {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "check-wsl",
+				type: "stdout",
+				data: await this.t("WSL 功能未启用，正在启用...", "WSL feature not enabled, enabling..."),
+			});
+
+			const enableResult = await this.enableWSLFeature();
+
+			if (!enableResult.isOk) {
+				if (enableResult.wasCancelled) {
+					broadcastService.broadcastChannelToAll("install-log", {
+						step: "enable-wsl",
+						type: "error",
+						data: await this.t(
+							"安装已取消：需要管理员权限来启用 WSL",
+							"Installation cancelled: Administrator privileges required to enable WSL",
+						),
+					});
+				} else {
+					broadcastService.broadcastChannelToAll("install-log", {
+						step: "enable-wsl",
+						type: "error",
+						data: enableResult.error || (await this.t("WSL 启用失败", "Failed to enable WSL")),
+					});
+				}
+				return { isOk: false };
+			}
+
+			// WSL enabled successfully, but needs reboot
+			if (enableResult.needsReboot) {
+				broadcastService.broadcastChannelToAll("wsl-restart-required", {
+					reason: "wsl-enabled",
+					message: await this.t(
+						"WSL 功能已启用，需要重启系统才能继续。请重启后重新安装 Podman。",
+						"WSL feature has been enabled. System restart required to continue. Please restart and retry Podman installation.",
+					),
+				});
+				return { isOk: false };
+			}
+		}
+
+		// Handle WSL enabled but needs restart
+		if (wslStatus.requiresRestart) {
+			broadcastService.broadcastChannelToAll("wsl-restart-required", {
+				reason: "wsl-pending-reboot",
+				message: await this.t(
+					"WSL 功能已启用但需要重启系统。请重启后继续安装。",
+					"WSL feature is enabled but requires system restart. Please restart to continue.",
+				),
+			});
+			return { isOk: false };
+		}
+
+		// Check if WSL is operational
+		if (!wslStatus.isOperational) {
+			// WSL feature is enabled but not operational - try to install/update WSL kernel
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "check-wsl",
+				type: "stdout",
+				data: await this.t(
+					"WSL 未完全安装，正在安装 WSL 内核...",
+					"WSL is not fully installed, installing WSL kernel...",
+				),
+			});
+
+			// Try running wsl --update to install the WSL kernel
+			const updateResult = await this.runCommandWithBroadcast("wsl", ["--update"], "wsl-update");
+
+			if (!updateResult.isOk) {
+				// wsl --update failed, check if restart is needed
+				broadcastService.broadcastChannelToAll("wsl-restart-required", {
+					reason: "wsl-kernel-installed",
+					message: await this.t(
+						"WSL 内核已更新，可能需要重启系统。请重启后重新安装 Podman。",
+						"WSL kernel has been updated. System restart may be required. Please restart and retry Podman installation.",
+					),
+				});
+				return { isOk: false };
+			}
+
+			// Re-check if WSL is now operational after update
+			const recheckStatus = await this.checkWSLStatus();
+			if (!recheckStatus.isOperational) {
+				// Still not operational after update - likely needs restart
+				broadcastService.broadcastChannelToAll("wsl-restart-required", {
+					reason: "wsl-kernel-installed",
+					message: await this.t(
+						"WSL 内核已安装/更新，需要重启系统才能继续。请重启后重新安装 Podman。",
+						"WSL kernel has been installed/updated. System restart required to continue.",
+					),
+				});
+				return { isOk: false };
+			}
+		}
+
+		broadcastService.broadcastChannelToAll("install-log", {
+			step: "check-wsl",
+			type: "complete",
+			data: await this.t("WSL 状态正常", "WSL is operational"),
+		});
 
 		// 2. Check and install Scoop
 		const scoopCheck = await this.checkScoop();
@@ -1377,7 +1932,40 @@ export class EnvService {
 				};
 			}
 
-			// macOS/Windows: Start the Podman machine first
+			// macOS/Windows: Check if machine exists before starting
+			const machineCheck = await this.checkPodmanMachineExists();
+			if (!machineCheck.isOk) {
+				const errorMsg = await this.t(
+					"无法检查 Podman 机器状态",
+					"Failed to check Podman machine status",
+				);
+				return { isOk: false, error: errorMsg };
+			}
+
+			// Initialize machine if it doesn't exist
+			if (!machineCheck.exists) {
+				console.log("[Local Vibe] Machine 'ai302-machine' does not exist, initializing...");
+				const initMsg = await this.t(
+					"Podman 机器不存在，正在初始化...",
+					"Podman machine does not exist, initializing...",
+				);
+				broadcastService.broadcastChannelToAll("install-log", {
+					step: "podman-machine-init",
+					type: "stdout",
+					data: initMsg,
+				});
+
+				const initResult = await this._initPodmanMachine();
+				if (!initResult.isOk) {
+					const initErrorMsg = await this.t(
+						"初始化 Podman 机器失败",
+						"Failed to initialize Podman machine",
+					);
+					return { isOk: false, error: initErrorMsg };
+				}
+			}
+
+			// Start the Podman machine
 			const startResult = await this.runCommandWithBroadcast(
 				"podman",
 				["machine", "start", "ai302-machine"],
@@ -1394,6 +1982,63 @@ export class EnvService {
 				// Based on actual Podman error: "Error: unable to start "ai302-machine": already running"
 				if (errorMessage.includes("already running")) {
 					alreadyStarted = true;
+					console.log(
+						"[Local Vibe] Machine reports 'already running', checking if it's actually ready...",
+					);
+
+					// Wait for Podman to be ready even if machine is already running
+					const ready = await this.waitForPodmanReady(30_000); // 30 second timeout
+					if (!ready) {
+						console.log(
+							"[Local Vibe] Podman not responding despite machine being 'running', attempting recovery...",
+						);
+
+						// Machine reports running but not responding - try to stop and restart
+						const stopMsg = await this.t(
+							"Podman machine 响应超时，正在尝试重启...",
+							"Podman machine not responding, attempting restart...",
+						);
+						broadcastService.broadcastChannelToAll("install-log", {
+							step: "podman-machine-recover",
+							type: "stderr",
+							data: stopMsg,
+						});
+
+						// Stop the machine forcefully
+						await this.runCommandWithBroadcast(
+							"podman",
+							["machine", "stop", "ai302-machine"],
+							"podman-machine-stop-recovery",
+						);
+
+						// Wait a moment
+						await new Promise((resolve) => setTimeout(resolve, 3000));
+
+						// Start the machine again
+						const restartResult = await this.runCommandWithBroadcast(
+							"podman",
+							["machine", "start", "ai302-machine"],
+							"podman-machine-start-recovery",
+						);
+
+						if (!restartResult.isOk) {
+							const restartErrorMsg = await this.t(
+								"重启 Podman machine 失败，请手动重启计算机后再试",
+								"Failed to restart Podman machine, please restart your computer and try again",
+							);
+							return { isOk: false, error: restartErrorMsg };
+						}
+
+						// Wait for it to be ready after restart
+						const restartReady = await this.waitForPodmanReady(30_000);
+						if (!restartReady) {
+							const timeoutMsg = await this.t(
+								"Podman machine 重启后仍然超时，请手动检查 Podman 状态",
+								"Podman machine still timing out after restart, please check Podman status manually",
+							);
+							return { isOk: false, error: timeoutMsg };
+						}
+					}
 				} else if (isCommandNotFound(errorMessage)) {
 					// Check if podman command is not found
 					const notInstalledMsg = await this.t(
@@ -1401,9 +2046,80 @@ export class EnvService {
 						"Podman is not installed. Please install Podman first.",
 					);
 					return { isOk: false, error: notInstalledMsg };
+				} else if (isWSLError(errorMessage)) {
+					// WSL-specific errors - machine exists but WSL distribution is missing
+					console.log("[Local Vibe] WSL error detected, checking WSL state...");
+
+					// Check if WSL has any distributions installed
+					const wslListCheck = await this.checkWSLDistributions();
+					if (!wslListCheck.hasDistributions) {
+						// WSL is installed but has no distributions
+						// Need to install WSL with a distribution
+						const noDistroMsg = await this.t(
+							"WSL 未安装任何 Linux 发行版。请运行 'wsl --install' 并重启计算机后再试。",
+							"WSL has no Linux distributions installed. Please run 'wsl --install' and restart your computer, then try again.",
+						);
+						return { isOk: false, error: noDistroMsg };
+					}
+
+					// Recover by deleting and re-initializing the machine
+					console.log("[Local Vibe] WSL is available, recovering by re-initializing machine...");
+					const recoverMsg = await this.t(
+						"检测到 WSL 错误，正在重新初始化 Podman 机器...",
+						"WSL error detected, re-initializing Podman machine...",
+					);
+					broadcastService.broadcastChannelToAll("install-log", {
+						step: "podman-machine-recover",
+						type: "stdout",
+						data: recoverMsg,
+					});
+
+					// Delete the broken machine
+					await this.runCommandWithBroadcast(
+						"podman",
+						["machine", "rm", "ai302-machine", "-f"],
+						"podman-machine-rm",
+					);
+
+					// Re-initialize
+					const initResult = await this._initPodmanMachine();
+					if (!initResult.isOk) {
+						const initErrorMsg = await this.t(
+							"重新初始化 Podman 机器失败。请确保 WSL 已正确安装。",
+							"Failed to re-initialize Podman machine. Please ensure WSL is properly installed.",
+						);
+						return { isOk: false, error: initErrorMsg };
+					}
+
+					// Try starting again
+					const retryResult = await this.runCommandWithBroadcast(
+						"podman",
+						["machine", "start", "ai302-machine"],
+						"podman-machine-start-retry",
+					);
+					if (!retryResult.isOk) {
+						const retryErrorMsg = await this.t(
+							"重新启动 Podman 机器失败",
+							"Failed to restart Podman machine after recovery",
+						);
+						return { isOk: false, error: retryErrorMsg, output: retryResult.output };
+					}
 				} else {
 					// Other errors
 					return { isOk: false, error: errorMessage };
+				}
+			}
+
+			// Wait for Podman to be ready before running compose
+			// This is especially important on Windows/WSL where machine startup takes time
+			if (!alreadyStarted) {
+				const ready = await this.waitForPodmanReady(30_000); // 30 second timeout
+				if (!ready) {
+					const timeoutMsg = await this.t(
+						"Podman machine 启动超时，请检查 Podman 状态",
+						"Podman machine startup timed out, please check Podman status",
+					);
+					return { isOk: false, error: timeoutMsg };
 				}
 			}
 

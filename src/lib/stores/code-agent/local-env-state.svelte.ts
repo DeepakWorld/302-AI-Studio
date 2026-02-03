@@ -7,6 +7,7 @@
 
 export type PodmanHealthStatus = "unknown" | "healthy" | "unhealthy";
 export type SandboxHealthStatus = "unknown" | "healthy" | "unhealthy";
+export type PodmanComponentStatus = "unknown" | "missing" | "installed";
 
 export interface InstallLogEntry {
 	step: string;
@@ -21,9 +22,22 @@ export interface PodmanHealthCheckData {
 	timestamp: number;
 }
 
+export interface PodmanValidationDetails {
+	podmanInstalled: boolean;
+	machineExists: boolean;
+	composeInstalled: boolean;
+}
+
 class LocalEnvState {
 	// Podman installation status
 	podmanInstalled = $state(false);
+
+	// Detailed component status for better diagnostics
+	podmanComponentStatus = $state<PodmanValidationDetails>({
+		podmanInstalled: false,
+		machineExists: false,
+		composeInstalled: false,
+	});
 
 	// Podman health status
 	podmanHealth = $state<PodmanHealthStatus>("unknown");
@@ -45,6 +59,12 @@ class LocalEnvState {
 	// Installation logs
 	installLogs = $state<InstallLogEntry[]>([]);
 
+	// WSL restart required notification
+	wslRestartRequired = $state<{
+		reason: string;
+		message: string;
+	} | null>(null);
+
 	// Unsubscribe functions for broadcast listeners
 	private unsubscribeInstallLog: (() => void) | null = null;
 	private unsubscribeHealthCheck: (() => void) | null = null;
@@ -53,6 +73,7 @@ class LocalEnvState {
 
 	// Health check resolvers for waiting on first health check after start
 	private healthCheckResolvers: Array<() => void> = [];
+	private unsubscribeWslRestart: (() => void) | null = null;
 
 	/**
 	 * Refresh Podman installation status by calling envService.validPodman()
@@ -62,6 +83,11 @@ class LocalEnvState {
 		try {
 			const result = await window.electronAPI.envService.validPodman();
 			this.podmanInstalled = result.isOk && result.isValid;
+
+			// Save detailed component status for UI display
+			if (result.details) {
+				this.podmanComponentStatus = result.details;
+			}
 
 			// Print command output
 			if (result.output) {
@@ -238,6 +264,32 @@ class LocalEnvState {
 					}
 
 					console.log("[LocalEnvState] Podman health check:", this.podmanHealth);
+				},
+			);
+		}
+
+		// Subscribe to wsl-restart-required channel
+		if (!this.unsubscribeWslRestart) {
+			this.unsubscribeWslRestart = window.electronAPI.onWslRestartRequired(
+				async (data: { reason: string; message: string }) => {
+					this.wslRestartRequired = data;
+					console.log("[LocalEnvState] WSL restart required:", data);
+
+					// Show dialog immediately in the callback
+					const result = confirm(
+						`${data.message}\n\n点击"确定"立即重启系统，点击"取消"稍后手动重启。`,
+					);
+
+					if (result) {
+						// User chose to restart now
+						console.log("[LocalEnvState] User confirmed restart, triggering system restart...");
+						await window.electronAPI.envService.triggerSystemRestart();
+					} else {
+						console.log("[LocalEnvState] User cancelled restart");
+					}
+
+					// Clear the notification
+					this.wslRestartRequired = null;
 				},
 			);
 		}

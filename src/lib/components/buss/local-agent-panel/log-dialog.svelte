@@ -19,7 +19,7 @@
 		<div class="rounded-md bg-black/90 p-4 font-mono text-sm text-green-400">
 			<ScrollArea class="h-[300px]">
 				<div class="space-y-1">
-					{#each logs as log, _i (log)}
+					{#each logs as log, i (i)}
 						<p>{log}</p>
 					{/each}
 				</div>

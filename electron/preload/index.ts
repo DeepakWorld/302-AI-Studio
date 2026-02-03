@@ -309,6 +309,11 @@ if (process.contextIsolated) {
 				ipcRenderer.on("broadcast-event", listener);
 				return () => ipcRenderer.removeListener("broadcast-event", listener);
 			},
+			onWslRestartRequired: (callback: (data: { reason: string; message: string }) => void) => {
+				const listener = (_: unknown, data: { reason: string; message: string }) => callback(data);
+				ipcRenderer.on("wsl-restart-required", listener);
+				return () => ipcRenderer.removeListener("wsl-restart-required", listener);
+			},
 		});
 
 		// Expose shell window ID from process arguments

@@ -26,7 +26,6 @@
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import PodmanCard from "$lib/components/buss/local-agent-panel/podman-card.svelte";
 	import SandboxCard from "$lib/components/buss/local-agent-panel/sandbox-card.svelte";
-	import UnsupportPanel from "$lib/components/buss/local-agent-panel/unsupport-panel.svelte";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import type { SelectOption } from "$lib/components/buss/settings/setting-select.svelte";
 	import SettingSelect from "$lib/components/buss/settings/setting-select.svelte";
@@ -34,11 +33,10 @@
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
-	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { persistedClaudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
-	import { isMac } from "$lib/utils/platform";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import type { CodeAgentType } from "@shared/storage/code-agent";
 	import ClaudeCodePanel from "./claude-code-panel.svelte";
 	import LocalModePanel from "./local-mode-panel.svelte";
@@ -130,15 +128,9 @@
 				{/if}
 			{/if}
 			{#if codeAgentState.type === "local"}
-				{#if isMac}
-					<div class="max-h-[500px] overflow-y-auto pr-2">
-						<LocalModePanel {onClose} />
-					</div>
-				{:else}
-					<div class="max-h-[500px] overflow-y-auto pr-2">
-						<UnsupportPanel />
-					</div>
-				{/if}
+				<div class="max-h-[500px] overflow-y-auto pr-2">
+					<LocalModePanel {onClose} />
+				</div>
 			{/if}
 		</div>
 	</div>

@@ -108,6 +108,9 @@ declare global {
 			onLocalSandboxStateChanged: (
 				callback: (data: { starting?: boolean; running?: boolean }) => void,
 			) => () => void;
+			onWslRestartRequired: (
+				callback: (data: { reason: string; message: string }) => void,
+			) => () => void;
 		};
 		windowId: string;
 		tab: Tab;

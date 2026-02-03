@@ -18,5 +18,7 @@ services:
       - AI302_API_KEY=${AI302_API_KEY}
     volumes:
       # host path injected from .env file at runtime
-      - ${HOST_DATA_PATH}:/home/user
+      - type: bind
+        source: ${HOST_DATA_PATH}
+        target: /home/user
     restart: unless-stopped

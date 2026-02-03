@@ -124,6 +124,33 @@ export function isPermissionDenied(error: unknown): boolean {
 }
 
 /**
+ * Check if error is a WSL-related error (Windows only)
+ * Used for detecting Podman machine WSL distribution issues
+ */
+export function isWSLError(error: unknown): boolean {
+	const isWSLErrMessage = (message: string): boolean => {
+		const lowerMsg = message.toLowerCase();
+		return (
+			lowerMsg.includes("wsl_e_distro_not_found") ||
+			lowerMsg.includes("bootstrap script failed") ||
+			lowerMsg.includes("exit status 0xffffffff") ||
+			(lowerMsg.includes("wsl") && lowerMsg.includes("not found"))
+		);
+	};
+
+	return match(error)
+		.when(
+			(err): err is ExtendedExecError => err instanceof Error,
+			(err) => isWSLErrMessage(err.message),
+		)
+		.when(
+			(err): err is string => typeof err === "string",
+			(err) => isWSLErrMessage(err),
+		)
+		.otherwise(() => false);
+}
+
+/**
  * Parse command execution error type
  */
 export function parseCmdError(error: unknown): {
