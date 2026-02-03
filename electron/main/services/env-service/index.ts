@@ -1340,15 +1340,109 @@ export class EnvService {
 		}
 
 		// Initialize Podman Machine
-		const machineInit = await this.runCommandWithBroadcast(
+		let machineInit = await this.runCommandWithBroadcast(
 			"podman",
 			["machine", "init", "ai302-machine"],
 			"init-podman",
 		);
 
-		// Handle case where machine already exists on hypervisor level
+		// Handle case: "Error: system connection "ai302-machine" (or -root) already exists"
+		// This happens when the machine was deleted but the connection record remains
+		// Need to check for both user and root connection errors
+		if (
+			!machineInit.isOk &&
+			(machineInit.output?.includes('system connection "ai302-machine" already exists') ||
+				machineInit.output?.includes('system connection "ai302-machine-root" already exists'))
+		) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: await this.t(
+					"检测到失效的系统连接，正在修复...",
+					"Detected stale system connection, attempting to fix...",
+				),
+			});
+
+			// Remove both stale connections to be safe
+			try {
+				await execAsync("podman system connection rm ai302-machine");
+			} catch (e) {
+				console.debug(
+					"[EnvService] Failed to remove ai302-machine connection (likely did not exist):",
+					e,
+				);
+			}
+			try {
+				await execAsync("podman system connection rm ai302-machine-root");
+			} catch (e) {
+				console.debug(
+					"[EnvService] Failed to remove ai302-machine-root connection (likely did not exist):",
+					e,
+				);
+			}
+
+			// Retry initialization
+			machineInit = await this.runCommandWithBroadcast(
+				"podman",
+				["machine", "init", "ai302-machine"],
+				"init-podman",
+			);
+		}
+
+		// Handle case: "Error: the WSL import of guest OS failed ... ERROR_ALREADY_EXISTS"
+		// This happens when the WSL distribution already exists but podman doesn't know about it
+		if (
+			!machineInit.isOk &&
+			machineInit.output?.includes("WSL import of guest OS failed") &&
+			(machineInit.output?.includes("ERROR_ALREADY_EXISTS") ||
+				machineInit.output?.includes("0xffffffff"))
+		) {
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: await this.t(
+					"检测到残留的 WSL 分发，正在清理...",
+					"Detected residual WSL distribution, cleaning up...",
+				),
+			});
+
+			// Unregister conflicting WSL distributions
+			if (process.platform === "win32") {
+				try {
+					await execAsync("wsl --unregister podman-ai302-machine");
+				} catch (e) {
+					console.debug(
+						"[EnvService] Failed to unregister podman-ai302-machine (likely did not exist):",
+						e,
+					);
+				}
+				try {
+					await execAsync("wsl --unregister podman-machine-ai302-machine");
+				} catch (e) {
+					console.debug(
+						"[EnvService] Failed to unregister podman-machine-ai302-machine (likely did not exist):",
+						e,
+					);
+				}
+			}
+
+			// Retry initialization again
+			machineInit = await this.runCommandWithBroadcast(
+				"podman",
+				["machine", "init", "ai302-machine"],
+				"init-podman",
+			);
+		}
+
+		// Handle case where machine already exists on hypervisor level (fallback check)
 		// This can happen if machine exists in WSL but not in Podman's registry
-		if (!machineInit.isOk && machineInit.output?.includes("already exists")) {
+		// IMPORTANT: Must ensure we don't treat "system connection already exists" as success
+		if (
+			!machineInit.isOk &&
+			(machineInit.output?.includes("already exists") ||
+				machineInit.output?.includes("VM already exists")) &&
+			!machineInit.output?.includes("system connection") // Exclude connection errors
+		) {
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "init-podman",
 				type: "stdout",

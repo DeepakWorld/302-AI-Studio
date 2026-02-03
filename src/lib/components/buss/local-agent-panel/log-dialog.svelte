@@ -12,15 +12,15 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="w-[600px]">
+	<Dialog.Content class="min-w-[600px]">
 		<Dialog.Header>
 			<Dialog.Title>{title}</Dialog.Title>
 		</Dialog.Header>
 		<div class="rounded-md bg-black/90 p-4 font-mono text-sm text-green-400">
-			<ScrollArea class="h-[300px]">
-				<div class="space-y-1">
+			<ScrollArea class="h-[300px] w-full">
+				<div class="space-y-1 min-w-0">
 					{#each logs as log, i (i)}
-						<p>{log}</p>
+						<p class="whitespace-pre-wrap break-all">{log}</p>
 					{/each}
 				</div>
 			</ScrollArea>
