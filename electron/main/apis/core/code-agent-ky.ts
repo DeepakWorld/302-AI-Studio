@@ -1,4 +1,4 @@
-import { DEFAULT_SANDBOX_PORT, envService } from "@electron/main/services/env-service";
+import { DEFAULT_SANDBOX_PORT, envService } from "@electron/main/services/local-vibe-service";
 import { getCustomUserAgentFragment } from "@electron/main/utils/user-agent";
 import ky from "ky";
 
