@@ -3,7 +3,7 @@
 ## Milestones
 
 - [x] **v1.0 Streaming Fix** - Phases 1-3 (shipped 2026-02-04)
-- [ ] **v1.1 Streaming Input to Taskboard** - Phases 4-5 (in progress)
+- [x] **v1.1 Streaming Input to Taskboard** - Phases 4-5 (shipped 2026-02-04)
 
 ## Overview
 
@@ -21,7 +21,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 ### v1.1 Streaming Input to Taskboard
 
 - [x] **Phase 4: Core Redirection** - Redirect chat input to taskboard during streaming
-- [ ] **Phase 5: Attachment Handling** - Upload attachments to sandbox and reference in tasks
+- [x] **Phase 5: Attachment Handling** - Upload attachments to sandbox and reference in tasks
 
 ## Phase Details
 
@@ -50,7 +50,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md — Handle attachments during chat input redirection
+- [x] 05-01-PLAN.md — Handle attachments during chat input redirection
 
 ## Progress
 
@@ -60,8 +60,8 @@ Plans:
 | 2. Transport Layer Validation | v1.0 | 1/1 | Complete | 2026-02-04 |
 | 3. Frontend State Sync | v1.0 | 2/2 | Complete | 2026-02-04 |
 | 4. Core Redirection | v1.1 | 1/1 | Complete | 2026-02-04 |
-| 5. Attachment Handling | v1.1 | 0/1 | Planned | - |
+| 5. Attachment Handling | v1.1 | 1/1 | Complete | 2026-02-04 |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-04 after Phase 5 planning*
+*Last updated: 2026-02-04 after v1.1 milestone complete*

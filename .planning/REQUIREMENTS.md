@@ -16,8 +16,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Attachment Handling
 
-- [ ] **ATTACH-01**: Attachments in chat input are uploaded to sandbox workspace
-- [ ] **ATTACH-02**: Uploaded attachment paths are referenced in task content
+- [x] **ATTACH-01**: Attachments in chat input are uploaded to sandbox workspace
+- [x] **ATTACH-02**: Uploaded attachment paths are referenced in task content
 
 ## Future Requirements
 
@@ -50,8 +50,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REDIR-02 | Phase 4 | Complete |
 | REDIR-03 | Phase 4 | Complete |
 | REDIR-04 | Phase 4 | Complete |
-| ATTACH-01 | Phase 5 | Pending |
-| ATTACH-02 | Phase 5 | Pending |
+| ATTACH-01 | Phase 5 | Complete |
+| ATTACH-02 | Phase 5 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 6 total
@@ -60,4 +60,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-04*
-*Last updated: 2026-02-04 after Phase 4 complete*
+*Last updated: 2026-02-04 after v1.1 milestone complete*
