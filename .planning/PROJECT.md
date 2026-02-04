@@ -1,42 +1,70 @@
-# 302-AI-Studio: Streaming Completion Detection Fix
+# 302-AI-Studio: Vibe Mode Enhancements
 
 ## What This Is
 
-A focused improvement to 302-AI-Studio's streaming response handling. Currently, when AI models finish generating output, the UI takes too long to recognize completion - loading spinners remain visible even after the stream has ended. This project fixes the delayed detection across all streaming features (chat messages, Code Agent output, MCP tools) so users can immediately send the next message without waiting.
+302-AI-Studio is an Electron desktop AI chat application with Vibe Mode (Claude Code sandbox integration). This project focuses on improving the Vibe Mode workflow by allowing users to add tasks to the taskboard while the AI is still streaming output.
 
 ## Core Value
 
-Users see instant feedback when AI responses complete - loading indicators disappear immediately and the UI becomes responsive without delay.
+Users can capture task ideas immediately without waiting for AI output to complete — input during streaming goes directly to the taskboard.
+
+## Current Milestone: v1.1 Streaming Input to Taskboard
+
+**Goal:** When AI is streaming in Vibe Mode, redirect chat input to taskboard instead of queuing messages.
+
+**Target features:**
+- Auto-detect streaming state and redirect input to taskboard
+- Upload attachments to sandbox and reference paths in task content
+- Show toast notification confirming task was added
+- Clear input after adding to taskboard
+
+## Previous Milestone (v1.0 Shipped)
+
+**Shipped:** 2026-02-04
+
+All streaming contexts now have instant completion detection:
+- Chat message streaming via Hono.js backend
+- Code Agent streaming output in terminal and file operations
+- MCP tool invocation streaming output
+- All AI providers (OpenAI, Anthropic, Google, 302AI)
+
+**Technical Implementation:**
+- SafeClose pattern guarantees stream closure in all code paths
+- [DONE] marker emission triggers AI SDK onFinish callback
+- Transport layer debug logging for stream lifecycle validation
+- AbortController pattern prevents race conditions in async operations
 
 ## Requirements
 
 ### Validated
 
-Existing streaming features that work but have delayed completion detection:
-
-- ✓ Chat message streaming via Hono.js backend (localhost:8089) — existing
-- ✓ Code Agent streaming output in terminal and file operations — existing
-- ✓ MCP tool invocation streaming output — existing
-- ✓ Multiple AI provider support (OpenAI, Anthropic, Google, 302AI) — existing
-- ✓ Vercel AI SDK integration with streamText/streamUI — existing
+- ✓ BACK-01: ReadableStream closes properly via controller.close() — v1.0
+- ✓ BACK-02: Error events handled with proper cleanup — v1.0
+- ✓ BACK-03: Stream completion signals include [DONE] marker — v1.0
+- ✓ BACK-04: All AI providers send proper completion events — v1.0
+- ✓ TRANS-01: Finish event detection logs at transport layer — v1.0
+- ✓ TRANS-02: SSE protocol validation confirms [DONE] delivery — v1.0
+- ✓ TRANS-03: Connection close events forwarded to frontend — v1.0
+- ✓ FRONT-01: Race conditions fixed in onFinish callback — v1.0
+- ✓ FRONT-02: Loading spinner clears <100ms — v1.0
+- ✓ FRONT-03: Chat input enables immediately — v1.0
+- ✓ FRONT-04: Fix applies to all streaming contexts — v1.0
 
 ### Active
 
-Fixes to implement:
-
-- [ ] Detect stream completion immediately when model stops generating
-- [ ] Handle stream interruptions gracefully (network errors, user cancellation)
-- [ ] Remove loading indicators as soon as output stops
-- [ ] Make UI responsive immediately after completion (can send next message)
-- [ ] Apply fixes to all streaming contexts (chat, Code Agent, MCP tools)
+- [ ] INPUT-01: Detect streaming state in Vibe Mode
+- [ ] INPUT-02: Redirect input to taskboard when streaming
+- [ ] INPUT-03: Upload attachments to sandbox workspace
+- [ ] INPUT-04: Reference attachment paths in task content
+- [ ] INPUT-05: Show toast notification after task added
+- [ ] INPUT-06: Clear input and attachments after adding
 
 ### Out of Scope
 
-- Adding new streaming features or capabilities — not this project
-- Changing AI provider integrations or adding new providers — existing works
-- UI redesign beyond loading state indicators — minimal visual changes only
-- Performance optimization unrelated to completion detection — separate concern
-- Changing the Hono.js backend architecture — fix within existing patterns
+- Visual hints on input box during streaming — toast is sufficient feedback
+- Extending Task type with attachment metadata — use path references instead
+- Confirmation dialog before adding — keep interaction fast
+- Changes to non-Vibe-Mode chat behavior — only affects Vibe Mode streaming
 
 ## Context
 
@@ -45,40 +73,28 @@ Fixes to implement:
 - Hono.js backend server (localhost:8089) for AI streaming
 - Vercel AI SDK (v6.0.1) with provider SDKs (Anthropic, OpenAI, Google)
 - Reactive state management via Svelte 5 runes (singleton stores)
-- Multi-window architecture with IPC bridge
 
-**Streaming Architecture:**
-- Frontend: `DynamicChatTransport` sends HTTP POST to backend
-- Backend: Hono router uses AI SDK `streamText()` with middleware (smoothStream, extractReasoning)
-- Response: SSE stream consumed by frontend, updates `chatState` reactively
-- Issue likely in: stream completion signal handling (backend not sending proper end signal, or frontend not detecting it)
+**Relevant Files:**
+- `src/lib/stores/chat-state.svelte.ts` - Chat state with streaming detection
+- `src/lib/stores/code-agent/code-agent-taskboard-state.svelte.ts` - Taskboard state
+- `src/lib/stores/code-agent/code-agent-state.svelte.ts` - Vibe Mode state
+- `src/lib/components/buss/chat/chat-input/` - Chat input components
+- `src/lib/api/taskboard/` - Taskboard API layer
 
-**Affected Code Paths:**
-- Chat: `src/lib/transport/dynamic-chat-transport.ts` → `electron/main/server/router.ts`
-- Code Agent: streaming handled in `src/routes/(with-sidebar)/chat/[id]/components/agent-preview/`
-- MCP Tools: tool output streaming via AI SDK tool integration
-- State: `src/lib/stores/chat-state.svelte.ts` manages loading indicators
-
-**Known Patterns:**
-- Error handling via `ChatErrorHandler` converts technical errors to user messages
-- Toast notifications for user-facing errors (svelte-sonner)
-- Console logging with prefixes for debugging
-- IPC communication for cross-process coordination
-
-## Constraints
-
-- **Tech Stack**: Must use existing Hono.js backend + Vercel AI SDK — no major architectural changes
-- **Compatibility**: Cannot break existing streaming functionality — all current features must continue working
-- **Multi-Provider**: Solution must work across all AI providers (OpenAI, Anthropic, Google, 302AI, compatible providers)
-- **Multi-Context**: Fix must apply to chat messages, Code Agent streaming, and MCP tool output
-- **User Experience**: Zero regression — fix the delay without introducing new issues
-- **Codebase**: Follow existing patterns (stores, IPC, error handling) — maintain consistency
+**Existing Patterns:**
+- Taskboard already has `addTaskFromInput()` method
+- Attachments upload to sandbox via existing upload flow
+- Toast notifications via existing toast system
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Investigate both frontend and backend | Unknown where issue originates, need root cause analysis | — Pending |
+| Three-phase architecture: Backend → Transport → Frontend | Matches natural data flow; isolates layers for debugging | ✓ Good |
+| SafeClose pattern with try-catch-finally | Guarantees controller.close() in all paths | ✓ Good |
+| [DONE] marker in ClaudeCodeProcessor | AI SDK SSE parser requires it for onFinish | ✓ Good |
+| AbortController for title generation | Matches existing suggestions pattern | ✓ Good |
+| DEBUG_TRANSPORT conditional logging | Avoids production overhead | ✓ Good |
 
 ---
-*Last updated: 2026-02-02 after initialization*
+*Last updated: 2026-02-04 after v1.1 milestone start*

@@ -770,6 +770,7 @@
 	"taskboard_button_delete": "删除",
 	"taskboard_button_mark_done": "未完成",
 	"taskboard_empty": "暂无任务",
+	"taskboard_task_added_from_chat": "任务已添加到任务板",
 	"taskboard_edit_title": "编辑任务",
 	"taskboard_edit_save": "保存",
 	"taskboard_button_edit": "编辑",

@@ -1,56 +1,44 @@
-# Requirements: Streaming Completion Detection Fix
+# Requirements: Streaming Input to Taskboard
 
-**Defined:** 2026-02-02
-**Core Value:** Users see instant feedback when AI responses complete - loading indicators disappear immediately and the UI becomes responsive without delay.
+**Defined:** 2026-02-04
+**Core Value:** Users can capture task ideas immediately without waiting for AI output to complete
 
-## v1 Requirements
+## v1.1 Requirements
 
-Requirements for this fix cycle. Each maps to roadmap phases.
+Requirements for this milestone. Each maps to roadmap phases.
 
-### Backend Stream Lifecycle
+### Core Redirection
 
-- [x] **BACK-01**: ReadableStream closes properly via controller.close() in finally blocks for all stream paths
-- [x] **BACK-02**: Error events are handled with proper cleanup - no orphaned streams
-- [x] **BACK-03**: Stream completion signals include explicit [DONE] marker per AI SDK protocol
-- [x] **BACK-04**: All AI providers (OpenAI, Anthropic, Google, 302AI) send proper completion events
+- [x] **REDIR-01**: User can type in chat input while AI is streaming in Vibe Mode
+- [x] **REDIR-02**: User pressing Enter/Send during streaming adds input as task to taskboard
+- [x] **REDIR-03**: User sees toast notification confirming task was added
+- [x] **REDIR-04**: Chat input and attachments are cleared after task is added
 
-### Transport Layer
+### Attachment Handling
 
-- [x] **TRANS-01**: Finish event detection logs at transport layer for debugging
-- [x] **TRANS-02**: SSE protocol validation confirms [DONE] marker delivery
-- [x] **TRANS-03**: Connection close events are detected and forwarded to frontend
+- [x] **ATTACH-01**: Attachments in chat input are uploaded to sandbox workspace
+- [x] **ATTACH-02**: Uploaded attachment paths are referenced in task content
 
-### Frontend State
+## Future Requirements
 
-- [ ] **FRONT-01**: Race conditions fixed between onFinish callback and async operations
-- [ ] **FRONT-02**: Loading spinner clears instantly (<100ms) when stream completes
-- [ ] **FRONT-03**: Chat input becomes enabled immediately after response completion
-- [ ] **FRONT-04**: Fix applies to all streaming contexts: chat messages, Code Agent, MCP tools
+Deferred to later milestones. Tracked but not in current roadmap.
 
-## v2 Requirements
+### Polish
 
-Deferred to future release. Tracked but not in current roadmap.
-
-### Resilience
-
-- **RES-01**: Add 30-second fetch timeout to prevent hanging connections
-- **RES-02**: Manual stop button for stuck streams
-- **RES-03**: Auto-retry failed streams with user confirmation
-
-### Observability
-
-- **OBS-01**: Stream duration metrics/telemetry
-- **OBS-02**: Completion latency monitoring dashboard
+- **POLISH-01**: User can undo task addition via toast action button
+- **POLISH-02**: User sees task count badge near input during streaming
+- **POLISH-03**: Placeholder text changes to indicate taskboard mode
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
-| New streaming features | Bug fix only, not adding new capabilities |
-| Provider integration changes | Existing provider integrations work, just need proper completion |
-| UI redesign | Minimal changes - only loading state indicators |
-| Performance optimization | Separate concern from completion detection |
-| Architecture changes | Fix within existing Hono + AI SDK patterns |
+| Separate queue input UI | Adds cognitive load, breaks flow |
+| Modal confirmation dialog | Interrupts typing flow |
+| Visual hint on input box | Toast notification is sufficient feedback |
+| Extending Task type with attachment metadata | Path references in content are cleaner |
 
 ## Traceability
 
@@ -58,23 +46,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BACK-01 | Phase 1 | Complete |
-| BACK-02 | Phase 1 | Complete |
-| BACK-03 | Phase 1 | Complete |
-| BACK-04 | Phase 1 | Complete |
-| TRANS-01 | Phase 2 | Complete |
-| TRANS-02 | Phase 2 | Complete |
-| TRANS-03 | Phase 2 | Complete |
-| FRONT-01 | Phase 3 | Pending |
-| FRONT-02 | Phase 3 | Pending |
-| FRONT-03 | Phase 3 | Pending |
-| FRONT-04 | Phase 3 | Pending |
+| REDIR-01 | Phase 4 | Complete |
+| REDIR-02 | Phase 4 | Complete |
+| REDIR-03 | Phase 4 | Complete |
+| REDIR-04 | Phase 4 | Complete |
+| ATTACH-01 | Phase 5 | Complete |
+| ATTACH-02 | Phase 5 | Complete |
 
 **Coverage:**
-- v1 requirements: 11 total
-- Mapped to phases: 11
-- Unmapped: 0 ✓
+- v1.1 requirements: 6 total
+- Mapped to phases: 6
+- Unmapped: 0
 
 ---
-*Requirements defined: 2026-02-02*
-*Last updated: 2026-02-03 after Phase 2 completion*
+*Requirements defined: 2026-02-04*
+*Last updated: 2026-02-04 after v1.1 milestone complete*
