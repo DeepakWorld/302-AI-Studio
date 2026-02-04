@@ -133,14 +133,33 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Adds a new task from chat input content (used for redirection during streaming).
 	 * Does NOT clear any input state - caller handles that.
+	 * Attachments are queued to pendingAttachments for deferred upload when sandbox initializes.
 	 */
-	addTaskFromChatInput(content: string) {
+	addTaskFromChatInput(content: string, attachments: AttachmentFile[] = []) {
 		const trimmedContent = content.trim();
-		if (!trimmedContent) return;
+		// Allow task creation if there's content OR attachments
+		if (!trimmedContent && attachments.length === 0) return;
+
+		// Build attachment references for task content
+		const ATTACHMENTS_DIR_PATH = ".302ai/attachments";
+		const attachmentRefs =
+			attachments.length > 0
+				? attachments.map((att) => `[Attachment: ${ATTACHMENTS_DIR_PATH}/${att.name}]`).join("\n")
+				: "";
+		const taskContent = attachmentRefs
+			? trimmedContent
+				? `${trimmedContent}\n\n${attachmentRefs}`
+				: attachmentRefs
+			: trimmedContent;
+
+		// Queue attachments for upload (processed when sandbox initializes)
+		if (attachments.length > 0) {
+			this.addPendingAttachments(attachments);
+		}
 
 		const newTask: Task = {
 			id: nanoid(),
-			content: trimmedContent,
+			content: taskContent,
 			status: "pending",
 			number: 1,
 			executedCount: 0,
