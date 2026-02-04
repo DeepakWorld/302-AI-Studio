@@ -135,7 +135,8 @@ export class CodeAgentTaskboardState {
 	 * Does NOT clear any input state - caller handles that.
 	 * Attachments are queued to pendingAttachments for deferred upload when sandbox initializes.
 	 */
-	addTaskFromChatInput(content: string, attachments: AttachmentFile[] = []) {
+	addTaskFromChatInput(payload: { content: string; attachments?: AttachmentFile[] }) {
+		const { content, attachments = [] } = payload;
 		const trimmedContent = content.trim();
 		// Allow task creation if there's content OR attachments
 		if (!trimmedContent && attachments.length === 0) return;

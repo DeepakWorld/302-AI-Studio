@@ -61,6 +61,13 @@
 			(chatState.isStreaming || chatState.isSubmitted),
 	);
 
+	// Button should be enabled for taskboard redirection even during streaming
+	const canSendOrRedirect = $derived(
+		chatState.sendMessageEnabled ||
+			(shouldRedirectToTaskboard &&
+				(chatState.inputValue.trim() !== "" || chatState.attachments.length > 0)),
+	);
+
 	function isInCompositionCooldown(): boolean {
 		return Date.now() - compositionEndTime < COMPOSITION_COOLDOWN_MS;
 	}
@@ -139,8 +146,8 @@
 	}
 
 	async function handleSendMessage() {
-		// 如果不满足发送条件，直接返回，不执行任何操作
-		if (!chatState.sendMessageEnabled) {
+		// Allow taskboard redirection even when normal send is disabled
+		if (!chatState.sendMessageEnabled && !shouldRedirectToTaskboard) {
 			return;
 		}
 
@@ -186,7 +193,7 @@
 						const content = chatState.inputValue.trim();
 						const attachments = [...chatState.attachments]; // Clone before clearing
 						if (content || attachments.length > 0) {
-							codeAgentTaskboardState.addTaskFromChatInput(content, attachments);
+							codeAgentTaskboardState.addTaskFromChatInput({ content, attachments });
 							toast.success(m.taskboard_task_added_from_chat());
 							chatState.inputValue = "";
 							chatState.attachments = [];
@@ -544,7 +551,7 @@
 						<SendMessageButton onClick={handleSendMessage} />
 					{:else}
 						<button
-							disabled={!chatState.sendMessageEnabled}
+							disabled={!canSendOrRedirect}
 							class={cn(
 								"shrink-0 flex size-9 items-center cursor-pointer justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
 								"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",
