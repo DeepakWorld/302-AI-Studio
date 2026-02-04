@@ -20,7 +20,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 
 ### v1.1 Streaming Input to Taskboard
 
-- [ ] **Phase 4: Core Redirection** - Redirect chat input to taskboard during streaming
+- [x] **Phase 4: Core Redirection** - Redirect chat input to taskboard during streaming
 - [ ] **Phase 5: Attachment Handling** - Upload attachments to sandbox and reference in tasks
 
 ## Phase Details
@@ -37,7 +37,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04-01-PLAN.md — Add taskboard method and chat input redirection logic
+- [x] 04-01-PLAN.md — Add taskboard method and chat input redirection logic
 
 ### Phase 5: Attachment Handling
 **Goal**: Attachments in chat input are uploaded to sandbox and referenced in task content
@@ -59,9 +59,9 @@ Plans:
 | 1. Backend Stream Lifecycle | v1.0 | 2/2 | Complete | 2026-02-04 |
 | 2. Transport Layer Validation | v1.0 | 1/1 | Complete | 2026-02-04 |
 | 3. Frontend State Sync | v1.0 | 2/2 | Complete | 2026-02-04 |
-| 4. Core Redirection | v1.1 | 0/1 | Planned | - |
+| 4. Core Redirection | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 5. Attachment Handling | v1.1 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-04*
+*Last updated: 2026-02-04 after Phase 4 complete*

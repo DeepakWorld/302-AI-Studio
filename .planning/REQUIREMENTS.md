@@ -9,10 +9,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Core Redirection
 
-- [ ] **REDIR-01**: User can type in chat input while AI is streaming in Vibe Mode
-- [ ] **REDIR-02**: User pressing Enter/Send during streaming adds input as task to taskboard
-- [ ] **REDIR-03**: User sees toast notification confirming task was added
-- [ ] **REDIR-04**: Chat input and attachments are cleared after task is added
+- [x] **REDIR-01**: User can type in chat input while AI is streaming in Vibe Mode
+- [x] **REDIR-02**: User pressing Enter/Send during streaming adds input as task to taskboard
+- [x] **REDIR-03**: User sees toast notification confirming task was added
+- [x] **REDIR-04**: Chat input and attachments are cleared after task is added
 
 ### Attachment Handling
 
@@ -46,10 +46,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REDIR-01 | Phase 4 | Pending |
-| REDIR-02 | Phase 4 | Pending |
-| REDIR-03 | Phase 4 | Pending |
-| REDIR-04 | Phase 4 | Pending |
+| REDIR-01 | Phase 4 | Complete |
+| REDIR-02 | Phase 4 | Complete |
+| REDIR-03 | Phase 4 | Complete |
+| REDIR-04 | Phase 4 | Complete |
 | ATTACH-01 | Phase 5 | Pending |
 | ATTACH-02 | Phase 5 | Pending |
 
@@ -60,4 +60,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-04*
-*Last updated: 2026-02-04 after roadmap creation*
+*Last updated: 2026-02-04 after Phase 4 complete*
