@@ -34,10 +34,10 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
   2. User pressing Enter during streaming adds input as new task to taskboard
   3. User sees toast notification confirming task was added
   4. Chat input is cleared after task is added
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Add taskboard method and chat input redirection logic
 
 ### Phase 5: Attachment Handling
 **Goal**: Attachments in chat input are uploaded to sandbox and referenced in task content
@@ -59,7 +59,7 @@ Plans:
 | 1. Backend Stream Lifecycle | v1.0 | 2/2 | Complete | 2026-02-04 |
 | 2. Transport Layer Validation | v1.0 | 1/1 | Complete | 2026-02-04 |
 | 3. Frontend State Sync | v1.0 | 2/2 | Complete | 2026-02-04 |
-| 4. Core Redirection | v1.1 | 0/? | Not started | - |
+| 4. Core Redirection | v1.1 | 0/1 | Planned | - |
 | 5. Attachment Handling | v1.1 | 0/? | Not started | - |
 
 ---
