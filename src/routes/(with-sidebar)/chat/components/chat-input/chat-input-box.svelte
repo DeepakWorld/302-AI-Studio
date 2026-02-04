@@ -54,6 +54,13 @@
 			chatState.hasMessages,
 	);
 
+	// Redirect to taskboard when user sends message while AI is streaming in Vibe Mode
+	const shouldRedirectToTaskboard = $derived(
+		codeAgentState.enabled &&
+			codeAgentState.inCodeAgentMode &&
+			(chatState.isStreaming || chatState.isSubmitted),
+	);
+
 	function isInCompositionCooldown(): boolean {
 		return Date.now() - compositionEndTime < COMPOSITION_COOLDOWN_MS;
 	}
@@ -174,6 +181,19 @@
 					});
 				})
 				.otherwise(() => {
+					// Redirect to taskboard if streaming in Vibe Mode
+					if (shouldRedirectToTaskboard) {
+						const content = chatState.inputValue.trim();
+						if (content) {
+							codeAgentTaskboardState.addTaskFromChatInput(content);
+							toast.success(m.taskboard_task_added_from_chat());
+							chatState.inputValue = "";
+							chatState.attachments = [];
+						}
+						return;
+					}
+
+					// Original send logic
 					if (chatState.hasMessages) {
 						chatState.sendMessage();
 					} else {
