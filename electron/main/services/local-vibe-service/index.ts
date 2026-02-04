@@ -242,7 +242,7 @@ export class LocalVibeService {
 			// Set cwd to runtimeDir so podman-compose can read the .env file
 			const result = await this.runCommandWithBroadcast(
 				"podman-compose",
-				["-f", composePath, "up", "-d", "--force-recreate"],
+				["-f", `"${composePath}"`, "up", "-d", "--force-recreate"],
 				"podman-compose-up",
 				true,
 				runtimeDir,
@@ -295,7 +295,7 @@ export class LocalVibeService {
 			// Execute: podman-compose -f <path> --podman-pull-args "--platform linux/amd64" pull
 			const result = await this.runCommandWithBroadcast(
 				"podman-compose",
-				["-f", composePath, "--podman-pull-args", '"--platform linux/amd64"', "pull"],
+				["-f", `"${composePath}"`, "--podman-pull-args", '"--platform linux/amd64"', "pull"],
 				"podman-compose-pull",
 			);
 
@@ -333,7 +333,7 @@ export class LocalVibeService {
 			// Set cwd to runtimeDir so podman-compose can read the .env file
 			const result = await this.runCommandWithBroadcast(
 				"podman-compose",
-				["-f", composePath, "stop"],
+				["-f", `"${composePath}"`, "stop"],
 				"podman-compose-stop",
 				true,
 				path.dirname(composePath),
