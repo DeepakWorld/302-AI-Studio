@@ -411,11 +411,7 @@ export class FileTreeState {
 				return;
 			}
 
-			const response = await withRetry(
-				() => listSandboxFiles(this.sandboxId, path, 2),
-				3,
-				1000,
-			);
+			const response = await withRetry(() => listSandboxFiles(this.sandboxId, path, 2), 3, 1000);
 
 			if (response.success && response.filelist) {
 				if (merge) {
@@ -797,11 +793,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_pasting());
 
 		try {
-			const response = await copySandboxFile(
-				this.sandboxId,
-				sourcePath,
-				destPath,
-			);
+			const response = await copySandboxFile(this.sandboxId, sourcePath, destPath);
 
 			if (response.success) {
 				toast.success(m.toast_file_paste_success(), { id: toastId });

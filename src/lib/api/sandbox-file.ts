@@ -175,7 +175,6 @@ export async function downloadSandboxFile(
 	} catch (error) {
 		// Handle HTTP errors
 		if (error && typeof error === "object" && "response" in error) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const httpError = error as { response: Response };
 			try {
 				const errorText = await httpError.response.text();
@@ -275,7 +274,7 @@ export async function getFileContent(
 			if (data.success === false) {
 				throw new Error(data.error?.message || "Failed to download file");
 			}
-			
+
 			// Fallback: request as text if it was json content
 			return JSON.stringify(data);
 		}
@@ -284,7 +283,6 @@ export async function getFileContent(
 		return response.text();
 	} catch (error) {
 		if (error && typeof error === "object" && "response" in error) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const httpError = error as { response: Response };
 			const errorText = await httpError.response.text();
 			console.error("[getFileContent] Error response:", errorText);
@@ -347,7 +345,6 @@ async function sandboxFileOperation(
 		return await response.json();
 	} catch (error) {
 		if (error && typeof error === "object" && "response" in error) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const httpError = error as { response: Response };
 			const errorText = await httpError.response.text();
 			console.error("[sandboxFileOperation] Error response:", errorText);
