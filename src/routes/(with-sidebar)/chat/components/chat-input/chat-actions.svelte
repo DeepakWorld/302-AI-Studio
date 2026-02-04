@@ -21,9 +21,18 @@
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
 	import { mcpState } from "$lib/stores/mcp-state.svelte";
+	import { quickPromptState } from "$lib/stores/quick-prompt-state.svelte";
 	import { cn } from "$lib/utils";
 	import mcpIcon from "@lobehub/icons-static-svg/icons/mcp.svg";
-	import { ClipboardList, Globe, Lightbulb, ListTodo, Settings2, Zap } from "@lucide/svelte";
+	import {
+		ClipboardList,
+		Globe,
+		Lightbulb,
+		ListTodo,
+		Settings2,
+		Sparkles,
+		Zap,
+	} from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
 	import { toast } from "svelte-sonner";
 	import { AttachmentUploader } from "../attachment";
@@ -184,6 +193,20 @@
 	<AttachmentUploader {disabled} />
 {/snippet}
 
+{#snippet actionOpenQuickPrompt()}
+	<ButtonWithTooltip
+		class={cn(
+			"hover:!bg-chat-action-hover",
+			quickPromptState.isOpen && "!bg-chat-action-active hover:!bg-chat-action-active",
+		)}
+		tooltip={m.quick_prompt_panel_title()}
+		onclick={() => (quickPromptState.isOpen ? quickPromptState.close() : quickPromptState.open())}
+		{disabled}
+	>
+		<Sparkles class={cn(quickPromptState.isOpen && "!text-chat-action-active-fg")} />
+	</ButtonWithTooltip>
+{/snippet}
+
 {#snippet actionEnableSkills()}
 	{@const hasForceUseSkills = codeAgentState.skills.some((s) => s.forceUse)}
 	<ButtonWithTooltip
@@ -316,6 +339,10 @@
 
 <div class="flex h-chat-bar items-center gap-chat-bar-gap">
 	{@render actionUploadAttachment()}
+
+	{#if !codeAgentState.enabled}
+		{@render actionOpenQuickPrompt()}
+	{/if}
 
 	{#if !codeAgentState.enabled && chatState.providerType === "302ai"}
 		{@render actionEnableOnlineSearch()}
