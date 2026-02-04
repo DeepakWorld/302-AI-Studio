@@ -47,10 +47,10 @@ Plans:
   1. Attachments in chat input are uploaded to sandbox workspace when task is added
   2. Uploaded attachment paths appear in task content
   3. Chat attachments are cleared after task is added
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 05-01: TBD
+- [ ] 05-01-PLAN.md — Handle attachments during chat input redirection
 
 ## Progress
 
@@ -60,8 +60,8 @@ Plans:
 | 2. Transport Layer Validation | v1.0 | 1/1 | Complete | 2026-02-04 |
 | 3. Frontend State Sync | v1.0 | 2/2 | Complete | 2026-02-04 |
 | 4. Core Redirection | v1.1 | 1/1 | Complete | 2026-02-04 |
-| 5. Attachment Handling | v1.1 | 0/? | Not started | - |
+| 5. Attachment Handling | v1.1 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-04 after Phase 4 complete*
+*Last updated: 2026-02-04 after Phase 5 planning*
