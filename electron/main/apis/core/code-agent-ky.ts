@@ -1,4 +1,4 @@
-import { DEFAULT_SANDBOX_PORT, envService } from "@electron/main/services/local-vibe-service";
+import { DEFAULT_SANDBOX_PORT, localVibeService } from "@electron/main/services/local-vibe-service";
 import { getCustomUserAgentFragment } from "@electron/main/utils/user-agent";
 import ky from "ky";
 
@@ -15,7 +15,7 @@ export const localCodeAgentKy = ky.create({
 	hooks: {
 		beforeRequest: [
 			async (request) => {
-				const runtimePort = envService.getRuntimePort();
+				const runtimePort = localVibeService.getRuntimePort();
 
 				if (!runtimePort) {
 					return;

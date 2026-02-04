@@ -49,13 +49,13 @@
 	}
 
 	async function handleOpenDirectory() {
-		await window.electronAPI.envService.openComposeDirectory();
+		await window.electronAPI.localVibeService.openComposeDirectory();
 	}
 
 	onMount(async () => {
 		localEnvState.startSandboxListening();
 		try {
-			fileDirectory = await window.electronAPI.envService.getComposeDirectory();
+			fileDirectory = await window.electronAPI.localVibeService.getComposeDirectory();
 		} catch (error) {
 			console.error("Failed to get compose directory:", error);
 		}

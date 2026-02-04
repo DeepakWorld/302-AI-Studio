@@ -21,7 +21,7 @@ export const codeAgentKy = ky.create({
 				// If local mode, redirect to local base URL and skip apiKey injection
 				if (codeAgentState.type === "local") {
 					try {
-						const localBaseUrl = await window.electronAPI.envService.getLocalBaseUrl();
+						const localBaseUrl = await window.electronAPI.localVibeService.getLocalBaseUrl();
 						if (localBaseUrl) {
 							const url = new URL(request.url);
 							// If the request is targeting the production API, switch it to local

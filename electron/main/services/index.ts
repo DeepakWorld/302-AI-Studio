@@ -7,7 +7,7 @@ import { DataService, dataService } from "./data-service";
 import { DeepLinkService, deepLinkService } from "./deep-link-service";
 import { ExternalLinkService, externalLinkService } from "./external-link-service";
 import { GhostWindowService, ghostWindowService } from "./ghost-window-service";
-import { EnvService, envService } from "./local-vibe-service";
+import { localVibeService, LocalVibeService } from "./local-vibe-service";
 import { McpService, mcpService } from "./mcp-service";
 import { NotificationService, notificationService } from "./notification-service";
 import { PluginService, pluginService } from "./plugin-service";
@@ -33,10 +33,10 @@ export {
 	CodeAgentService,
 	DataService,
 	DeepLinkService,
-	EnvService,
 	ExternalLinkService,
 	GeneralSettingsService,
 	GhostWindowService,
+	LocalVibeService,
 	McpService,
 	NotificationService,
 	PluginService,
@@ -62,10 +62,10 @@ export {
 	codeAgentService,
 	dataService,
 	deepLinkService,
-	envService,
 	externalLinkService,
 	generalSettingsService,
 	ghostWindowService,
+	localVibeService,
 	mcpService,
 	notificationService,
 	pluginService,

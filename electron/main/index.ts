@@ -15,7 +15,7 @@ import { initServer } from "./server/router";
 import {
 	appService,
 	deepLinkService,
-	envService,
+	localVibeService,
 	shortcutService,
 	trayService,
 	windowService,
@@ -95,7 +95,7 @@ if (!gotTheLock) {
 		if (!isMac) {
 			// Stop local sandbox before quitting (for Windows/Linux)
 			console.log("[Main] All windows closed, stopping local sandbox...");
-			await envService.stopLocalSandbox();
+			await localVibeService.stopLocalSandbox();
 			console.log("[Main] Local sandbox stopped, quitting app...");
 			app.quit();
 		}
@@ -119,7 +119,7 @@ if (!gotTheLock) {
 
 			// Stop local sandbox before exiting (for macOS)
 			console.log("[Main] Stopping local sandbox before exit...");
-			const result = await envService.stopLocalSandbox();
+			const result = await localVibeService.stopLocalSandbox();
 			console.log("[Main] Local sandbox stop result:", result);
 
 			app.exit();

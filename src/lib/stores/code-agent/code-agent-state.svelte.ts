@@ -77,7 +77,7 @@ class CodeAgentState {
 
 	async refreshLocalBaseUrl() {
 		try {
-			const url = await window.electronAPI.envService.getLocalBaseUrl();
+			const url = await window.electronAPI.localVibeService.getLocalBaseUrl();
 			if (url) {
 				this.localBaseUrl = url + "/api/v1";
 			}

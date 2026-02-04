@@ -1,27 +1,27 @@
 import { ipcMain } from "electron";
 import {
-	registryService,
-	broadcastService,
-	storageService,
-	pluginService,
-	generalSettingsService,
-	ssoService,
-	ghostWindowService,
-	shortcutService,
-	windowService,
-	deepLinkService,
-	envService,
-	codeAgentService,
-	tabService,
 	aiApplicationService,
 	appService,
+	broadcastService,
+	codeAgentService,
 	dataService,
+	deepLinkService,
 	externalLinkService,
+	generalSettingsService,
+	ghostWindowService,
+	localVibeService,
 	mcpService,
 	notificationService,
+	pluginService,
 	providerService,
+	registryService,
+	shortcutService,
+	ssoService,
+	storageService,
+	tabService,
 	threadService,
 	updaterService,
+	windowService,
 } from "../services";
 
 /**
@@ -211,33 +211,43 @@ export function registerIpcHandlers() {
 		deepLinkService.simulateDeepLink(event, url),
 	);
 
-	// envService service registration
-	ipcMain.handle("envService:getComposeDirectory", (event) =>
-		envService.getComposeDirectory(event),
+	// localVibeService service registration
+	ipcMain.handle("localVibeService:getComposeDirectory", (event) =>
+		localVibeService.getComposeDirectory(event),
 	);
-	ipcMain.handle("envService:openComposeDirectory", (event) =>
-		envService.openComposeDirectory(event),
+	ipcMain.handle("localVibeService:openComposeDirectory", (event) =>
+		localVibeService.openComposeDirectory(event),
 	);
-	ipcMain.handle("envService:getLocalBaseUrl", (event) => envService.getLocalBaseUrl(event));
-	ipcMain.handle("envService:getSandboxStatus", (event) => envService.getSandboxStatus(event));
-	ipcMain.handle("envService:triggerSystemRestart", (event) =>
-		envService.triggerSystemRestart(event),
+	ipcMain.handle("localVibeService:getLocalBaseUrl", (event) =>
+		localVibeService.getLocalBaseUrl(event),
 	);
-	ipcMain.handle("envService:validPodman", (event) => envService.validPodman(event));
-	ipcMain.handle("envService:startPodmanHealthCheck", (event) =>
-		envService.startPodmanHealthCheck(event),
+	ipcMain.handle("localVibeService:getSandboxStatus", (event) =>
+		localVibeService.getSandboxStatus(event),
 	);
-	ipcMain.handle("envService:installWSL", (event) => envService.installWSL(event));
-	ipcMain.handle("envService:installScoop", (event) => envService.installScoop(event));
-	ipcMain.handle("envService:installHomebrew", (event) => envService.installHomebrew(event));
-	ipcMain.handle("envService:installPodman", (event) => envService.installPodman(event));
-	ipcMain.handle("envService:stopLocalSandboxByIpc", (event) =>
-		envService.stopLocalSandboxByIpc(event),
+	ipcMain.handle("localVibeService:triggerSystemRestart", (event) =>
+		localVibeService.triggerSystemRestart(event),
 	);
-	ipcMain.handle("envService:ensureLocalSandboxRunning", (event) =>
-		envService.ensureLocalSandboxRunning(event),
+	ipcMain.handle("localVibeService:validPodman", (event) => localVibeService.validPodman(event));
+	ipcMain.handle("localVibeService:startPodmanHealthCheck", (event) =>
+		localVibeService.startPodmanHealthCheck(event),
 	);
-	ipcMain.handle("envService:startPodmanMachine", (event) => envService.startPodmanMachine(event));
+	ipcMain.handle("localVibeService:installWSL", (event) => localVibeService.installWSL(event));
+	ipcMain.handle("localVibeService:installScoop", (event) => localVibeService.installScoop(event));
+	ipcMain.handle("localVibeService:installHomebrew", (event) =>
+		localVibeService.installHomebrew(event),
+	);
+	ipcMain.handle("localVibeService:installPodman", (event) =>
+		localVibeService.installPodman(event),
+	);
+	ipcMain.handle("localVibeService:stopLocalSandboxByIpc", (event) =>
+		localVibeService.stopLocalSandboxByIpc(event),
+	);
+	ipcMain.handle("localVibeService:ensureLocalSandboxRunning", (event) =>
+		localVibeService.ensureLocalSandboxRunning(event),
+	);
+	ipcMain.handle("localVibeService:startPodmanMachine", (event) =>
+		localVibeService.startPodmanMachine(event),
+	);
 
 	// codeAgentService service registration
 	ipcMain.handle(
@@ -587,20 +597,20 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
 	ipcMain.removeHandler("windowService:navigateToThread");
 	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
-	ipcMain.removeHandler("envService:getComposeDirectory");
-	ipcMain.removeHandler("envService:openComposeDirectory");
-	ipcMain.removeHandler("envService:getLocalBaseUrl");
-	ipcMain.removeHandler("envService:getSandboxStatus");
-	ipcMain.removeHandler("envService:triggerSystemRestart");
-	ipcMain.removeHandler("envService:validPodman");
-	ipcMain.removeHandler("envService:startPodmanHealthCheck");
-	ipcMain.removeHandler("envService:installWSL");
-	ipcMain.removeHandler("envService:installScoop");
-	ipcMain.removeHandler("envService:installHomebrew");
-	ipcMain.removeHandler("envService:installPodman");
-	ipcMain.removeHandler("envService:stopLocalSandboxByIpc");
-	ipcMain.removeHandler("envService:ensureLocalSandboxRunning");
-	ipcMain.removeHandler("envService:startPodmanMachine");
+	ipcMain.removeHandler("localVibeService:getComposeDirectory");
+	ipcMain.removeHandler("localVibeService:openComposeDirectory");
+	ipcMain.removeHandler("localVibeService:getLocalBaseUrl");
+	ipcMain.removeHandler("localVibeService:getSandboxStatus");
+	ipcMain.removeHandler("localVibeService:triggerSystemRestart");
+	ipcMain.removeHandler("localVibeService:validPodman");
+	ipcMain.removeHandler("localVibeService:startPodmanHealthCheck");
+	ipcMain.removeHandler("localVibeService:installWSL");
+	ipcMain.removeHandler("localVibeService:installScoop");
+	ipcMain.removeHandler("localVibeService:installHomebrew");
+	ipcMain.removeHandler("localVibeService:installPodman");
+	ipcMain.removeHandler("localVibeService:stopLocalSandboxByIpc");
+	ipcMain.removeHandler("localVibeService:ensureLocalSandboxRunning");
+	ipcMain.removeHandler("localVibeService:startPodmanMachine");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxModel");
 	ipcMain.removeHandler("codeAgentService:checkClaudeCodeSandbox");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxesByIpc");

@@ -17,7 +17,7 @@ const execAsync = promisify(exec);
 /** Default port for local sandbox API */
 export const DEFAULT_SANDBOX_PORT = 8123;
 
-export class EnvService {
+export class LocalVibeService {
 	/** Default port for local sandbox API */
 	private runtimePort: number | null = null;
 	private isOperating = false;
@@ -86,7 +86,7 @@ export class EnvService {
 			const error = await shell.openPath(dir);
 			return error === "";
 		} catch (error) {
-			console.error("[EnvService] Failed to open compose directory:", error);
+			console.error("[LocalVibeService] Failed to open compose directory:", error);
 			return false;
 		}
 	}
@@ -118,20 +118,20 @@ export class EnvService {
 	 */
 	async triggerSystemRestart(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
 		if (process.platform !== "win32") {
-			console.log("[EnvService] System restart not supported on this platform");
+			console.log("[LocalVibeService] System restart not supported on this platform");
 			return { isOk: false };
 		}
 
 		try {
-			console.log("[EnvService] Triggering system restart in 10 seconds...");
+			console.log("[LocalVibeService] Triggering system restart in 10 seconds...");
 			// Use shutdown command to restart after 10 seconds
 			// /r = restart, /t 10 = 10 second delay
 			await execAsync("shutdown /r /t 10");
-			console.log("[EnvService] System restart scheduled");
+			console.log("[LocalVibeService] System restart scheduled");
 			return { isOk: true };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error("[EnvService] Failed to trigger system restart:", errorMessage);
+			console.error("[LocalVibeService] Failed to trigger system restart:", errorMessage);
 			return { isOk: false };
 		}
 	}
@@ -451,13 +451,13 @@ export class EnvService {
 				const match = output.match(pattern);
 				if (match && match[1]) {
 					const password = match[1].trim();
-					console.log("[EnvService] Extracted password (length):", password.length);
+					console.log("[LocalVibeService] Extracted password (length):", password.length);
 					return { success: true, password };
 				}
 			}
 
 			console.error(
-				"[EnvService] Failed to parse AppleScript output. stdout:",
+				"[LocalVibeService] Failed to parse AppleScript output. stdout:",
 				stdout,
 				"stderr:",
 				stderr,
@@ -465,7 +465,7 @@ export class EnvService {
 			return { success: false, error: await this.t("无法获取密码", "Failed to get password") };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error("[EnvService] AppleScript error:", errorMessage);
+			console.error("[LocalVibeService] AppleScript error:", errorMessage);
 
 			// User cancelled - check various possible error messages
 			if (
@@ -621,7 +621,7 @@ export class EnvService {
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.log(
-				"[EnvService] DISM check failed (likely permission issue), falling back to WSL status check:",
+				"[LocalVibeService] DISM check failed (likely permission issue), falling back to WSL status check:",
 				errorMessage,
 			);
 
@@ -630,12 +630,12 @@ export class EnvService {
 			try {
 				const { stdout: statusOutput } = await execAsync("wsl --status");
 				// If wsl --status works, WSL is enabled
-				console.log("[EnvService] WSL status check succeeded:", statusOutput);
+				console.log("[LocalVibeService] WSL status check succeeded:", statusOutput);
 				return { isOk: true, state: "enabled" };
 			} catch (statusError) {
 				const statusErrorMsg =
 					statusError instanceof Error ? statusError.message : String(statusError);
-				console.log("[EnvService] WSL status check failed:", statusErrorMsg);
+				console.log("[LocalVibeService] WSL status check failed:", statusErrorMsg);
 
 				// wsl --status failed, check if it's because WSL is not enabled
 				// Error messages like "The Windows Subsystem for Linux optional component is not enabled"
@@ -646,18 +646,18 @@ export class EnvService {
 					statusErrorMsg.includes("未启用") ||
 					statusErrorMsg.includes("未安装")
 				) {
-					console.log("[EnvService] WSL is not enabled");
+					console.log("[LocalVibeService] WSL is not enabled");
 					return { isOk: true, state: "disabled" };
 				}
 
 				// Check if it's a command not found error
 				if (isCommandNotFound(statusError)) {
-					console.log("[EnvService] WSL command not found - WSL not installed");
+					console.log("[LocalVibeService] WSL command not found - WSL not installed");
 					return { isOk: true, state: "disabled" };
 				}
 
 				// For any other error, assume WSL is disabled (safer to attempt enablement)
-				console.log("[EnvService] Unknown WSL error, assuming disabled");
+				console.log("[LocalVibeService] Unknown WSL error, assuming disabled");
 				return { isOk: true, state: "disabled" };
 			}
 		}
@@ -725,7 +725,7 @@ export class EnvService {
 			return { isOk: true, needsReboot: true };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error("[EnvService] Failed to enable WSL feature:", errorMessage);
+			console.error("[LocalVibeService] Failed to enable WSL feature:", errorMessage);
 
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "enable-wsl",
@@ -887,7 +887,7 @@ export class EnvService {
 			// Suppress error logging if operating (starting/stopping) or if it's a connection error
 			// unexpected errors should still be logged
 			if (!this.isOperating) {
-				console.error("[EnvService] Local sandbox health check failed:", errorMessage);
+				console.error("[LocalVibeService] Local sandbox health check failed:", errorMessage);
 			}
 			return { isOk: true, isHealth: false, error: errorMessage };
 		}
@@ -925,7 +925,9 @@ export class EnvService {
 						cleanOutput.includes("podman-ai302-machine") ||
 						cleanOutput.includes("podman-machine-ai302-machine");
 					if (existsInWSL) {
-						console.log("[EnvService] Machine not in Podman list but exists in WSL distributions");
+						console.log(
+							"[LocalVibeService] Machine not in Podman list but exists in WSL distributions",
+						);
 					}
 					return { isOk: true, exists, existsInWSL };
 				} catch (_wslError) {
@@ -1094,7 +1096,7 @@ export class EnvService {
 
 			return { isOk: true };
 		} catch (error) {
-			console.error("[EnvService] Failed to start Podman health check:", error);
+			console.error("[LocalVibeService] Failed to start Podman health check:", error);
 			return { isOk: false };
 		}
 	}
@@ -1138,7 +1140,7 @@ export class EnvService {
 
 			return { isOk: true };
 		} catch (error) {
-			console.error("[EnvService] Failed to start Local Sandbox health check:", error);
+			console.error("[LocalVibeService] Failed to start Local Sandbox health check:", error);
 			return { isOk: false };
 		}
 	}
@@ -1154,7 +1156,7 @@ export class EnvService {
 			}
 			return { isOk: true };
 		} catch (error) {
-			console.error("[EnvService] Failed to stop Local Sandbox health check:", error);
+			console.error("[LocalVibeService] Failed to stop Local Sandbox health check:", error);
 			return { isOk: false };
 		}
 	}
@@ -1334,7 +1336,7 @@ export class EnvService {
 				try {
 					await execAsync("wsl --unregister podman-machine-ai302-machine");
 				} catch (_altCleanupError) {
-					console.log("[EnvService] Could not clean up orphaned WSL distribution");
+					console.log("[LocalVibeService] Could not clean up orphaned WSL distribution");
 				}
 			}
 		}
@@ -1368,7 +1370,7 @@ export class EnvService {
 				await execAsync("podman system connection rm ai302-machine");
 			} catch (e) {
 				console.debug(
-					"[EnvService] Failed to remove ai302-machine connection (likely did not exist):",
+					"[LocalVibeService] Failed to remove ai302-machine connection (likely did not exist):",
 					e,
 				);
 			}
@@ -1376,7 +1378,7 @@ export class EnvService {
 				await execAsync("podman system connection rm ai302-machine-root");
 			} catch (e) {
 				console.debug(
-					"[EnvService] Failed to remove ai302-machine-root connection (likely did not exist):",
+					"[LocalVibeService] Failed to remove ai302-machine-root connection (likely did not exist):",
 					e,
 				);
 			}
@@ -1412,7 +1414,7 @@ export class EnvService {
 					await execAsync("wsl --unregister podman-ai302-machine");
 				} catch (e) {
 					console.debug(
-						"[EnvService] Failed to unregister podman-ai302-machine (likely did not exist):",
+						"[LocalVibeService] Failed to unregister podman-ai302-machine (likely did not exist):",
 						e,
 					);
 				}
@@ -1420,7 +1422,7 @@ export class EnvService {
 					await execAsync("wsl --unregister podman-machine-ai302-machine");
 				} catch (e) {
 					console.debug(
-						"[EnvService] Failed to unregister podman-machine-ai302-machine (likely did not exist):",
+						"[LocalVibeService] Failed to unregister podman-machine-ai302-machine (likely did not exist):",
 						e,
 					);
 				}
@@ -1478,7 +1480,7 @@ export class EnvService {
 			.with("darwin", () => this._installPodmanMacOS())
 			.with("linux", () => this._installPodmanLinux())
 			.otherwise(() => {
-				console.error(`[EnvService] Unsupported platform: ${platform}`);
+				console.error(`[LocalVibeService] Unsupported platform: ${platform}`);
 				return { isOk: false };
 			});
 
@@ -2238,4 +2240,4 @@ export class EnvService {
 	}
 }
 
-export const envService = new EnvService();
+export const localVibeService = new LocalVibeService();

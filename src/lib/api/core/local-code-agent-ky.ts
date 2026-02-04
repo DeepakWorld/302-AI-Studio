@@ -26,7 +26,7 @@ export const localCodeAgentKy = ky.create({
 				request.headers.set("User-Agent", userAgent);
 
 				try {
-					const localBaseUrl = await window.electronAPI.envService.getLocalBaseUrl();
+					const localBaseUrl = await window.electronAPI.localVibeService.getLocalBaseUrl();
 					if (localBaseUrl) {
 						const localUrl = new URL(localBaseUrl);
 						const url = new URL(request.url);

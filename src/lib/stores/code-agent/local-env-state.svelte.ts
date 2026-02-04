@@ -76,12 +76,12 @@ class LocalEnvState {
 	private unsubscribeWslRestart: (() => void) | null = null;
 
 	/**
-	 * Refresh Podman installation status by calling envService.validPodman()
+	 * Refresh Podman installation status by calling localVibeService.validPodman()
 	 */
 	async refreshPodmanStatus(): Promise<void> {
 		this.checking = true;
 		try {
-			const result = await window.electronAPI.envService.validPodman();
+			const result = await window.electronAPI.localVibeService.validPodman();
 			this.podmanInstalled = result.isOk && result.isValid;
 
 			// Save detailed component status for UI display
@@ -113,14 +113,14 @@ class LocalEnvState {
 		}
 
 		try {
-			await window.electronAPI.envService.startPodmanHealthCheck();
+			await window.electronAPI.localVibeService.startPodmanHealthCheck();
 		} catch (error) {
 			console.error("[LocalEnvState] Failed to start Podman health check:", error);
 		}
 	}
 
 	/**
-	 * Install Podman - clears logs first, then calls envService.installPodman()
+	 * Install Podman - clears logs first, then calls localVibeService.installPodman()
 	 */
 	async installPodman(): Promise<void> {
 		// Clear previous logs before starting new installation
@@ -129,7 +129,7 @@ class LocalEnvState {
 		this.installFailed = false;
 
 		try {
-			const result = await window.electronAPI.envService.installPodman();
+			const result = await window.electronAPI.localVibeService.installPodman();
 			this.installFailed = !result.isOk;
 
 			// Refresh status after installation
@@ -149,7 +149,7 @@ class LocalEnvState {
 
 	/**
 	 * Start Podman machine (sandbox)
-	 * Calls envService.startPodmanMachine() and prints output with [Local Vibe] prefix
+	 * Calls localVibeService.startPodmanMachine() and prints output with [Local Vibe] prefix
 	 */
 	async startSandbox(): Promise<boolean> {
 		if (!this.podmanInstalled) {
@@ -161,7 +161,7 @@ class LocalEnvState {
 		this.broadcastSandboxState({ starting: true });
 		this.sandboxHealthStatus = "unknown";
 		try {
-			const result = await window.electronAPI.envService.startPodmanMachine();
+			const result = await window.electronAPI.localVibeService.startPodmanMachine();
 
 			// Print Podman machine output
 			if (result.output) {
@@ -201,13 +201,13 @@ class LocalEnvState {
 
 	/**
 	 * Stop Podman machine (sandbox)
-	 * Calls envService.stopLocalSandboxByIpc() and prints output with [Local Vibe] prefix
+	 * Calls localVibeService.stopLocalSandboxByIpc() and prints output with [Local Vibe] prefix
 	 */
 	async stopSandbox(): Promise<boolean> {
 		this.sandboxStarting = true;
 		this.broadcastSandboxState({ starting: true });
 		try {
-			const result = await window.electronAPI.envService.stopLocalSandboxByIpc();
+			const result = await window.electronAPI.localVibeService.stopLocalSandboxByIpc();
 
 			// Print command output with [Local Vibe] prefix
 			if (result.output) {
@@ -283,7 +283,7 @@ class LocalEnvState {
 					if (result) {
 						// User chose to restart now
 						console.log("[LocalEnvState] User confirmed restart, triggering system restart...");
-						await window.electronAPI.envService.triggerSystemRestart();
+						await window.electronAPI.localVibeService.triggerSystemRestart();
 					} else {
 						console.log("[LocalEnvState] User cancelled restart");
 					}
@@ -356,7 +356,7 @@ class LocalEnvState {
 	 */
 	async syncInitialState(): Promise<void> {
 		try {
-			const status = (await window.electronAPI.envService.getSandboxStatus()) as {
+			const status = (await window.electronAPI.localVibeService.getSandboxStatus()) as {
 				isRunning: boolean;
 				isOperating: boolean;
 			};
@@ -497,7 +497,7 @@ class LocalEnvState {
 		this.sandboxHealthStatus = "unknown";
 
 		try {
-			const result = await window.electronAPI.envService.ensureLocalSandboxRunning();
+			const result = await window.electronAPI.localVibeService.ensureLocalSandboxRunning();
 
 			if (result.isOk) {
 				this.sandboxRunning = true;
