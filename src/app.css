@@ -230,6 +230,41 @@
 	[data-slot="dialog-content"][data-mcp-import-dialog] {
 		max-width: 42rem !important;
 	}
+
+	/* Search keyword highlighting with fade-out animation */
+	mark.search-highlight {
+		background-color: rgba(255, 213, 0, 0.5);
+		color: inherit;
+		padding: 0 2px;
+		border-radius: 2px;
+		scroll-margin-top: 100px;
+		scroll-margin-bottom: 100px;
+		animation: highlight-fade 3s ease-in-out forwards;
+	}
+
+	@keyframes highlight-fade {
+		0%,
+		70% {
+			background-color: rgba(255, 213, 0, 0.5);
+		}
+		100% {
+			background-color: transparent;
+		}
+	}
+
+	.dark mark.search-highlight {
+		animation: highlight-fade-dark 3s ease-in-out forwards;
+	}
+
+	@keyframes highlight-fade-dark {
+		0%,
+		70% {
+			background-color: rgba(255, 213, 0, 0.35);
+		}
+		100% {
+			background-color: transparent;
+		}
+	}
 }
 
 /* Design System tokens for new buss components */

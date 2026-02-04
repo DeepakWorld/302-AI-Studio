@@ -1,9 +1,11 @@
 import {
 	type QuickPrompt,
 	type QuickPromptCategory,
-	quickPrompts,
 	QUICK_PROMPT_CATEGORIES,
 } from "$lib/datas/quick-prompts";
+import { quickPromptsEn } from "$lib/datas/quick-prompts-en";
+import { quickPromptsZh } from "$lib/datas/quick-prompts-zh";
+import { getLocale } from "$lib/paraglide/runtime";
 import { SvelteMap } from "svelte/reactivity";
 
 class QuickPromptState {
@@ -11,8 +13,8 @@ class QuickPromptState {
 	searchQuery = $state("");
 	selectedCategory = $state<QuickPromptCategory | null>(null);
 
-	/** All available prompts */
-	private prompts = quickPrompts;
+	/** All available prompts based on current language */
+	private prompts = $derived(getLocale() === "zh" ? quickPromptsZh : quickPromptsEn);
 
 	/** All available categories */
 	categories = QUICK_PROMPT_CATEGORIES;

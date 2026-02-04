@@ -238,7 +238,9 @@ class CodeAgentSendMessageButtonState {
 								const content = await this.#attachmentToBase64(att);
 								if (!content)
 									console.warn("Chat attachment content is null for:", att.name, att.filePath);
-								return content ? { content, save_path: `${workspacePath}/${att.name}` } : null;
+								return content
+									? { content, save_path: `${workspacePath}/.302ai/attachments/${att.name}` }
+									: null;
 							}),
 						);
 						// Filter out null results (attachments that couldn't be converted)
