@@ -595,7 +595,7 @@
 
 				// Fetch from API
 				const content = await withRetry(
-					() => getFileContent(currentSandboxId!, file.path, apiKey, undefined, signal),
+					() => getFileContent(currentSandboxId!, file.path, signal),
 					3,
 					1000,
 				);
@@ -627,7 +627,7 @@
 			) {
 				// Binary files: download and create blob URL with retry
 				const response = await withRetry(
-					() => downloadSandboxFile(currentSandboxId!, file.path, apiKey),
+					() => downloadSandboxFile(currentSandboxId!, file.path),
 					3,
 					1000,
 				);
@@ -916,7 +916,7 @@
 				type: file.type,
 			});
 
-			const response = await uploadSandboxFile(currentSandboxId, filePath, file, apiKey);
+			const response = await uploadSandboxFile(currentSandboxId, filePath, file);
 
 			if (response.success) {
 				// Update local cache and view

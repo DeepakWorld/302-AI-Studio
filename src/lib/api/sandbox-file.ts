@@ -3,7 +3,16 @@
  * 302.AI 沙盒文件系统 API
  */
 
-import { getApiKeyByProviderKey } from "./utils";
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+import { _302AIKy } from "./core/_302ai-ky";
+import { localCodeAgentKy } from "./core/local-code-agent-ky";
+
+/**
+ * Get the appropriate ky instance based on code agent mode
+ */
+function getCodeAgentKy() {
+	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
+}
 
 export interface SandboxFileInfo {
 	name: string;
@@ -46,28 +55,31 @@ export interface SandboxFileDownloadResponse {
 export async function listSandboxFiles(
 	sandboxId: string,
 	path: string | string[],
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 	depth: number = 1,
 ): Promise<SandboxFileListResponse> {
-	const response = await fetch(`${baseUrl}/302/claude-code/sandbox/file/list`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
-		},
-		body: JSON.stringify({
-			sandbox_id: sandboxId,
-			path,
-			depth,
-		}),
-	});
+	try {
+		const kyInstance = getCodeAgentKy();
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						path,
+						depth,
+					}
+				: {
+						sandbox_id: sandboxId,
+						path,
+						depth,
+					};
 
-	if (!response.ok) {
-		throw new Error(`Failed to list files`);
+		const response = await kyInstance.post("302/claude-code/sandbox/file/list", {
+			json: requestBody,
+		});
+
+		return await response.json();
+	} catch (error) {
+		console.error("Failed to list files:", error);
+		throw error;
 	}
-
-	return response.json();
 }
 
 /**
@@ -112,57 +124,70 @@ function parseErrorMessage(text: string, fallback: string): string {
 export async function downloadSandboxFile(
 	sandboxId: string,
 	path: string | string[],
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 ): Promise<SandboxFileDownloadResponse> {
-	const response = await fetch(`${baseUrl}/302/claude-code/sandbox/file/download`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
-		},
-		body: JSON.stringify({ sandbox_id: sandboxId, path }),
-	});
-
-	// 处理 HTTP 错误
-	if (!response.ok) {
-		const errorText = await response.text();
-		throw new Error(
-			parseErrorMessage(errorText, `Failed to download file: ${response.statusText}`),
-		);
-	}
-
-	const contentType = response.headers.get("content-type");
-
-	// 非 JSON 内容，直接返回 Blob
-	if (!contentType?.includes("application/json")) {
-		return buildDirectContentResponse(path, await response.blob(), contentType);
-	}
-
-	// JSON 内容处理
-	const text = await response.text();
-	let jsonData: unknown;
 	try {
-		jsonData = JSON.parse(text);
-	} catch {
+		const kyInstance = getCodeAgentKy();
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						path,
+					}
+				: {
+						sandbox_id: sandboxId,
+						path,
+					};
+
+		const response = await kyInstance.post("302/claude-code/sandbox/file/download", {
+			json: requestBody,
+		});
+
+		const contentType = response.headers.get("content-type");
+
+		// 非 JSON 内容，直接返回 Blob
+		if (!contentType?.includes("application/json")) {
+			return buildDirectContentResponse(path, await response.blob(), contentType);
+		}
+
+		// JSON 内容处理
+		const text = await response.text();
+		let jsonData: unknown;
+		try {
+			jsonData = JSON.parse(text);
+		} catch {
+			return buildDirectContentResponse(path, text, contentType);
+		}
+
+		// 检查错误响应
+		if (typeof jsonData === "object" && jsonData !== null) {
+			const data = jsonData as Record<string, unknown>;
+			if (data.success === false || data.error) {
+				const error = data.error as { message?: string } | undefined;
+				throw new Error(error?.message || "Download failed");
+			}
+			// 标准 API 响应
+			if (Array.isArray(data.result)) {
+				return jsonData as SandboxFileDownloadResponse;
+			}
+		}
+
+		// JSON 文件内容（如 package.json）
 		return buildDirectContentResponse(path, text, contentType);
-	}
-
-	// 检查错误响应
-	if (typeof jsonData === "object" && jsonData !== null) {
-		const data = jsonData as Record<string, unknown>;
-		if (data.success === false || data.error) {
-			const error = data.error as { message?: string } | undefined;
-			throw new Error(error?.message || "Download failed");
+	} catch (error) {
+		// Handle HTTP errors
+		if (error && typeof error === "object" && "response" in error) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const httpError = error as { response: Response };
+			try {
+				const errorText = await httpError.response.text();
+				throw new Error(
+					parseErrorMessage(errorText, `Failed to download file: ${httpError.response.statusText}`),
+				);
+			} catch (parseError) {
+				throw parseError instanceof Error ? parseError : error;
+			}
 		}
-		// 标准 API 响应
-		if (Array.isArray(data.result)) {
-			return jsonData as SandboxFileDownloadResponse;
-		}
+		throw error;
 	}
-
-	// JSON 文件内容（如 package.json）
-	return buildDirectContentResponse(path, text, contentType);
 }
 
 /**
@@ -171,26 +196,30 @@ export async function downloadSandboxFile(
 export async function writeSandboxFile(
 	sandboxId: string,
 	fileList: Array<{ file: string; save_path: string }>,
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 ): Promise<{ result: string }> {
-	const response = await fetch(`${baseUrl}/302/claude-code/sandbox/file/write`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
-		},
-		body: JSON.stringify({
-			sandbox_id: sandboxId,
-			file_list: fileList,
-		}),
-	});
+	try {
+		const kyInstance = getCodeAgentKy();
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						file_list: fileList,
+					}
+				: {
+						sandbox_id: sandboxId,
+						file_list: fileList,
+					};
 
-	if (!response.ok) {
-		throw new Error(`Failed to write file: ${response.statusText}`);
+		const response = await kyInstance.post("302/claude-code/sandbox/file/write", {
+			json: requestBody,
+		});
+
+		return await response.json();
+	} catch (error) {
+		if (error instanceof Error) {
+			throw new Error(`Failed to write file: ${error.message}`);
+		}
+		throw error;
 	}
-
-	return response.json();
 }
 
 /**
@@ -200,52 +229,69 @@ export async function writeSandboxFile(
 export async function getFileContent(
 	sandboxId: string,
 	filePath: string,
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 	signal?: AbortSignal,
 ): Promise<string> {
-	// 直接调用下载 API，它会返回文件内容
-	const response = await fetch(`${baseUrl}/302/claude-code/sandbox/file/download`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
-		},
-		body: JSON.stringify({
-			sandbox_id: sandboxId,
-			path: filePath,
-		}),
-		signal, // 传递 AbortSignal 以支持请求取消
-	});
+	const kyInstance = getCodeAgentKy();
+	const requestBody =
+		codeAgentState.type === "local"
+			? {
+					path: filePath,
+				}
+			: {
+					sandbox_id: sandboxId,
+					path: filePath,
+				};
 
-	if (!response.ok) {
-		const errorText = await response.text();
-		console.error("[getFileContent] Error response:", errorText);
-		throw new Error(`Failed to download file: ${response.statusText}`);
-	}
+	try {
+		// 直接调用下载 API，它会返回文件内容
+		const response = await kyInstance.post("302/claude-code/sandbox/file/download", {
+			json: requestBody,
+			signal, // 传递 AbortSignal 以支持请求取消
+		});
 
-	const contentType = response.headers.get("content-type");
-	console.log("[getFileContent] Content-Type:", contentType);
+		const contentType = response.headers.get("content-type");
+		console.log("[getFileContent] Content-Type:", contentType);
 
-	// 如果返回的是 JSON，说明返回的是下载 URL
-	if (contentType?.includes("application/json")) {
-		const jsonResponse = await response.json();
-		console.log("[getFileContent] JSON response:", jsonResponse);
+		// 如果返回的是 JSON，说明返回的是下载 URL
+		if (contentType?.includes("application/json")) {
+			// Clone response to read json, as we might need text fallback
+			const jsonResponse = await response.json();
+			console.log("[getFileContent] JSON response:", jsonResponse);
 
-		// 如果有 download_url，则获取文件内容
-		if (jsonResponse.download_url) {
-			const contentResponse = await fetch(jsonResponse.download_url, { signal });
-			if (!contentResponse.ok) {
-				throw new Error(`Failed to fetch file content: ${contentResponse.statusText}`);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const data = jsonResponse as any;
+
+			// 如果有 download_url，则获取文件内容
+			if (data.download_url) {
+				const contentResponse = await fetch(data.download_url, { signal });
+				if (!contentResponse.ok) {
+					throw new Error(`Failed to fetch file content: ${contentResponse.statusText}`);
+				}
+				return contentResponse.text();
 			}
-			return contentResponse.text();
+
+			// 如果是文件内容本身是 JSON，ky.json() 解析了它，我们需要把它转回 string
+			// 或者是错误信息
+			if (data.success === false) {
+				throw new Error(data.error?.message || "Failed to download file");
+			}
+			
+			// Fallback: request as text if it was json content
+			return JSON.stringify(data);
 		}
 
-		throw new Error("No download URL in response");
+		// 否则，直接返回文本内容
+		return response.text();
+	} catch (error) {
+		if (error && typeof error === "object" && "response" in error) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const httpError = error as { response: Response };
+			const errorText = await httpError.response.text();
+			console.error("[getFileContent] Error response:", errorText);
+			throw new Error(`Failed to download file: ${httpError.response.statusText}`);
+		}
+		throw error;
 	}
-
-	// 否则，直接返回文本内容
-	return response.text();
 }
 
 export enum Operation {
@@ -259,7 +305,7 @@ export enum Operation {
 export interface SandboxFileOperationRequest {
 	operation: Operation;
 	original_path: string;
-	sandbox_id: string;
+	sandbox_id?: string;
 	target_path?: string;
 	[property: string]: unknown;
 }
@@ -278,35 +324,37 @@ async function sandboxFileOperation(
 	operation: Operation,
 	originalPath: string,
 	targetPath?: string,
-	apiKey: string = "",
-	baseUrl: string = "https://api.302.ai",
 ): Promise<SandboxFileOperationResponse> {
-	const requestBody: SandboxFileOperationRequest = {
-		operation,
-		original_path: originalPath,
-		sandbox_id: sandboxId,
-	};
+	try {
+		const kyInstance = getCodeAgentKy();
+		const requestBody: SandboxFileOperationRequest = {
+			operation,
+			original_path: originalPath,
+		};
 
-	if (targetPath !== undefined) {
-		requestBody.target_path = targetPath;
+		if (codeAgentState.type !== "local") {
+			requestBody.sandbox_id = sandboxId;
+		}
+
+		if (targetPath !== undefined) {
+			requestBody.target_path = targetPath;
+		}
+
+		const response = await kyInstance.post("302/claude-code/sandbox/file/operation", {
+			json: requestBody,
+		});
+
+		return await response.json();
+	} catch (error) {
+		if (error && typeof error === "object" && "response" in error) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const httpError = error as { response: Response };
+			const errorText = await httpError.response.text();
+			console.error("[sandboxFileOperation] Error response:", errorText);
+			throw new Error(`Failed to perform file operation: ${httpError.response.statusText}`);
+		}
+		throw error;
 	}
-
-	const response = await fetch(`${baseUrl}/302/claude-code/sandbox/file/operation`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
-		},
-		body: JSON.stringify(requestBody),
-	});
-
-	if (!response.ok) {
-		const errorText = await response.text();
-		console.error("[sandboxFileOperation] Error response:", errorText);
-		throw new Error(`Failed to perform file operation: ${response.statusText}`);
-	}
-
-	return response.json();
 }
 
 /**
@@ -316,10 +364,8 @@ export async function renameSandboxFile(
 	sandboxId: string,
 	oldPath: string,
 	newPath: string,
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 ): Promise<SandboxFileOperationResponse> {
-	return sandboxFileOperation(sandboxId, Operation.Rename, oldPath, newPath, apiKey, baseUrl);
+	return sandboxFileOperation(sandboxId, Operation.Rename, oldPath, newPath);
 }
 
 /**
@@ -328,10 +374,8 @@ export async function renameSandboxFile(
 export async function deleteSandboxFile(
 	sandboxId: string,
 	path: string,
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 ): Promise<SandboxFileOperationResponse> {
-	return sandboxFileOperation(sandboxId, Operation.Remove, path, undefined, apiKey, baseUrl);
+	return sandboxFileOperation(sandboxId, Operation.Remove, path);
 }
 
 /**
@@ -341,10 +385,8 @@ export async function copySandboxFile(
 	sandboxId: string,
 	sourcePath: string,
 	destPath: string,
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 ): Promise<SandboxFileOperationResponse> {
-	return sandboxFileOperation(sandboxId, Operation.Copy, sourcePath, destPath, apiKey, baseUrl);
+	return sandboxFileOperation(sandboxId, Operation.Copy, sourcePath, destPath);
 }
 
 /**
@@ -353,10 +395,8 @@ export async function copySandboxFile(
 export async function createSandboxFolder(
 	sandboxId: string,
 	path: string,
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 ): Promise<SandboxFileOperationResponse> {
-	return sandboxFileOperation(sandboxId, Operation.Mkdir, path, undefined, apiKey, baseUrl);
+	return sandboxFileOperation(sandboxId, Operation.Mkdir, path);
 }
 
 /**
@@ -366,32 +406,32 @@ export async function uploadSandboxFile(
 	sandboxId: string,
 	path: string,
 	file: File,
-	apiKey: string,
-	baseUrl: string = "https://api.302.ai",
 	auto_unzip: boolean = false,
 ): Promise<SandboxFileOperationResponse> {
 	try {
+		const kyInstance = getCodeAgentKy();
 		const formData = new FormData();
-		formData.append("sandbox_id", sandboxId);
+		if (codeAgentState.type !== "local") {
+			formData.append("sandbox_id", sandboxId);
+		}
 		formData.append("path", path);
 		formData.append("file", file);
 		if (auto_unzip) {
 			formData.append("auto_unzip", "true");
 		}
 
-		const response = await fetch(`${baseUrl}/302/claude-code/sandbox/file/upload`, {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${getApiKeyByProviderKey(apiKey)}`,
-			},
+		const response = await kyInstance.post("302/claude-code/sandbox/file/upload", {
 			body: formData,
 		});
 
-		const data = await response.json();
-		if (!data.success && data.error && typeof data.error === "object") {
+		const data: SandboxFileOperationResponse = await response.json();
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const anyData = data as any;
+
+		if (!data.success && anyData.error && typeof anyData.error === "object") {
 			return {
 				success: false,
-				error: data.error.message || JSON.stringify(data.error),
+				error: anyData.error.message || JSON.stringify(anyData.error),
 			};
 		}
 		return data;

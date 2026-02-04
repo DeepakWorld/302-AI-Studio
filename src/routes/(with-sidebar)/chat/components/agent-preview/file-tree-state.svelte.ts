@@ -412,7 +412,7 @@ export class FileTreeState {
 			}
 
 			const response = await withRetry(
-				() => listSandboxFiles(this.sandboxId, path, apiKey, undefined, 2),
+				() => listSandboxFiles(this.sandboxId, path, 2),
 				3,
 				1000,
 			);
@@ -628,7 +628,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_renaming());
 
 		try {
-			const response = await renameSandboxFile(this.sandboxId, oldPath, newPath, validation.apiKey);
+			const response = await renameSandboxFile(this.sandboxId, oldPath, newPath);
 
 			if (response.success) {
 				toast.success(m.toast_file_rename_success(), { id: toastId });
@@ -677,7 +677,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_deleting());
 
 		try {
-			const response = await deleteSandboxFile(this.sandboxId, path, validation.apiKey);
+			const response = await deleteSandboxFile(this.sandboxId, path);
 
 			if (response.success) {
 				toast.success(m.toast_file_delete_success(), { id: toastId });
@@ -801,7 +801,6 @@ export class FileTreeState {
 				this.sandboxId,
 				sourcePath,
 				destPath,
-				validation.apiKey,
 			);
 
 			if (response.success) {
@@ -859,7 +858,7 @@ export class FileTreeState {
 			// Create an empty file
 			const file = new File([""], filename, { type: "text/plain" });
 
-			const response = await uploadSandboxFile(this.sandboxId, fullPath, file, apiKey);
+			const response = await uploadSandboxFile(this.sandboxId, fullPath, file);
 
 			if (response.success) {
 				toast.success(m.toast_file_create_success(), { id: toastId });
@@ -924,7 +923,7 @@ export class FileTreeState {
 				? `${targetPath}${file.name}`
 				: `${targetPath}/${file.name}`;
 
-			const response = await uploadSandboxFile(this.sandboxId, fullPath, file, apiKey);
+			const response = await uploadSandboxFile(this.sandboxId, fullPath, file);
 
 			if (response.success) {
 				toast.success(m.toast_file_upload_success(), { id: toastId });
@@ -999,8 +998,6 @@ export class FileTreeState {
 				this.sandboxId,
 				zipUploadPath,
 				zipFile,
-				apiKey,
-				undefined,
 				true, // auto_unzip
 			);
 
@@ -1051,7 +1048,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_creating_folder());
 
 		try {
-			const response = await createSandboxFolder(this.sandboxId, targetPath, apiKey);
+			const response = await createSandboxFolder(this.sandboxId, targetPath);
 
 			if (response.success) {
 				toast.success(m.toast_file_create_folder_success(), { id: toastId });
@@ -1103,7 +1100,7 @@ export class FileTreeState {
 		const downloadToastId = toast.loading(m.toast_downloading_file({ fileName }));
 
 		try {
-			const response = await downloadSandboxFile(this.sandboxId, file.path, apiKey);
+			const response = await downloadSandboxFile(this.sandboxId, file.path);
 
 			if (!response.result || response.result.length === 0) {
 				toast.error(m.toast_download_no_info(), { id: downloadToastId });
