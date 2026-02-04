@@ -131,6 +131,24 @@ export class CodeAgentTaskboardState {
 	}
 
 	/**
+	 * Adds a new task from chat input content (used for redirection during streaming).
+	 * Does NOT clear any input state - caller handles that.
+	 */
+	addTaskFromChatInput(content: string) {
+		const trimmedContent = content.trim();
+		if (!trimmedContent) return;
+
+		const newTask: Task = {
+			id: nanoid(),
+			content: trimmedContent,
+			status: "pending",
+			number: 1,
+			executedCount: 0,
+		};
+		this.updateTasklist([...this.tasklist, newTask]);
+	}
+
+	/**
 	 * Adds multiple tasks from an array of task content strings.
 	 * Used by the AI task decomposition feature.
 	 */

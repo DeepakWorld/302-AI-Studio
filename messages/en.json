@@ -769,6 +769,7 @@
 	"taskboard_button_delete": "Delete",
 	"taskboard_button_mark_done": "Mark Done",
 	"taskboard_empty": "No tasks yet",
+	"taskboard_task_added_from_chat": "Task added to taskboard",
 	"taskboard_edit_title": "Edit Task",
 	"taskboard_edit_save": "Save",
 	"taskboard_button_edit": "Edit",
