@@ -1,53 +1,27 @@
 <script lang="ts">
 	import { SettingSelect } from "$lib/components/buss/settings";
+	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
+	import { RefreshCw } from "@lucide/svelte";
 	import { onMount } from "svelte";
 
 	let { mode = "settings" }: { mode?: "settings" | "chat" } = $props();
 	void mode; // Mark as intentionally unused for future use
 
-	// Local state
+	// Local state for agent framework (currently only claude-code)
 	let agentFramework = $state("claude-code");
-	let selectedSession = $state("new");
-	let workDirectory = $state("new");
-
-	// Workspace directories state
-	let existingDirectories = $state<string[]>([]);
 
 	const frameworkOptions = [{ value: "claude-code", label: "claude code" }];
-	const sessionOptions = [{ value: "new", label: m.local_platform_new_session() }];
 
-	// Grouped options for Work Directory - reactive based on fetched directories
-	const workDirectoryOptions = $derived(() => ({
-		standalone: [{ value: "new", label: m.local_platform_new_work_directory() }],
-		groups:
-			existingDirectories.length > 0
-				? [
-						{
-							groupKey: "existing",
-							groupLabel: m.local_platform_existing_work_directory(),
-							items: existingDirectories.map((dir) => ({
-								value: dir,
-								label: dir,
-							})),
-						},
-					]
-				: [],
-	}));
-
-	// Fetch existing work directories on mount
+	// Fetch sessions on mount
 	onMount(async () => {
-		await loadWorkspaceDirectories();
+		await localClaudeCodeSandboxState.refreshSessions();
 	});
 
-	async function loadWorkspaceDirectories() {
-		try {
-			existingDirectories = await window.electronAPI.localVibeService.listWorkspaceDirectories();
-		} catch (error) {
-			console.error("[WorkspaceConfig] Failed to load directories:", error);
-			existingDirectories = [];
-		}
+	async function handleRefresh() {
+		await localClaudeCodeSandboxState.refreshSessions();
 	}
 </script>
 
@@ -60,12 +34,28 @@
 
 	<!-- Select Session -->
 	<div class="space-y-2">
-		<Label class="text-label-fg font-normal">{m.local_platform_select_session()}</Label>
+		<div class="flex items-center justify-between">
+			<Label class="text-label-fg font-normal">{m.local_platform_select_session()}</Label>
+			<Button
+				variant="ghost"
+				size="icon"
+				class="h-6 w-6"
+				onclick={handleRefresh}
+				disabled={localClaudeCodeSandboxState.isLoading}
+			>
+				<RefreshCw
+					class="h-3.5 w-3.5 {localClaudeCodeSandboxState.isLoading ? 'animate-spin' : ''}"
+				/>
+			</Button>
+		</div>
 		<SettingSelect
 			name="Select Session"
-			bind:value={selectedSession}
-			options={sessionOptions}
+			value={localClaudeCodeSandboxState.selectedSessionId}
+			groupedOptions={localClaudeCodeSandboxState.sessionOptions}
 			placeholder={m.local_platform_new_session_placeholder()}
+			onValueChange={localClaudeCodeSandboxState.handleSessionSelected.bind(
+				localClaudeCodeSandboxState,
+			)}
 		/>
 	</div>
 
@@ -74,9 +64,12 @@
 		<Label class="text-label-fg font-normal">{m.local_platform_work_directory()}</Label>
 		<SettingSelect
 			name="Work Directory"
-			bind:value={workDirectory}
-			groupedOptions={workDirectoryOptions()}
+			value={localClaudeCodeSandboxState.selectedWorkspacePath}
+			groupedOptions={localClaudeCodeSandboxState.workspaceOptions}
 			placeholder={m.local_platform_new_work_directory_placeholder()}
+			onValueChange={localClaudeCodeSandboxState.handleWorkspaceSelected.bind(
+				localClaudeCodeSandboxState,
+			)}
 		/>
 	</div>
 </div>

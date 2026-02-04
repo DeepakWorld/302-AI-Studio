@@ -19,7 +19,7 @@ import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 import { toast } from "svelte-sonner";
 import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
 import { DEFAULT_WORKSPACE_PATH } from "./constants";
-import { handleError, validatePath, validateSandboxId, withRetry } from "./utils";
+import { handleError, validatePath, validateSandboxId } from "./utils";
 
 export interface TreeNode extends SandboxFileInfo {
 	children: TreeNode[];
@@ -411,7 +411,7 @@ export class FileTreeState {
 				return;
 			}
 
-			const response = await withRetry(() => listSandboxFiles(this.sandboxId, path, 2), 3, 1000);
+			const response = await listSandboxFiles(this.sandboxId, path, 2);
 
 			if (response.success && response.filelist) {
 				if (merge) {

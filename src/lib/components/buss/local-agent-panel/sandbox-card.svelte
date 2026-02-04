@@ -7,7 +7,7 @@
 		type SandboxHealthStatus,
 	} from "$lib/stores/code-agent/local-env-state.svelte";
 	import { Loader2 } from "@lucide/svelte";
-	import { onDestroy, onMount } from "svelte";
+	import { onMount } from "svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
 	import StatusIndicator from "./status-indicator.svelte";
 
@@ -59,11 +59,6 @@
 		} catch (error) {
 			console.error("Failed to get compose directory:", error);
 		}
-	});
-
-	onDestroy(() => {
-		// Keep listeners alive across tabs; localEnvState is shared and stopSandboxListening()
-		// would unsubscribe for all tabs.
 	});
 </script>
 

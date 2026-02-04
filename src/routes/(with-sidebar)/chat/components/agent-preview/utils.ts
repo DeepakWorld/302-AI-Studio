@@ -5,9 +5,6 @@
 import type { SandboxFileInfo } from "$lib/api/sandbox-file";
 import { toast } from "svelte-sonner";
 
-// Re-export withRetry from common utils
-export { withRetry } from "$lib/utils/retry";
-
 /**
  * Get threadId from window.tab or default to "shell"
  */

@@ -3,8 +3,13 @@
  * 302.AI 沙盒会话 API
  */
 
-import { type } from "arktype";
 import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
+import {
+	listLocalClaudeCodeSessionsResponse,
+	type ListLocalClaudeCodeSessionsResponse,
+} from "@shared/types";
+import { type } from "arktype";
 import { _302AIKy } from "./core/_302ai-ky";
 import { localCodeAgentKy } from "./core/local-code-agent-ky";
 
@@ -154,10 +159,14 @@ export async function updateSessionNote(
 			};
 		}
 
-		// Refresh sandbox/session list so UI stays in sync with latest note
+		// Refresh session list so UI stays in sync with latest note
 		if (typeof window !== "undefined") {
 			try {
-				await window.electronAPI?.codeAgentService?.updateClaudeCodeSandboxesByIpc?.();
+				if (codeAgentState.type === "local") {
+					await localClaudeCodeSandboxState.refreshSessions();
+				} else {
+					await window.electronAPI?.codeAgentService?.updateClaudeCodeSandboxesByIpc?.();
+				}
 			} catch (refreshError) {
 				console.error(
 					"Failed to refresh Claude code sandboxes after updating session note:",
@@ -219,5 +228,25 @@ export async function deleteSession(request: DeleteSessionRequest): Promise<Dele
 			success: false,
 			error: error instanceof Error ? error.message : "Failed to delete session",
 		};
+	}
+}
+
+export async function listLocalClaudeCodeSessions(): Promise<ListLocalClaudeCodeSessionsResponse> {
+	try {
+		const kyInstance = getCodeAgentKy();
+
+		const response = await kyInstance.get("302/claude-code/sandbox/session").json();
+		const validated = listLocalClaudeCodeSessionsResponse(response);
+		if (validated instanceof type.errors) {
+			console.error(
+				"Failed to validate list local claude code sessions response:",
+				validated.summary,
+			);
+			throw new Error("Invalid response format from list local claude code sessions API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to list local claude code sessions:", error);
+		throw error;
 	}
 }

@@ -5,6 +5,9 @@
  * for the Code Agent local mode.
  */
 
+import { m } from "$lib/paraglide/messages";
+import { toast } from "svelte-sonner";
+
 export type PodmanHealthStatus = "unknown" | "healthy" | "unhealthy";
 export type SandboxHealthStatus = "unknown" | "healthy" | "unhealthy";
 export type PodmanComponentStatus = "unknown" | "missing" | "installed";
@@ -74,6 +77,29 @@ class LocalEnvState {
 	// Health check resolvers for waiting on first health check after start
 	private healthCheckResolvers: Array<() => void> = [];
 	private unsubscribeWslRestart: (() => void) | null = null;
+
+	constructor() {
+		// Sync podmanInstalled status on initialization
+		this.syncPodmanInstalledStatus();
+	}
+
+	/**
+	 * Sync podmanInstalled status from main process on initialization
+	 */
+	private async syncPodmanInstalledStatus(): Promise<void> {
+		try {
+			const result = await window.electronAPI.localVibeService.validPodman();
+			this.podmanInstalled = result.isOk && result.isValid;
+
+			if (result.details) {
+				this.podmanComponentStatus = result.details;
+			}
+
+			console.log("[LocalEnvState] Initial podmanInstalled sync:", this.podmanInstalled);
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to sync initial podmanInstalled status:", error);
+		}
+	}
 
 	/**
 	 * Refresh Podman installation status by calling localVibeService.validPodman()
@@ -152,6 +178,7 @@ class LocalEnvState {
 	 * Calls localVibeService.startPodmanMachine() and prints output with [Local Vibe] prefix
 	 */
 	async startSandbox(): Promise<boolean> {
+		toast.info(m.code_agent_local_sandbox_starting());
 		if (!this.podmanInstalled) {
 			console.error("[LocalEnvState] Cannot start sandbox: Podman not installed");
 			return false;

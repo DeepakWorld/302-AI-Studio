@@ -1,4 +1,8 @@
+import { m } from "$lib/paraglide/messages";
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 import ky from "ky";
+import { toast } from "svelte-sonner";
 
 const { getUserAgentFragment } = window.electronAPI.appService;
 
@@ -19,6 +23,28 @@ export const localCodeAgentKy = ky.create({
 		"X-Title": "302.AI Studio",
 	},
 	retry: 3,
+	fetch: async (input, init) => {
+		try {
+			return await fetch(input, init);
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				error.message === "Failed to fetch" &&
+				codeAgentState.type === "local"
+			) {
+				toast.error(m.code_agent_local_container_not_started(), {
+					id: "local-code-agent-connection-error",
+					action: {
+						label: m.toast_button_start_sandbox(),
+						onClick: async () => {
+							await localEnvState.startSandbox();
+						},
+					},
+				});
+			}
+			throw error;
+		}
+	},
 	hooks: {
 		beforeRequest: [
 			async (request) => {

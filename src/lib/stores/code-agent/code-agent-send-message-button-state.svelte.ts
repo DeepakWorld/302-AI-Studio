@@ -6,6 +6,7 @@ import { chatState } from "../chat-state.svelte";
 import { mcpState } from "../mcp-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
+import { localClaudeCodeSandboxState } from "./local-claude-code-sandbox-state.svelte";
 import { localEnvState } from "./local-env-state.svelte";
 import { fileToBase64 } from "./utils";
 
@@ -175,7 +176,13 @@ class CodeAgentSendMessageButtonState {
 					workspacePath = workspace_path;
 
 					// Refresh sessions to sync the new workspace_path to local storage
-					await window.electronAPI.codeAgentService.updateClaudeCodeSessions(sandboxInfo.sandboxId);
+					if (codeAgentState.type === "local") {
+						await localClaudeCodeSandboxState.refreshSessions();
+					} else {
+						await window.electronAPI.codeAgentService.updateClaudeCodeSessions(
+							sandboxInfo.sandboxId,
+						);
+					}
 
 					// Collect all files to upload in a single batch request
 					const filesToUpload: Array<{ content: string; save_path: string }> = [];
