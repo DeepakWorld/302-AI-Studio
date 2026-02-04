@@ -184,8 +184,9 @@
 					// Redirect to taskboard if streaming in Vibe Mode
 					if (shouldRedirectToTaskboard) {
 						const content = chatState.inputValue.trim();
-						if (content) {
-							codeAgentTaskboardState.addTaskFromChatInput(content);
+						const attachments = [...chatState.attachments]; // Clone before clearing
+						if (content || attachments.length > 0) {
+							codeAgentTaskboardState.addTaskFromChatInput(content, attachments);
 							toast.success(m.taskboard_task_added_from_chat());
 							chatState.inputValue = "";
 							chatState.attachments = [];
