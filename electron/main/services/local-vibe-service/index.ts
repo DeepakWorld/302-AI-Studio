@@ -6,6 +6,7 @@ import { isCommandNotFound, isWSLError } from "@electron/main/utils/cmd";
 import { exec, spawn, type SpawnOptions } from "child_process";
 import { app, shell, type IpcMainInvokeEvent } from "electron";
 import fs from "fs";
+import { readdir } from "fs/promises";
 import getPort from "get-port";
 import path from "path";
 import { match } from "ts-pattern";
@@ -88,6 +89,30 @@ export class LocalVibeService {
 		} catch (error) {
 			console.error("[LocalVibeService] Failed to open compose directory:", error);
 			return false;
+		}
+	}
+
+	/**
+	 * List existing work directories in ai302/workspace
+	 * Returns array of directory names (not full paths)
+	 */
+	async listWorkspaceDirectories(_event: IpcMainInvokeEvent): Promise<string[]> {
+		const composeDir = this.getRuntimeComposeDir();
+		const workspaceDir = path.join(composeDir, "workspace");
+
+		try {
+			// Use readdir with withFileTypes to filter directories
+			const entries = await readdir(workspaceDir, { withFileTypes: true });
+
+			// Filter and return only directory names, sorted alphabetically
+			return entries
+				.filter((entry) => entry.isDirectory())
+				.map((entry) => entry.name)
+				.sort();
+		} catch (error) {
+			// If workspace doesn't exist or no permissions, return empty array
+			console.log("[EnvService] Failed to list workspace directories:", error);
+			return [];
 		}
 	}
 

@@ -27,7 +27,6 @@
 	let isPodmanInstalling = $derived(localEnvState.installing);
 	let installFailed = $derived(localEnvState.installFailed);
 	let installLogs = $derived(localEnvState.installLogs);
-	let componentStatus = $derived(localEnvState.podmanComponentStatus);
 
 	// Format logs for display
 	let formattedLogs = $derived(
@@ -55,21 +54,6 @@
 	let showLogButton = $derived(
 		!podmanInstalled && (installLogs.length > 0 || isPodmanInstalling || installFailed),
 	);
-
-	// Calculate missing components for display
-	let missingComponents = $derived.by(() => {
-		const missing: string[] = [];
-		if (!componentStatus.podmanInstalled) {
-			missing.push("Podman");
-		}
-		if (!componentStatus.machineExists) {
-			missing.push("ai302-machine");
-		}
-		if (!componentStatus.composeInstalled) {
-			missing.push("podman-compose");
-		}
-		return missing;
-	});
 
 	async function handleInstallPodman() {
 		await onInstall();
@@ -109,15 +93,6 @@
 					text={podmanInstalled ? m.local_platform_installed() : m.local_platform_not_installed()}
 				/>
 			</div>
-			<!-- Missing Components Detail -->
-			{#if !podmanInstalled && missingComponents.length > 0 && !isPodmanInstalling}
-				<div class="flex items-center gap-3">
-					<Label class="text-muted-foreground min-w-16 font-normal"></Label>
-					<span class="text-xs text-amber-600">
-						缺少: {missingComponents.join(", ")}
-					</span>
-				</div>
-			{/if}
 			<!-- Health Status -->
 			{#if podmanInstalled}
 				<div class="flex items-center gap-3">

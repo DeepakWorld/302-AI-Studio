@@ -2,40 +2,53 @@
 	import { SettingSelect } from "$lib/components/buss/settings";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import { onMount } from "svelte";
 
 	let { mode = "settings" }: { mode?: "settings" | "chat" } = $props();
 	void mode; // Mark as intentionally unused for future use
 
-	// Local state only
+	// Local state
 	let agentFramework = $state("claude-code");
 	let selectedSession = $state("new");
 	let workDirectory = $state("new");
 
+	// Workspace directories state
+	let existingDirectories = $state<string[]>([]);
+
 	const frameworkOptions = [{ value: "claude-code", label: "claude code" }];
 	const sessionOptions = [{ value: "new", label: m.local_platform_new_session() }];
 
-	// Simulated existing directories
-	const existingWorkDirectories = [
-		{ value: "dir1", label: "MyProject-A", session: "Session-Alpha" },
-		{ value: "dir2", label: "MyProject-B", session: "Session-Beta" },
-		{ value: "dir3", label: "Experiment-01", session: "Session-Gamma" },
-	];
-
-	// Grouped options for Work Directory
-	const workDirectoryOptions = $derived({
+	// Grouped options for Work Directory - reactive based on fetched directories
+	const workDirectoryOptions = $derived(() => ({
 		standalone: [{ value: "new", label: m.local_platform_new_work_directory() }],
-		groups: [
-			{
-				groupKey: "existing",
-				groupLabel: m.local_platform_existing_work_directory(),
-				items: existingWorkDirectories.map((dir) => ({
-					value: dir.value,
-					label: dir.label,
-					extra: m.local_platform_session({ session: dir.session }),
-				})),
-			},
-		],
+		groups:
+			existingDirectories.length > 0
+				? [
+						{
+							groupKey: "existing",
+							groupLabel: m.local_platform_existing_work_directory(),
+							items: existingDirectories.map((dir) => ({
+								value: dir,
+								label: dir,
+							})),
+						},
+					]
+				: [],
+	}));
+
+	// Fetch existing work directories on mount
+	onMount(async () => {
+		await loadWorkspaceDirectories();
 	});
+
+	async function loadWorkspaceDirectories() {
+		try {
+			existingDirectories = await window.electronAPI.localVibeService.listWorkspaceDirectories();
+		} catch (error) {
+			console.error("[WorkspaceConfig] Failed to load directories:", error);
+			existingDirectories = [];
+		}
+	}
 </script>
 
 <div class="space-y-4">
@@ -62,7 +75,7 @@
 		<SettingSelect
 			name="Work Directory"
 			bind:value={workDirectory}
-			groupedOptions={workDirectoryOptions}
+			groupedOptions={workDirectoryOptions()}
 			placeholder={m.local_platform_new_work_directory_placeholder()}
 		/>
 	</div>
