@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { updateSessionNote } from "$lib/api/sandbox-session";
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { Button } from "$lib/components/ui/button";
@@ -11,6 +10,7 @@
 		claudeCodeSandboxState,
 		persistedClaudeCodeSandboxState,
 	} from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { formatDateTimeFull } from "$lib/utils/date-format";
 	import { ExternalLink, Loader2 } from "@lucide/svelte";
 	import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
@@ -337,6 +337,3 @@
 	onClose={() => (isSessionDeleteDialogOpen = false)}
 	onConfirm={handleConfirmSessionDelete}
 />
-
-<style>
-</style>

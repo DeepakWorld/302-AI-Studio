@@ -23,6 +23,17 @@ export class LocalVibeService {
 	private runtimePort: number | null = null;
 	private isOperating = false;
 
+	constructor() {
+		try {
+			const dir = this.getRuntimeComposeDir();
+			if (!fs.existsSync(dir)) {
+				fs.mkdirSync(dir, { recursive: true });
+			}
+		} catch (error) {
+			console.error("[LocalVibeService] Failed to initialize runtime directory:", error);
+		}
+	}
+
 	// Localization helper method
 	private async t(zh: string, en: string): Promise<string> {
 		const language = await generalSettingsService.getLanguage();
@@ -80,10 +91,6 @@ export class LocalVibeService {
 	async openComposeDirectory(_event: IpcMainInvokeEvent): Promise<boolean> {
 		const dir = this.getRuntimeComposeDir();
 		try {
-			// Ensure directory exists
-			if (!fs.existsSync(dir)) {
-				fs.mkdirSync(dir, { recursive: true });
-			}
 			const error = await shell.openPath(dir);
 			return error === "";
 		} catch (error) {
@@ -174,9 +181,6 @@ export class LocalVibeService {
 		const runtimeDir = this.getRuntimeComposeDir();
 		const runtimeComposePath = this.getRuntimeComposePath();
 		const envFilePath = path.join(runtimeDir, ".env");
-
-		// Ensure runtime directory exists
-		fs.mkdirSync(runtimeDir, { recursive: true });
 
 		// Copy template compose to runtime directory
 		fs.copyFileSync(templatePath, runtimeComposePath);
