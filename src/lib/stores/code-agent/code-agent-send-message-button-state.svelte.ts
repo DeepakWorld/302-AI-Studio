@@ -146,7 +146,7 @@ class CodeAgentSendMessageButtonState {
 			// Ensure local sandbox is running if in local mode
 			const localSandboxResult = await this.ensureLocalSandboxReady();
 			if (!localSandboxResult.isOk) {
-				toast.error(localSandboxResult.error ?? m.code_agent_local_sandbox_start_failed());
+				toast.error(m.code_agent_local_sandbox_start_failed());
 				this.isChecking = false;
 				return;
 			}

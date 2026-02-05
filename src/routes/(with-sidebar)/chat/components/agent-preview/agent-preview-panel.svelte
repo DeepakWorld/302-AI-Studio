@@ -39,7 +39,6 @@
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
-	import { withRetry } from "$lib/utils/retry";
 	import { Check, Copy, Download, FileWarning, Loader2, Pencil, Save, X } from "@lucide/svelte";
 	import type { ModelProvider, Skill } from "@shared/types";
 	import { onDestroy, untrack } from "svelte";
@@ -604,11 +603,7 @@
 				}
 
 				// Fetch from API
-				const content = await withRetry(
-					() => getFileContent(currentSandboxId!, file.path, signal),
-					3,
-					1000,
-				);
+				const content = await getFileContent(currentSandboxId!, file.path, signal);
 
 				if (signal.aborted) return;
 
@@ -636,11 +631,7 @@
 				previewType === "pdf"
 			) {
 				// Binary files: download and create blob URL with retry
-				const response = await withRetry(
-					() => downloadSandboxFile(currentSandboxId!, file.path),
-					3,
-					1000,
-				);
+				const response = await downloadSandboxFile(currentSandboxId!, file.path);
 
 				if (signal.aborted) return;
 

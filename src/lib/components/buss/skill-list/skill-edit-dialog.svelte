@@ -229,15 +229,15 @@
 			});
 
 			if (result.success) {
-				toast.success(m.toast_save_success?.() || "Skill saved successfully");
+				toast.success(m.toast_save_success());
 				onSave?.(skill, { ...formData });
 				handleClose();
 			} else {
-				toast.error(result.message || m.skills_load_failed?.() || "Failed to save skill");
+				toast.error(m.skills_load_failed());
 			}
 		} catch (error) {
 			console.error("Failed to save skill:", error);
-			toast.error(m.skills_load_failed?.() || "Failed to save skill");
+			toast.error(m.skills_load_failed());
 		} finally {
 			isSaving = false;
 		}

@@ -243,7 +243,7 @@ class ClaudeCodeSandboxState {
 			// Refresh sessions after successful deletion
 			await this.refreshSessions(sandboxId);
 		} else {
-			toast.error(result.error || m.delete_session_failed());
+			toast.error(m.delete_session_failed());
 		}
 
 		return result.success;

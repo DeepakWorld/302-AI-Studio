@@ -32,7 +32,7 @@
 	import type { Skill } from "@shared/types";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
-	import { SvelteSet, SvelteMap } from "svelte/reactivity";
+	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 	import SkillCard from "../skill-card.svelte";
 
 	interface Props {
@@ -364,12 +364,12 @@
 
 	async function handleSync() {
 		if (!currentSandboxId) {
-			toast.error(m.skills_sync_no_sandbox?.() ?? "No sandbox available for sync");
+			toast.error(m.skills_sync_no_sandbox());
 			return;
 		}
 
 		isSyncing = true;
-		const toastId = toast.loading(m.skills_syncing?.() ?? "Syncing skills...");
+		const toastId = toast.loading(m.skills_syncing());
 
 		try {
 			const response = await syncSkills({
@@ -380,7 +380,7 @@
 			toast.dismiss(toastId);
 
 			if (response.success && response.result.exit_code === 0) {
-				toast.success(m.skills_sync_success?.() ?? "Skills synced successfully");
+				toast.success(m.skills_sync_success());
 				onRefresh?.();
 			} else {
 				const errorMsg = response.result.stderr || response.result.error || "Sync failed";
@@ -391,7 +391,7 @@
 			toast.dismiss(toastId);
 
 			// Try to extract error message from response
-			let errorMessage = m.skills_sync_failed?.() ?? "Failed to sync skills";
+			let errorMessage = m.skills_sync_failed();
 			if (e && typeof e === "object" && "response" in e) {
 				try {
 					const httpError = e as { response: Response };
