@@ -23,7 +23,12 @@
 	import { SvelteMap } from "svelte/reactivity";
 	import { downloadCode } from "./download-utils";
 	import type { ShikiHighlighter } from "./highlighter";
-	import { ensureHighlighter, ensureLanguageLoaded, LANGUAGE_ALIASES } from "./highlighter";
+	import {
+		ensureHighlighter,
+		ensureLanguageLoaded,
+		isLanguageLoaded,
+		LANGUAGE_ALIASES,
+	} from "./highlighter";
 
 	interface RenderedToken {
 		id: string;
@@ -46,6 +51,7 @@
 		theme?: string | null;
 		messageId?: string;
 		messagePartIndex?: number;
+		isStreaming?: boolean;
 	}
 
 	const props: Props = $props();
@@ -66,6 +72,7 @@
 	let showMermaidPreview = $state(false);
 	let mermaidSvg = $state("");
 	let mermaidError = $state<string | null>(null);
+	const isStreaming = $derived(props.isStreaming ?? false);
 
 	const FONT_STYLE = {
 		Italic: 1,
@@ -243,12 +250,15 @@
 
 	const toggleMermaidPreview = () => {
 		showMermaidPreview = !showMermaidPreview;
-		if (showMermaidPreview && isMermaidCode) {
+		if (showMermaidPreview && isMermaidCode && !isStreaming) {
 			void renderMermaid(props.code);
 		}
 	};
 
 	const handleOpenMermaidInNewTab = async () => {
+		if (isStreaming) {
+			return;
+		}
 		if (!mermaidSvg) {
 			// Ensure mermaid is rendered before opening in new tab
 			await renderMermaid(props.code);
@@ -474,12 +484,13 @@
 			return;
 		}
 
+		const renderLanguage = getRenderLanguage();
 		const pieces = (lastChunk + chunk).split("\n");
 		for (let index = 0; index < pieces.length; index += 1) {
 			const piece = pieces[index];
 			const isLast = index === pieces.length - 1;
 			const result = highlighter.codeToTokens(piece, {
-				lang: resolvedLanguage as never,
+				lang: renderLanguage as never,
 				theme: resolvedTheme,
 				grammarState,
 			});
@@ -507,13 +518,25 @@
 
 		if (resolvedLanguage !== effectiveLang) {
 			resolvedLanguage = effectiveLang;
-			ensureLanguageLoaded(effectiveLang).catch((error) => {
-				console.warn(`Failed to load language ${effectiveLang}:`, error);
-			});
+			const targetLanguage = effectiveLang;
+			ensureLanguageLoaded(targetLanguage)
+				.then(() => {
+					if (!highlighter || resolvedLanguage !== targetLanguage) {
+						return;
+					}
+					resetState();
+					syncCode(props.code);
+				})
+				.catch((error) => {
+					console.warn(`Failed to load language ${targetLanguage}:`, error);
+				});
 			return true;
 		}
 		return false;
 	};
+
+	const getRenderLanguage = (): string =>
+		isLanguageLoaded(resolvedLanguage) ? resolvedLanguage : "plaintext";
 
 	const updateTheme = (): boolean => {
 		const requested = props.theme?.trim();
@@ -541,6 +564,8 @@
 			return;
 		}
 
+		const renderLanguage = getRenderLanguage();
+
 		if (!code) {
 			resetState();
 			lines = [];
@@ -554,7 +579,7 @@
 				const segment = chunks[i];
 				const isLast = i === chunks.length - 1;
 				const result = highlighter.codeToTokens(segment, {
-					lang: resolvedLanguage as never,
+					lang: renderLanguage as never,
 					theme: resolvedTheme,
 					grammarState,
 				});
@@ -622,10 +647,13 @@
 	});
 
 	$effect(() => {
-		// Re-render mermaid when theme changes
-		if (showMermaidPreview && isMermaidCode && props.code) {
-			void renderMermaid(props.code);
+		if (!showMermaidPreview || !isMermaidCode) return;
+		if (isStreaming) {
+			mermaidSvg = "";
+			mermaidError = null;
+			return;
 		}
+		void renderMermaid(props.code);
 	});
 </script>
 
@@ -717,8 +745,9 @@
 					</ButtonWithTooltip>
 					<ButtonWithTooltip
 						class="text-muted-foreground hover:!bg-chat-action-hover"
-						tooltip={m.tooltip_open_in_new_tab()}
+						tooltip={isStreaming ? "Waiting for output to finish..." : m.tooltip_open_in_new_tab()}
 						tooltipSide="bottom"
+						disabled={isStreaming}
 						onclick={handleOpenMermaidInNewTab}
 					>
 						<ExternalLink class="" />
@@ -757,6 +786,8 @@
 						<p class="font-medium">Failed to render diagram:</p>
 						<p>{mermaidError}</p>
 					</div>
+				{:else if isStreaming}
+					<div class="text-muted-foreground">Waiting for output to finish...</div>
 				{:else if mermaidSvg}
 					<div class="mermaid-diagram">
 						{@html mermaidSvg}
