@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { SettingSelect } from "$lib/components/buss/settings";
-	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
 	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
-	import { RefreshCw } from "@lucide/svelte";
+	import { cn } from "$lib/utils";
+	import { RefreshCcw } from "@lucide/svelte";
 	import { onMount } from "svelte";
+	import { ButtonWithTooltip } from "../button-with-tooltip";
 
 	let { mode = "settings" }: { mode?: "settings" | "chat" } = $props();
 	void mode; // Mark as intentionally unused for future use
@@ -36,17 +37,16 @@
 	<div class="space-y-2">
 		<div class="flex items-center justify-between">
 			<Label class="text-label-fg font-normal">{m.local_platform_select_session()}</Label>
-			<Button
-				variant="ghost"
-				size="icon"
-				class="h-6 w-6"
+			<ButtonWithTooltip
+				class="hover:!bg-chat-action-hover"
+				tooltip={m.label_button_reload()}
 				onclick={handleRefresh}
 				disabled={localClaudeCodeSandboxState.isLoading}
 			>
-				<RefreshCw
-					class="h-3.5 w-3.5 {localClaudeCodeSandboxState.isLoading ? 'animate-spin' : ''}"
+				<RefreshCcw
+					class={cn("h-4 w-4", localClaudeCodeSandboxState.isLoading ? "animate-spin" : "")}
 				/>
-			</Button>
+			</ButtonWithTooltip>
 		</div>
 		<SettingSelect
 			name="Select Session"
