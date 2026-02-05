@@ -819,6 +819,7 @@
 	"label_file_tree_new_folder": "新建文件夹",
 	"label_file_tree_delete": "删除",
 	"label_file_tree_rename": "重命名",
+	"label_file_tree_open_local": "打开本地文件",
 	"label_file_tree_copy": "复制",
 	"label_file_tree_paste": "粘贴",
 	"text_description_rename_file": "重命名文件",

@@ -817,6 +817,7 @@
 	"label_file_tree_new_folder": "New Folder",
 	"label_file_tree_delete": "Delete",
 	"label_file_tree_rename": "Rename",
+	"label_file_tree_open_local": "Open Local File",
 	"label_file_tree_copy": "Copy",
 	"label_file_tree_paste": "Paste",
 	"text_description_rename_file": "Please enter a new file name",

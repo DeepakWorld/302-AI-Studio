@@ -218,6 +218,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("localVibeService:openComposeDirectory", (event) =>
 		localVibeService.openComposeDirectory(event),
 	);
+	ipcMain.handle("localVibeService:openWorkspaceDirectory", (event, subPath) =>
+		localVibeService.openWorkspaceDirectory(event, subPath),
+	);
 	ipcMain.handle("localVibeService:listWorkspaceDirectories", (event) =>
 		localVibeService.listWorkspaceDirectories(event),
 	);
@@ -602,6 +605,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
 	ipcMain.removeHandler("localVibeService:getComposeDirectory");
 	ipcMain.removeHandler("localVibeService:openComposeDirectory");
+	ipcMain.removeHandler("localVibeService:openWorkspaceDirectory");
 	ipcMain.removeHandler("localVibeService:listWorkspaceDirectories");
 	ipcMain.removeHandler("localVibeService:getLocalBaseUrl");
 	ipcMain.removeHandler("localVibeService:getSandboxStatus");

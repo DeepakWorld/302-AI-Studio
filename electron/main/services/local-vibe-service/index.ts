@@ -105,6 +105,30 @@ export class LocalVibeService {
 	}
 
 	/**
+	 * Open a specific workspace directory in system explorer via IPC
+	 */
+	async openWorkspaceDirectory(_event: IpcMainInvokeEvent, subPath: string): Promise<boolean> {
+		const composeDir = this.getRuntimeComposeDir();
+		const workspaceDir = path.join(composeDir, "workspace");
+
+		// Prevent directory traversal
+		const safeSubPath = subPath.replace(/\.\./g, "");
+		const targetDir = path.join(workspaceDir, safeSubPath);
+
+		try {
+			const error = await shell.openPath(targetDir);
+			if (error) {
+				console.error("[LocalVibeService] Failed to open path:", targetDir, error);
+				return false;
+			}
+			return true;
+		} catch (error) {
+			console.error("[LocalVibeService] Failed to open workspace directory:", error);
+			return false;
+		}
+	}
+
+	/**
 	 * List existing work directories in ai302/workspace
 	 * Returns array of directory names (not full paths)
 	 */
