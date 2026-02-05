@@ -42,17 +42,9 @@
 	const isLocalVibeMode = $derived(codeAgentState.enabled && codeAgentState.type === "local");
 
 	// Handle open local
-	async function handleOpenLocal(targetPath?: string, isFile: boolean = false) {
-		let path = targetPath ?? fileTreeState.currentDirectory;
+	async function handleOpenLocal(targetPath?: string) {
+		const path = targetPath ?? fileTreeState.currentDirectory;
 		if (!path) return;
-
-		// If it's a file, we want to open the containing folder
-		if (isFile) {
-			const lastSlashIndex = path.lastIndexOf("/");
-			if (lastSlashIndex > -1) {
-				path = path.substring(0, lastSlashIndex) || "/";
-			}
-		}
 
 		// Remove workspace prefix if present to get path relative to workspace root
 		let relativePath = path;
@@ -545,7 +537,7 @@
 
 			<!-- Open Local File -->
 			{#if isLocalVibeMode}
-				<ContextMenu.Item onSelect={() => handleOpenLocal(node.path, node.type === "file")}>
+				<ContextMenu.Item onSelect={() => handleOpenLocal(node.path)}>
 					<span>{m.label_file_tree_open_local()}</span>
 				</ContextMenu.Item>
 			{/if}
