@@ -1,24 +1,26 @@
-# 302-AI-Studio: Vibe Mode Enhancements
+# 302-AI-Studio: Chat Enhancements
 
 ## What This Is
 
-302-AI-Studio is an Electron desktop AI chat application with Vibe Mode (Claude Code sandbox integration). This project focuses on improving the Vibe Mode workflow by allowing users to add tasks to the taskboard while the AI is still streaming output.
+302-AI-Studio is an Electron desktop AI chat application with multi-provider support and Vibe Mode (Claude Code sandbox integration). This project focuses on improving the chat experience with intelligent context management.
 
 ## Core Value
 
-Users can capture task ideas immediately without waiting for AI output to complete — input during streaming goes directly to the taskboard.
+Efficient AI conversations through smart context compression — users get coherent responses without hitting token limits or losing conversation history.
 
-## Current Milestone: v1.1 Streaming Input to Taskboard
+## Current Milestone: v1.2 Auto Context Compression
 
-**Goal:** When AI is streaming in Vibe Mode, redirect chat input to taskboard instead of queuing messages.
+**Goal:** Automatically compress older chat messages into rolling summaries to manage context window efficiently.
 
 **Target features:**
-- Auto-detect streaming state and redirect input to taskboard
-- Upload attachments to sandbox and reference paths in task content
-- Show toast notification confirming task was added
-- Clear input after adding to taskboard
+- Configurable message limit N in settings
+- Rolling summary of messages beyond N (200-500 chars)
+- Use title generation model for summarization
+- Visual indicator showing compressed message count
+- Expand option to view what was compressed
+- Chat mode only (Code Agent keeps full context)
 
-## Previous Milestone (v1.0 Shipped)
+## Previous Milestone (v1.1 Shipped)
 
 **Shipped:** 2026-02-04
 
@@ -49,22 +51,31 @@ All streaming contexts now have instant completion detection:
 - ✓ FRONT-02: Loading spinner clears <100ms — v1.0
 - ✓ FRONT-03: Chat input enables immediately — v1.0
 - ✓ FRONT-04: Fix applies to all streaming contexts — v1.0
+- ✓ INPUT-01: Detect streaming state in Vibe Mode — v1.1
+- ✓ INPUT-02: Redirect input to taskboard when streaming — v1.1
+- ✓ INPUT-03: Upload attachments to sandbox workspace — v1.1
+- ✓ INPUT-04: Reference attachment paths in task content — v1.1
+- ✓ INPUT-05: Show toast notification after task added — v1.1
+- ✓ INPUT-06: Clear input and attachments after adding — v1.1
 
 ### Active
 
-- [ ] INPUT-01: Detect streaming state in Vibe Mode
-- [ ] INPUT-02: Redirect input to taskboard when streaming
-- [ ] INPUT-03: Upload attachments to sandbox workspace
-- [ ] INPUT-04: Reference attachment paths in task content
-- [ ] INPUT-05: Show toast notification after task added
-- [ ] INPUT-06: Clear input and attachments after adding
+- [ ] COMP-01: Configurable message limit N in chat settings
+- [ ] COMP-02: Summarize messages beyond N into 200-500 char rolling summary
+- [ ] COMP-03: Update rolling summary incrementally as new messages arrive
+- [ ] COMP-04: Prepend summary to recent messages when sending to AI
+- [ ] COMP-05: Visual indicator showing count of compressed messages
+- [ ] COMP-06: Expand option to view original compressed messages
+- [ ] COMP-07: Exclude Code Agent mode from compression (full context preserved)
 
 ### Out of Scope
 
 - Visual hints on input box during streaming — toast is sufficient feedback
 - Extending Task type with attachment metadata — use path references instead
 - Confirmation dialog before adding — keep interaction fast
-- Changes to non-Vibe-Mode chat behavior — only affects Vibe Mode streaming
+- Context compression for Code Agent mode — keep full context for code tasks
+- Token-based compression triggers — fixed message count is simpler
+- Background/continuous summarization — on-send is sufficient
 
 ## Context
 
@@ -97,4 +108,4 @@ All streaming contexts now have instant completion detection:
 | DEBUG_TRANSPORT conditional logging | Avoids production overhead | ✓ Good |
 
 ---
-*Last updated: 2026-02-04 after v1.1 milestone start*
+*Last updated: 2026-02-05 after v1.2 milestone start*
