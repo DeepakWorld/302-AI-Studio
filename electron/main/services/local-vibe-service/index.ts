@@ -1324,6 +1324,150 @@ export class LocalVibeService {
 	}
 
 	/**
+	 * Checks if an error is network-related
+	 * @param errorMessage The error message to check
+	 * @returns Object indicating error type and user-friendly messages
+	 */
+	private classifyNetworkError(errorMessage: string): {
+		isNetworkError: boolean;
+		errorType: "dns" | "timeout" | "connection_refused" | "proxy" | "unknown";
+		zhMessage: string;
+		enMessage: string;
+	} {
+		const lowerMsg = errorMessage.toLowerCase();
+
+		// DNS resolution errors
+		if (
+			lowerMsg.includes("no such host") ||
+			lowerMsg.includes("lookup") ||
+			lowerMsg.includes("resolve") ||
+			lowerMsg.includes("nxdomain")
+		) {
+			return {
+				isNetworkError: true,
+				errorType: "dns",
+				zhMessage: "无法解析容器镜像仓库地址，请检查网络连接和 DNS 设置",
+				enMessage:
+					"Cannot resolve container registry address. Please check your network connection and DNS settings.",
+			};
+		}
+
+		// Connection timeout
+		if (
+			lowerMsg.includes("timeout") ||
+			lowerMsg.includes("timed out") ||
+			lowerMsg.includes("deadline exceeded")
+		) {
+			return {
+				isNetworkError: true,
+				errorType: "timeout",
+				zhMessage: "连接容器镜像仓库超时，请检查网络连接或稍后重试",
+				enMessage:
+					"Connection to container registry timed out. Please check your network or try again later.",
+			};
+		}
+
+		// Connection refused
+		if (lowerMsg.includes("connection refused") || lowerMsg.includes("refused")) {
+			return {
+				isNetworkError: true,
+				errorType: "connection_refused",
+				zhMessage: "连接被拒绝，可能是防火墙或代理设置问题",
+				enMessage: "Connection refused. This may be due to firewall or proxy settings.",
+			};
+		}
+
+		// Proxy errors
+		if (lowerMsg.includes("proxy") || lowerMsg.includes("tunnel")) {
+			return {
+				isNetworkError: true,
+				errorType: "proxy",
+				zhMessage: "代理服务器错误，请检查代理设置",
+				enMessage: "Proxy server error. Please check your proxy settings.",
+			};
+		}
+
+		return {
+			isNetworkError: false,
+			errorType: "unknown",
+			zhMessage: "",
+			enMessage: "",
+		};
+	}
+
+	/**
+	 * Initialize Podman machine with retry logic for network errors
+	 */
+	private async _initPodmanMachineWithRetry(
+		maxRetries = 3,
+	): Promise<{ isOk: boolean; output?: string }> {
+		let lastError = "";
+
+		for (let attempt = 1; attempt <= maxRetries; attempt++) {
+			// Log retry attempt (if not first attempt)
+			if (attempt > 1) {
+				const retryMsg = await this.t(
+					`第 ${attempt}/${maxRetries} 次尝试初始化 Podman...`,
+					`Attempt ${attempt}/${maxRetries} to initialize Podman...`,
+				);
+				broadcastService.broadcastChannelToAll("install-log", {
+					step: "init-podman",
+					type: "stdout",
+					data: retryMsg,
+				});
+
+				// Exponential backoff: wait 2^attempt seconds (2, 4, 8 seconds)
+				const delayMs = Math.pow(2, attempt - 1) * 1000;
+				await new Promise((resolve) => setTimeout(resolve, delayMs));
+			}
+
+			const result = await this.runCommandWithBroadcast(
+				"podman",
+				["machine", "init", "ai302-machine"],
+				"init-podman",
+			);
+
+			if (result.isOk) {
+				return { isOk: true, output: result.output };
+			}
+
+			lastError = result.output || "";
+
+			// Check if this is a network error
+			const networkError = this.classifyNetworkError(lastError);
+
+			if (networkError.isNetworkError) {
+				// Log the specific network error
+				broadcastService.broadcastChannelToAll("install-log", {
+					step: "init-podman",
+					type: "stderr",
+					data: networkError.enMessage,
+				});
+
+				// If it's the last attempt, fail with the specific message
+				if (attempt === maxRetries) {
+					const language = await generalSettingsService.getLanguage();
+					const finalError = language === "zh" ? networkError.zhMessage : networkError.enMessage;
+					broadcastService.broadcastChannelToAll("install-log", {
+						step: "init-podman",
+						type: "error",
+						data: finalError,
+					});
+					return { isOk: false, output: lastError };
+				}
+
+				// Otherwise, continue to next retry
+				continue;
+			}
+
+			// Not a network error, return the result as-is
+			return { isOk: false, output: lastError };
+		}
+
+		return { isOk: false, output: lastError };
+	}
+
+	/**
 	 * Initializes the ai302-machine if it doesn't already exist
 	 * Checks for existing machine before attempting init
 	 * Handles orphaned WSL distributions by cleaning them up first
@@ -1375,20 +1519,17 @@ export class LocalVibeService {
 			}
 		}
 
-		// Initialize Podman Machine
-		let machineInit = await this.runCommandWithBroadcast(
-			"podman",
-			["machine", "init", "ai302-machine"],
-			"init-podman",
-		);
+		// Initialize Podman Machine with retry logic
+		let machineInit = await this._initPodmanMachineWithRetry(3);
+		let lastError = machineInit.output || "";
 
 		// Handle case: "Error: system connection "ai302-machine" (or -root) already exists"
 		// This happens when the machine was deleted but the connection record remains
 		// Need to check for both user and root connection errors
 		if (
 			!machineInit.isOk &&
-			(machineInit.output?.includes('system connection "ai302-machine" already exists') ||
-				machineInit.output?.includes('system connection "ai302-machine-root" already exists'))
+			(lastError?.includes('system connection "ai302-machine" already exists') ||
+				lastError?.includes('system connection "ai302-machine-root" already exists'))
 		) {
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "init-podman",
@@ -1417,21 +1558,17 @@ export class LocalVibeService {
 				);
 			}
 
-			// Retry initialization
-			machineInit = await this.runCommandWithBroadcast(
-				"podman",
-				["machine", "init", "ai302-machine"],
-				"init-podman",
-			);
+			// Retry initialization with retry logic
+			machineInit = await this._initPodmanMachineWithRetry(3);
+			lastError = machineInit.output || "";
 		}
 
 		// Handle case: "Error: the WSL import of guest OS failed ... ERROR_ALREADY_EXISTS"
 		// This happens when the WSL distribution already exists but podman doesn't know about it
 		if (
 			!machineInit.isOk &&
-			machineInit.output?.includes("WSL import of guest OS failed") &&
-			(machineInit.output?.includes("ERROR_ALREADY_EXISTS") ||
-				machineInit.output?.includes("0xffffffff"))
+			lastError?.includes("WSL import of guest OS failed") &&
+			(lastError?.includes("ERROR_ALREADY_EXISTS") || lastError?.includes("0xffffffff"))
 		) {
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "init-podman",
@@ -1462,12 +1599,9 @@ export class LocalVibeService {
 				}
 			}
 
-			// Retry initialization again
-			machineInit = await this.runCommandWithBroadcast(
-				"podman",
-				["machine", "init", "ai302-machine"],
-				"init-podman",
-			);
+			// Retry initialization again with retry logic
+			machineInit = await this._initPodmanMachineWithRetry(3);
+			lastError = machineInit.output || "";
 		}
 
 		// Handle case where machine already exists on hypervisor level (fallback check)
@@ -1475,9 +1609,8 @@ export class LocalVibeService {
 		// IMPORTANT: Must ensure we don't treat "system connection already exists" as success
 		if (
 			!machineInit.isOk &&
-			(machineInit.output?.includes("already exists") ||
-				machineInit.output?.includes("VM already exists")) &&
-			!machineInit.output?.includes("system connection") // Exclude connection errors
+			(lastError?.includes("already exists") || lastError?.includes("VM already exists")) &&
+			!lastError?.includes("system connection") // Exclude connection errors
 		) {
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "init-podman",
