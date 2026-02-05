@@ -1,273 +1,158 @@
-# Stream Completion Detection - Feature Research
+# Feature Research: Context Compression
 
-**Domain:** AI Chat Application UX - Streaming Response Completion Indicators
-**Researched:** 2026-02-02
+**Domain:** AI Chat Application - Context Window Management
+**Researched:** 2026-02-05
 **Confidence:** HIGH
 
-## Feature Landscape
+## Summary
 
-### Table Stakes (Users Expect These)
+Context compression in AI chat applications is a well-established pattern with clear industry consensus on core behavior: keep recent messages verbatim, summarize older ones into a rolling summary, and inject that summary as context for the AI. The feature landscape divides cleanly into table stakes (what users expect from any compression system), differentiators (what makes one implementation better than another), and anti-features (common requests that degrade the experience). 302-AI-Studio's planned approach -- fixed message count N, rolling summary via fast model, on-send timing -- aligns with the most successful production patterns.
 
-Features users assume exist. Missing these = product feels incomplete or broken.
+The existing codebase provides strong foundations: `incrementalSummary` on `ThreadParams` already tracks rolling summaries for title generation, the `/generate-title` endpoint pattern is directly reusable, and the `onFinish` callback already orchestrates post-completion tasks.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Immediate Loading Indicator** | Users need to know AI is thinking/generating. Absence creates "is it stuck?" confusion. | LOW | Shows as soon as request is sent; spinner or skeleton. |
-| **Loading State Visibility** | Users can distinguish "loading" from "done." Visual state must be obvious. | LOW | Clear visual representation: spinner, loading text, avatar animation. |
-| **Stop Generation Button** | Users need to cancel long/wrong responses. No cancel = feeling trapped. | MEDIUM | Must be discoverable while streaming; disables when stream ends. |
-| **Stream Completion Signal** | Users must know when response is **finished** (not mid-stream). Loading indicator must disappear instantly when done. | HIGH | **Core pain point**: Spinner stays visible after stream ends = broken UX. |
-| **Content Remains Visible During Stream** | Users read incrementally while AI is still thinking. Spinner shouldn't hide content. | MEDIUM | Stream text appears in chat; loading indicator is separate/subtle. |
-| **Error State Distinction** | Users know if response failed vs. still loading. Ambiguity = frustration. | MEDIUM | Clear error message; different visual state from loading. |
+## Table Stakes
 
-### Differentiators (Competitive Advantage)
+Features users expect from any context compression system. Missing any of these makes the feature feel broken or untrustworthy.
 
-Features that set product apart. Not required, but valuable.
+| Feature | Why Expected | Complexity | Dependency | Notes |
+|---------|--------------|------------|------------|-------|
+| **Configurable message limit N** | Users need control over how much recent context to preserve. No single default works for all use cases (quick Q&A vs deep technical discussion). | LOW | `PreferencesSettingsState` in preferences store | Default of 20 is reasonable. Range 4-100. Must be per-thread or global with per-thread override. |
+| **Rolling summary of older messages** | Core mechanism. Users expect compressed messages to be *summarized*, not silently dropped. Dropping context without summarization is data loss, not compression. | MEDIUM | `/generate-summary` endpoint on Hono backend; title generation model | Summary replaces N+ messages for the AI but originals persist in storage. 200-500 chars per the project spec. |
+| **Incremental summary updates** | Each new conversation turn should update the existing summary, not re-summarize all compressed messages from scratch. Full re-summarization is O(n) per turn and causes redundant API calls. | MEDIUM | Previous summary state on `ThreadParams` (pattern exists: `incrementalSummary`) | Feed previous summary + newly compressed messages to model. Same incremental pattern as title generation. |
+| **Recent messages preserved verbatim** | Messages within the N-message window must be sent to the AI exactly as-is. Users expect the AI to "remember" recent exchanges with full fidelity. | LOW | Message slicing logic in `sendMessage` | Last N messages sent verbatim. Everything before N goes into summary. |
+| **Summary injected as system context** | The rolling summary must be prepended to the AI request so the model has conversation history context. Without injection, compression = amnesia. | LOW | Transport layer `body()` function; system prompt composition | Inject as system message prefix: `[Previous conversation summary: ...]`. |
+| **Code Agent exemption** | Code Agent (Vibe Mode) requires full context for accurate code operations. Compressing context for code tasks causes incorrect file references, lost state, and broken workflows. | LOW | `codeAgentState.enabled` check (already used for branching logic) | Bypass all compression when Code Agent is active. Clear requirement from project spec. |
+| **Original messages still accessible** | Users must be able to scroll back and see all original messages. Compression affects what the AI sees, not what the user sees in the UI. | LOW | `persistedMessagesState` remains unchanged; UI renders all messages | Messages are never deleted. Compression only affects the payload sent to the backend. |
+| **Visual indicator of compression state** | Users need to know compression is active and how many messages are compressed. Without visibility, users cannot understand why the AI "forgot" something. | LOW | Small UI component in chat message list area | Badge or inline text: "12 earlier messages summarized" or similar. |
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Sub-Second Completion Detection** | Instant visual feedback when stream ends feels magical vs. noticeable 0.5-2s delay. | MEDIUM | Requires efficient finish_reason parsing and immediate state transition. |
-| **Granular Loading States** | Different indicators for different phases: thinking → streaming → finishing. Claude uses "[Using tool...]" pattern. | MEDIUM | Communicates what AI is doing, not just "loading." |
-| **Progress Indication During Generation** | Shows model is actively working (not hung). Could be: token count, character count, time elapsed. | LOW | Subtle progress bar or token counter reassures user. |
-| **Customizable Indicators** | Users can choose spinner style, colors, speed, animation. Theme integration. | LOW | Design polish; aligns with theme system. |
-| **Streaming Speed Controls** | Allow users to adjust how fast text appears (via smoothStream middleware). Feels snappier at fast speeds. | LOW | Already partially implemented; expose as user preference. |
-| **Completion Chime/Sound Notification** | Audio feedback when response completes (accessibility + delight). Opt-in. | LOW | Accessibility enhancement; non-intrusive. |
-| **Persistent Loading State Analytics** | Track: how often spinners stay visible too long? Average time to completion detection. | LOW | Data collection for UX optimization. |
+## Differentiators
 
-### Anti-Features (Commonly Requested, Often Problematic)
+Features that elevate the compression experience beyond basic functionality. Not expected, but valued.
 
-Features that seem good but create problems.
+| Feature | Value Proposition | Complexity | Dependency | Notes |
+|---------|-------------------|------------|------------|-------|
+| **Expand/collapse compressed messages** | Users can tap to see what the summary covers -- builds trust. Industry pattern: collapsed earlier messages with "Show more" affordance. | MEDIUM | UI component; expand state per thread | Not expanding individual messages, but showing a summary banner that can expand to show the full summary text and/or list which messages were compressed. |
+| **Summary preview on hover/click** | Users can inspect the actual summary text the AI will receive. Transparency builds trust in the compression quality. | LOW | Tooltip or popover on the compression indicator | Show the 200-500 char summary. Users can verify accuracy. |
+| **Compression happens on-send** | Summary generation occurs when user sends a new message, not continuously in the background. This means the latest AI response is always fully available before compression. | MEDIUM | Integration into `sendMessage` or `onFinish` flow | On-send timing avoids wasted API calls for conversations that never continue. The project spec already mandates this timing. |
+| **Pinned/protected messages** | Certain critical messages (e.g., user's initial instructions, key decisions) are never compressed away. They remain verbatim regardless of position relative to N. | HIGH | Per-message metadata flag; modified message filtering logic | Hybrid approach from research: "pinned" or "key" messages preserved in original form while messages between key points get compressed. Industry best practice but adds UX complexity. |
+| **Per-thread compression toggle** | Some threads are short-lived Q&A (compression unnecessary), others are long research sessions (compression essential). Per-thread override lets users choose. | MEDIUM | Thread-level setting in `ThreadParams`; per-thread settings UI | Global default with per-thread override. Some threads may need full context always (e.g., legal analysis). |
+| **Summary quality indicator** | Show confidence/quality of the generated summary. If the summary seems degraded (detected by drift over many rounds), warn the user. | HIGH | Summary quality scoring (likely needs separate LLM call or heuristic) | Addresses "context drift" -- the known risk of rolling summaries degrading over many compression rounds. |
+| **Compression statistics** | Show users: "X messages compressed, Y tokens saved, Z% reduction." Communicates tangible value. | LOW | Token counting or character counting of original vs compressed | Token counting per-provider is hard. Character-based estimate is simpler and sufficient for display. |
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Animated Loading Bar with ETA** | Shows progress; feels professional. | Inaccurate ETAs undermine trust. Bar misleads users about remaining time (models don't have linear generation). | Use indeterminate progress indicator (no ETA). Show "still generating..." text instead. |
-| **Auto-Dismiss Spinner After Timeout** | Assume stream is done after N seconds. | False negatives: long-thinking Claude takes 30+ seconds. Stream appears to complete but AI still thinking. | **Don't guess.** Wait for actual finish_reason signal from API. |
-| **Spinner Only for First 1-2 Seconds** | Cloudscape recommends: "Avoid displaying loading state for under 1 second." | Over-applied rule: hiding indicator entirely after 1s makes users think it broke/hung. | Show indicator throughout stream; just avoid flicker for very-fast responses (<100ms). |
-| **"Generating..." Text Loop Animation** | Looks active; indicates processing. | Repetitive; can feel mocking ("still generating..." for 30 seconds). Text updates every 100ms create visual noise. | Use static "Generating..." + subtle spinner animation. Update text only for significant state changes. |
-| **Infinite Retry on Network Disconnect** | Auto-reconnect and retry indefinitely. | User loses visibility into what's happening. May retry stale requests. Creates confusing state after network returns. | Clear error message + one-click retry button. User in control. |
+## Anti-Features
+
+Features to deliberately NOT build. These are commonly requested or seem logical but degrade the experience based on research and domain analysis.
+
+| Anti-Feature | Why It Seems Good | Why It Is Harmful | What to Do Instead |
+|--------------|-------------------|-------------------|-------------------|
+| **Token-based compression threshold** | "Compress when approaching token limit" sounds precise and optimal. | Token counting requires model-specific libraries (tiktoken for OpenAI, different for Anthropic/Google). No single library covers all four providers. Adds complexity, dependency bloat (~2MB for tiktoken alone), and maintenance burden for marginal UX improvement. Users do not think in tokens. | Use fixed message count. Users understand "keep last 20 messages" intuitively. Message count is provider-agnostic and predictable. Project spec already chose this approach. |
+| **Automatic background summarization** | "Summarize continuously so it's ready when needed" sounds proactive. | Wastes API calls and credits. Most conversations never get long enough to need compression. Background processing adds latency, cost, and complexity (cancellation, stale summaries). Creates race conditions if user sends while summarization is in-flight. | Summarize on-send (or in onFinish). Only compress when actually needed, at the moment it matters. Project spec already chose this timing. |
+| **Full re-summarization each time** | "Re-summarize all compressed messages for accuracy" sounds thorough. | Summarization cost grows linearly with conversation length. At 100+ compressed messages, re-summarization is expensive and slow. Research shows this is the most common performance anti-pattern. Redundant re-summarization was flagged by Factory.ai as a significant limitation. | Incremental summarization: feed previous summary + newly compressed messages to model. Only process the delta. Project spec already chose this approach. |
+| **Compressing Code Agent context** | "Apply compression universally" seems consistent. | Code Agent needs full context for accurate file references, terminal state, workspace understanding. Compressing away earlier file operations causes the AI to re-read files it already processed, suggest changes to wrong locations, or lose track of the project structure. | Exempt Code Agent entirely. The project spec already mandates this. Code Agent conversations have different cost/context tradeoffs. |
+| **Invisible compression (no user awareness)** | "Just handle it silently" seems user-friendly. | When the AI "forgets" something the user mentioned 30 messages ago, and the user has no idea why, trust erodes. Users blame the AI model, not the hidden compression. Silent compression is the top complaint in chat apps that implement it. | Always show a visual indicator. Make compression visible and understandable. Let users inspect the summary if they want to verify. |
+| **Automatic summary-only mode (hiding original messages)** | "Replace old messages with summary in the UI" saves vertical space. | Users lose access to their conversation history. They cannot copy earlier code blocks, reference specific instructions, or verify what was actually said. This is UX hostile. | Keep all messages visible in the UI. Compression only affects the AI payload, never the displayed messages. Add optional visual dimming of compressed messages at most. |
+| **User-editable summaries** | "Let users fix bad summaries" sounds empowering. | Creates a text editing task mid-conversation. Users do not want to be editors of AI-generated summaries. The summary format is optimized for AI consumption, not human reading. Editing a summary is error-prone and the edits may not improve AI comprehension. | If summary quality is poor, let users regenerate it (one click). Or let them adjust the threshold N to keep more messages verbatim. |
+| **Multi-level memory hierarchy (MemGPT-style)** | "Separate working memory, episodic memory, semantic memory" sounds sophisticated. | Massively overengineered for a chat app. Adds architectural complexity (3+ storage tiers, retrieval logic, paging system) for minimal UX benefit. MemGPT patterns are designed for autonomous agents, not human-supervised chat. | Single rolling summary is sufficient. It covers the use case completely. If future needs arise, can add retrieval-augmented memory later as a separate feature. |
+| **Compression that modifies stored messages** | "Replace old messages with summary in storage" saves disk space. | Destructive. Users lose original data permanently. Cannot undo compression. Cannot export full conversation history. Violates data integrity expectations. | Store compression state (summary, count) as separate metadata. Original messages remain untouched in `persistedMessagesState`. |
 
 ## Feature Dependencies
 
 ```
-Stream Completion Signal (finish_reason detection from API)
-    ├──requires──> Efficient Parsing
-    │                 └──requires──> Server sends finish_reason explicitly
-    │
-    ├──enables────> Immediate Loading Indicator Removal
-    │                 └──enhances──> Stop Generation Button
-    │                                  (know when to hide/disable button)
-    │
-    ├──enables────> Error State Detection
-    │                 └──shows──> Connection/API errors
-    │
-    └──blocks─────> Auto-Dismiss Spinner Timeout
-                     (don't guess if done; wait for signal)
-
-Content Remains Visible During Stream
-    └──requires──> Separate Loading Indicator UI
-                    (spinner doesn't cover message content)
-
-Granular Loading States (thinking/streaming/finishing)
-    └──requires──> Stream Completion Signal
-                    (know when each phase ends)
-
-Streaming Speed Controls
-    └──requires──> smoothStream middleware support
-                    (already in codebase)
+Configurable Message Limit N (setting)
+    |
+    +---> Rolling Summary Generation (backend endpoint)
+    |         |
+    |         +---> Incremental Summary Updates (previous summary + delta)
+    |         |         |
+    |         |         +---> Summary Quality (over many rounds, drift risk)
+    |         |
+    |         +---> Title Generation Model (reuse existing config)
+    |
+    +---> Summary Injection into AI Request (transport layer)
+    |         |
+    |         +---> Code Agent Exemption (bypass when Vibe Mode active)
+    |
+    +---> Visual Compression Indicator (UI)
+              |
+              +---> Expand/View Summary (UI detail)
+              |
+              +---> Summary Preview on Hover (UI transparency)
 ```
 
-### Dependency Notes
+### Critical Path
 
-- **Stream Completion Signal → Everything**: Stream completion detection is the foundation. Without it, all other features either fail (auto-dismiss timeout) or degrade (loading indicator clarity).
-- **Content Visibility ↔ Loading Indicator**: Must be designed together. Separate concerns: content in main message area, loading indicator in secondary area (avatar status, corner indicator).
-- **Granular States → Completion Signal**: Thinking phase, streaming phase, finishing phase - each needs explicit signal from API or client-side heuristic.
-- **Stop Generation Button ↔ Completion Signal**: Must know when stream is done to disable button and prevent errors.
+1. **Configurable limit N** - Foundation. Everything depends on knowing where to split.
+2. **Rolling summary generation** - Core mechanism. Requires backend endpoint.
+3. **Summary injection** - Makes compression functional. Without injection, summary is unused.
+4. **Visual indicator** - Makes compression visible. Without it, users are confused when AI "forgets."
+5. **Expand/view** - Builds trust. Users can verify what was compressed.
 
-## Current Implementation Status
+### Dependency on Existing Features
 
-### What Works Well
+| Existing Feature | How Compression Depends on It |
+|-----------------|-------------------------------|
+| **Title generation model config** | Reuse same fast model for summarization. `preferencesSettings.titleGenerationModel` provides the model selection. |
+| **`/generate-title` endpoint** | Architectural pattern. New `/generate-summary` endpoint mirrors its structure exactly. |
+| **`incrementalSummary` on ThreadParams** | Precedent. Proves the storage pattern works. New `contextSummary` field follows same approach. |
+| **`onFinish` callback chain** | Integration point. Compression triggers after title generation, before suggestions. |
+| **`persistedChatParamsState`** | Storage mechanism. Thread-level compression state persisted alongside other thread params. |
+| **`codeAgentState.enabled`** | Exemption gate. Already used to branch behavior in `sendMessage`. |
+| **System prompt composition** | Injection point. Summary prepended to existing system prompt in transport body. |
 
-1. **Chat status tracking** (`isStreaming`, `isSubmitted`, `isReady` in chat-state.svelte.ts)
-   - Uses AI SDK's Chat class which emits status updates
-   - onFinish callback detects completion
+## MVP Recommendation
 
-2. **Streaming infrastructure**
-   - Uses Vercel AI SDK with streaming support
-   - DynamicChatTransport handles API routing
-   - finish_reason appears to be handled in onFinish callback
+### Must Ship (Phase 1)
 
-### Current Gaps (The Problem We're Solving)
+These features constitute the minimum viable compression feature:
 
-1. **Loading indicator stays visible after stream ends**
-   - Status updates correctly (chat.status changes to "ready")
-   - But UI components may not be re-rendering or may have race conditions
-   - Race condition suspect: onFinish callback fires after visible stream completion
+1. **Configurable message limit N** in preferences (default: 20, range: 4-100)
+2. **Rolling summary generation** via new `/generate-summary` backend endpoint
+3. **Incremental summary updates** feeding previous summary + new messages
+4. **Summary injection** into AI request as system prompt prefix
+5. **Code Agent exemption** bypassing compression in Vibe Mode
+6. **Visual indicator** showing "N messages summarized" in chat
+7. **Expand to view summary** showing the actual summary text on click
 
-2. **Stop button state management**
-   - Likely coupled to `isStreaming` state
-   - May not transition fast enough when stream completes
+### Defer to Post-MVP
 
-3. **Missing visual feedback**
-   - No granular state indicators (thinking vs. streaming vs. done)
-   - No completion "snap" or feedback when spinner disappears
-
-## MVP Definition
-
-### Launch With (v1)
-
-**Core fix to solve immediate problem:**
-
-- [ ] **Fix completion detection race condition** — Debug why onFinish fires late or UI doesn't re-render immediately when stream ends
-  - Root cause: Is onFinish called after visual stream end? Is there state sync issue?
-  - Solution: Ensure `chat.status` transitions to "ready" **immediately** when finish_reason received from API
-  - Testing: Measure time from last text chunk to loading indicator disappears
-
-- [ ] **Ensure loading indicator is bound to correct state** — Verify UI component reads `chatState.isStreaming` not cached/derived state
-  - Remove any state caching that delays indicator update
-  - Ensure signal propagates to all dependent UI components
-
-- [ ] **Stop button state sync** — Disable button immediately when stream completes
-  - No race condition: button disabled = !isStreaming
-
-### Add After Validation (v1.x)
-
-Once core completion detection is working reliably:
-
-- [ ] **Granular loading states** — Show "[Generating title...]" or "[Using tool: file-read]" during specific operations
-  - Requires API enhancement: send intermediate status signals
-  - Cloudscape pattern: "_[Generating] [artifact type]_"
-
-- [ ] **Progress indication** — Token counter or character counter during generation
-  - Reassures user; shows model is active (not hung)
-
-- [ ] **Completion feedback** — Subtle animation or sound when response finishes
-  - Accessibility: optional audio cue + visual indicator
-  - Delight: satisfying "done" moment
-
-### Future Consideration (v2+)
-
-- [ ] **Streaming speed customization** — Let users adjust text appearance speed
-- [ ] **Custom theme integration** — Spinner colors/styles match theme system
-- [ ] **Analytics** — Track completion detection latency, spinner visibility duration
-
-## Feature Prioritization Matrix
-
-| Feature | User Value | Implementation Cost | Priority | Notes |
-|---------|------------|---------------------|----------|-------|
-| Fix completion detection race | HIGH | MEDIUM | **P0** | Solving the problem statement |
-| Stop button sync | HIGH | LOW | **P0** | Quick win with high UX impact |
-| Granular loading states | MEDIUM | HIGH | P1 | Requires API changes; differentiation |
-| Progress indication | MEDIUM | LOW | P1 | Token/char counter straightforward |
-| Completion feedback | MEDIUM | LOW | P1 | Sound + animation polish |
-| Streaming speed controls | LOW | LOW | P2 | Nice-to-have; already partially done |
-| Theme integration | LOW | LOW | P2 | Design polish |
-
-**Priority key:**
-- P0: Must fix for launch (addresses problem statement)
-- P1: Should add once P0 works (competitive feature; ~70% value at 50% effort)
-- P2: Nice to have (polish; future release)
-
-## Root Cause Analysis: Why Spinner Stays Visible
-
-Based on research and codebase inspection:
-
-### Hypothesis 1: onFinish Callback Latency (LIKELY)
-**Evidence:**
-- `onFinish` callback in chat-state is called after visual stream completion
-- Vercel AI SDK's `useChat` emits `status: "ready"` in `onFinish` callback
-- If callback is delayed 0.5-2 seconds, spinner remains visible during that window
-
-**Prevention:**
-- Move `chat.status` update to earliest possible signal (when finish_reason received from server)
-- Don't wait for callback chain to finish; update state on finish_reason detection
-- Ensure UI reads live `chat.status`, not cached/derived state
-
-### Hypothesis 2: UI Component Not Re-rendering (POSSIBLE)
-**Evidence:**
-- Svelte 5 runes manage state reactivity
-- If component reads stale `isStreaming` value, UI won't update
-- Possible: state snapshot taken at render time; updates don't propagate
-
-**Prevention:**
-- Verify loading indicator component reads `$derived` state, not static snapshot
-- Check: does spinner component re-run when `isStreaming` changes?
-- Use Svelte effect to force UI update on state change
-
-### Hypothesis 3: Race Condition in Message Rendering (LESS LIKELY)
-**Evidence:**
-- If message DOM updates are async, spinner might stay visible while content updates
-- Network latency could cause: stream ends → spinner goes away → content chunk arrives → spinner reappears
-
-**Prevention:**
-- Ensure stop spinner event triggers **after** last content chunk is rendered
-- Don't rely on setTimeout/Promise ordering; use explicit state flags
-
-## Design Patterns From Industry Leaders
-
-### ChatGPT Pattern
-- **Indicator**: Small animated dots under last message
-- **Completion**: Dots disappear instantly when model finishes
-- **Stop button**: Red stop icon; disappears when stream done
-- **Feedback**: No sound; visual only
-
-### Claude.ai Pattern
-- **Indicator**: Avatar with subtle pulse animation + text like "[Using Read...]"
-- **Phases**: Thinking → Streaming → Tool use → Done
-- **Completion**: Status text disappears; avatar stops animating
-- **Feedback**: Smooth transitions; clear phase labels
-
-### Perplexity Pattern
-- **Indicator**: "Searching..." → "Writing..." → "Done"
-- **Completion**: Progress updates; final "✓ Done" message
-- **Sources**: Live source count updates during generation
-- **Feedback**: Clear phase progression
-
-**What They All Have in Common:**
-- Completion detected **immediately** when stream ends
-- No spinner lingering after finish_reason
-- Visual indicator tied to **exact moment** of completion
-- Stop button disabled/hidden at completion
-
-## Recommended Implementation Approach
-
-### Phase 1: Debug & Diagnose (Hours)
-1. Add timing logs: when does `onFinish` fire vs. last text chunk vs. spinner disappears?
-2. Check: is `chat.status` updating to "ready" immediately?
-3. Verify: is spinner component re-rendering when `isStreaming` changes?
-4. Measure: actual latency from API finish_reason to UI indicator removal
-
-### Phase 2: Fix Core Issue (Hours-Days)
-1. Move status update as early as possible in stream lifecycle
-2. Ensure all UI components read live state (not snapshots)
-3. Test with various response lengths (1 token, 100 tokens, 1000+ tokens)
-
-### Phase 3: Add Polish (Days)
-1. Granular loading states if API supports it
-2. Progress indication (token count)
-3. Completion feedback (animation/sound)
+- **Pinned/protected messages**: Adds significant UX complexity (how to pin? per-message UI? undo?). The fixed N-message window already protects recent messages, which is sufficient.
+- **Per-thread compression toggle**: Start with global setting. Add per-thread if users request it.
+- **Summary quality indicator**: Requires additional research into detection heuristics. Rolling summaries are generally good enough for 50-100 rounds before drift becomes noticeable.
+- **Compression statistics**: Nice-to-have polish. Low complexity but not essential for functionality.
 
 ## Sources
 
-### API/Protocol Research
-- [OpenAI API Reference - Streaming](https://platform.openai.com/docs/api-reference/chat-streaming)
-- [Vercel AI SDK - useChat Hook](https://sdk.vercel.ai/docs/reference/ai-sdk-ui/use-chat)
-- [Claude API - Streaming Output](https://platform.claude.com/docs/en/agent-sdk/streaming-output)
+### Industry Research (Verified)
+- [Context Window Management Strategies - GetMaxim.ai](https://www.getmaxim.ai/articles/context-window-management-strategies-for-long-context-ai-agents-and-chatbots/) - Hierarchical summarization patterns, embedding-based compression
+- [Compressing Context - Factory.ai](https://factory.ai/news/compressing-context) - Structured vs unstructured summarization, incremental vs full re-summarization tradeoffs
+- [Evaluating Context Compression - Factory.ai](https://factory.ai/news/evaluating-compression) - 36,000+ messages analyzed, compression approaches compared
+- [LLM Chat History Summarization Guide - Mem0.ai](https://mem0.ai/blog/llm-chat-history-summarization-guide-2025) - Rolling summary patterns, hybrid approaches
+- [Context Window Management - OneUpTime](https://oneuptime.com/blog/post/2026-01-30-context-window-management/view) - SlidingWindowManager pattern, summary_target_tokens
+- [Context Window Overflow Fix - Redis](https://redis.io/blog/context-window-overflow/) - Effective vs claimed context windows, 60-70% usable
+- [KVzip Memory Compression - TechXplore](https://techxplore.com/news/2025-11-ai-tech-compress-llm-chatbot.html) - 3-4x compression with maintained accuracy
 
-### SSE & Stream Completion
-- [Using server-sent events - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
-- [Real-Time Data Streaming with SSE - DEV Community](https://dev.to/serifcolakel/real-time-data-streaming-with-server-sent-events-sse-1gb2)
-- [Understanding OpenAI's Responses API - Medium](https://madhub081011.medium.com/understanding-openais-new-responses-api-streaming-model-a6d932e481e8)
+### UX Patterns (Verified)
+- [Chat-Native App UX Best Practices - Skywork.ai](https://skywork.ai/blog/chat-native-app-ux-best-practices/) - Visual separation, streaming indicators, progressive disclosure
+- [Expanding Conversational UI - LukeW](https://www.lukew.com/ff/entry.asp?2018=) - Collapse/expand patterns for chat message management
+- [TypingMind Context Length Limit](https://docs.typingmind.com/chat-models-settings/context-length-limit) - User-configurable message count limiting, preserving system message
+- [LibreChat Memory Configuration](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/memory) - tokenLimit, messageWindowSize configuration patterns
 
-### UI/UX Patterns
-- [Cloudscape Design System - GenAI Loading States](https://cloudscape.design/patterns/genai/genai-loading-states/)
-- [The Complete Guide to Streaming LLM Responses - DEV Community](https://dev.to/pockit_tools/the-complete-guide-to-streaming-llm-responses-in-web-applications-from-sse-to-real-time-ui-3534)
-- [UI Best Practices for Loading States - LogRocket](https://blog.logrocket.com/ui-design-best-practices-loading-error-empty-state-react/)
-- [React Loading States with Suspense & Transitions - React Docs](https://react.dev/reference/react/Suspense)
+### Anti-Pattern Research (Verified)
+- [Incremental Summarization - ArXiv](https://arxiv.org/html/2510.06677) - Full vs incremental summarization comparison, production results
+- [Don't Let Your AI Agent Forget - Medium](https://techwithibrahim.medium.com/dont-let-your-ai-agent-forget-smarter-strategies-for-summarizing-message-history-a2d5284539f1) - Rolling summary as "rolling snowball," context drift risk
+- [Efficient Context Management - JetBrains Research](https://blog.jetbrains.com/research/2025/12/efficient-context-management/) - Context folding, minimize tokens per task not per request
 
-### Implementation References
-- [Vercel AI SDK 5 Release Notes](https://vercel.com/blog/ai-sdk-5)
-- [Building ChatGPT-like Streaming Responses - Medium](https://medium.com/@PowerUpSkills/building-with-claude-ai-real-time-streaming-interactive-response-handling-part-5-of-6-d775713fdb55)
-- [Streaming Structured LLM Completions - Medium](https://medium.com/@enginoid/rendering-realtime-uis-with-streaming-structured-llm-completions-5d10479cefc0)
+### Codebase Verification (HIGH Confidence)
+- `src/lib/stores/chat-state.svelte.ts` - Verified `onFinish` callback, `sendMessage` flow, Code Agent branching
+- `electron/main/server/router.ts` - Verified `/generate-title` endpoint pattern with multi-provider support
+- `src/lib/api/title-generation.ts` - Verified API call pattern, abort support, fallback chain
+- `src/shared/types.ts` - Verified `ThreadParams.incrementalSummary` exists as direct precedent
+- `src/lib/stores/preferences-settings.state.svelte.ts` - Verified settings pattern and title model configuration
+
+## Confidence: HIGH
+
+**Reasoning:** Context compression is a well-understood domain with strong industry consensus. The planned approach (fixed N, rolling summary, incremental updates, on-send timing) matches the most successful production patterns. The existing codebase has direct precedent for every aspect of the implementation (incremental summarization for titles, fast model configuration, onFinish orchestration, thread-level state persistence). All feature categorizations are informed by both industry research and codebase-verified implementation feasibility.
 
 ---
-*Stream completion detection research for: 302-AI-Studio*
-*Researched: 2026-02-02*
+*Context compression feature research for: 302-AI-Studio v1.2*
+*Researched: 2026-02-05*
