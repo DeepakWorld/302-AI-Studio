@@ -1568,6 +1568,7 @@ export const chat = new Chat({
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
 				workspacePath: codeAgentEnabled && claudeCodeSandboxState.currentSessionWorkspacePath,
+				vibeMode: codeAgentEnabled && codeAgentState.type,
 			};
 		},
 	}),

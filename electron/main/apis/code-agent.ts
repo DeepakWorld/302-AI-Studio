@@ -241,14 +241,11 @@ export async function addClaudeCodeSandboxMCP(
 		(info) => `claude mcp add --transport http ${info.name} ${info.url}`,
 	);
 	try {
-		const response =
-			mode === "remote"
-				? _302AIKy
-				: localCodeAgentKy
-						.post("302/claude-code/sandbox/mcp/add", {
-							json: { sandbox_id: sandboxId, mcp_servers: commands },
-						})
-						.json();
+		const response = await (mode === "remote" ? _302AIKy : localCodeAgentKy)
+			.post("302/claude-code/sandbox/mcp/add", {
+				json: { sandbox_id: sandboxId, mcp_servers: commands },
+			})
+			.json();
 
 		const validated = addMcpSchemaResponse(response);
 		if (validated instanceof type.errors) {
@@ -291,8 +288,9 @@ export type BatchUploadFileResponse = typeof batchUploadFileResponseSchema.infer
  */
 export async function batchUploadFile(
 	request: BatchUploadFileRequest,
+	mode: string,
 ): Promise<BatchUploadFileResponse> {
-	const response = await _302AIKy
+	const response = await (mode === "remote" ? _302AIKy : localCodeAgentKy)
 		.post("302/claude-code/sandbox/file/upload/batch", {
 			json: request,
 			timeout: 300000,

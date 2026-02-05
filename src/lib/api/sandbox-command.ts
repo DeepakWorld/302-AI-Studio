@@ -10,7 +10,7 @@ import { localCodeAgentKy } from "./core/local-code-agent-ky";
 /**
  * Get the appropriate ky instance based on code agent mode
  */
-function getCodeAgentKy() {
+export function getCodeAgentKy() {
 	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
 }
 

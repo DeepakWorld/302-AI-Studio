@@ -73,6 +73,7 @@ export type RouterRequestBody = {
 	inTaskOrchestrationMode?: boolean;
 	workspacePath?: string;
 	thinkingBudget?: ThinkingBudgetType;
+	vibeMode?: string;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1344,6 +1345,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		inTaskOrchestrationMode,
 		workspacePath,
 		thinkingBudget,
+		vibeMode,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { data: codeAgentConfig } = await codeAgentService.getCodeAgentConfig(threadId);
@@ -1367,6 +1369,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			inTaskOrchestrationMode,
 			workspacePath,
 			thinkingBudget,
+			vibeMode,
 		}),
 	);
 
@@ -1618,7 +1621,12 @@ CHECK BEFORE EVERY ACTION:
 			// 	}
 			// }
 			try {
-				await uploadAttachmentsFromMessages(sandboxId, workspacePath ?? "", messages);
+				await uploadAttachmentsFromMessages(
+					sandboxId,
+					workspacePath ?? "",
+					vibeMode ?? "remote",
+					messages,
+				);
 			} catch (uploadError) {
 				console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
 				sendStreamError(controller, "Failed to upload attachments");
