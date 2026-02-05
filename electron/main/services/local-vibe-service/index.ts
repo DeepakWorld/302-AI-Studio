@@ -1,4 +1,5 @@
 import { getLocalSandboxHealthStatus } from "@electron/main/apis/code-agent";
+import { PLATFORM } from "@electron/main/constants/index";
 import { broadcastService } from "@electron/main/services/broadcast-service";
 import { generalSettingsService } from "@electron/main/services/settings-service/general-settings-service";
 import { providerStorage } from "@electron/main/services/storage-service/provider-storage";
@@ -62,13 +63,17 @@ export class LocalVibeService {
 	/**
 	 * Get the runtime compose directory
 	 * In development: <project-root>/ai302
-	 * In production: <userData>/ai302
+	 * In production (macOS): <documents>/ai302
+	 * In production (others): <userData>/ai302
 	 */
 	private getRuntimeComposeDir(): string {
-		if (app.isPackaged) {
-			return path.join(app.getPath("userData"), "ai302");
-		}
-		return path.join(process.cwd(), "ai302");
+		return match(app.isPackaged)
+			.with(true, () =>
+				match(PLATFORM.IS_MAC)
+					.with(true, () => path.join(app.getPath("documents"), "ai302"))
+					.otherwise(() => path.join(app.getPath("userData"), "ai302")),
+			)
+			.otherwise(() => path.join(process.cwd(), "ai302"));
 	}
 
 	/**
