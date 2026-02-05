@@ -1,21 +1,39 @@
-# Requirements: Streaming Input to Taskboard
+# Requirements: Auto Context Compression
 
-**Defined:** 2026-02-04
-**Core Value:** Users can capture task ideas immediately without waiting for AI output to complete
+**Defined:** 2026-02-05
+**Core Value:** Efficient AI conversations through smart context compression
 
-## v1.1 Requirements
+## v1.2 Requirements
 
 Requirements for this milestone. Each maps to roadmap phases.
 
-### Core Redirection
+### Compression Core
+
+- [ ] **COMP-01**: User can configure message limit N in settings (default: 20)
+- [ ] **COMP-02**: Messages beyond N are summarized into 200-500 char rolling summary
+- [ ] **COMP-03**: Summary is automatically injected as context when sending to AI
+- [ ] **COMP-04**: Summary is auto-updated when message count exceeds threshold
+
+### User Interface
+
+- [ ] **UI-01**: User sees visual indicator when compression is active
+- [ ] **UI-02**: User sees count of compressed messages
+- [ ] **UI-03**: User can configure message limit N in preferences settings
+- [ ] **UI-04**: User can expand to view original compressed messages
+
+### Exemptions
+
+- [ ] **EXEMPT-01**: Code Agent mode preserves full message context
+- [ ] **EXEMPT-02**: Private chat mode preserves full message context
+
+## Previous Milestones (Shipped)
+
+### v1.1 Streaming Input to Taskboard (shipped 2026-02-04)
 
 - [x] **REDIR-01**: User can type in chat input while AI is streaming in Vibe Mode
 - [x] **REDIR-02**: User pressing Enter/Send during streaming adds input as task to taskboard
 - [x] **REDIR-03**: User sees toast notification confirming task was added
 - [x] **REDIR-04**: Chat input and attachments are cleared after task is added
-
-### Attachment Handling
-
 - [x] **ATTACH-01**: Attachments in chat input are uploaded to sandbox workspace
 - [x] **ATTACH-02**: Uploaded attachment paths are referenced in task content
 
@@ -23,7 +41,14 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 Deferred to later milestones. Tracked but not in current roadmap.
 
-### Polish
+### Compression Polish
+
+- **COMP-POLISH-01**: User can manually trigger summary regeneration
+- **COMP-POLISH-02**: Summary quality detection with degradation warning
+- **COMP-POLISH-03**: Per-thread compression toggle
+- **COMP-POLISH-04**: Pinned messages exempt from compression
+
+### Taskboard Polish
 
 - **POLISH-01**: User can undo task addition via toast action button
 - **POLISH-02**: User sees task count badge near input during streaming
@@ -35,10 +60,11 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Separate queue input UI | Adds cognitive load, breaks flow |
-| Modal confirmation dialog | Interrupts typing flow |
-| Visual hint on input box | Toast notification is sufficient feedback |
-| Extending Task type with attachment metadata | Path references in content are cleaner |
+| Token-based compression triggers | Provider-specific complexity; message count is simpler |
+| Background/continuous summarization | Wastes API credits on interim states |
+| Modifying stored messages | Destructive; breaks branching, regeneration, editing |
+| Summary for Code Agent mode | Full context needed for code tasks |
+| Per-model compression settings | Over-engineering; fixed N is sufficient for v1 |
 
 ## Traceability
 
@@ -46,18 +72,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REDIR-01 | Phase 4 | Complete |
-| REDIR-02 | Phase 4 | Complete |
-| REDIR-03 | Phase 4 | Complete |
-| REDIR-04 | Phase 4 | Complete |
-| ATTACH-01 | Phase 5 | Complete |
-| ATTACH-02 | Phase 5 | Complete |
+| COMP-01 | TBD | Pending |
+| COMP-02 | TBD | Pending |
+| COMP-03 | TBD | Pending |
+| COMP-04 | TBD | Pending |
+| UI-01 | TBD | Pending |
+| UI-02 | TBD | Pending |
+| UI-03 | TBD | Pending |
+| UI-04 | TBD | Pending |
+| EXEMPT-01 | TBD | Pending |
+| EXEMPT-02 | TBD | Pending |
 
 **Coverage:**
-- v1.1 requirements: 6 total
-- Mapped to phases: 6
-- Unmapped: 0
+- v1.2 requirements: 10 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 10
 
 ---
-*Requirements defined: 2026-02-04*
-*Last updated: 2026-02-04 after v1.1 milestone complete*
+*Requirements defined: 2026-02-05*
+*Last updated: 2026-02-05 after initial definition*
