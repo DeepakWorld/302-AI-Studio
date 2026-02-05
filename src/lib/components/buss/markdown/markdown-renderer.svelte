@@ -681,6 +681,7 @@
 				theme={props.codeTheme ?? DEFAULT_THEME}
 				messageId={props.messageId}
 				messagePartIndex={props.messagePartIndex}
+				isStreaming={props.isStreaming}
 			/>
 		{:else if block.kind === "todo"}
 			<TodoListRenderer todos={block.todos} />
