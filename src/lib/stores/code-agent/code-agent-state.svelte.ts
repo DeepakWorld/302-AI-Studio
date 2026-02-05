@@ -20,6 +20,7 @@ import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-
 import { codeAgentGlobalConfigsState } from "./code-agent-global-configs-state.svelte";
 import { codeAgentSendMessageButtonState } from "./code-agent-send-message-button-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
+import { localClaudeCodeSandboxState } from "./local-claude-code-sandbox-state.svelte";
 import { localEnvState } from "./local-env-state.svelte";
 import { withLoadingState } from "./utils";
 
@@ -221,6 +222,10 @@ class CodeAgentState {
 
 	updateType(type: CodeAgentType): void {
 		this.updateState({ type });
+		// 切换模式时重置 session 和 sandbox ID，避免配置混乱和竞态问题
+		claudeCodeAgentState.resetSessionAndSandbox();
+		// 重置 local session 选择
+		localClaudeCodeSandboxState.reset();
 	}
 
 	updateEnabled(enabled: boolean): void {

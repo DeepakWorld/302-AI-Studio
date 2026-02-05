@@ -159,20 +159,17 @@ export async function updateSessionNote(
 			};
 		}
 
-		// Refresh session list so UI stays in sync with latest note
-		if (typeof window !== "undefined") {
-			try {
-				if (codeAgentState.type === "local") {
-					await localClaudeCodeSandboxState.refreshSessions();
-				} else {
-					await window.electronAPI?.codeAgentService?.updateClaudeCodeSandboxesByIpc?.();
-				}
-			} catch (refreshError) {
-				console.error(
-					"Failed to refresh Claude code sandboxes after updating session note:",
-					refreshError,
-				);
+		try {
+			if (codeAgentState.type === "local") {
+				await localClaudeCodeSandboxState.refreshSessions();
+			} else {
+				await window.electronAPI?.codeAgentService?.updateClaudeCodeSandboxesByIpc?.();
 			}
+		} catch (refreshError) {
+			console.error(
+				"Failed to refresh Claude code sandboxes after updating session note:",
+				refreshError,
+			);
 		}
 
 		return {

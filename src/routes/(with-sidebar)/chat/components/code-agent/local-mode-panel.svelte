@@ -11,12 +11,30 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
+	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 
 	let { onClose }: Props = $props();
 
 	async function handleInstall() {
 		await localEnvState.installPodman();
+	}
+
+	function handleLocalModeConfirm() {
+		const sessionId = localClaudeCodeSandboxState.selectedSessionId;
+
+		// 同步 session ID（"new" 表示新建，设为空字符串）
+		if (sessionId === "new") {
+			claudeCodeAgentState.updateCurrentSessionId("");
+		} else {
+			claudeCodeAgentState.updateCurrentSessionId(sessionId);
+		}
+
+		// Local 模式没有 sandbox，置空
+		claudeCodeAgentState.updateSandboxId("");
+
+		onClose?.();
 	}
 </script>
 
@@ -42,7 +60,7 @@
 		<Button variant="secondary" onclick={onClose}>
 			{m.common_cancel()}
 		</Button>
-		<Button onclick={onClose}>
+		<Button onclick={handleLocalModeConfirm}>
 			{m.label_button_confirm()}
 		</Button>
 	</div>

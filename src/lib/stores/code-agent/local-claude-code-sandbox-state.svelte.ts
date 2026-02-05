@@ -1,5 +1,5 @@
-import type { GroupedSelectData } from "$lib/components/buss/settings/setting-select.svelte";
 import { listLocalClaudeCodeSessions } from "$lib/api/sandbox-session";
+import type { GroupedSelectData } from "$lib/components/buss/settings/setting-select.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import type { LocalSessionInfo } from "@shared/storage/code-agent";

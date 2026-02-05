@@ -231,6 +231,13 @@ class ClaudeCodeAgentState {
 		this.updateState({ sandboxId });
 	}
 
+	/**
+	 * 批量重置 session 和 sandbox ID，避免竞态问题
+	 */
+	resetSessionAndSandbox(): void {
+		this.updateState({ currentSessionId: "", sandboxId: "" });
+	}
+
 	updateSandboxRemark(sandboxRemark: string): void {
 		this.updateState({ sandboxRemark });
 	}

@@ -28,7 +28,7 @@
 	type SessionType = {
 		sessionId: string;
 		workspacePath: string;
-		note?: string;
+		note?: string | null;
 		usedAt?: string;
 	};
 
