@@ -51,10 +51,11 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
   3. ChatState exposes compression fields with getters/setters
   4. Compression is automatically disabled in Code Agent mode
   5. Compression is automatically disabled in private chat mode
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
+- [ ] 06-01-PLAN.md — Data model and preferences state foundation
+- [ ] 06-02-PLAN.md — ChatState integration and settings UI
 
 ### Phase 7: Backend Summarization
 **Goal**: Backend can generate rolling summaries from message history
@@ -106,11 +107,11 @@ Plans:
 | 3. Frontend State Sync | v1.0 | 2/2 | Complete | 2026-02-04 |
 | 4. Core Redirection | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 5. Attachment Handling | v1.1 | 1/1 | Complete | 2026-02-04 |
-| 6. Foundation | v1.2 | 0/TBD | Not started | - |
+| 6. Foundation | v1.2 | 0/2 | Ready | - |
 | 7. Backend Summarization | v1.2 | 0/TBD | Not started | - |
 | 8. Router Integration | v1.2 | 0/TBD | Not started | - |
 | 9. UI Indicators | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-05 after v1.2 roadmap added*
+*Last updated: 2026-02-06 after Phase 6 planning*
