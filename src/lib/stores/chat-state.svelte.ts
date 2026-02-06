@@ -435,6 +435,35 @@ class ChatState {
 		persistedChatParamsState.current.clearScreenMessageId = value;
 	}
 
+	// Context compression state accessors
+	get contextSummary(): string | undefined {
+		return persistedChatParamsState.current.contextSummary;
+	}
+	set contextSummary(value: string | undefined) {
+		persistedChatParamsState.current.contextSummary = value;
+	}
+
+	get compressedMessageCount(): number | undefined {
+		return persistedChatParamsState.current.compressedMessageCount;
+	}
+	set compressedMessageCount(value: number | undefined) {
+		persistedChatParamsState.current.compressedMessageCount = value;
+	}
+
+	get lastCompressionMessageId(): string | undefined {
+		return persistedChatParamsState.current.lastCompressionMessageId;
+	}
+	set lastCompressionMessageId(value: string | undefined) {
+		persistedChatParamsState.current.lastCompressionMessageId = value;
+	}
+
+	get compressionEnabled(): boolean | undefined {
+		return persistedChatParamsState.current.compressionEnabled;
+	}
+	set compressionEnabled(value: boolean | undefined) {
+		persistedChatParamsState.current.compressionEnabled = value;
+	}
+
 	providerType = $derived<string | null>(
 		this.selectedModel
 			? (providerState.getProvider(this.selectedModel.providerId)?.apiType ?? null)
@@ -486,6 +515,26 @@ class ChatState {
 	 * Whether there are visible messages (after applying clear screen filter)
 	 */
 	hasVisibleMessages = $derived(this.visibleMessages.length > 0);
+
+	/**
+	 * Whether context compression should be applied for this thread.
+	 * Returns false when:
+	 * - Global compression is disabled in preferences
+	 * - Per-thread compression is explicitly disabled
+	 * - Code Agent mode is enabled (needs full context)
+	 * - Private chat mode is active (no persistence)
+	 */
+	shouldApplyCompression = $derived.by(() => {
+		// Check global preference first
+		if (!preferencesSettings.contextCompressionEnabled) return false;
+		// Check per-thread override (explicit false disables)
+		if (this.compressionEnabled === false) return false;
+		// Exempt: Code Agent mode needs full context for code understanding
+		if (codeAgentState.enabled) return false;
+		// Exempt: Private chat mode doesn't persist, no need to compress
+		if (this.isPrivateChatActive) return false;
+		return true;
+	});
 
 	canTogglePrivacy = $derived(!this.hasMessages);
 	canRegenerate = $derived(
