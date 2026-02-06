@@ -80,10 +80,11 @@ Plans:
   2. Messages beyond threshold are excluded from AI request
   3. Summary auto-updates after AI response when message count exceeds threshold
   4. Summary generation follows AbortController pattern (cancels on new message)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md — Backend compression utility and router endpoint integration
+- [ ] 08-02-PLAN.md — Frontend transport body extension and onFinish summary trigger
 
 ### Phase 9: UI Indicators
 **Goal**: User has visibility into compression state and can view compressed content
@@ -109,9 +110,9 @@ Plans:
 | 5. Attachment Handling | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 6. Foundation | v1.2 | 2/2 | Complete | 2026-02-06 |
 | 7. Backend Summarization | v1.2 | 1/1 | Complete | 2026-02-06 |
-| 8. Router Integration | v1.2 | 0/TBD | Not started | - |
+| 8. Router Integration | v1.2 | 0/2 | Not started | - |
 | 9. UI Indicators | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-06 after Phase 7 planned*
+*Last updated: 2026-02-06 after Phase 8 planned*
