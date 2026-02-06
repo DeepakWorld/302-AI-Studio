@@ -210,6 +210,7 @@
 	"settings_contextCompressionEnableDesc": "自动总结较早的消息以管理上下文窗口",
 	"settings_contextCompressionLimit": "压缩前消息数量",
 	"settings_contextCompressionLimitDesc": "触发压缩前保留的消息数量",
+	"compression_banner_count": "{count} 条较早的消息已总结",
 	"sidebar_close": "关闭边栏",
 	"sidebar_open": "打开边栏",
 	"text_alert_chat_error": "回复失败！",

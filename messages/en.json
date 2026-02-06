@@ -210,6 +210,7 @@
 	"settings_contextCompressionEnableDesc": "Automatically summarize older messages to manage context window",
 	"settings_contextCompressionLimit": "Message limit before compression",
 	"settings_contextCompressionLimitDesc": "Number of messages to keep before triggering compression",
+	"compression_banner_count": "{count} earlier messages summarized",
 	"sidebar_close": "Close Sidebar",
 	"sidebar_open": "Open Sidebar",
 	"text_alert_chat_error": "Reply failed!",
