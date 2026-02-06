@@ -9,7 +9,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Compression Core
 
-- [ ] **COMP-01**: User can configure message limit N in settings (default: 20)
+- [x] **COMP-01**: User can configure message limit N in settings (default: 20)
 - [ ] **COMP-02**: Messages beyond N are summarized into 200-500 char rolling summary
 - [ ] **COMP-03**: Summary is automatically injected as context when sending to AI
 - [ ] **COMP-04**: Summary is auto-updated when message count exceeds threshold
@@ -18,13 +18,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [ ] **UI-01**: User sees visual indicator when compression is active
 - [ ] **UI-02**: User sees count of compressed messages
-- [ ] **UI-03**: User can configure message limit N in preferences settings
+- [x] **UI-03**: User can configure message limit N in preferences settings
 - [ ] **UI-04**: User can expand to view original compressed messages
 
 ### Exemptions
 
-- [ ] **EXEMPT-01**: Code Agent mode preserves full message context
-- [ ] **EXEMPT-02**: Private chat mode preserves full message context
+- [x] **EXEMPT-01**: Code Agent mode preserves full message context
+- [x] **EXEMPT-02**: Private chat mode preserves full message context
 
 ## Previous Milestones (Shipped)
 
@@ -72,16 +72,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COMP-01 | Phase 6 | Pending |
+| COMP-01 | Phase 6 | Complete |
 | COMP-02 | Phase 7 | Pending |
 | COMP-03 | Phase 8 | Pending |
 | COMP-04 | Phase 8 | Pending |
 | UI-01 | Phase 9 | Pending |
 | UI-02 | Phase 9 | Pending |
-| UI-03 | Phase 6 | Pending |
+| UI-03 | Phase 6 | Complete |
 | UI-04 | Phase 9 | Pending |
-| EXEMPT-01 | Phase 6 | Pending |
-| EXEMPT-02 | Phase 6 | Pending |
+| EXEMPT-01 | Phase 6 | Complete |
+| EXEMPT-02 | Phase 6 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 10 total
@@ -90,4 +90,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after roadmap traceability update*
+*Last updated: 2026-02-06 after Phase 6 complete*

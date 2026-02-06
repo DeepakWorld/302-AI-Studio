@@ -34,7 +34,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 
 ### v1.2 Auto Context Compression
 
-- [ ] **Phase 6: Foundation** - Data model, settings, and exemption logic
+- [x] **Phase 6: Foundation** - Data model, settings, and exemption logic
 - [ ] **Phase 7: Backend Summarization** - Endpoint for generating rolling summaries
 - [ ] **Phase 8: Router Integration** - Inject summary into AI requests with auto-update
 - [ ] **Phase 9: UI Indicators** - Visual feedback for compression state
@@ -54,8 +54,8 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Data model and preferences state foundation
-- [ ] 06-02-PLAN.md — ChatState integration and settings UI
+- [x] 06-01-PLAN.md — Data model and preferences state foundation
+- [x] 06-02-PLAN.md — ChatState integration and settings UI
 
 ### Phase 7: Backend Summarization
 **Goal**: Backend can generate rolling summaries from message history
@@ -107,11 +107,11 @@ Plans:
 | 3. Frontend State Sync | v1.0 | 2/2 | Complete | 2026-02-04 |
 | 4. Core Redirection | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 5. Attachment Handling | v1.1 | 1/1 | Complete | 2026-02-04 |
-| 6. Foundation | v1.2 | 0/2 | Ready | - |
+| 6. Foundation | v1.2 | 2/2 | Complete | 2026-02-06 |
 | 7. Backend Summarization | v1.2 | 0/TBD | Not started | - |
 | 8. Router Integration | v1.2 | 0/TBD | Not started | - |
 | 9. UI Indicators | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-06 after Phase 6 planning*
+*Last updated: 2026-02-06 after Phase 6 complete*
