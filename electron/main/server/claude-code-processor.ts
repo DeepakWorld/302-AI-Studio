@@ -397,7 +397,7 @@ class ClaudeCodeProcessor {
 			duration_ms: data.duration_ms,
 			duration_api_ms: data.duration_api_ms,
 			num_turns: data.num_turns,
-			content: data.choices?.[0]?.delta?.content ?? "",
+			content: data.choices?.[0]?.delta?.content ?? data.result ?? "",
 			session_id: data.session_id,
 			total_cost_usd: data.total_cost_usd,
 			uuid: data.uuid,

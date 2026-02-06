@@ -270,21 +270,6 @@ class ClaudeCodeAgentState {
 
 	updateThinkingBudget(thinkingBudget: ThinkingBudgetType) {
 		this.updateState({ thinkingBudget });
-
-		// if (this.sandboxId) {
-		// 	this.isUpdatingThinkingBudget = true;
-		// 	try {
-		// 		const { isOK } = await updateClaudeCodeSandboxThinkingBudget(
-		// 			this.sandboxId,
-		// 			THINKING_BUDGET_MAP[thinkingBudget],
-		// 		);
-		// 		if (!isOK) {
-		// 			// toast.error("Failed to update thinking budget");
-		// 		}
-		// 	} finally {
-		// 		this.isUpdatingThinkingBudget = false;
-		// 	}
-		// }
 	}
 
 	async handleAgentModeExecute(): Promise<{
@@ -364,11 +349,11 @@ class ClaudeCodeAgentState {
 	/**
 	 * Handle local mode execution.
 	 * Local mode doesn't need sandbox verification - it returns a virtual sandboxInfo
-	 * with empty sandboxId since local mode runs on the user's machine.
+	 * with "local" sandboxId since local mode runs on the user's machine.
 	 */
 	handleLocalModeExecute(): { isOK: boolean; sandboxInfo: ClaudeCodeSandboxInfo } {
 		const sandboxInfo: ClaudeCodeSandboxInfo = {
-			sandboxId: "",
+			sandboxId: "local",
 			sandboxRemark: "",
 			llmModel: this.model,
 			diskUsage: "normal",
@@ -470,7 +455,7 @@ class ClaudeCodeAgentState {
 		this.updateState({
 			currentSessionId: sessionId === "new" ? "" : sessionId,
 			currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
-			sandboxId: "", // Local mode doesn't use sandbox
+			sandboxId: "local", // Local mode doesn't use sandbox
 			isManualNote: false,
 		});
 	}
