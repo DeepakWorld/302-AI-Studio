@@ -66,10 +66,10 @@ Plans:
   2. Summary preserves key facts, decisions, and context from older messages
   3. Endpoint uses title generation model for fast, cheap summarization
   4. API wrapper with AbortController support exists in frontend
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md — Backend endpoint, frontend API wrapper, and ChatState AbortController
 
 ### Phase 8: Router Integration
 **Goal**: AI receives compressed context instead of full message history
@@ -108,10 +108,10 @@ Plans:
 | 4. Core Redirection | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 5. Attachment Handling | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 6. Foundation | v1.2 | 2/2 | Complete | 2026-02-06 |
-| 7. Backend Summarization | v1.2 | 0/TBD | Not started | - |
+| 7. Backend Summarization | v1.2 | 0/1 | Planned | - |
 | 8. Router Integration | v1.2 | 0/TBD | Not started | - |
 | 9. UI Indicators | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-06 after Phase 6 complete*
+*Last updated: 2026-02-06 after Phase 7 planned*
