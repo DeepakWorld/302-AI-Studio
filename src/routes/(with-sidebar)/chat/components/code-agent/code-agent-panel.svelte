@@ -146,28 +146,30 @@
 				</div>
 			{/if}
 
-			<div class="gap-settings-gap flex flex-col">
-				<Label class="text-label-fg">{m.title_sandbox_remark()}</Label>
-				<div class="flex flex-row gap-2">
-					<Input
-						class="!bg-settings-item-bg dark:!bg-settings-item-bg h-10 rounded-[10px]"
-						bind:value={tempSandboxRemark}
-						placeholder={m.placeholder_input_sandbox_remark()}
-					/>
-					<Button
-						variant="outline"
-						class="h-10 shrink-0"
-						disabled={codeAgentState.isUpdatingSandboxRemark || !isSandboxRemarkChanged}
-						onclick={handleUpdateSandboxRemark}
-					>
-						{#if codeAgentState.isUpdatingSandboxRemark}
-							<LdrsLoader type="line-spinner" size={16} />
-						{:else}
-							{m.text_button_save()}
-						{/if}
-					</Button>
+			{#if codeAgentState.type === "remote"}
+				<div class="gap-settings-gap flex flex-col">
+					<Label class="text-label-fg">{m.title_sandbox_remark()}</Label>
+					<div class="flex flex-row gap-2">
+						<Input
+							class="!bg-settings-item-bg dark:!bg-settings-item-bg h-10 rounded-[10px]"
+							bind:value={tempSandboxRemark}
+							placeholder={m.placeholder_input_sandbox_remark()}
+						/>
+						<Button
+							variant="outline"
+							class="h-10 shrink-0"
+							disabled={codeAgentState.isUpdatingSandboxRemark || !isSandboxRemarkChanged}
+							onclick={handleUpdateSandboxRemark}
+						>
+							{#if codeAgentState.isUpdatingSandboxRemark}
+								<LdrsLoader type="line-spinner" size={16} />
+							{:else}
+								{m.text_button_save()}
+							{/if}
+						</Button>
+					</div>
 				</div>
-			</div>
+			{/if}
 
 			<div class="gap-settings-gap flex flex-col">
 				<Label class="text-label-fg">{m.label_session_remark()}</Label>

@@ -36,7 +36,6 @@
 	import * as Select from "$lib/components/ui/select/index.js";
 	import { m } from "$lib/paraglide/messages";
 	import { cn } from "$lib/utils";
-	import { formatDateTimeShort } from "$lib/utils/date-format";
 
 	let {
 		name,
@@ -75,8 +74,7 @@
 	}
 
 	function formatExtra(extra?: string): string {
-		if (!extra) return "";
-		return formatDateTimeShort(extra) || extra;
+		return extra || "";
 	}
 </script>
 
@@ -130,10 +128,19 @@
 
 {#snippet selectItem(option: SelectOption)}
 	{#if option.extra}
-		<Select.Item value={option.value} label={option.label} title={option.label}>
-			<span class="flex w-full items-center justify-between min-w-0">
-				<span class="truncate" title={option.label}>{option.label}</span>
-				<span class="ml-2 text-xs text-muted-foreground shrink-0">{formatExtra(option.extra)}</span>
+		{@const extraText = formatExtra(option.extra)}
+		{@const combinedTitle = `${option.label} (${extraText})`}
+		<Select.Item value={option.value} label={option.label} title={combinedTitle}>
+			<span class="flex w-full items-center justify-between min-w-0 gap-2">
+				<span class="truncate flex-1 basis-1/2 min-w-0 text-left" title={combinedTitle}>
+					{option.label}
+				</span>
+				<span
+					class="truncate basis-1/2 min-w-0 text-right text-xs text-muted-foreground shrink-0"
+					title={combinedTitle}
+				>
+					{extraText}
+				</span>
 			</span>
 		</Select.Item>
 	{:else}

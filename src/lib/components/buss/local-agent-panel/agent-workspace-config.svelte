@@ -16,14 +16,11 @@
 
 	const frameworkOptions = [{ value: "claude-code", label: "claude code" }];
 
-	// Fetch sessions on mount
-	onMount(async () => {
-		await localClaudeCodeSandboxState.refreshSessions();
-	});
-
 	async function handleRefresh() {
 		await localClaudeCodeSandboxState.refreshSessions();
 	}
+
+	onMount(async () => await localClaudeCodeSandboxState.refreshSessions());
 </script>
 
 <div class="space-y-4">
@@ -56,6 +53,7 @@
 			onValueChange={localClaudeCodeSandboxState.handleSessionSelected.bind(
 				localClaudeCodeSandboxState,
 			)}
+			contentClass="w-[var(--bits-select-anchor-width)]"
 		/>
 	</div>
 
@@ -70,6 +68,7 @@
 			onValueChange={localClaudeCodeSandboxState.handleWorkspaceSelected.bind(
 				localClaudeCodeSandboxState,
 			)}
+			contentClass="w-[var(--bits-select-anchor-width)]"
 		/>
 	</div>
 </div>

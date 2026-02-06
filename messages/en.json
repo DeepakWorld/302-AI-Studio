@@ -1278,7 +1278,7 @@
 	"quick_prompt_no_results": "No matching prompts found",
 	"quick_prompt_hint": "Type / to quickly access prompts",
 	"local_platform_environment_monitoring": "Environment Monitoring",
-	"local_platform_podman": "Podman",
+	"local_platform_podman": "Local Environment",
 	"local_platform_installation_status": "Installation Status",
 	"local_platform_installed": "Installed",
 	"local_platform_not_installed": "Not Installed",

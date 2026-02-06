@@ -3,6 +3,7 @@ import { validate302Provider } from "$lib/api/webserve-deploy";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+import { formatDateTimeShort } from "$lib/utils/date-format";
 import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
 import { toast } from "svelte-sonner";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
@@ -63,11 +64,15 @@ class ClaudeCodeSandboxState {
 				.flatMap((sandbox) => sandbox.sessionInfos)
 				.map((session) => {
 					const name = session.note && session.note !== "" ? session.note : session.sessionId;
+					// Filter out zero/default dates (e.g. 0001-01-01)
+					const date = new Date(session.usedAt);
+					const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+
 					return {
 						key: session.workspacePath,
 						label: name,
 						value: session.sessionId,
-						extra: session.usedAt,
+						extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
 					};
 				}),
 		];
@@ -82,12 +87,18 @@ class ClaudeCodeSandboxState {
 				groupLabel: sandbox.sandboxRemark || sandbox.sandboxId,
 				items: [...sandbox.sessionInfos]
 					.sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime())
-					.map((session) => ({
-						key: session.workspacePath,
-						label: session.note || session.sessionId,
-						value: session.sessionId,
-						extra: session.usedAt,
-					})),
+					.map((session) => {
+						// Filter out zero/default dates
+						const date = new Date(session.usedAt);
+						const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+
+						return {
+							key: session.workspacePath,
+							label: session.note || session.sessionId,
+							value: session.sessionId,
+							extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
+						};
+					}),
 			})),
 		};
 	});

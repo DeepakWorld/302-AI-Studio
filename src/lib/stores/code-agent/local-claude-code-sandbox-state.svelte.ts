@@ -43,10 +43,8 @@ class LocalClaudeCodeSandboxState {
 
 	// Derived: Workspace directories extracted from sessions
 	workspaceDirectories = $derived.by(() => {
-		const dirs = this.sessions
-			.map((s) => s.workspace_path.split("/").pop() || s.workspace_path)
-			.filter((dir) => dir !== "");
-		return [...new Set(dirs)]; // unique
+		const dirs = this.sessions.map((s) => s.workspace_path).filter((dir) => dir !== "");
+		return [...new Set(dirs)];
 	});
 
 	// Derived: Session options for dropdown
@@ -62,7 +60,7 @@ class LocalClaudeCodeSandboxState {
 								items: this.sessions.map((s) => ({
 									value: s.session_id,
 									label: s.note || s.session_id,
-									extra: s.workspace_path,
+									extra: `${m.local_platform_work_directory()}: ${s.workspace_path}`,
 								})),
 							},
 						]
@@ -80,10 +78,18 @@ class LocalClaudeCodeSandboxState {
 							{
 								groupKey: "existing",
 								groupLabel: m.local_platform_existing_work_directory(),
-								items: this.workspaceDirectories.map((dir) => ({
-									value: dir,
-									label: dir,
-								})),
+								items: this.workspaceDirectories.map((dir) => {
+									const relatedSessions = this.sessions.filter((s) => s.workspace_path === dir);
+									const sessionLabel = relatedSessions
+										.map((s) => s.note || m.local_platform_new_session())
+										.join(", ");
+									console.log("relatedSessions", relatedSessions);
+									return {
+										value: dir,
+										label: dir,
+										extra: m.local_platform_session({ session: sessionLabel }),
+									};
+								}),
 							},
 						]
 					: [],
@@ -115,8 +121,7 @@ class LocalClaudeCodeSandboxState {
 		if (sessionId !== "new") {
 			const session = this.sessions.find((s) => s.session_id === sessionId);
 			if (session && session.workspace_path) {
-				const dirName = session.workspace_path.split("/").pop() || session.workspace_path;
-				this.selectedWorkspacePath = dirName;
+				this.selectedWorkspacePath = session.workspace_path;
 			}
 		}
 	}
