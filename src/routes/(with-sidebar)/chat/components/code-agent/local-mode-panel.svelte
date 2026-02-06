@@ -11,9 +11,13 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
+	import { mcpState } from "$lib/stores/mcp-state.svelte";
+	import { toast } from "svelte-sonner";
 
 	let { onClose }: Props = $props();
 
@@ -23,17 +27,28 @@
 
 	function handleLocalModeConfirm() {
 		const sessionId = localClaudeCodeSandboxState.selectedSessionId;
+		const workspacePath = localClaudeCodeSandboxState.selectedWorkspacePath;
 
-		// 同步 session ID（"new" 表示新建，设为空字符串）
-		if (sessionId === "new") {
-			claudeCodeAgentState.updateCurrentSessionId("");
-		} else {
-			claudeCodeAgentState.updateCurrentSessionId(sessionId);
+		// Get skills (same as remote mode)
+		codeAgentState.getSkillList(true);
+
+		// Filter incompatible MCP servers (same as remote mode)
+		if (chatState.mcpServerIds.length > 0) {
+			const { compatibleIds, filteredNames } = mcpState.filterStreamableHTTPServers(
+				chatState.mcpServerIds,
+			);
+
+			if (filteredNames.length > 0) {
+				toast.warning(m.mcp_filtered_warning({ names: filteredNames.join(", ") }));
+				chatState.handleMCPServerChange(compatibleIds);
+			}
 		}
 
-		// Local 模式没有 sandbox，置空
-		claudeCodeAgentState.updateSandboxId("");
+		// Call handleLocalEnabled to update persisted state
+		claudeCodeAgentState.handleLocalEnabled(sessionId, workspacePath);
 
+		// Set enabled and close panel
+		codeAgentState.updateEnabled(true);
 		onClose?.();
 	}
 </script>

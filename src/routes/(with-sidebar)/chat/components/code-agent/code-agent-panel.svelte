@@ -38,6 +38,7 @@
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import type { CodeAgentType } from "@shared/storage/code-agent";
+	import { DEFAULT_WORKSPACE_PATH } from "../agent-preview/constants";
 	import ClaudeCodePanel from "./claude-code-panel.svelte";
 	import LocalModePanel from "./local-mode-panel.svelte";
 
@@ -96,6 +97,21 @@
 
 	async function handleInstall() {
 		await localEnvState.installPodman();
+	}
+
+	async function handleOpenWorkspace() {
+		const path = codeAgentState.currentWorkspacePath;
+		if (!path) return;
+
+		// Remove workspace prefix if present to get path relative to workspace root
+		let relativePath = path;
+		if (relativePath.startsWith(DEFAULT_WORKSPACE_PATH)) {
+			relativePath = relativePath.slice(DEFAULT_WORKSPACE_PATH.length);
+		}
+
+		// Remove leading slash if present to ensure relative path
+		relativePath = relativePath.startsWith("/") ? relativePath.slice(1) : relativePath;
+		await window.electronAPI.localVibeService.openWorkspaceDirectory(relativePath);
 	}
 </script>
 
@@ -193,6 +209,18 @@
 					</Button>
 				</div>
 			</div>
+
+			{#if codeAgentState.type === "local" && !codeAgentState.isFreshTab}
+				<div class="flex flex-row items-center gap-4">
+					<Label class="text-label-fg">{m.local_platform_work_directory()}</Label>
+					<button
+						class="text-sm hover:underline cursor-pointer focus:outline-none text-left break-all text-primary"
+						onclick={handleOpenWorkspace}
+					>
+						{codeAgentState.currentWorkspacePath}
+					</button>
+				</div>
+			{/if}
 
 			<div class="flex flex-row justify-between">
 				<Button variant="secondary" onclick={onClose}>

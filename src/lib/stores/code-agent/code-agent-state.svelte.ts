@@ -238,6 +238,11 @@ class CodeAgentState {
 
 	async executeCodeAgentMode(): Promise<{ isOK: boolean; sandboxInfo?: ClaudeCodeSandboxInfo }> {
 		if (this.currentAgentId === "claude-code") {
+			// Local mode: skip sandbox verification, return virtual sandboxInfo
+			if (this.type === "local") {
+				return claudeCodeAgentState.handleLocalModeExecute();
+			}
+			// Remote mode: verify sandbox and return real sandboxInfo
 			return claudeCodeAgentState.handleAgentModeExecute();
 		}
 		return { isOK: false };

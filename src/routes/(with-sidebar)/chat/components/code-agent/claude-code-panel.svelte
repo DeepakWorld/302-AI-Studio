@@ -106,7 +106,7 @@
 			groupedOptions={claudeCodeSandboxState.groupedSessions}
 			placeholder={m.select_session_placeholder()}
 			{disabled}
-			contentClass="max-w-[600px]"
+			contentClass="w-[var(--bits-select-anchor-width)]"
 			onValueChange={(v) => claudeCodeSandboxState.handleSessionSelected(v)}
 		/>
 	</div>
@@ -161,7 +161,7 @@
 			onValueChange={(v) => claudeCodeSandboxState.handleSelectSandbox(v)}
 			disabled={disabled || isRefreshing}
 			class="!bg-background dark:!bg-background"
-			contentClass="max-w-[500px]"
+			contentClass="w-[var(--bits-select-anchor-width)]"
 		/>
 	</div>
 {/snippet}
@@ -177,7 +177,7 @@
 			onValueChange={(v) => claudeCodeSandboxState.handleWorkspaceSelected(v)}
 			disabled={disabled || isRefreshing}
 			class="!bg-background dark:!bg-background"
-			contentClass="max-w-[500px]"
+			contentClass="w-[var(--bits-select-anchor-width)]"
 		/>
 	</div>
 {/snippet}

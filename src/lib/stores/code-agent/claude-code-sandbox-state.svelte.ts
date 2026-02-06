@@ -6,6 +6,7 @@ import { m } from "$lib/paraglide/messages";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 import { formatDateTimeShort } from "$lib/utils/date-format";
 import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
+import { SvelteSet } from "svelte/reactivity";
 import { toast } from "svelte-sonner";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
@@ -70,7 +71,7 @@ class ClaudeCodeSandboxState {
 					const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
 
 					return {
-						key: session.workspacePath,
+						key: session.sessionId,
 						label: name,
 						value: session.sessionId,
 						extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
@@ -94,7 +95,7 @@ class ClaudeCodeSandboxState {
 						const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
 
 						return {
-							key: session.workspacePath,
+							key: session.sessionId,
 							label: session.note || session.sessionId,
 							value: session.sessionId,
 							extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
@@ -111,28 +112,26 @@ class ClaudeCodeSandboxState {
 		const sandboxList = persistedClaudeCodeSandboxState.current;
 
 		// Extract all unique workspacePaths from all sessions across all sandboxes
-		const allWorkspacePaths: string[] = [];
+		const allWorkspacePaths = new SvelteSet<string>();
 		for (const sandbox of sandboxList) {
 			for (const session of sandbox.sessionInfos) {
-				if (
-					session.workspacePath &&
-					session.workspacePath !== "" &&
-					!allWorkspacePaths.includes(session.workspacePath)
-				) {
-					allWorkspacePaths.push(session.workspacePath);
+				if (session.workspacePath && session.workspacePath !== "") {
+					allWorkspacePaths.add(session.workspacePath);
 				}
 			}
 		}
 
+		const pathList = Array.from(allWorkspacePaths);
+
 		return {
 			standalone: [{ key: "new", label: m.local_platform_new_work_directory(), value: "new" }],
 			groups:
-				allWorkspacePaths.length > 0
+				pathList.length > 0
 					? [
 							{
 								groupKey: "existing",
 								groupLabel: m.local_platform_existing_work_directory(),
-								items: allWorkspacePaths.map((path) => {
+								items: pathList.map((path) => {
 									// Find all sessions that use this workspace path
 									const relatedSessions: { note: string | null; sessionId: string }[] = [];
 									for (const sandbox of sandboxList) {
@@ -145,7 +144,9 @@ class ClaudeCodeSandboxState {
 											}
 										}
 									}
-									const sessionLabel = relatedSessions.map((s) => s.note || s.sessionId).join(", ");
+									const sessionLabel = [
+										...new SvelteSet(relatedSessions.map((s) => s.note || m.select_session_new())),
+									].join(", ");
 									return {
 										key: path,
 										label: path,

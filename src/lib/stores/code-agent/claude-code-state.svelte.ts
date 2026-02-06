@@ -232,6 +232,19 @@ class ClaudeCodeAgentState {
 		this.updateState({ currentSessionId: sessionId, isManualNote: false });
 	}
 
+	updateCurrentWorkspacePath(workspacePath: string): void {
+		this.updateState({ currentWorkspacePath: workspacePath });
+	}
+
+	updateLocalModeState(sessionId: string, workspacePath: string): void {
+		this.updateState({
+			currentSessionId: sessionId === "new" ? "" : sessionId,
+			currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
+			sandboxId: "",
+			isManualNote: false,
+		});
+	}
+
 	updateSandboxId(sandboxId: string): void {
 		this.updateState({ sandboxId });
 	}
@@ -348,6 +361,22 @@ class ClaudeCodeAgentState {
 		return { isOK: false };
 	}
 
+	/**
+	 * Handle local mode execution.
+	 * Local mode doesn't need sandbox verification - it returns a virtual sandboxInfo
+	 * with empty sandboxId since local mode runs on the user's machine.
+	 */
+	handleLocalModeExecute(): { isOK: boolean; sandboxInfo: ClaudeCodeSandboxInfo } {
+		const sandboxInfo: ClaudeCodeSandboxInfo = {
+			sandboxId: "",
+			sandboxRemark: "",
+			llmModel: this.model,
+			diskUsage: "normal",
+		};
+
+		return { isOK: true, sandboxInfo };
+	}
+
 	async handleCreateNewSandbox(): Promise<boolean> {
 		const { isOK, sandboxId } = await createClaudeCodeSandboxByIpc(
 			threadId,
@@ -430,6 +459,20 @@ class ClaudeCodeAgentState {
 				};
 
 		this.updateState(updateData);
+	}
+
+	/**
+	 * Handle local mode enabled - similar to handleEnabled but for local mode.
+	 * Converts selected values from localClaudeCodeSandboxState to current values
+	 * and persists them. Local mode doesn't use sandboxId.
+	 */
+	handleLocalEnabled(sessionId: string, workspacePath: string): void {
+		this.updateState({
+			currentSessionId: sessionId === "new" ? "" : sessionId,
+			currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
+			sandboxId: "", // Local mode doesn't use sandbox
+			isManualNote: false,
+		});
 	}
 
 	init() {
