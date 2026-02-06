@@ -838,8 +838,9 @@ class ClaudeCodeProcessor {
 		if (this.buffer.trim() === "") {
 			// If buffer is empty but we have a pending finish event, send it now
 			if (this.pendingFinishEvent) {
-				const result = this.pendingFinishEvent + "\n\n";
+				const result = this.pendingFinishEvent + "\n\n" + "data: [DONE]\n\n";
 				this.pendingFinishEvent = null;
+				console.log("[ClaudeCodeProcessor] Stream completed, sent finish event and [DONE] marker");
 				return result;
 			}
 			return "";
@@ -849,10 +850,13 @@ class ClaudeCodeProcessor {
 		this.buffer = "";
 		let result = finalLine ? `${finalLine}\n\n` : "";
 
-		// If we have a pending finish event, append it
+		// If we have a pending finish event, append it with [DONE] marker
 		if (this.pendingFinishEvent) {
 			result += this.pendingFinishEvent + "\n\n";
+			// CRITICAL: Send [DONE] marker after finish event per AI SDK SSE protocol
+			result += "data: [DONE]\n\n";
 			this.pendingFinishEvent = null;
+			console.log("[ClaudeCodeProcessor] Stream completed, sent finish event and [DONE] marker");
 		}
 
 		return result;

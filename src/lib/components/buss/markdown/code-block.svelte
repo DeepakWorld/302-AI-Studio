@@ -5,23 +5,30 @@
 	import * as m from "$lib/paraglide/messages.js";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
+	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { persistedThemeState } from "$lib/stores/theme.state.svelte";
 	import {
 		ChevronDown,
 		CodeXml,
 		Download,
+		ExternalLink,
 		GitBranch,
 		ImagePlay,
 		MonitorPlay,
 	} from "@lucide/svelte";
-	import mermaid from "mermaid";
 	import type { GrammarState, ThemedToken } from "@shikijs/types";
+	import mermaid from "mermaid";
 	import { onMount } from "svelte";
-	import { SvelteMap } from "svelte/reactivity";
 	import { toast } from "svelte-sonner";
-	import type { ShikiHighlighter } from "./highlighter";
-	import { ensureHighlighter, ensureLanguageLoaded, LANGUAGE_ALIASES } from "./highlighter";
+	import { SvelteMap } from "svelte/reactivity";
 	import { downloadCode } from "./download-utils";
+	import type { ShikiHighlighter } from "./highlighter";
+	import {
+		ensureHighlighter,
+		ensureLanguageLoaded,
+		isLanguageLoaded,
+		LANGUAGE_ALIASES,
+	} from "./highlighter";
 
 	interface RenderedToken {
 		id: string;
@@ -44,6 +51,7 @@
 		theme?: string | null;
 		messageId?: string;
 		messagePartIndex?: number;
+		isStreaming?: boolean;
 	}
 
 	const props: Props = $props();
@@ -64,6 +72,7 @@
 	let showMermaidPreview = $state(false);
 	let mermaidSvg = $state("");
 	let mermaidError = $state<string | null>(null);
+	const isStreaming = $derived(props.isStreaming ?? false);
 
 	const FONT_STYLE = {
 		Italic: 1,
@@ -241,9 +250,98 @@
 
 	const toggleMermaidPreview = () => {
 		showMermaidPreview = !showMermaidPreview;
-		if (showMermaidPreview && isMermaidCode) {
+		if (showMermaidPreview && isMermaidCode && !isStreaming) {
 			void renderMermaid(props.code);
 		}
+	};
+
+	const handleOpenMermaidInNewTab = async () => {
+		if (isStreaming) {
+			return;
+		}
+		if (!mermaidSvg) {
+			// Ensure mermaid is rendered before opening in new tab
+			await renderMermaid(props.code);
+		}
+
+		// Wrap mermaid SVG in an interactive HTML document with pan & zoom
+		const htmlContent = buildMermaidPreviewHtml(mermaidSvg);
+
+		// Generate unique previewId
+		const previewId = `mermaid-${props.blockId}`;
+
+		// Create new tab with mermaid content as HTML preview
+		await tabBarState.handleNewTab(
+			m.title_mermaid_preview(),
+			"htmlPreview",
+			true,
+			"/html-preview",
+			htmlContent,
+			previewId,
+		);
+	};
+
+	const buildMermaidPreviewHtml = (svg: string): string => {
+		const htmlParts = [
+			"<!DOCTYPE html>",
+			"<html>",
+			"<head>",
+			'<meta charset="UTF-8">',
+			'<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+			"<title>Mermaid Diagram</title>",
+			"<style>",
+			"* { margin: 0; padding: 0; box-sizing: border-box; }",
+			"html, body { width: 100%; height: 100%; overflow: hidden; background-color: #f5f5f5; }",
+			".viewport { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }",
+			".viewport.dragging { cursor: grabbing; }",
+			".mermaid-container { position: absolute; transform-origin: 0 0; padding: 40px; }",
+			".mermaid-container svg { display: block; max-width: none; height: auto; shape-rendering: geometricPrecision; text-rendering: geometricPrecision; image-rendering: optimizeQuality; }",
+			".controls { position: fixed; bottom: 20px; right: 20px; display: flex; gap: 8px; z-index: 100; }",
+			".controls button { width: 40px; height: 40px; border: none; border-radius: 8px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: background 0.2s, transform 0.1s; }",
+			".controls button:hover { background: #f0f0f0; }",
+			".controls button:active { transform: scale(0.95); }",
+			".zoom-info { position: fixed; bottom: 20px; left: 20px; padding: 8px 12px; background: white; border-radius: 6px; font-family: system-ui, sans-serif; font-size: 13px; color: #666; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }",
+			"@media (prefers-color-scheme: dark) { html, body { background-color: #1a1a1a; } .controls button { background: #2d2d2d; color: #fff; } .controls button:hover { background: #3d3d3d; } .zoom-info { background: #2d2d2d; color: #aaa; } }",
+			"</style>",
+			"</head>",
+			"<body>",
+			'<div class="viewport" id="viewport">',
+			'<div class="mermaid-container" id="container">',
+			svg,
+			"</div>",
+			"</div>",
+			'<div class="controls">',
+			'<button id="zoomIn" title="Zoom In">+</button>',
+			'<button id="zoomOut" title="Zoom Out">−</button>',
+			'<button id="reset" title="Reset View">⟲</button>',
+			"</div>",
+			'<div class="zoom-info" id="zoomInfo">100%</div>',
+			"<script>",
+			"(function() {",
+			"var viewport = document.getElementById('viewport');",
+			"var container = document.getElementById('container');",
+			"var zoomInfo = document.getElementById('zoomInfo');",
+			"var scale = 1, panX = 0, panY = 0, isDragging = false, startX = 0, startY = 0, initialScale = 1;",
+			"var minScale = 0.1, maxScale = 10;",
+			"function updateTransform() { container.style.left = panX + 'px'; container.style.top = panY + 'px'; container.style.zoom = scale; zoomInfo.textContent = Math.round(scale * 100) + '%'; }",
+			"function fitToViewport() { var vw = viewport.clientWidth, vh = viewport.clientHeight, svg = container.querySelector('svg'); if (!svg) return; container.style.zoom = 1; var sw = svg.offsetWidth || svg.getBoundingClientRect().width, sh = svg.offsetHeight || svg.getBoundingClientRect().height; var padding = 80; var scaleX = (vw - padding) / (sw + 80), scaleY = (vh - padding) / (sh + 80); initialScale = Math.min(scaleX, scaleY, 3); initialScale = Math.max(initialScale, 0.5); scale = initialScale; var cw = (sw + 80) * scale, ch = (sh + 80) * scale; panX = (vw - cw) / 2; panY = (vh - ch) / 2; updateTransform(); }",
+			"function centerContent() { var vw = viewport.clientWidth, vh = viewport.clientHeight, cw = container.offsetWidth * scale, ch = container.offsetHeight * scale; panX = (vw - cw) / 2; panY = (vh - ch) / 2; updateTransform(); }",
+			"function tryFit(attempts) { if (attempts <= 0) return; var svg = container.querySelector('svg'); if (svg && svg.getBoundingClientRect().width > 0) { fitToViewport(); } else { setTimeout(function() { tryFit(attempts - 1); }, 50); } }",
+			"if (document.readyState === 'complete') { tryFit(10); } else { window.addEventListener('load', function() { tryFit(10); }); }",
+			"viewport.addEventListener('mousedown', function(e) { if (e.button !== 0) return; isDragging = true; startX = e.clientX - panX; startY = e.clientY - panY; viewport.classList.add('dragging'); e.preventDefault(); });",
+			"document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = e.clientX - startX; panY = e.clientY - startY; updateTransform(); e.preventDefault(); });",
+			"document.addEventListener('mouseup', function() { isDragging = false; viewport.classList.remove('dragging'); });",
+			"viewport.addEventListener('wheel', function(e) { e.preventDefault(); var rect = viewport.getBoundingClientRect(), mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top, prevScale = scale, delta = e.deltaY > 0 ? 0.9 : 1.1; scale = Math.min(maxScale, Math.max(minScale, scale * delta)); var scaleRatio = scale / prevScale; panX = mouseX - (mouseX - panX) * scaleRatio; panY = mouseY - (mouseY - panY) * scaleRatio; updateTransform(); }, { passive: false });",
+			"document.getElementById('zoomIn').addEventListener('click', function() { var vw = viewport.clientWidth / 2, vh = viewport.clientHeight / 2, prevScale = scale; scale = Math.min(maxScale, scale * 1.2); var scaleRatio = scale / prevScale; panX = vw - (vw - panX) * scaleRatio; panY = vh - (vh - panY) * scaleRatio; updateTransform(); });",
+			"document.getElementById('zoomOut').addEventListener('click', function() { var vw = viewport.clientWidth / 2, vh = viewport.clientHeight / 2, prevScale = scale; scale = Math.max(minScale, scale / 1.2); var scaleRatio = scale / prevScale; panX = vw - (vw - panX) * scaleRatio; panY = vh - (vh - panY) * scaleRatio; updateTransform(); });",
+			"document.getElementById('reset').addEventListener('click', function() { fitToViewport(); });",
+			"window.addEventListener('resize', fitToViewport);",
+			"})();",
+			"</" + "script>",
+			"</body>",
+			"</html>",
+		];
+		return htmlParts.join("\n");
 	};
 
 	const toggleHtmlPreview = () => {
@@ -386,12 +484,13 @@
 			return;
 		}
 
+		const renderLanguage = getRenderLanguage();
 		const pieces = (lastChunk + chunk).split("\n");
 		for (let index = 0; index < pieces.length; index += 1) {
 			const piece = pieces[index];
 			const isLast = index === pieces.length - 1;
 			const result = highlighter.codeToTokens(piece, {
-				lang: resolvedLanguage as never,
+				lang: renderLanguage as never,
 				theme: resolvedTheme,
 				grammarState,
 			});
@@ -419,13 +518,25 @@
 
 		if (resolvedLanguage !== effectiveLang) {
 			resolvedLanguage = effectiveLang;
-			ensureLanguageLoaded(effectiveLang).catch((error) => {
-				console.warn(`Failed to load language ${effectiveLang}:`, error);
-			});
+			const targetLanguage = effectiveLang;
+			ensureLanguageLoaded(targetLanguage)
+				.then(() => {
+					if (!highlighter || resolvedLanguage !== targetLanguage) {
+						return;
+					}
+					resetState();
+					syncCode(props.code);
+				})
+				.catch((error) => {
+					console.warn(`Failed to load language ${targetLanguage}:`, error);
+				});
 			return true;
 		}
 		return false;
 	};
+
+	const getRenderLanguage = (): string =>
+		isLanguageLoaded(resolvedLanguage) ? resolvedLanguage : "plaintext";
 
 	const updateTheme = (): boolean => {
 		const requested = props.theme?.trim();
@@ -453,6 +564,8 @@
 			return;
 		}
 
+		const renderLanguage = getRenderLanguage();
+
 		if (!code) {
 			resetState();
 			lines = [];
@@ -466,7 +579,7 @@
 				const segment = chunks[i];
 				const isLast = i === chunks.length - 1;
 				const result = highlighter.codeToTokens(segment, {
-					lang: resolvedLanguage as never,
+					lang: renderLanguage as never,
 					theme: resolvedTheme,
 					grammarState,
 				});
@@ -525,14 +638,22 @@
 	$effect(() => {
 		isSvgCode = detectSvg(props.code, props.language);
 		isHtmlCode = detectHtml(props.code, props.language);
+		const wasMermaid = isMermaidCode;
 		isMermaidCode = detectMermaid(props.code, props.language);
+		// Auto-enable preview when mermaid is first detected
+		if (!wasMermaid && isMermaidCode) {
+			showMermaidPreview = true;
+		}
 	});
 
 	$effect(() => {
-		// Re-render mermaid when theme changes
-		if (showMermaidPreview && isMermaidCode && props.code) {
-			void renderMermaid(props.code);
+		if (!showMermaidPreview || !isMermaidCode) return;
+		if (isStreaming) {
+			mermaidSvg = "";
+			mermaidError = null;
+			return;
 		}
+		void renderMermaid(props.code);
 	});
 </script>
 
@@ -612,7 +733,7 @@
 				{#if isMermaidCode}
 					<ButtonWithTooltip
 						class="text-muted-foreground hover:!bg-chat-action-hover"
-						tooltip={showMermaidPreview ? "Show code" : "Preview diagram"}
+						tooltip={showMermaidPreview ? m.tooltip_show_code() : m.tooltip_preview_diagram()}
 						tooltipSide="bottom"
 						onclick={toggleMermaidPreview}
 					>
@@ -621,6 +742,15 @@
 						{:else}
 							<GitBranch class="" />
 						{/if}
+					</ButtonWithTooltip>
+					<ButtonWithTooltip
+						class="text-muted-foreground hover:!bg-chat-action-hover"
+						tooltip={isStreaming ? "Waiting for output to finish..." : m.tooltip_open_in_new_tab()}
+						tooltipSide="bottom"
+						disabled={isStreaming}
+						onclick={handleOpenMermaidInNewTab}
+					>
+						<ExternalLink class="" />
 					</ButtonWithTooltip>
 				{/if}
 				{#if isHtmlCode && props.messageId !== undefined && props.messagePartIndex !== undefined}
@@ -656,6 +786,8 @@
 						<p class="font-medium">Failed to render diagram:</p>
 						<p>{mermaidError}</p>
 					</div>
+				{:else if isStreaming}
+					<div class="text-muted-foreground">Waiting for output to finish...</div>
 				{:else if mermaidSvg}
 					<div class="mermaid-diagram">
 						{@html mermaidSvg}

@@ -394,6 +394,8 @@ app.post("/chat/302ai", async (c) => {
 		}),
 	});
 
+	console.log("[302ai] Stream created successfully, returning response");
+
 	// 	const debugStream = stream.pipeThrough(
 	// 	new TransformStream({
 	// 		transform(chunk, controller) {
@@ -405,6 +407,11 @@ app.post("/chat/302ai", async (c) => {
 
 	// return createUIMessageStreamResponse({ stream: debugStream });
 
+	// AI SDK's createUIMessageStreamResponse automatically handles:
+	// - controller.close() in all paths (success, error, abort)
+	// - [DONE] marker emission after finish event
+	// - Error propagation and cleanup
+	// No manual lifecycle management needed for this endpoint.
 	return createUIMessageStreamResponse({ stream });
 });
 
@@ -573,6 +580,13 @@ app.post("/chat/openai", async (c) => {
 		}),
 	});
 
+	console.log("[openai] Stream created successfully, returning response");
+
+	// AI SDK's createUIMessageStreamResponse automatically handles:
+	// - controller.close() in all paths (success, error, abort)
+	// - [DONE] marker emission after finish event
+	// - Error propagation and cleanup
+	// No manual lifecycle management needed for this endpoint.
 	return createUIMessageStreamResponse({ stream });
 });
 
@@ -741,6 +755,13 @@ app.post("/chat/anthropic", async (c) => {
 		}),
 	});
 
+	console.log("[anthropic] Stream created successfully, returning response");
+
+	// AI SDK's createUIMessageStreamResponse automatically handles:
+	// - controller.close() in all paths (success, error, abort)
+	// - [DONE] marker emission after finish event
+	// - Error propagation and cleanup
+	// No manual lifecycle management needed for this endpoint.
 	return createUIMessageStreamResponse({ stream });
 });
 
@@ -908,6 +929,13 @@ app.post("/chat/gemini", async (c) => {
 		}),
 	});
 
+	console.log("[gemini] Stream created successfully, returning response");
+
+	// AI SDK's createUIMessageStreamResponse automatically handles:
+	// - controller.close() in all paths (success, error, abort)
+	// - [DONE] marker emission after finish event
+	// - Error propagation and cleanup
+	// No manual lifecycle management needed for this endpoint.
 	return createUIMessageStreamResponse({ stream });
 });
 
@@ -1559,23 +1587,41 @@ CHECK BEFORE EVERY ACTION:
 	// Create a combined stream that sends start immediately, then pipes upstream data
 	const combinedStream = new ReadableStream({
 		async start(controller) {
+			// Track if stream has been closed to prevent double-close errors
+			let streamClosed = false;
+
+			// Helper function to safely close the controller exactly once
+			const safeClose = () => {
+				if (!streamClosed) {
+					try {
+						controller.close();
+						console.log("[302ai-code-agent] Stream closed via safeClose");
+					} catch (_closeError) {
+						// Controller already closed, ignore
+					}
+					streamClosed = true;
+				}
+			};
+
 			// Send start event immediately for optimistic UI update
 			controller.enqueue(encoder.encode(immediateStartEvent));
 			console.log("[302ai-code-agent] Sent immediate start event");
 
-			// Upload attachments after sending start event (non-blocking UX)
-			// This allows the UI to show "AI is typing" immediately while upload happens in background
-			if (sandboxId && workspacePath) {
-				try {
-					await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
-				} catch (uploadError) {
-					console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
-					sendStreamError(controller, "Failed to upload attachments");
-					return;
-				}
-			}
-
 			try {
+				// Upload attachments after sending start event (non-blocking UX)
+				// This allows the UI to show "AI is typing" immediately while upload happens in background
+				if (sandboxId && workspacePath) {
+					try {
+						await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
+					} catch (uploadError) {
+						console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
+						sendStreamError(controller, "Failed to upload attachments");
+						streamClosed = true; // sendStreamError closes the controller
+						console.log("[302ai-code-agent] Error sent, stream closed via sendStreamError");
+						return;
+					}
+				}
+
 				const response = await responsePromise;
 
 				console.log("[302ai-code-agent] Response status:", response.status, response.statusText);
@@ -1593,6 +1639,8 @@ CHECK BEFORE EVERY ACTION:
 						controller,
 						errorText || `HTTP ${response.status}: ${response.statusText}`,
 					);
+					streamClosed = true; // sendStreamError closes the controller
+					console.log("[302ai-code-agent] Error sent, stream closed via sendStreamError");
 					return;
 				}
 
@@ -1601,16 +1649,16 @@ CHECK BEFORE EVERY ACTION:
 				// Pipe the transformed stream from ClaudeCodeProcessor
 				const reader = response.body?.getReader();
 				if (!reader) {
-					controller.close();
-					return;
+					console.log("[302ai-code-agent] No reader available, closing stream");
+					return; // finally block will call safeClose
 				}
 
 				try {
 					while (true) {
 						const { done, value } = await reader.read();
 						if (done) {
-							controller.close();
-							break;
+							console.log("[302ai-code-agent] Reader done, stream complete");
+							break; // finally block will call safeClose
 						}
 						try {
 							controller.enqueue(value);
@@ -1619,6 +1667,7 @@ CHECK BEFORE EVERY ACTION:
 							console.log("[302ai-code-agent] Controller closed, stopping stream");
 							reader.cancel();
 							abortController.abort();
+							streamClosed = true; // Controller was closed externally
 							break;
 						}
 					}
@@ -1627,12 +1676,18 @@ CHECK BEFORE EVERY ACTION:
 					reader.cancel().catch(() => {
 						// Ignore cancel errors
 					});
-					throw error;
+					throw error; // Re-throw to be caught by outer catch
 				}
 			} catch (error) {
 				console.error("[302ai-code-agent] Stream error:", error);
 				const errorMessage = error instanceof Error ? error.message : "Unknown error";
 				sendStreamError(controller, errorMessage);
+				streamClosed = true; // sendStreamError closes the controller
+				console.log("[302ai-code-agent] Error sent, stream closed via sendStreamError");
+			} finally {
+				// CRITICAL: Guarantee stream closure in ALL code paths
+				console.log("[302ai-code-agent] Finally block reached, ensuring stream closure");
+				safeClose();
 			}
 		},
 	});

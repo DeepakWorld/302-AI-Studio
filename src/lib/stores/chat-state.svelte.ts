@@ -198,6 +198,9 @@ class ChatState {
 	// AbortController for canceling pending suggestions generation
 	private suggestionsAbortController: AbortController | null = null;
 
+	// AbortController for canceling pending title generation
+	private titleAbortController: AbortController | null = null;
+
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
@@ -218,6 +221,18 @@ class ChatState {
 	}
 
 	/**
+	 * Cancel any pending title generation request.
+	 * Should be called before sending a new message to avoid race conditions.
+	 */
+	cancelPendingTitle() {
+		if (this.titleAbortController) {
+			this.titleAbortController.abort();
+			this.titleAbortController = null;
+			console.log("[Title] Cancelled pending title generation");
+		}
+	}
+
+	/**
 	 * Create a new AbortController for suggestions generation.
 	 * Returns the AbortSignal to be passed to the fetch request.
 	 */
@@ -226,6 +241,17 @@ class ChatState {
 		this.cancelPendingSuggestions();
 		this.suggestionsAbortController = new AbortController();
 		return this.suggestionsAbortController.signal;
+	}
+
+	/**
+	 * Create a new AbortController for title generation.
+	 * Returns the AbortSignal to be passed to the fetch request.
+	 */
+	createTitleAbortController(): AbortSignal {
+		// Cancel any existing pending request first
+		this.cancelPendingTitle();
+		this.titleAbortController = new AbortController();
+		return this.titleAbortController.signal;
 	}
 
 	constructor() {
@@ -601,6 +627,8 @@ class ChatState {
 		if (canSend) {
 			// Cancel any pending suggestions generation to avoid race conditions
 			this.cancelPendingSuggestions();
+			// Cancel any pending title generation to avoid race conditions
+			this.cancelPendingTitle();
 
 			try {
 				const currentModel = this.selectedModel!;
@@ -801,6 +829,8 @@ class ChatState {
 
 		// Cancel any pending suggestions generation to avoid race conditions
 		this.cancelPendingSuggestions();
+		// Cancel any pending title generation to avoid race conditions
+		this.cancelPendingTitle();
 
 		const currentModel = this.selectedModel!;
 
@@ -1527,6 +1557,9 @@ export const chat = new Chat({
 		console.error("[Chat onError]", error);
 	},
 	onFinish: async ({ messages, isAbort, isDisconnect, isError }) => {
+		const onFinishStartTime = performance.now();
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		console.log("[onFinish] Stream completion received at:", new Date().toISOString());
 		console.log("更新完成", $state.snapshot(messages));
 		console.debug("[onFinish] messages", JSON.stringify($state.snapshot(messages), null, 2));
 		console.log("[onFinish] isAbort:", isAbort, "isDisconnect:", isDisconnect, "isError:", isError);
@@ -1612,6 +1645,11 @@ export const chat = new Chat({
 			canDeploy: codeAgentEnabled && (codeAgentGlobalConfigsState.autoDeploy || isDeployCommand),
 			lastMessage: messages[messages.length - 1],
 		});
+		console.log(
+			"[onFinish] CHAT_FINISHED emitted, elapsed:",
+			(performance.now() - onFinishStartTime).toFixed(2),
+			"ms",
+		);
 
 		persistedMessagesState.current = messages;
 
@@ -1700,6 +1738,9 @@ export const chat = new Chat({
 		}
 
 		if (shouldGenerateTitle && titleModel) {
+			// Create AbortController for title generation - will be cancelled if user sends new message
+			const titleAbortSignal = chatState.createTitleAbortController();
+
 			try {
 				const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 				const serverPort = window.app?.serverPort ?? 8089;
@@ -1738,9 +1779,13 @@ export const chat = new Chat({
 					previousSummary,
 					isFirstMessage,
 					fallbackConfig,
+					titleAbortSignal,
 				);
 
-				if (result) {
+				// Check if request was aborted or new stream started - skip state updates
+				if (titleAbortSignal.aborted || chatState.isStreaming || chatState.isSubmitted) {
+					console.log("[Title] Skipped: request was aborted or new stream in progress");
+				} else if (result) {
 					persistedChatParamsState.current.title = result.title;
 					persistedChatParamsState.current.incrementalSummary = result.summary;
 
@@ -1749,7 +1794,12 @@ export const chat = new Chat({
 					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
 				}
 			} catch (error) {
-				console.error("Failed to generate title:", error);
+				// AbortError is expected when user sends a new message, don't log as error
+				if (error instanceof DOMException && error.name === "AbortError") {
+					console.log("[Title] Generation cancelled");
+				} else {
+					console.error("Failed to generate title:", error);
+				}
 			}
 		} else if (isFirstMessage && isDefaultTitle && titleTiming !== "off") {
 			// Fallback for firstTime mode when model is not configured
@@ -1876,5 +1926,10 @@ export const chat = new Chat({
 					});
 			}
 		}
+		console.log(
+			"[onFinish] Callback complete, total elapsed:",
+			(performance.now() - onFinishStartTime).toFixed(2),
+			"ms",
+		);
 	},
 });
