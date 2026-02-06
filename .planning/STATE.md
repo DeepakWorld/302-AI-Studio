@@ -21,9 +21,9 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 **Status:** In progress
 **Progress:** ████████████░ 92% (8/10 plans from v1.0-v1.1, 2/2 v1.2 phase 6, 1/1 v1.2 phase 7, 2/3 v1.2 phase 8)
 
-**Last Activity:** 2026-02-06 - Completed 08-02-PLAN.md (Frontend Chat Pipeline Integration)
+**Last Activity:** 2026-02-06 - Completed 08-01-PLAN.md (Backend Router Compression Integration) and 08-02-PLAN.md (Frontend Chat Pipeline Integration)
 
-**Next Action:** Execute Phase 8 Plan 3 (backend endpoint wiring)
+**Next Action:** Execute Phase 8 Plan 3 (remaining router integration)
 
 ---
 
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 **Phases:** 6-9 (4 phases, plans TBD)
 **Phase 6 complete:** Data model + ChatState integration + Settings UI
 **Phase 7 complete:** Backend summarization endpoint + API wrapper + AbortController lifecycle
-**Phase 8 in progress:** Frontend pipeline wired (body + onFinish); backend endpoints pending
+**Phase 8 in progress:** Backend router compression (4 endpoints wired), Frontend pipeline wired (body + onFinish); remaining plans pending
 
 ### v1.1 Streaming Input to Taskboard - SHIPPED 2026-02-04
 
@@ -57,9 +57,9 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13 (5 v1.0 + 2 v1.1 + 3 v1.2 + 1 phase 6 research + 2 phase 8)
-- Average duration: ~14 min
-- Total execution time: ~2.7 hours
+- Total plans completed: 14 (5 v1.0 + 2 v1.1 + 3 v1.2 + 1 phase 6 research + 3 phase 8)
+- Average duration: ~15 min
+- Total execution time: ~3.4 hours
 
 *Updated after each plan completion*
 
@@ -83,6 +83,8 @@ Recent decisions affecting current work:
 - [v1.2]: Language param accepted in API but prompt auto-detects from conversation
 - [v1.2]: Reuse titleGenerationModel for summary generation (no separate model setting)
 - [v1.2]: Summary generation awaited in onFinish (not fire-and-forget) for state consistency
+- [v1.2]: Compression applied AFTER template resolution, BEFORE convertToModelMessages
+- [v1.2]: Context summary prepended to system prompt with [Context from earlier conversation] markers
 
 ### Pending Todos
 
@@ -97,7 +99,7 @@ None.
 ## Session Continuity
 
 **Last session:** 2026-02-06
-**Stopped at:** Completed 08-02-PLAN.md
+**Stopped at:** Completed 08-01-PLAN.md and 08-02-PLAN.md
 **Resume file:** None
 
 ---
