@@ -10,7 +10,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Compression Core
 
 - [x] **COMP-01**: User can configure message limit N in settings (default: 20)
-- [ ] **COMP-02**: Messages beyond N are summarized into 200-500 char rolling summary
+- [x] **COMP-02**: Messages beyond N are summarized into 200-500 char rolling summary
 - [ ] **COMP-03**: Summary is automatically injected as context when sending to AI
 - [ ] **COMP-04**: Summary is auto-updated when message count exceeds threshold
 
@@ -73,7 +73,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | COMP-01 | Phase 6 | Complete |
-| COMP-02 | Phase 7 | Pending |
+| COMP-02 | Phase 7 | Complete |
 | COMP-03 | Phase 8 | Pending |
 | COMP-04 | Phase 8 | Pending |
 | UI-01 | Phase 9 | Pending |

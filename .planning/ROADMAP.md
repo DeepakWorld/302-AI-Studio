@@ -35,7 +35,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 ### v1.2 Auto Context Compression
 
 - [x] **Phase 6: Foundation** - Data model, settings, and exemption logic
-- [ ] **Phase 7: Backend Summarization** - Endpoint for generating rolling summaries
+- [x] **Phase 7: Backend Summarization** - Endpoint for generating rolling summaries
 - [ ] **Phase 8: Router Integration** - Inject summary into AI requests with auto-update
 - [ ] **Phase 9: UI Indicators** - Visual feedback for compression state
 
@@ -69,7 +69,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 07-01-PLAN.md — Backend endpoint, frontend API wrapper, and ChatState AbortController
+- [x] 07-01-PLAN.md — Backend endpoint, frontend API wrapper, and ChatState AbortController
 
 ### Phase 8: Router Integration
 **Goal**: AI receives compressed context instead of full message history
@@ -108,7 +108,7 @@ Plans:
 | 4. Core Redirection | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 5. Attachment Handling | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 6. Foundation | v1.2 | 2/2 | Complete | 2026-02-06 |
-| 7. Backend Summarization | v1.2 | 0/1 | Planned | - |
+| 7. Backend Summarization | v1.2 | 1/1 | Complete | 2026-02-06 |
 | 8. Router Integration | v1.2 | 0/TBD | Not started | - |
 | 9. UI Indicators | v1.2 | 0/TBD | Not started | - |
 
