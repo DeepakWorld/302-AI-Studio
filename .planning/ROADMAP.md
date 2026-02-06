@@ -36,7 +36,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [x] **Phase 6: Foundation** - Data model, settings, and exemption logic
 - [x] **Phase 7: Backend Summarization** - Endpoint for generating rolling summaries
-- [ ] **Phase 8: Router Integration** - Inject summary into AI requests with auto-update
+- [x] **Phase 8: Router Integration** - Inject summary into AI requests with auto-update
 - [ ] **Phase 9: UI Indicators** - Visual feedback for compression state
 
 ## Phase Details
@@ -83,8 +83,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Backend compression utility and router endpoint integration
-- [ ] 08-02-PLAN.md — Frontend transport body extension and onFinish summary trigger
+- [x] 08-01-PLAN.md — Backend compression utility and router endpoint integration
+- [x] 08-02-PLAN.md — Frontend transport body extension and onFinish summary trigger
 
 ### Phase 9: UI Indicators
 **Goal**: User has visibility into compression state and can view compressed content
@@ -110,9 +110,9 @@ Plans:
 | 5. Attachment Handling | v1.1 | 1/1 | Complete | 2026-02-04 |
 | 6. Foundation | v1.2 | 2/2 | Complete | 2026-02-06 |
 | 7. Backend Summarization | v1.2 | 1/1 | Complete | 2026-02-06 |
-| 8. Router Integration | v1.2 | 0/2 | Not started | - |
+| 8. Router Integration | v1.2 | 2/2 | Complete | 2026-02-06 |
 | 9. UI Indicators | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-06 after Phase 8 planned*
+*Last updated: 2026-02-06 after Phase 8 complete*
