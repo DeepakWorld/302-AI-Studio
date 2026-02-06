@@ -94,10 +94,10 @@ Plans:
   1. User sees visual indicator when compression is active in current thread
   2. User sees count of compressed messages (e.g., "12 earlier messages summarized")
   3. User can expand to view the actual summary text
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 09-01: TBD
+- [ ] 09-01-PLAN.md — Compression banner component and message list integration
 
 ## Progress
 
@@ -111,7 +111,7 @@ Plans:
 | 6. Foundation | v1.2 | 2/2 | Complete | 2026-02-06 |
 | 7. Backend Summarization | v1.2 | 1/1 | Complete | 2026-02-06 |
 | 8. Router Integration | v1.2 | 2/2 | Complete | 2026-02-06 |
-| 9. UI Indicators | v1.2 | 0/TBD | Not started | - |
+| 9. UI Indicators | v1.2 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-02-04*
