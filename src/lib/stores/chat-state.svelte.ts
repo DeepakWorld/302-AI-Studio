@@ -1629,6 +1629,13 @@ export const chat = new Chat({
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
 				workspacePath: codeAgentEnabled && claudeCodeSandboxState.currentSessionWorkspacePath,
+
+				// Context compression (only sent when compression is active)
+				...(chatState.shouldApplyCompression &&
+					chatState.contextSummary && {
+						contextSummary: chatState.contextSummary,
+						compressedMessageCount: chatState.compressedMessageCount ?? 0,
+					}),
 			};
 		},
 	}),
