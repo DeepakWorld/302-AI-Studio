@@ -171,6 +171,7 @@ class CodeAgentSendMessageButtonState {
 					const { workspace_path } = await initProject({
 						sandboxId: sandboxInfo.sandboxId,
 						sessionId,
+						workspacePath: codeAgentState.currentWorkspacePath,
 					});
 
 					workspacePath = workspace_path;

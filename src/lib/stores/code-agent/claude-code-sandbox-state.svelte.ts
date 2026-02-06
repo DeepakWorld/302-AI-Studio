@@ -1,5 +1,6 @@
 import { deleteSession } from "$lib/api/sandbox-session";
 import { validate302Provider } from "$lib/api/webserve-deploy";
+import type { GroupedSelectData } from "$lib/components/buss/settings/setting-select.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
@@ -100,6 +101,61 @@ class ClaudeCodeSandboxState {
 						};
 					}),
 			})),
+		};
+	});
+
+	/**
+	 * Workspace path options for the dropdown
+	 */
+	workspacePathOptions = $derived.by((): GroupedSelectData => {
+		const sandboxList = persistedClaudeCodeSandboxState.current;
+
+		// Extract all unique workspacePaths from all sessions across all sandboxes
+		const allWorkspacePaths: string[] = [];
+		for (const sandbox of sandboxList) {
+			for (const session of sandbox.sessionInfos) {
+				if (
+					session.workspacePath &&
+					session.workspacePath !== "" &&
+					!allWorkspacePaths.includes(session.workspacePath)
+				) {
+					allWorkspacePaths.push(session.workspacePath);
+				}
+			}
+		}
+
+		return {
+			standalone: [{ key: "new", label: m.local_platform_new_work_directory(), value: "new" }],
+			groups:
+				allWorkspacePaths.length > 0
+					? [
+							{
+								groupKey: "existing",
+								groupLabel: m.local_platform_existing_work_directory(),
+								items: allWorkspacePaths.map((path) => {
+									// Find all sessions that use this workspace path
+									const relatedSessions: { note: string | null; sessionId: string }[] = [];
+									for (const sandbox of sandboxList) {
+										for (const session of sandbox.sessionInfos) {
+											if (session.workspacePath === path) {
+												relatedSessions.push({
+													note: session.note,
+													sessionId: session.sessionId,
+												});
+											}
+										}
+									}
+									const sessionLabel = relatedSessions.map((s) => s.note || s.sessionId).join(", ");
+									return {
+										key: path,
+										label: path,
+										value: path,
+										extra: m.local_platform_session({ session: sessionLabel }),
+									};
+								}),
+							},
+						]
+					: [],
 		};
 	});
 
@@ -210,6 +266,12 @@ class ClaudeCodeSandboxState {
 				claudeCodeAgentState.selectedSessionRemark =
 					targetSandbox.sessionInfos.find((sessionInfo) => sessionInfo.sessionId === sessionId)
 						?.note || "";
+
+				// Sync workspacePath when selecting a session
+				const session = targetSandbox.sessionInfos.find((s) => s.sessionId === sessionId);
+				if (session?.workspacePath) {
+					claudeCodeAgentState.selectedWorkspacePath = session.workspacePath;
+				}
 			}
 		}
 
@@ -233,6 +295,11 @@ class ClaudeCodeSandboxState {
 				claudeCodeAgentState.selectedSessionRemark = "";
 			}
 		}
+	}
+
+	handleWorkspaceSelected(workspacePath: string): void {
+		claudeCodeAgentState.selectedWorkspacePath = workspacePath;
+		// Note: According to requirements, we do NOT reset session to "new" when selecting a workspace
 	}
 
 	async deleteSession(sandboxId: string, sessionId: string): Promise<boolean> {

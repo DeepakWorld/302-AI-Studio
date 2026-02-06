@@ -78,6 +78,7 @@ class ClaudeCodeAgentState {
 	selectedSessionRemark = $state("");
 	selectedSandboxId = $state<"auto" | string>("auto");
 	selectedSandboxRemark = $state("");
+	selectedWorkspacePath = $state<"new" | string>("new");
 
 	isUpdatingThinkingBudget = $state(false);
 
@@ -88,6 +89,10 @@ class ClaudeCodeAgentState {
 	skills = $derived(persistedClaudeCodeAgentState.current?.skills ?? []);
 	thinkingBudget = $derived(persistedClaudeCodeAgentState.current?.thinkingBudget ?? "off");
 	isManualNote = $derived(persistedClaudeCodeAgentState.current?.isManualNote ?? false);
+	currentWorkspacePath = $derived(
+		persistedClaudeCodeAgentState.current?.currentWorkspacePath ?? "",
+	);
+
 	agentMode = $derived.by<"new" | "existing">(() => {
 		return this.selectedSessionId === "new" ? "new" : "existing";
 	});
@@ -405,29 +410,37 @@ class ClaudeCodeAgentState {
 	}
 
 	handleEnabled() {
-		const [isExistingMode, sandboxId, sessionId] = [
+		const [isExistingMode, sandboxId, sessionId, workspacePath] = [
 			this.agentMode === "existing",
 			this.selectedSandboxId,
 			this.selectedSessionId,
+			this.selectedWorkspacePath,
 		];
 
 		const updateData = isExistingMode
 			? {
 					sandboxId,
 					currentSessionId: sessionId,
+					currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
 				}
 			: {
 					sandboxId: sandboxId === "auto" ? "" : sandboxId,
 					currentSessionId: "",
+					currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
 				};
 
 		this.updateState(updateData);
 	}
 
 	init() {
-		const [currentSessionId, sandboxId] = [this.currentSessionId, this.sandboxId];
+		const [currentSessionId, sandboxId, currentWorkspacePath] = [
+			this.currentSessionId,
+			this.sandboxId,
+			this.currentWorkspacePath,
+		];
 		this.selectedSessionId = currentSessionId === "" ? "new" : currentSessionId;
 		this.selectedSandboxId = sandboxId === "" ? "auto" : sandboxId;
+		this.selectedWorkspacePath = currentWorkspacePath === "" ? "new" : currentWorkspacePath;
 	}
 }
 

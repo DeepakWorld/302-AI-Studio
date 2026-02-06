@@ -290,6 +290,12 @@ class CodeAgentState {
 			.otherwise(() => "");
 	}
 
+	get currentWorkspacePath(): string {
+		return match(this.currentAgentId)
+			.with("claude-code", () => claudeCodeAgentState.currentWorkspacePath)
+			.otherwise(() => "");
+	}
+
 	get skills(): Skill[] {
 		return match(this.currentAgentId)
 			.with("claude-code", () => claudeCodeAgentState.skills)

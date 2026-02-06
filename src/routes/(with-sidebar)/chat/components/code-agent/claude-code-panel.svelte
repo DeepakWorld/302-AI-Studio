@@ -166,6 +166,22 @@
 	</div>
 {/snippet}
 
+{#snippet selectWorkspacePath()}
+	<div class="gap-settings-gap flex flex-col">
+		<Label class="text-label-fg text-xs">{m.local_platform_work_directory()}</Label>
+		<SettingSelect
+			name="workspacePath"
+			value={claudeCodeAgentState.selectedWorkspacePath}
+			groupedOptions={claudeCodeSandboxState.workspacePathOptions}
+			placeholder={m.local_platform_new_work_directory_placeholder()}
+			onValueChange={(v) => claudeCodeSandboxState.handleWorkspaceSelected(v)}
+			disabled={disabled || isRefreshing}
+			class="!bg-background dark:!bg-background"
+			contentClass="max-w-[500px]"
+		/>
+	</div>
+{/snippet}
+
 {#snippet advancedSettings()}
 	<Collapsible.Root class="!bg-settings-item-bg dark:!bg-settings-item-bg rounded-[10px] px-4 py-2">
 		<div class="flex flex-row items-center justify-between">
@@ -184,6 +200,7 @@
 		<Collapsible.Content class="pb-2">
 			<div class="flex flex-col gap-2">
 				{@render selectSandbox()}
+				{@render selectWorkspacePath()}
 
 				<Field.Description class="text-sm">
 					{m.description_advanced_settings()}
