@@ -4,7 +4,7 @@
 
 - [x] **v1.0 Streaming Fix** - Phases 1-3 (shipped 2026-02-04)
 - [x] **v1.1 Streaming Input to Taskboard** - Phases 4-5 (shipped 2026-02-04)
-- [ ] **v1.2 Auto Context Compression** - Phases 6-9 (in progress)
+- [x] **v1.2 Auto Context Compression** - Phases 6-9 (shipped 2026-02-06)
 
 ## Overview
 
@@ -37,7 +37,7 @@ See: `.planning/milestones/v1.0-ROADMAP.md`
 - [x] **Phase 6: Foundation** - Data model, settings, and exemption logic
 - [x] **Phase 7: Backend Summarization** - Endpoint for generating rolling summaries
 - [x] **Phase 8: Router Integration** - Inject summary into AI requests with auto-update
-- [ ] **Phase 9: UI Indicators** - Visual feedback for compression state
+- [x] **Phase 9: UI Indicators** - Visual feedback for compression state
 
 ## Phase Details
 
@@ -97,7 +97,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 09-01-PLAN.md — Compression banner component and message list integration
+- [x] 09-01-PLAN.md — Compression banner component and message list integration
 
 ## Progress
 
@@ -111,8 +111,8 @@ Plans:
 | 6. Foundation | v1.2 | 2/2 | Complete | 2026-02-06 |
 | 7. Backend Summarization | v1.2 | 1/1 | Complete | 2026-02-06 |
 | 8. Router Integration | v1.2 | 2/2 | Complete | 2026-02-06 |
-| 9. UI Indicators | v1.2 | 0/1 | Planned | - |
+| 9. UI Indicators | v1.2 | 1/1 | Complete | 2026-02-06 |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-06 after Phase 8 complete*
+*Last updated: 2026-02-06 after Phase 9 complete — v1.2 milestone shipped*

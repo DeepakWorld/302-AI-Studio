@@ -16,10 +16,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### User Interface
 
-- [ ] **UI-01**: User sees visual indicator when compression is active
-- [ ] **UI-02**: User sees count of compressed messages
+- [x] **UI-01**: User sees visual indicator when compression is active
+- [x] **UI-02**: User sees count of compressed messages
 - [x] **UI-03**: User can configure message limit N in preferences settings
-- [ ] **UI-04**: User can expand to view original compressed messages
+- [x] **UI-04**: User can expand to view original compressed messages
 
 ### Exemptions
 
@@ -76,10 +76,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMP-02 | Phase 7 | Complete |
 | COMP-03 | Phase 8 | Complete |
 | COMP-04 | Phase 8 | Complete |
-| UI-01 | Phase 9 | Pending |
-| UI-02 | Phase 9 | Pending |
+| UI-01 | Phase 9 | Complete |
+| UI-02 | Phase 9 | Complete |
 | UI-03 | Phase 6 | Complete |
-| UI-04 | Phase 9 | Pending |
+| UI-04 | Phase 9 | Complete |
 | EXEMPT-01 | Phase 6 | Complete |
 | EXEMPT-02 | Phase 6 | Complete |
 
@@ -90,4 +90,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-06 after Phase 8 complete*
+*Last updated: 2026-02-06 after Phase 9 complete — v1.2 milestone shipped*
