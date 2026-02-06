@@ -38,8 +38,10 @@ async function generateTitleRequest(
 	serverPort: number,
 	previousSummary?: string,
 	isFirstGeneration?: boolean,
+	signal?: AbortSignal,
 ): Promise<GenerateTitleResult> {
 	const response = await fetch(`http://localhost:${serverPort}/generate-title`, {
+		signal,
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -74,6 +76,7 @@ export async function generateTitle(
 	previousSummary?: string,
 	isFirstGeneration?: boolean,
 	fallbackConfig?: FallbackModelConfig,
+	signal?: AbortSignal,
 ): Promise<GenerateTitleResult | null> {
 	const port = serverPort ?? 8089;
 
@@ -86,8 +89,11 @@ export async function generateTitle(
 			port,
 			previousSummary,
 			isFirstGeneration,
+			signal,
 		);
 	} catch (error) {
+		// Check if aborted before retry
+		if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 		console.error("Title generation failed with configured model:", error);
 
 		// 等待 500ms 后重试
@@ -124,6 +130,7 @@ export async function generateTitle(
 				port,
 				previousSummary,
 				isFirstGeneration,
+				signal,
 			);
 		} catch (fallbackError) {
 			console.error("Title generation failed with fallback model:", fallbackError);

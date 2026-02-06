@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { browser } from "$app/environment";
 	import ChatMinimap from "$lib/components/buss/chat/chat-minimap.svelte";
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import * as m from "$lib/paraglide/messages";
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { generalSettings } from "$lib/stores/general-settings.state.svelte";
+	import { searchHighlightState } from "$lib/stores/search-highlight-state.svelte";
 	import { persistedThemeState } from "$lib/stores/theme.state.svelte";
 	import type { ChatMessage } from "$lib/types/chat";
 	import { cn } from "$lib/utils";
@@ -35,6 +37,57 @@
 	let showScrollToTop = $state(false);
 	let showScrollToBottom = $state(false);
 	let showMinimap = $state(false);
+
+	// Initialize search highlight state immediately (before effects run)
+	if (browser) {
+		searchHighlightState.initializeForTab();
+	}
+
+	/**
+	 * Highlight search keywords in DOM by wrapping matching text nodes with <mark> tags
+	 */
+	function highlightKeywordInDOM(container: HTMLElement, keyword: string): void {
+		if (!keyword) return;
+		const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+		const textNodes: Text[] = [];
+		let node;
+		while ((node = walker.nextNode())) {
+			textNodes.push(node as Text);
+		}
+		const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const regex = new RegExp(`(${escapedKeyword})`, "gi");
+		for (const textNode of textNodes) {
+			const text = textNode.textContent || "";
+			if (regex.test(text)) {
+				regex.lastIndex = 0;
+				const parent = textNode.parentNode;
+				if (
+					!parent ||
+					parent.nodeName === "SCRIPT" ||
+					parent.nodeName === "STYLE" ||
+					parent.nodeName === "MARK"
+				)
+					continue;
+				const fragment = document.createDocumentFragment();
+				let lastIndex = 0;
+				let match;
+				while ((match = regex.exec(text)) !== null) {
+					if (match.index > lastIndex) {
+						fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+					}
+					const mark = document.createElement("mark");
+					mark.className = "search-highlight";
+					mark.textContent = match[1];
+					fragment.appendChild(mark);
+					lastIndex = match.index + match[0].length;
+				}
+				if (lastIndex < text.length) {
+					fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+				}
+				parent.replaceChild(fragment, textNode);
+			}
+		}
+	}
 
 	const containerClass = $derived.by(() => {
 		switch (generalSettings.layoutMode) {
@@ -90,8 +143,25 @@
 		showMinimap = messages.length > 0 && hasScroll;
 	};
 
+	/**
+	 * Scroll to the first message containing the search keyword (fallback)
+	 */
+	const scrollToFirstMatch = (keyword: string): void => {
+		if (!messageListContainer) return;
+
+		const lowerKeyword = keyword.toLowerCase();
+		const messageElements = messageListContainer.querySelectorAll("[data-message-id]");
+
+		for (const el of messageElements) {
+			const textContent = el.textContent?.toLowerCase() || "";
+			if (textContent.includes(lowerKeyword)) {
+				el.scrollIntoView({ behavior: "smooth", block: "center" });
+				break;
+			}
+		}
+	};
+
 	$effect(() => {
-		console.log("be updated");
 		const viewport = getViewportElement();
 		if (!viewport) return;
 
@@ -99,7 +169,8 @@
 		if (!messagesContainer) return;
 
 		mutationObserver = new MutationObserver(() => {
-			if (shouldAutoScroll) {
+			// Don't auto-scroll if we have a search keyword active
+			if (shouldAutoScroll && !searchHighlightState.searchKeyword) {
 				scrollToBottom(viewport);
 			}
 		});
@@ -126,6 +197,11 @@
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		messages;
 
+		// Don't scroll to bottom if we have a search keyword - we'll scroll to the match instead
+		if (searchHighlightState.searchKeyword) {
+			return;
+		}
+
 		scrollToBottom(viewport);
 	});
 
@@ -146,6 +222,41 @@
 		return () => {
 			viewport.removeEventListener("scroll", handleScroll);
 		};
+	});
+
+	// Effect to apply DOM highlighting and scroll to first match
+	$effect(() => {
+		const keyword = searchHighlightState.searchKeyword;
+		if (!keyword || searchHighlightState.hasScrolled) return;
+		if (messages.length === 0 || !messageListContainer) return;
+
+		// Wait for DOM to render, then apply highlighting and scroll instantly
+		setTimeout(() => {
+			if (!messageListContainer) return;
+
+			// Apply DOM highlighting to all messages
+			highlightKeywordInDOM(messageListContainer, keyword);
+
+			// Scroll to first highlight mark using viewport (instant, no animation)
+			const highlightMark = messageListContainer.querySelector("mark.search-highlight");
+			if (highlightMark) {
+				const viewport = getViewportElement();
+				if (viewport) {
+					const markRect = highlightMark.getBoundingClientRect();
+					const viewportRect = viewport.getBoundingClientRect();
+					const scrollTop =
+						viewport.scrollTop +
+						markRect.top -
+						viewportRect.top -
+						viewport.offsetHeight / 2 +
+						markRect.height / 2;
+					viewport.scrollTo({ top: Math.max(0, scrollTop), behavior: "instant" });
+				}
+			} else {
+				scrollToFirstMatch(keyword);
+			}
+			searchHighlightState.markScrolled();
+		}, 50);
 	});
 
 	onMount(() => {

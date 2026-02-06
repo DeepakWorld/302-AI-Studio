@@ -287,6 +287,14 @@ export const ensureHighlighter = (): Promise<ShikiHighlighter> => {
 	return highlighterPromise;
 };
 
+export const isLanguageLoaded = (lang: string): boolean => {
+	let normalized = (lang || "plaintext").toLowerCase() as SupportedLanguage;
+	if (LANGUAGE_ALIASES[normalized]) {
+		normalized = LANGUAGE_ALIASES[normalized];
+	}
+	return loadedLanguages.has(normalized);
+};
+
 /**
  * 加载特定语言（如果还未加载）
  * 使用 async/await，但不阻塞 UI，因为在后台执行

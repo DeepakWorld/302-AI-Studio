@@ -176,10 +176,11 @@
 		user_skills: [],
 	});
 
-	const allSkills = $derived<Skill[]>([...skillsData.builtin_skills, ...skillsData.user_skills]);
-
 	function findSkill(skillName: string): Skill | undefined {
-		return allSkills.find((s) => s.name === skillName);
+		return (
+			skillsData.user_skills.find((s) => s.name === skillName) ||
+			skillsData.builtin_skills.find((s) => s.name === skillName)
+		);
 	}
 
 	async function loadSkills() {
