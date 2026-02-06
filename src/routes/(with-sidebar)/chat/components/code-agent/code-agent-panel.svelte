@@ -26,6 +26,7 @@
 	import { LdrsLoader } from "$lib/components/buss/ldrs-loader";
 	import PodmanCard from "$lib/components/buss/local-agent-panel/podman-card.svelte";
 	import SandboxCard from "$lib/components/buss/local-agent-panel/sandbox-card.svelte";
+	import UnsupportPanel from "$lib/components/buss/local-agent-panel/unsupport-panel.svelte";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import type { SelectOption } from "$lib/components/buss/settings/setting-select.svelte";
 	import SettingSelect from "$lib/components/buss/settings/setting-select.svelte";
@@ -35,8 +36,12 @@
 	import { m } from "$lib/paraglide/messages";
 	import { persistedClaudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
-	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import {
+		codeAgentState,
+		persistedCodeAgentConfigState,
+	} from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
+	import { isMac } from "$lib/utils/platform";
 	import type { CodeAgentType } from "@shared/storage/code-agent";
 	import { DEFAULT_WORKSPACE_PATH } from "../agent-preview/constants";
 	import ClaudeCodePanel from "./claude-code-panel.svelte";
@@ -45,6 +50,7 @@
 	let { onClose }: Props = $props();
 
 	let disabled = $derived(!codeAgentState.isFreshTab);
+	let displayType = $derived(persistedCodeAgentConfigState.current?.type ?? "remote");
 	let tempSandboxRemark = $state("");
 	let tempSessionRemark = $state("");
 
@@ -122,13 +128,13 @@
 				<Label class="mb-2 text-label-fg">{m.title_code_agent_type()}</Label>
 				<SegButton
 					options={platformOptions}
-					selectedKey={codeAgentState.type}
+					selectedKey={displayType}
 					onSelect={handleSelect}
 					{disabled}
 				/>
 			</div>
 
-			{#if codeAgentState.type === "remote"}
+			{#if displayType === "remote"}
 				<Label class="text-label-fg">{m.title_agent()}</Label>
 				<SettingSelect
 					name="agent"
@@ -143,10 +149,16 @@
 					<ClaudeCodePanel {onClose} />
 				{/if}
 			{/if}
-			{#if codeAgentState.type === "local"}
-				<div class="max-h-[500px] overflow-y-auto pr-2">
-					<LocalModePanel {onClose} />
-				</div>
+			{#if displayType === "local"}
+				{#if isMac}
+					<div class="max-h-[500px] overflow-y-auto pr-2">
+						<LocalModePanel {onClose} />
+					</div>
+				{:else}
+					<div class="max-h-[500px] overflow-y-auto pr-2">
+						<UnsupportPanel />
+					</div>
+				{/if}
 			{/if}
 		</div>
 	</div>

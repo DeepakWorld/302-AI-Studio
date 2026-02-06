@@ -14,6 +14,7 @@ import {
 	type Skill,
 	type ThinkingBudgetType,
 } from "@shared/storage/code-agent";
+import { isWindows } from "$lib/utils/platform";
 import { match } from "ts-pattern";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-state.svelte";
@@ -65,7 +66,10 @@ class CodeAgentState {
 	localBaseUrl = $state("");
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
-	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
+	type = $derived.by(() => {
+		if (isWindows) return "remote";
+		return persistedCodeAgentConfigState.current?.type ?? "remote";
+	});
 	currentAgentId = $derived.by(
 		() => persistedCodeAgentConfigState.current?.currentAgentId ?? "claude-code",
 	);
@@ -222,6 +226,8 @@ class CodeAgentState {
 
 	updateType(type: CodeAgentType): void {
 		this.updateState({ type });
+		// Windows 下 type 始终为 remote，切换仅影响 UI 显示，不需要重置
+		if (isWindows) return;
 		// 切换模式时重置 session 和 sandbox ID，避免配置混乱和竞态问题
 		claudeCodeAgentState.resetSessionAndSandbox();
 		// 重置 local session 选择
