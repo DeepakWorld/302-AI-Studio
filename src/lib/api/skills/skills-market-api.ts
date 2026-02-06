@@ -111,9 +111,10 @@ export async function getCategoriesByNames(
 
 	try {
 		const url = new URL(`${SKILLS_MARKET_BASE_URL}/api/skills/categories-by-names`);
-		// Add each name as a separate query parameter (repeated parameter format)
+		// Use bracket notation so the backend always parses names as an array,
+		// even when there is only a single value
 		for (const name of names) {
-			url.searchParams.append("names", name);
+			url.searchParams.append("names[]", name);
 		}
 		url.searchParams.set("locale", locale);
 
