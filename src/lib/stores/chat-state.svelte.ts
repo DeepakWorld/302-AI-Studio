@@ -1,3 +1,4 @@
+import { generateContextSummary } from "$lib/api/context-summary-generation";
 import { generateSuggestions } from "$lib/api/suggestions-generation";
 import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
@@ -1911,6 +1912,70 @@ export const chat = new Chat({
 		persistedChatParamsState.flush();
 
 		await broadcastService.broadcastToAll("thread-list-updated", {});
+
+		// Context summary auto-update
+		if (chatState.shouldApplyCompression) {
+			const compressionLimit = preferencesSettings.contextCompressionLimit;
+			const totalMessages = messages.length;
+
+			if (totalMessages > compressionLimit) {
+				const summaryModel = preferencesSettings.titleGenerationModel;
+				if (summaryModel) {
+					const summaryAbortSignal = chatState.createSummaryAbortController();
+					try {
+						const provider = persistedProviderState.current.find(
+							(p) => p.id === summaryModel.providerId,
+						);
+						const serverPort = window.app?.serverPort ?? 8089;
+
+						const existingCompressed = chatState.compressedMessageCount ?? 0;
+						const keepRecentCount = Math.min(compressionLimit, totalMessages);
+						const newCompressionEnd = totalMessages - keepRecentCount;
+
+						if (newCompressionEnd > existingCompressed) {
+							const messagesToCompress = messages.slice(existingCompressed, newCompressionEnd);
+
+							if (messagesToCompress.length >= 2) {
+								let fallbackConfig: FallbackModelConfig | undefined;
+								if (!provider && chatState.selectedModel && chatState.currentProvider) {
+									fallbackConfig = {
+										model: chatState.selectedModel,
+										provider: chatState.currentProvider,
+									};
+								}
+
+								const summaryResult = await generateContextSummary(
+									messagesToCompress,
+									summaryModel,
+									provider,
+									serverPort,
+									chatState.contextSummary,
+									generalSettings.language,
+									fallbackConfig,
+									summaryAbortSignal,
+								);
+
+								if (summaryAbortSignal.aborted || chatState.isStreaming || chatState.isSubmitted) {
+									console.log("[ContextSummary] Skipped: aborted or stream in progress");
+								} else if (summaryResult) {
+									chatState.contextSummary = summaryResult;
+									chatState.compressedMessageCount = newCompressionEnd;
+									chatState.lastCompressionMessageId = messages[newCompressionEnd - 1]?.id;
+									persistedChatParamsState.flush();
+									console.log(`[ContextSummary] Updated: ${newCompressionEnd} messages compressed`);
+								}
+							}
+						}
+					} catch (error) {
+						if (error instanceof DOMException && error.name === "AbortError") {
+							console.log("[ContextSummary] Generation cancelled");
+						} else {
+							console.error("[ContextSummary] Failed:", error);
+						}
+					}
+				}
+			}
+		}
 
 		// Generate suggestions asynchronously (non-blocking)
 		// This runs in the background and updates the last message when ready
