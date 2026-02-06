@@ -31,6 +31,7 @@ import { THINKING_BUDGET_MAP } from "./constant";
 import {
 	appendPromptToLastUserMessage,
 	appendPromptToSystemMessage,
+	applyContextCompression,
 	convertAiSdkMessagesToOpenAiMessages,
 	createForcedSkillModelMessages,
 	createUIMessageStreamFromGenerator,
@@ -198,6 +199,8 @@ app.post("/chat/302ai", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -224,6 +227,8 @@ app.post("/chat/302ai", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 	console.log(
 		baseUrl,
@@ -319,8 +324,22 @@ app.post("/chat/302ai", async (c) => {
 		JSON.stringify(resolvedMessages, null, 2),
 	);
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const baseConfig = {
@@ -346,7 +365,7 @@ app.post("/chat/302ai", async (c) => {
 
 		const streamTextOptions = {
 			...baseConfig,
-			...(systemPrompt && { system: systemPrompt }),
+			...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		};
 
 		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
@@ -374,7 +393,7 @@ app.post("/chat/302ai", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		...baseConfig,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		stopWhen: stepCountIs(20),
 	};
 
@@ -434,6 +453,8 @@ app.post("/chat/openai", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -453,6 +474,8 @@ app.post("/chat/openai", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 
 	const openai = createOpenAI({
@@ -504,14 +527,28 @@ app.post("/chat/openai", async (c) => {
 		}
 	}
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertedMessages,
-		...(systemPrompt && { system: systemPrompt }),
+		...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -552,7 +589,7 @@ app.post("/chat/openai", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		model: wrapModel,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
 	};
@@ -609,6 +646,8 @@ app.post("/chat/anthropic", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -628,6 +667,8 @@ app.post("/chat/anthropic", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 
 	const anthropic = createAnthropic({
@@ -679,14 +720,28 @@ app.post("/chat/anthropic", async (c) => {
 		}
 	}
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertedMessages,
-		...(systemPrompt && { system: systemPrompt }),
+		...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -727,7 +782,7 @@ app.post("/chat/anthropic", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		model: wrapModel,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
 	};
@@ -784,6 +839,8 @@ app.post("/chat/gemini", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -803,6 +860,8 @@ app.post("/chat/gemini", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 
 	const google = createGoogleGenerativeAI({
@@ -853,14 +912,28 @@ app.post("/chat/gemini", async (c) => {
 		}
 	}
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertedMessages,
-		...(systemPrompt && { system: systemPrompt }),
+		...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -901,7 +974,7 @@ app.post("/chat/gemini", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		model: wrapModel,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
 	};

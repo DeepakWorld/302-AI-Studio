@@ -1,7 +1,7 @@
 # Project State: Auto Context Compression
 
 **Last Updated:** 2026-02-06
-**Status:** Executing Phase 7
+**Status:** Executing Phase 8
 
 ---
 
@@ -10,20 +10,20 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Efficient AI conversations through smart context compression
-**Current focus:** v1.2 Auto Context Compression - Phase 7 Backend Summarization
+**Current focus:** v1.2 Auto Context Compression - Phase 8 Router Integration
 
 ---
 
 ## Current Position
 
-**Phase:** 7 of 9 (Backend Summarization)
-**Plan:** 1 of 1
-**Status:** Phase complete
-**Progress:** ███████████ 100% (8/10 plans from v1.0-v1.1, 2/2 v1.2 phase 6, 1/1 v1.2 phase 7)
+**Phase:** 8 of 9 (Router Integration)
+**Plan:** 2 of 3
+**Status:** In progress
+**Progress:** ████████████░ 92% (8/10 plans from v1.0-v1.1, 2/2 v1.2 phase 6, 1/1 v1.2 phase 7, 2/3 v1.2 phase 8)
 
-**Last Activity:** 2026-02-06 - Completed 07-01-PLAN.md (Backend Summarization)
+**Last Activity:** 2026-02-06 - Completed 08-02-PLAN.md (Frontend Chat Pipeline Integration)
 
-**Next Action:** Execute Phase 8 plans
+**Next Action:** Execute Phase 8 Plan 3 (backend endpoint wiring)
 
 ---
 
@@ -36,6 +36,7 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 **Phases:** 6-9 (4 phases, plans TBD)
 **Phase 6 complete:** Data model + ChatState integration + Settings UI
 **Phase 7 complete:** Backend summarization endpoint + API wrapper + AbortController lifecycle
+**Phase 8 in progress:** Frontend pipeline wired (body + onFinish); backend endpoints pending
 
 ### v1.1 Streaming Input to Taskboard - SHIPPED 2026-02-04
 
@@ -56,9 +57,9 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11 (5 v1.0 + 2 v1.1 + 3 v1.2 + 1 phase 6 research)
-- Average duration: ~12 min
-- Total execution time: ~2.3 hours
+- Total plans completed: 13 (5 v1.0 + 2 v1.1 + 3 v1.2 + 1 phase 6 research + 2 phase 8)
+- Average duration: ~14 min
+- Total execution time: ~2.7 hours
 
 *Updated after each plan completion*
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [v1.2]: shouldApplyCompression exemption order: global > per-thread > Code Agent > private chat
 - [v1.2]: Reuse FallbackModelConfig from title-generation.ts for context summary API wrapper
 - [v1.2]: Language param accepted in API but prompt auto-detects from conversation
+- [v1.2]: Reuse titleGenerationModel for summary generation (no separate model setting)
+- [v1.2]: Summary generation awaited in onFinish (not fire-and-forget) for state consistency
 
 ### Pending Todos
 
@@ -94,7 +97,7 @@ None.
 ## Session Continuity
 
 **Last session:** 2026-02-06
-**Stopped at:** Completed 07-01-PLAN.md
+**Stopped at:** Completed 08-02-PLAN.md
 **Resume file:** None
 
 ---
