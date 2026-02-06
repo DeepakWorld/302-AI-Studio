@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ChatSettings from "./chat-settings.svelte";
+	import ContextCompressionSettings from "./context-compression-settings.svelte";
 	import EnableSupermarket from "./enable-supermarket.svelte";
 	import NewSessionModel from "./new-session-model.svelte";
 	import ParseUrl from "./parse-url.svelte";
@@ -21,5 +22,6 @@
 	<ParseUrl />
 	<PrivacyMode />
 	<SuggestionsSettings />
+	<ContextCompressionSettings />
 	<StreamSetting />
 </div>
