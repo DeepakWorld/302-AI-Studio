@@ -17,13 +17,13 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 **Phase:** 6 of 9 (Foundation)
-**Plan:** 1 of 2
-**Status:** In progress
-**Progress:** ████████░░ 80% (8/10 plans from v1.0-v1.1, 1/2 v1.2 phase 6)
+**Plan:** 2 of 2
+**Status:** Phase complete
+**Progress:** ██████████ 100% (8/10 plans from v1.0-v1.1, 2/2 v1.2 phase 6)
 
-**Last Activity:** 2026-02-06 - Completed 06-01-PLAN.md (Data Model Foundation)
+**Last Activity:** 2026-02-06 - Completed 06-02-PLAN.md (ChatState Integration and Settings UI)
 
-**Next Action:** Execute 06-02-PLAN.md
+**Next Action:** Execute Phase 7 plans
 
 ---
 
@@ -34,6 +34,7 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 **Goal:** Automatically compress older chat messages into rolling summaries to manage context window efficiently.
 
 **Phases:** 6-9 (4 phases, plans TBD)
+**Phase 6 complete:** Data model + ChatState integration + Settings UI
 
 ### v1.1 Streaming Input to Taskboard - SHIPPED 2026-02-04
 
@@ -54,9 +55,9 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8 (5 v1.0 + 2 v1.1 + 1 v1.2)
+- Total plans completed: 10 (5 v1.0 + 2 v1.1 + 2 v1.2 + 1 phase 6 research)
 - Average duration: ~12 min
-- Total execution time: ~1.7 hours
+- Total execution time: ~2.0 hours
 
 *Updated after each plan completion*
 
@@ -75,6 +76,7 @@ Recent decisions affecting current work:
 - [v1.1]: Use pendingAttachments pattern for deferred upload
 - [v1.2]: Compression enabled by default, 20-message threshold, clamped 5-100
 - [v1.2]: Thread-level compressionEnabled allows per-thread override of global setting
+- [v1.2]: shouldApplyCompression exemption order: global > per-thread > Code Agent > private chat
 
 ### Pending Todos
 
@@ -89,7 +91,7 @@ None.
 ## Session Continuity
 
 **Last session:** 2026-02-06
-**Stopped at:** Completed 06-01-PLAN.md
+**Stopped at:** Completed 06-02-PLAN.md
 **Resume file:** None
 
 ---
