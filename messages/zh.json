@@ -721,6 +721,8 @@
 	"title_code_agent": "Vibe 模式",
 	"title_local": "本地",
 	"title_remote": "远程",
+	"title_remote_platform_description": "无需配置，开箱即用",
+	"title_local_platform_description": "本地运行，极速响应",
 	"title_code_agent_type": "平台",
 	"title_agent": "Agent 框架",
 	"select_agent": "请选择一个代码代理",
@@ -1311,5 +1313,6 @@
 	"local_platform_new_work_directory_placeholder": "新建工作目录",
 	"local_platform_reinstall": "重新安装",
 	"local_platform_checking": "检测中",
-	"local_platform_unknown": "未知"
+	"local_platform_unknown": "未知",
+	"title_local_mode_description": "面向复杂任务，使用本地Cluade Code"
 }

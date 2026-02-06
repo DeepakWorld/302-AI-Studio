@@ -3,10 +3,12 @@
 		{
 			key: "remote",
 			label: m.title_remote(),
+			description: m.title_remote_platform_description(),
 		},
 		{
 			key: "local",
 			label: m.title_local(),
+			description: m.title_local_platform_description(),
 		},
 	];
 	export const options: SelectOption[] = [
@@ -131,6 +133,8 @@
 					selectedKey={displayType}
 					onSelect={handleSelect}
 					{disabled}
+					class="!h-[52px]"
+					thumbClass="!h-[40px]"
 				/>
 			</div>
 
