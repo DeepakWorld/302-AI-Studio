@@ -201,6 +201,9 @@ class ChatState {
 	// AbortController for canceling pending title generation
 	private titleAbortController: AbortController | null = null;
 
+	// AbortController for canceling pending context summary generation
+	private summaryAbortController: AbortController | null = null;
+
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
@@ -233,6 +236,18 @@ class ChatState {
 	}
 
 	/**
+	 * Cancel any pending context summary generation request.
+	 * Should be called before sending a new message to avoid race conditions.
+	 */
+	cancelPendingSummary() {
+		if (this.summaryAbortController) {
+			this.summaryAbortController.abort();
+			this.summaryAbortController = null;
+			console.log("[ContextSummary] Cancelled pending summary generation");
+		}
+	}
+
+	/**
 	 * Create a new AbortController for suggestions generation.
 	 * Returns the AbortSignal to be passed to the fetch request.
 	 */
@@ -252,6 +267,17 @@ class ChatState {
 		this.cancelPendingTitle();
 		this.titleAbortController = new AbortController();
 		return this.titleAbortController.signal;
+	}
+
+	/**
+	 * Create a new AbortController for context summary generation.
+	 * Returns the AbortSignal to be passed to the fetch request.
+	 */
+	createSummaryAbortController(): AbortSignal {
+		// Cancel any existing pending request first
+		this.cancelPendingSummary();
+		this.summaryAbortController = new AbortController();
+		return this.summaryAbortController.signal;
 	}
 
 	constructor() {
@@ -678,6 +704,8 @@ class ChatState {
 			this.cancelPendingSuggestions();
 			// Cancel any pending title generation to avoid race conditions
 			this.cancelPendingTitle();
+			// Cancel any pending context summary generation to avoid race conditions
+			this.cancelPendingSummary();
 
 			try {
 				const currentModel = this.selectedModel!;
@@ -880,6 +908,8 @@ class ChatState {
 		this.cancelPendingSuggestions();
 		// Cancel any pending title generation to avoid race conditions
 		this.cancelPendingTitle();
+		// Cancel any pending context summary generation to avoid race conditions
+		this.cancelPendingSummary();
 
 		const currentModel = this.selectedModel!;
 
