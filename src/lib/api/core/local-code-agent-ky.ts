@@ -8,7 +8,7 @@ const { getUserAgentFragment } = window.electronAPI.appService;
 
 /**
  * Ky instance for local Code Agent mode
- * - Uses http://localhost:<port> (default 8123)
+ * - Uses http://127.0.0.1:<port> (default 8123)
  * - No Authorization header needed (local sandbox doesn't require API key)
  * - Dynamically updates port if runtime uses a different one
  */
@@ -17,7 +17,7 @@ export const localCodeAgentKy = ky.create({
 	// Start with an HTTP prefixUrl to establish HTTP context immediately.
 	// This prevents ALPN negotiation errors (which happen when switching from HTTPS context)
 	// and ensures correct path resolution (avoiding relative path issues like including /chat/...).
-	prefixUrl: "http://localhost:8123",
+	prefixUrl: "http://127.0.0.1:8123",
 	headers: {
 		"HTTP-Referer": "https://studio.302.ai/",
 		"X-Title": "302.AI Studio",
@@ -57,9 +57,10 @@ export const localCodeAgentKy = ky.create({
 						const localUrl = new URL(localBaseUrl);
 						const url = new URL(request.url);
 
-						// If the runtime port is different from the current request port, update it
-						if (url.port !== localUrl.port) {
+						// If the runtime URL (host/port) is different, update it
+						if (url.port !== localUrl.port || url.hostname !== localUrl.hostname) {
 							url.port = localUrl.port;
+							url.hostname = localUrl.hostname;
 							// Since the original request was already HTTP (due to prefixUrl),
 							// reusing it here is safe and won't trigger ALPN errors.
 							return new Request(url.toString(), request);

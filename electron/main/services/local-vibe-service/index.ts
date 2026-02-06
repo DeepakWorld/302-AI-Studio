@@ -158,7 +158,7 @@ export class LocalVibeService {
 	async getLocalBaseUrl(_event: IpcMainInvokeEvent): Promise<string | null> {
 		const port = this.getRuntimePort();
 		if (!port) return null;
-		return `http://localhost:${port}`;
+		return `http://127.0.0.1:${port}`;
 	}
 
 	/**
