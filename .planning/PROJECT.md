@@ -1,38 +1,30 @@
-# 302-AI-Studio: Vibe Mode Enhancements
+# 302-AI-Studio: Chat Enhancements
 
 ## What This Is
 
-302-AI-Studio is an Electron desktop AI chat application with Vibe Mode (Claude Code sandbox integration). This project focuses on improving the Vibe Mode workflow by allowing users to add tasks to the taskboard while the AI is still streaming output.
+302-AI-Studio is an Electron desktop AI chat application with multi-provider support and Vibe Mode (Claude Code sandbox integration). This project focuses on improving the chat experience with intelligent context management.
 
 ## Core Value
 
-Users can capture task ideas immediately without waiting for AI output to complete — input during streaming goes directly to the taskboard.
+Efficient AI conversations through smart context compression — users get coherent responses without hitting token limits or losing conversation history.
 
-## Current Milestone: v1.1 Streaming Input to Taskboard
+## Current State (v1.2 Shipped)
 
-**Goal:** When AI is streaming in Vibe Mode, redirect chat input to taskboard instead of queuing messages.
+**Shipped:** 2026-02-06
 
-**Target features:**
-- Auto-detect streaming state and redirect input to taskboard
-- Upload attachments to sandbox and reference paths in task content
-- Show toast notification confirming task was added
-- Clear input after adding to taskboard
-
-## Previous Milestone (v1.0 Shipped)
-
-**Shipped:** 2026-02-04
-
-All streaming contexts now have instant completion detection:
-- Chat message streaming via Hono.js backend
-- Code Agent streaming output in terminal and file operations
-- MCP tool invocation streaming output
-- All AI providers (OpenAI, Anthropic, Google, 302AI)
+Auto context compression is now live:
+- Configurable message limit N in preferences (default: 20, range 5-100)
+- Rolling summary of messages beyond N (200-500 chars)
+- Summary auto-updates after each AI response when threshold exceeded
+- Visual banner shows compressed message count with expandable summary view
+- Code Agent and private chat modes exempt (full context preserved)
 
 **Technical Implementation:**
-- SafeClose pattern guarantees stream closure in all code paths
-- [DONE] marker emission triggers AI SDK onFinish callback
-- Transport layer debug logging for stream lifecycle validation
-- AbortController pattern prevents race conditions in async operations
+- `applyContextCompression()` utility filters messages and augments system prompt
+- All 4 chat endpoints (302ai, openai, anthropic, gemini) apply compression
+- `shouldApplyCompression` derived property handles exemption logic
+- AbortController pattern prevents race conditions in summary generation
+- Collapsible banner component using bits-ui Collapsible pattern
 
 ## Requirements
 
@@ -49,22 +41,35 @@ All streaming contexts now have instant completion detection:
 - ✓ FRONT-02: Loading spinner clears <100ms — v1.0
 - ✓ FRONT-03: Chat input enables immediately — v1.0
 - ✓ FRONT-04: Fix applies to all streaming contexts — v1.0
+- ✓ INPUT-01: Detect streaming state in Vibe Mode — v1.1
+- ✓ INPUT-02: Redirect input to taskboard when streaming — v1.1
+- ✓ INPUT-03: Upload attachments to sandbox workspace — v1.1
+- ✓ INPUT-04: Reference attachment paths in task content — v1.1
+- ✓ INPUT-05: Show toast notification after task added — v1.1
+- ✓ INPUT-06: Clear input and attachments after adding — v1.1
+- ✓ COMP-01: Configurable message limit N in chat settings — v1.2
+- ✓ COMP-02: Summarize messages beyond N into 200-500 char rolling summary — v1.2
+- ✓ COMP-03: Summary automatically injected as context when sending to AI — v1.2
+- ✓ COMP-04: Summary auto-updated when message count exceeds threshold — v1.2
+- ✓ UI-01: Visual indicator when compression is active — v1.2
+- ✓ UI-02: Count of compressed messages displayed — v1.2
+- ✓ UI-03: Message limit N configurable in preferences settings — v1.2
+- ✓ UI-04: Expand option to view summary text — v1.2
+- ✓ EXEMPT-01: Code Agent mode preserves full message context — v1.2
+- ✓ EXEMPT-02: Private chat mode preserves full message context — v1.2
 
 ### Active
 
-- [ ] INPUT-01: Detect streaming state in Vibe Mode
-- [ ] INPUT-02: Redirect input to taskboard when streaming
-- [ ] INPUT-03: Upload attachments to sandbox workspace
-- [ ] INPUT-04: Reference attachment paths in task content
-- [ ] INPUT-05: Show toast notification after task added
-- [ ] INPUT-06: Clear input and attachments after adding
+(None — ready for next milestone)
 
 ### Out of Scope
 
 - Visual hints on input box during streaming — toast is sufficient feedback
 - Extending Task type with attachment metadata — use path references instead
 - Confirmation dialog before adding — keep interaction fast
-- Changes to non-Vibe-Mode chat behavior — only affects Vibe Mode streaming
+- Token-based compression triggers — fixed message count is simpler
+- Background/continuous summarization — on-send is sufficient
+- Per-model compression settings — fixed N is sufficient for v1
 
 ## Context
 
@@ -74,17 +79,13 @@ All streaming contexts now have instant completion detection:
 - Vercel AI SDK (v6.0.1) with provider SDKs (Anthropic, OpenAI, Google)
 - Reactive state management via Svelte 5 runes (singleton stores)
 
-**Relevant Files:**
-- `src/lib/stores/chat-state.svelte.ts` - Chat state with streaming detection
-- `src/lib/stores/code-agent/code-agent-taskboard-state.svelte.ts` - Taskboard state
-- `src/lib/stores/code-agent/code-agent-state.svelte.ts` - Vibe Mode state
-- `src/lib/components/buss/chat/chat-input/` - Chat input components
-- `src/lib/api/taskboard/` - Taskboard API layer
-
-**Existing Patterns:**
-- Taskboard already has `addTaskFromInput()` method
-- Attachments upload to sandbox via existing upload flow
-- Toast notifications via existing toast system
+**Relevant Files (v1.2):**
+- `src/lib/stores/chat-state.svelte.ts` - Chat state with compression accessors and shouldApplyCompression
+- `src/lib/stores/preferences-settings.state.svelte.ts` - Compression settings (enabled, limit)
+- `electron/main/server/router.ts` - Chat endpoints with applyContextCompression integration
+- `electron/main/server/utils.ts` - applyContextCompression utility function
+- `src/lib/api/context-summary-generation.ts` - Frontend API wrapper for summary generation
+- `src/routes/(with-sidebar)/chat/components/message/compression-banner.svelte` - UI banner component
 
 ## Key Decisions
 
@@ -95,6 +96,12 @@ All streaming contexts now have instant completion detection:
 | [DONE] marker in ClaudeCodeProcessor | AI SDK SSE parser requires it for onFinish | ✓ Good |
 | AbortController for title generation | Matches existing suggestions pattern | ✓ Good |
 | DEBUG_TRANSPORT conditional logging | Avoids production overhead | ✓ Good |
+| Compression enabled by default, 20-message threshold | Sensible defaults; users can adjust | ✓ Good |
+| shouldApplyCompression exemption order | Clear precedence: global > per-thread > Code Agent > private | ✓ Good |
+| Reuse titleGenerationModel for summaries | No new settings needed; fast, cheap model | ✓ Good |
+| Summary generation awaited in onFinish | State consistency; matches title generation pattern | ✓ Good |
+| Compression AFTER template resolution | User prompt templates need full message history | ✓ Good |
+| Summary prepended to system prompt | Works with all providers; clean injection point | ✓ Good |
 
 ---
-*Last updated: 2026-02-04 after v1.1 milestone start*
+*Last updated: 2026-02-06 after v1.2 milestone shipped*

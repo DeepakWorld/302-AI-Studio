@@ -1,3 +1,4 @@
+import type { UIMessage } from "ai";
 import { batchUploadFile } from "../apis/code-agent";
 
 /**
@@ -1020,4 +1021,37 @@ export async function uploadAttachmentsFromMessages(
 		console.error("[uploadAttachmentsFromMessages] Failed to upload attachments:", error);
 		// Continue anyway - don't block message sending
 	}
+}
+
+/**
+ * Apply context compression to messages and system prompt.
+ *
+ * When compression is active, this function:
+ * 1. Slices off the oldest `compressedMessageCount` messages, keeping only recent ones
+ * 2. Prepends the context summary to the system prompt with marker tags
+ *
+ * This must be called AFTER user prompt template resolution (which needs full history)
+ * and BEFORE convertToModelMessages (which should receive filtered messages).
+ *
+ * @param messages - The full list of UI messages
+ * @param systemPrompt - The current system prompt (may be undefined)
+ * @param contextSummary - The compressed context summary text
+ * @param compressedMessageCount - Number of oldest messages that have been compressed
+ * @returns Object with filtered messages and augmented system prompt
+ */
+export function applyContextCompression(
+	messages: UIMessage[],
+	systemPrompt: string | undefined,
+	contextSummary: string,
+	compressedMessageCount: number,
+): { messages: UIMessage[]; systemPrompt: string } {
+	const recentMessages =
+		compressedMessageCount > 0 && compressedMessageCount < messages.length
+			? messages.slice(compressedMessageCount)
+			: messages;
+
+	const summaryBlock = `[Context from earlier conversation]\n${contextSummary}\n[End of earlier context]`;
+	const augmentedSystemPrompt = systemPrompt ? `${summaryBlock}\n\n${systemPrompt}` : summaryBlock;
+
+	return { messages: recentMessages, systemPrompt: augmentedSystemPrompt };
 }

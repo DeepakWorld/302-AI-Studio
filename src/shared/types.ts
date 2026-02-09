@@ -152,6 +152,14 @@ export interface ThreadParmas {
 	incrementalSummary?: string;
 	/** Message ID marking the clear screen point - messages up to and including this ID are hidden */
 	clearScreenMessageId?: string;
+	/** Rolling summary for context compression, stores condensed earlier conversation */
+	contextSummary?: string;
+	/** Count of messages included in the context summary */
+	compressedMessageCount?: number;
+	/** Message ID of last message included in compression */
+	lastCompressionMessageId?: string;
+	/** Whether compression is enabled for this thread (overrides global setting) */
+	compressionEnabled?: boolean;
 }
 
 export interface ThreadData {

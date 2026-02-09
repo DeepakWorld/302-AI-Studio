@@ -1,3 +1,4 @@
+import { generateContextSummary } from "$lib/api/context-summary-generation";
 import { generateSuggestions } from "$lib/api/suggestions-generation";
 import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
@@ -201,6 +202,9 @@ class ChatState {
 	// AbortController for canceling pending title generation
 	private titleAbortController: AbortController | null = null;
 
+	// AbortController for canceling pending context summary generation
+	private summaryAbortController: AbortController | null = null;
+
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
@@ -233,6 +237,18 @@ class ChatState {
 	}
 
 	/**
+	 * Cancel any pending context summary generation request.
+	 * Should be called before sending a new message to avoid race conditions.
+	 */
+	cancelPendingSummary() {
+		if (this.summaryAbortController) {
+			this.summaryAbortController.abort();
+			this.summaryAbortController = null;
+			console.log("[ContextSummary] Cancelled pending summary generation");
+		}
+	}
+
+	/**
 	 * Create a new AbortController for suggestions generation.
 	 * Returns the AbortSignal to be passed to the fetch request.
 	 */
@@ -252,6 +268,17 @@ class ChatState {
 		this.cancelPendingTitle();
 		this.titleAbortController = new AbortController();
 		return this.titleAbortController.signal;
+	}
+
+	/**
+	 * Create a new AbortController for context summary generation.
+	 * Returns the AbortSignal to be passed to the fetch request.
+	 */
+	createSummaryAbortController(): AbortSignal {
+		// Cancel any existing pending request first
+		this.cancelPendingSummary();
+		this.summaryAbortController = new AbortController();
+		return this.summaryAbortController.signal;
 	}
 
 	constructor() {
@@ -435,6 +462,35 @@ class ChatState {
 		persistedChatParamsState.current.clearScreenMessageId = value;
 	}
 
+	// Context compression state accessors
+	get contextSummary(): string | undefined {
+		return persistedChatParamsState.current.contextSummary;
+	}
+	set contextSummary(value: string | undefined) {
+		persistedChatParamsState.current.contextSummary = value;
+	}
+
+	get compressedMessageCount(): number | undefined {
+		return persistedChatParamsState.current.compressedMessageCount;
+	}
+	set compressedMessageCount(value: number | undefined) {
+		persistedChatParamsState.current.compressedMessageCount = value;
+	}
+
+	get lastCompressionMessageId(): string | undefined {
+		return persistedChatParamsState.current.lastCompressionMessageId;
+	}
+	set lastCompressionMessageId(value: string | undefined) {
+		persistedChatParamsState.current.lastCompressionMessageId = value;
+	}
+
+	get compressionEnabled(): boolean | undefined {
+		return persistedChatParamsState.current.compressionEnabled;
+	}
+	set compressionEnabled(value: boolean | undefined) {
+		persistedChatParamsState.current.compressionEnabled = value;
+	}
+
 	providerType = $derived<string | null>(
 		this.selectedModel
 			? (providerState.getProvider(this.selectedModel.providerId)?.apiType ?? null)
@@ -486,6 +542,26 @@ class ChatState {
 	 * Whether there are visible messages (after applying clear screen filter)
 	 */
 	hasVisibleMessages = $derived(this.visibleMessages.length > 0);
+
+	/**
+	 * Whether context compression should be applied for this thread.
+	 * Returns false when:
+	 * - Global compression is disabled in preferences
+	 * - Per-thread compression is explicitly disabled
+	 * - Code Agent mode is enabled (needs full context)
+	 * - Private chat mode is active (no persistence)
+	 */
+	shouldApplyCompression = $derived.by(() => {
+		// Check global preference first
+		if (!preferencesSettings.contextCompressionEnabled) return false;
+		// Check per-thread override (explicit false disables)
+		if (this.compressionEnabled === false) return false;
+		// Exempt: Code Agent mode needs full context for code understanding
+		if (codeAgentState.enabled) return false;
+		// Exempt: Private chat mode doesn't persist, no need to compress
+		if (this.isPrivateChatActive) return false;
+		return true;
+	});
 
 	canTogglePrivacy = $derived(!this.hasMessages);
 	canRegenerate = $derived(
@@ -629,6 +705,8 @@ class ChatState {
 			this.cancelPendingSuggestions();
 			// Cancel any pending title generation to avoid race conditions
 			this.cancelPendingTitle();
+			// Cancel any pending context summary generation to avoid race conditions
+			this.cancelPendingSummary();
 
 			try {
 				const currentModel = this.selectedModel!;
@@ -831,6 +909,8 @@ class ChatState {
 		this.cancelPendingSuggestions();
 		// Cancel any pending title generation to avoid race conditions
 		this.cancelPendingTitle();
+		// Cancel any pending context summary generation to avoid race conditions
+		this.cancelPendingSummary();
 
 		const currentModel = this.selectedModel!;
 
@@ -1550,6 +1630,13 @@ export const chat = new Chat({
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
 				workspacePath: codeAgentEnabled && claudeCodeSandboxState.currentSessionWorkspacePath,
+
+				// Context compression (only sent when compression is active)
+				...(chatState.shouldApplyCompression &&
+					chatState.contextSummary && {
+						contextSummary: chatState.contextSummary,
+						compressedMessageCount: chatState.compressedMessageCount ?? 0,
+					}),
 			};
 		},
 	}),
@@ -1825,6 +1912,70 @@ export const chat = new Chat({
 		persistedChatParamsState.flush();
 
 		await broadcastService.broadcastToAll("thread-list-updated", {});
+
+		// Context summary auto-update
+		if (chatState.shouldApplyCompression) {
+			const compressionLimit = preferencesSettings.contextCompressionLimit;
+			const totalMessages = messages.length;
+
+			if (totalMessages > compressionLimit) {
+				const summaryModel = preferencesSettings.titleGenerationModel;
+				if (summaryModel) {
+					const summaryAbortSignal = chatState.createSummaryAbortController();
+					try {
+						const provider = persistedProviderState.current.find(
+							(p) => p.id === summaryModel.providerId,
+						);
+						const serverPort = window.app?.serverPort ?? 8089;
+
+						const existingCompressed = chatState.compressedMessageCount ?? 0;
+						const keepRecentCount = Math.min(compressionLimit, totalMessages);
+						const newCompressionEnd = totalMessages - keepRecentCount;
+
+						if (newCompressionEnd > existingCompressed) {
+							const messagesToCompress = messages.slice(existingCompressed, newCompressionEnd);
+
+							if (messagesToCompress.length >= 2) {
+								let fallbackConfig: FallbackModelConfig | undefined;
+								if (!provider && chatState.selectedModel && chatState.currentProvider) {
+									fallbackConfig = {
+										model: chatState.selectedModel,
+										provider: chatState.currentProvider,
+									};
+								}
+
+								const summaryResult = await generateContextSummary(
+									messagesToCompress,
+									summaryModel,
+									provider,
+									serverPort,
+									chatState.contextSummary,
+									generalSettings.language,
+									fallbackConfig,
+									summaryAbortSignal,
+								);
+
+								if (summaryAbortSignal.aborted || chatState.isStreaming || chatState.isSubmitted) {
+									console.log("[ContextSummary] Skipped: aborted or stream in progress");
+								} else if (summaryResult) {
+									chatState.contextSummary = summaryResult;
+									chatState.compressedMessageCount = newCompressionEnd;
+									chatState.lastCompressionMessageId = messages[newCompressionEnd - 1]?.id;
+									persistedChatParamsState.flush();
+									console.log(`[ContextSummary] Updated: ${newCompressionEnd} messages compressed`);
+								}
+							}
+						}
+					} catch (error) {
+						if (error instanceof DOMException && error.name === "AbortError") {
+							console.log("[ContextSummary] Generation cancelled");
+						} else {
+							console.error("[ContextSummary] Failed:", error);
+						}
+					}
+				}
+			}
+		}
 
 		// Generate suggestions asynchronously (non-blocking)
 		// This runs in the background and updates the last message when ready
