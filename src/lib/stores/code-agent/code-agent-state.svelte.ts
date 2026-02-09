@@ -5,6 +5,7 @@ import * as m from "$lib/paraglide/messages";
 import { chatState } from "$lib/stores/chat-state.svelte";
 import { persistedTabState } from "$lib/stores/tab-bar-state.svelte";
 import type { ChatMessage } from "$lib/types/chat";
+import { isWindows } from "$lib/utils/platform";
 import type { Model } from "@302ai/studio-plugin-sdk";
 import {
 	CodeAgentConfigMetadata,
@@ -14,7 +15,6 @@ import {
 	type Skill,
 	type ThinkingBudgetType,
 } from "@shared/storage/code-agent";
-import { isWindows } from "$lib/utils/platform";
 import { match } from "ts-pattern";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-state.svelte";
@@ -226,20 +226,19 @@ class CodeAgentState {
 
 	updateType(type: CodeAgentType): void {
 		this.updateState({ type });
-		// Windows 下 type 始终为 remote，切换仅影响 UI 显示，不需要重置
+
 		if (isWindows) return;
-		// 切换模式时重置 session 和 sandbox ID，避免配置混乱和竞态问题
-		claudeCodeAgentState.resetSessionAndSandbox();
-		// 重置 local session 选择
+
+		claudeCodeAgentState.resetSessionAndSandbox(type);
+
 		localClaudeCodeSandboxState.reset();
 	}
 
 	updateEnabled(enabled: boolean, shouldReset = true): void {
 		this.updateState({ enabled });
 		if (shouldReset) {
-			// 切换模式时重置 session、sandbox ID 和工作区路径，避免配置混乱
-			claudeCodeAgentState.resetSessionAndSandbox();
-			// 重置 local session 选择
+			claudeCodeAgentState.resetSessionAndSandbox(this.type);
+
 			localClaudeCodeSandboxState.reset();
 		}
 	}

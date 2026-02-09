@@ -7,6 +7,7 @@ import { m } from "$lib/paraglide/messages";
 import type { ChatMessage } from "$lib/types/chat";
 import {
 	type CodeAgentMetadata,
+	type CodeAgentType,
 	type Skill,
 	type ThinkingBudgetType,
 } from "@shared/storage/code-agent";
@@ -254,8 +255,12 @@ class ClaudeCodeAgentState {
 	/**
 	 * 批量重置 session、sandbox ID 和工作区路径，避免配置混乱
 	 */
-	resetSessionAndSandbox(): void {
-		this.updateState({ currentSessionId: "", sandboxId: "", currentWorkspacePath: "" });
+	resetSessionAndSandbox(type: CodeAgentType): void {
+		this.updateState({
+			currentSessionId: "",
+			sandboxId: type === "remote" ? "" : "local",
+			currentWorkspacePath: "",
+		});
 	}
 
 	updateSandboxRemark(sandboxRemark: string): void {
