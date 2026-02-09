@@ -32,15 +32,20 @@ export const localCodeAgentKy = ky.create({
 				error.message === "Failed to fetch" &&
 				codeAgentState.type === "local"
 			) {
-				toast.error(m.code_agent_local_container_not_started(), {
-					id: "local-code-agent-connection-error",
-					action: {
-						label: m.toast_button_start_sandbox(),
-						onClick: async () => {
-							await localEnvState.startSandbox();
+				const toastId = "local-code-agent-connection-error";
+				const isAlreadyVisible = toast.getActiveToasts().some((t) => t.id === toastId);
+
+				if (!localEnvState.sandboxStarting && !isAlreadyVisible) {
+					toast.error(m.code_agent_local_container_not_started(), {
+						id: toastId,
+						action: {
+							label: m.toast_button_start_sandbox(),
+							onClick: async () => {
+								await localEnvState.startSandbox();
+							},
 						},
-					},
-				});
+					});
+				}
 			}
 			throw error;
 		}
