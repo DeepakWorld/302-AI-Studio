@@ -10,15 +10,7 @@ import {
 	type ListLocalClaudeCodeSessionsResponse,
 } from "@shared/types";
 import { type } from "arktype";
-import { _302AIKy } from "./core/_302ai-ky";
-import { localCodeAgentKy } from "./core/local-code-agent-ky";
-
-/**
- * Get the appropriate ky instance based on code agent mode
- */
-function getCodeAgentKy() {
-	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
-}
+import { getCodeAgentKy } from "./utils";
 
 export interface UpdateSessionNoteRequest {
 	/**
@@ -59,7 +51,7 @@ export async function _updateSessionNote(
 	request: _UpdateSessionNoteRequest,
 ): Promise<_UpdateSessionNoteResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode doesn't need sandbox_id
 		const requestBody =
@@ -135,7 +127,7 @@ export async function updateSessionNote(
 	request: UpdateSessionNoteRequest,
 ): Promise<UpdateSessionNoteResult> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode doesn't need sandbox_id
 		const requestBody =
@@ -190,7 +182,7 @@ export async function updateSessionNote(
  */
 export async function deleteSession(request: DeleteSessionRequest): Promise<DeleteSessionResult> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode doesn't need sandbox_id
 		const searchParams =
@@ -230,7 +222,7 @@ export async function deleteSession(request: DeleteSessionRequest): Promise<Dele
 
 export async function listLocalClaudeCodeSessions(): Promise<ListLocalClaudeCodeSessionsResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		const response = await kyInstance.get("302/claude-code/sandbox/session").json();
 		const validated = listLocalClaudeCodeSessionsResponse(response);

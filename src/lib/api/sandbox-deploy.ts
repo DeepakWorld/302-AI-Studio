@@ -1,6 +1,6 @@
-import { type } from "arktype";
 import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
-import { getCodeAgentKy } from "./sandbox-command";
+import { type } from "arktype";
+import { getCodeAgentKy } from "./utils";
 
 export const deploySandboxRequestSchema = type({
 	sandbox_id: "string",
@@ -23,7 +23,7 @@ export async function deploySandboxProject(
 	request: DeploySandboxRequest,
 ): Promise<DeploySandboxResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode doesn't need sandbox_id
 		const requestBody =

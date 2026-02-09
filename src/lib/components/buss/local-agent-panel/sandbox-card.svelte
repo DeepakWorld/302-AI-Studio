@@ -6,7 +6,7 @@
 		localEnvState,
 		type SandboxHealthStatus,
 	} from "$lib/stores/code-agent/local-env-state.svelte";
-	import { Loader2 } from "@lucide/svelte";
+	import { LoaderCircle } from "@lucide/svelte";
 	import { onMount } from "svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
 	import StatusIndicator from "./status-indicator.svelte";
@@ -108,7 +108,7 @@
 			disabled={isSandboxLoading || !podmanInstalled}
 		>
 			{#if isSandboxLoading}
-				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+				<LoaderCircle class="h-4 w-4 animate-spin" />
 				{sandboxRunning ? m.local_platform_stopping() : m.local_platform_starting()}
 			{:else}
 				{sandboxRunning ? m.local_platform_close() : m.local_platform_one_click_start()}

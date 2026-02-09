@@ -6,7 +6,7 @@ const userAgent = getCustomUserAgentFragment();
 
 export const localCodeAgentKy = ky.create({
 	timeout: 60000,
-	prefixUrl: `http://127.0.0.1:${DEFAULT_SANDBOX_PORT}`,
+	prefixUrl: `http://localhost:${DEFAULT_SANDBOX_PORT}`,
 	headers: {
 		"User-Agent": userAgent,
 		"HTTP-Referer": "https://studio.302.ai/",

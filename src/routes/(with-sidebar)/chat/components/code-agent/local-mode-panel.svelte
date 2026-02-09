@@ -48,7 +48,7 @@
 		claudeCodeAgentState.handleLocalEnabled(sessionId, workspacePath);
 
 		// Set enabled and close panel
-		codeAgentState.updateEnabled(true);
+		codeAgentState.updateEnabled(true, false);
 		onClose?.();
 	}
 </script>

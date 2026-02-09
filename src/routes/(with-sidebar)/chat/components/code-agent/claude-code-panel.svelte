@@ -58,9 +58,9 @@
 
 	async function handleOverlayAction(type: "enabled" | "disabled" | "cancel" | "close") {
 		if (type === "enabled") {
-			codeAgentState.updateEnabled(true);
+			codeAgentState.updateEnabled(true, false);
 		} else if (type === "close") {
-			codeAgentState.updateEnabled(false);
+			codeAgentState.updateEnabled(false, false);
 		}
 
 		onClose();

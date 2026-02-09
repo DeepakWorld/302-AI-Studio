@@ -234,8 +234,14 @@ class CodeAgentState {
 		localClaudeCodeSandboxState.reset();
 	}
 
-	updateEnabled(enabled: boolean): void {
+	updateEnabled(enabled: boolean, shouldReset = true): void {
 		this.updateState({ enabled });
+		if (shouldReset) {
+			// 切换模式时重置 session、sandbox ID 和工作区路径，避免配置混乱
+			claudeCodeAgentState.resetSessionAndSandbox();
+			// 重置 local session 选择
+			localClaudeCodeSandboxState.reset();
+		}
 	}
 
 	updatePlanMode(inPlanMode: boolean): void {

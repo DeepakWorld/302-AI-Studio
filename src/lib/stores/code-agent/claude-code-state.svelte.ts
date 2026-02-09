@@ -158,7 +158,9 @@ class ClaudeCodeAgentState {
 			.map((part) => part.text)
 			.join("\n");
 
-		if (!textContent.includes("**deploy sandbox successfully**")) return null;
+		if (!textContent.includes("**deploy sandbox successfully**")) {
+			return null;
+		}
 
 		// Pattern matches: {'success': True, 'status': '...', 'id': '...', 'url': '...', 'cover': '...'}
 		const deployInfoRegex =
@@ -250,10 +252,10 @@ class ClaudeCodeAgentState {
 	}
 
 	/**
-	 * 批量重置 session 和 sandbox ID，避免竞态问题
+	 * 批量重置 session、sandbox ID 和工作区路径，避免配置混乱
 	 */
 	resetSessionAndSandbox(): void {
-		this.updateState({ currentSessionId: "", sandboxId: "" });
+		this.updateState({ currentSessionId: "", sandboxId: "", currentWorkspacePath: "" });
 	}
 
 	updateSandboxRemark(sandboxRemark: string): void {

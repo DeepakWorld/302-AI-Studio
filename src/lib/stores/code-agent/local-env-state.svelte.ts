@@ -429,7 +429,7 @@ class LocalEnvState {
 					console.log(
 						"[LocalEnvState] Sandbox health check:",
 						this.sandboxHealthStatus,
-						data.error,
+						data.error ?? "no error",
 					);
 				},
 			);

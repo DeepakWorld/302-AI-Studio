@@ -1,14 +1,6 @@
-import { type } from "arktype";
 import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
-import { _302AIKy } from "../core/_302ai-ky";
-import { localCodeAgentKy } from "../core/local-code-agent-ky";
-
-/**
- * Get the appropriate ky instance based on code agent mode
- */
-function getCodeAgentKy() {
-	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
-}
+import { type } from "arktype";
+import { getCodeAgentKy } from "../utils";
 
 export const executeCommandRequestSchema = type({
 	sandboxId: "string",
@@ -37,7 +29,7 @@ export async function executeCommand(
 	request: ExecuteCommandRequest,
 ): Promise<ExecuteCommandResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode doesn't need sandbox_id
 		const requestBody =
@@ -94,7 +86,7 @@ export async function uploadFileToSandbox(
 	auto_unzip: boolean = false,
 ): Promise<SandboxFileOperationResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 		const formData = new FormData();
 
 		// Local mode doesn't need sandbox_id
@@ -154,7 +146,7 @@ export async function initProject(request: InitProjectRequest): Promise<InitProj
 						workspace_path: request.workspacePath ?? "",
 					};
 
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 		const response = await kyInstance
 			.post("302/claude-code/sandbox/project/init", {
 				json: requestBody,
@@ -204,7 +196,7 @@ export async function batchUploadFile(
 	request: BatchUploadFileRequest,
 ): Promise<BatchUploadFileResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode doesn't need sandbox_id
 		const requestBody =
@@ -262,7 +254,7 @@ export async function downloadFilesFromSandbox(
 ): Promise<DownloadFilesResponse> {
 	const { sandboxId, path, format } = request;
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode doesn't need sandbox_id
 		const requestBody =

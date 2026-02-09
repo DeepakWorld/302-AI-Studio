@@ -4,15 +4,7 @@
  */
 
 import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
-import { _302AIKy } from "./core/_302ai-ky";
-import { localCodeAgentKy } from "./core/local-code-agent-ky";
-
-/**
- * Get the appropriate ky instance based on code agent mode
- */
-export function getCodeAgentKy() {
-	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
-}
+import { getCodeAgentKy } from "./utils";
 
 export interface ExecuteCommandRequest {
 	sandbox_id: string;
@@ -46,7 +38,7 @@ export async function executeSandboxCommand(
 	request: ExecuteCommandRequest,
 ): Promise<ExecuteCommandResult> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 
 		// Local mode logic for request body
 		const requestBody =

@@ -4,15 +4,7 @@
  */
 
 import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
-import { _302AIKy } from "./core/_302ai-ky";
-import { localCodeAgentKy } from "./core/local-code-agent-ky";
-
-/**
- * Get the appropriate ky instance based on code agent mode
- */
-function getCodeAgentKy() {
-	return codeAgentState.type === "local" ? localCodeAgentKy : _302AIKy;
-}
+import { getCodeAgentKy } from "./utils";
 
 export interface SandboxFileInfo {
 	name: string;
@@ -58,7 +50,7 @@ export async function listSandboxFiles(
 	depth: number = 1,
 ): Promise<SandboxFileListResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 		const requestBody =
 			codeAgentState.type === "local"
 				? {
@@ -126,7 +118,7 @@ export async function downloadSandboxFile(
 	path: string | string[],
 ): Promise<SandboxFileDownloadResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 		const requestBody =
 			codeAgentState.type === "local"
 				? {
@@ -197,7 +189,7 @@ export async function writeSandboxFile(
 	fileList: Array<{ file: string; save_path: string }>,
 ): Promise<{ result: string }> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 		const requestBody =
 			codeAgentState.type === "local"
 				? {
@@ -230,7 +222,7 @@ export async function getFileContent(
 	filePath: string,
 	signal?: AbortSignal,
 ): Promise<string> {
-	const kyInstance = getCodeAgentKy();
+	const kyInstance = await getCodeAgentKy();
 	const requestBody =
 		codeAgentState.type === "local"
 			? {
@@ -324,7 +316,7 @@ async function sandboxFileOperation(
 	targetPath?: string,
 ): Promise<SandboxFileOperationResponse> {
 	try {
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 		const requestBody: SandboxFileOperationRequest = {
 			operation,
 			original_path: originalPath,
@@ -427,7 +419,7 @@ export async function uploadSandboxFile(
 			}
 		}
 
-		const kyInstance = getCodeAgentKy();
+		const kyInstance = await getCodeAgentKy();
 		const formData = new FormData();
 		if (codeAgentState.type !== "local") {
 			formData.append("sandbox_id", sandboxId);

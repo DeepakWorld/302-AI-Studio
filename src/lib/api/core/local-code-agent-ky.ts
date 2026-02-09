@@ -7,74 +7,62 @@ import { toast } from "svelte-sonner";
 const { getUserAgentFragment } = window.electronAPI.appService;
 
 /**
- * Ky instance for local Code Agent mode
- * - Uses http://127.0.0.1:<port> (default 8123)
+ * Factory function to create a Ky instance for local Code Agent mode
+ * - Uses http://localhost:<port> (default 8123)
  * - No Authorization header needed (local sandbox doesn't require API key)
  * - Dynamically updates port if runtime uses a different one
+ *
+ * NOTE: This is a factory function (not a singleton) to avoid connection reuse issues.
+ * When the sandbox restarts with a different port, stale HTTP/2 connections from a
+ * singleton instance can cause ERR_ALPN_NEGOTIATION_FAILED errors. Creating a fresh
+ * instance per request ensures each request uses the current port.
  */
-export const localCodeAgentKy = ky.create({
-	timeout: 60000,
-	// Start with an HTTP prefixUrl to establish HTTP context immediately.
-	// This prevents ALPN negotiation errors (which happen when switching from HTTPS context)
-	// and ensures correct path resolution (avoiding relative path issues like including /chat/...).
-	prefixUrl: "http://127.0.0.1:8123",
-	headers: {
-		"HTTP-Referer": "https://studio.302.ai/",
-		"X-Title": "302.AI Studio",
-	},
-	retry: 3,
-	fetch: async (input, init) => {
-		try {
-			return await fetch(input, init);
-		} catch (error) {
-			if (
-				error instanceof Error &&
-				error.message === "Failed to fetch" &&
-				codeAgentState.type === "local"
-			) {
-				const toastId = "local-code-agent-connection-error";
-				const isAlreadyVisible = toast.getActiveToasts().some((t) => t.id === toastId);
+export async function createLocalCodeAgentKy() {
+	const prefixUrl =
+		(await window.electronAPI.localVibeService.getLocalBaseUrl()) ?? "http://localhost:8123";
 
-				if (!localEnvState.sandboxStarting && !isAlreadyVisible) {
-					toast.error(m.code_agent_local_container_not_started(), {
-						id: toastId,
-						action: {
-							label: m.toast_button_start_sandbox(),
-							onClick: async () => {
-								await localEnvState.startSandbox();
+	return ky.create({
+		timeout: 60000,
+		prefixUrl: prefixUrl,
+		headers: {
+			"HTTP-Referer": "https://studio.302.ai/",
+			"X-Title": "302.AI Studio",
+		},
+		retry: 3,
+		fetch: async (input, init) => {
+			try {
+				return await fetch(input, init);
+			} catch (error) {
+				if (
+					error instanceof Error &&
+					error.message === "Failed to fetch" &&
+					codeAgentState.type === "local"
+				) {
+					const toastId = "local-code-agent-connection-error";
+					const isAlreadyVisible = toast.getActiveToasts().some((t) => t.id === toastId);
+
+					if (!localEnvState.sandboxStarting && !isAlreadyVisible) {
+						toast.error(m.code_agent_local_container_not_started(), {
+							id: toastId,
+							action: {
+								label: m.toast_button_start_sandbox(),
+								onClick: async () => {
+									await localEnvState.startSandbox();
+								},
 							},
-						},
-					});
-				}
-			}
-			throw error;
-		}
-	},
-	hooks: {
-		beforeRequest: [
-			async (request) => {
-				const userAgent = await getUserAgentFragment();
-				request.headers.set("User-Agent", userAgent);
-
-				try {
-					const localBaseUrl = await window.electronAPI.localVibeService.getLocalBaseUrl();
-					if (localBaseUrl) {
-						const localUrl = new URL(localBaseUrl);
-						const url = new URL(request.url);
-
-						// If the runtime URL (host/port) is different, update it
-						if (url.port !== localUrl.port || url.hostname !== localUrl.hostname) {
-							url.port = localUrl.port;
-							url.hostname = localUrl.hostname;
-							// Since the original request was already HTTP (due to prefixUrl),
-							// reusing it here is safe and won't trigger ALPN errors.
-							return new Request(url.toString(), request);
-						}
+						});
 					}
-				} catch (error) {
-					console.error("Failed to sync local port:", error);
 				}
-			},
-		],
-	},
-});
+				throw error;
+			}
+		},
+		hooks: {
+			beforeRequest: [
+				async (request) => {
+					const userAgent = await getUserAgentFragment();
+					request.headers.set("User-Agent", userAgent);
+				},
+			],
+		},
+	});
+}
