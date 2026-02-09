@@ -56,7 +56,6 @@ export async function createClaudeCodeSandbox(
 const updateClaudeCodeSandboxResponse = type({
 	success: "boolean",
 	data: {
-		message: "string",
 		sandbox_id: "string",
 	},
 });
