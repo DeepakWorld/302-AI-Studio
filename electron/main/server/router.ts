@@ -31,6 +31,7 @@ import { THINKING_BUDGET_MAP } from "./constant";
 import {
 	appendPromptToLastUserMessage,
 	appendPromptToSystemMessage,
+	applyContextCompression,
 	convertAiSdkMessagesToOpenAiMessages,
 	createForcedSkillModelMessages,
 	createUIMessageStreamFromGenerator,
@@ -73,6 +74,8 @@ export type RouterRequestBody = {
 	inTaskOrchestrationMode?: boolean;
 	workspacePath?: string;
 	thinkingBudget?: ThinkingBudgetType;
+	contextSummary?: string;
+	compressedMessageCount?: number;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -196,6 +199,8 @@ app.post("/chat/302ai", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -222,6 +227,8 @@ app.post("/chat/302ai", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 	console.log(
 		baseUrl,
@@ -317,8 +324,22 @@ app.post("/chat/302ai", async (c) => {
 		JSON.stringify(resolvedMessages, null, 2),
 	);
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const baseConfig = {
@@ -344,7 +365,7 @@ app.post("/chat/302ai", async (c) => {
 
 		const streamTextOptions = {
 			...baseConfig,
-			...(systemPrompt && { system: systemPrompt }),
+			...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		};
 
 		// Use createUIMessageStreamFromGenerator for immediate start event and async content generation
@@ -372,7 +393,7 @@ app.post("/chat/302ai", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		...baseConfig,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		stopWhen: stepCountIs(20),
 	};
 
@@ -432,6 +453,8 @@ app.post("/chat/openai", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -451,6 +474,8 @@ app.post("/chat/openai", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 
 	const openai = createOpenAI({
@@ -502,14 +527,28 @@ app.post("/chat/openai", async (c) => {
 		}
 	}
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertedMessages,
-		...(systemPrompt && { system: systemPrompt }),
+		...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -550,7 +589,7 @@ app.post("/chat/openai", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		model: wrapModel,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
 	};
@@ -607,6 +646,8 @@ app.post("/chat/anthropic", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -626,6 +667,8 @@ app.post("/chat/anthropic", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 
 	const anthropic = createAnthropic({
@@ -677,14 +720,28 @@ app.post("/chat/anthropic", async (c) => {
 		}
 	}
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertedMessages,
-		...(systemPrompt && { system: systemPrompt }),
+		...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -725,7 +782,7 @@ app.post("/chat/anthropic", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		model: wrapModel,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
 	};
@@ -782,6 +839,8 @@ app.post("/chat/gemini", async (c) => {
 		language: _language,
 		systemPrompt,
 		threadId,
+		contextSummary,
+		compressedMessageCount,
 	} = await c.req.json<{
 		baseUrl?: string;
 		model?: string;
@@ -801,6 +860,8 @@ app.post("/chat/gemini", async (c) => {
 		language?: string;
 		systemPrompt?: string;
 		threadId: string;
+		contextSummary?: string;
+		compressedMessageCount?: number;
 	}>();
 
 	const google = createGoogleGenerativeAI({
@@ -851,14 +912,28 @@ app.post("/chat/gemini", async (c) => {
 		}
 	}
 
+	// Apply context compression after template resolution
+	let messagesToSend = resolvedMessages;
+	let effectiveSystemPrompt = systemPrompt;
+	if (contextSummary && compressedMessageCount && compressedMessageCount > 0) {
+		const compressed = applyContextCompression(
+			resolvedMessages,
+			systemPrompt,
+			contextSummary,
+			compressedMessageCount,
+		);
+		messagesToSend = compressed.messages;
+		effectiveSystemPrompt = compressed.systemPrompt;
+	}
+
 	const convertedMessages = await convertToModelMessages(
-		enhanceMessagesWithFeedback(resolvedMessages),
+		enhanceMessagesWithFeedback(messagesToSend),
 	);
 
 	const streamTextOptions = {
 		model: wrapModel,
 		messages: convertedMessages,
-		...(systemPrompt && { system: systemPrompt }),
+		...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 	};
 
@@ -899,7 +974,7 @@ app.post("/chat/gemini", async (c) => {
 	// Note: Agent uses 'instructions' for system prompt, not 'system'
 	const agentConfig = {
 		model: wrapModel,
-		...(systemPrompt && { instructions: systemPrompt }),
+		...(effectiveSystemPrompt && { instructions: effectiveSystemPrompt }),
 		...(mcpTools && Object.keys(mcpTools).length > 0 && { tools: mcpTools }),
 		stopWhen: stepCountIs(20),
 	};
@@ -1084,6 +1159,163 @@ Return ONLY a valid JSON object in this exact format (no markdown, no code block
 	} catch (error) {
 		console.error("Title generation error:", error);
 		return c.json({ error: "Failed to generate title" }, 500);
+	}
+});
+
+app.post("/generate-context-summary", async (c) => {
+	const {
+		messages,
+		model,
+		apiKey,
+		baseUrl,
+		providerType,
+		previousSummary,
+		language: _language,
+	} = await c.req.json<{
+		messages: UIMessage[];
+		model: string;
+		apiKey?: string;
+		baseUrl?: string;
+		providerType: ModelProvider["apiType"];
+		previousSummary?: string;
+		language?: string;
+	}>();
+
+	const conversationText = messages
+		.map((msg) => {
+			const role = msg.role === "user" ? "User" : "Assistant";
+			const textParts = msg.parts.filter((part) => part.type === "text");
+			const text = textParts.map((part) => ("text" in part ? part.text : "")).join(" ");
+			return `${role}: ${text}`;
+		})
+		.join("\n");
+
+	let languageModel;
+	switch (providerType) {
+		case "302ai": {
+			const openai = createOpenAICompatible({
+				name: "302.AI",
+				baseURL: baseUrl || "https://api.openai.com/v1",
+				apiKey: apiKey || "sk-placeholder",
+			});
+			languageModel = openai.chatModel(model);
+			break;
+		}
+		case "openai": {
+			const openai = createOpenAI({
+				baseURL: baseUrl || "https://api.openai.com/v1",
+				apiKey: apiKey || "sk-placeholder",
+			});
+			languageModel = openai.chat(model);
+			break;
+		}
+		case "anthropic": {
+			const anthropic = createAnthropic({
+				baseURL: baseUrl || "https://api.anthropic.com/v1",
+				apiKey: apiKey || "sk-placeholder",
+			});
+			languageModel = anthropic.chat(model);
+			break;
+		}
+		case "gemini": {
+			const google = createGoogleGenerativeAI({
+				baseURL: baseUrl || "https://generativelanguage.googleapis.com/v1beta",
+				apiKey: apiKey || "sk-placeholder",
+			});
+			languageModel = google.chat(model);
+			break;
+		}
+		default:
+			return c.json({ error: "Invalid provider type" }, 400);
+	}
+
+	try {
+		let prompt: string;
+
+		if (!previousSummary) {
+			prompt = `Summarize the following conversation into a concise context summary (200-500 characters). Preserve:
+- Key topics and decisions made
+- Important facts, names, numbers, and dates mentioned
+- User preferences and requirements stated
+- Any ongoing tasks or action items
+
+Conversation:
+${conversationText}
+
+Requirements:
+- Use the SAME LANGUAGE as the main language in the conversation
+- Keep between 200-500 characters
+- Focus on information that would be useful context for continuing the conversation
+- Do not include pleasantries or greetings
+
+Return ONLY a valid JSON object in this exact format (no markdown, no code blocks):
+{"summary": "your summary here"}`;
+		} else {
+			prompt = `Update the following context summary with new conversation messages. The updated summary should be 200-500 characters and incorporate the new information while preserving important context from the previous summary.
+
+Previous Summary: ${previousSummary}
+
+New Messages:
+${conversationText}
+
+Requirements:
+- Use the SAME LANGUAGE as the main language in the conversation
+- Keep between 200-500 characters
+- Preserve key facts, decisions, and context from the previous summary
+- Add new important information from the latest messages
+- Remove outdated or superseded information
+- Focus on information useful for continuing the conversation
+
+Return ONLY a valid JSON object in this exact format (no markdown, no code blocks):
+{"summary": "your updated summary here"}`;
+		}
+
+		const { text } = await generateText({
+			model: languageModel,
+			prompt,
+		});
+
+		// Parse JSON response with fallback handling
+		let summary = "";
+
+		try {
+			// Try to extract JSON from the response (handle potential markdown code blocks)
+			let jsonStr = text.trim();
+
+			// Strip thinking/reasoning blocks from model response (handles both closed and unclosed tags)
+			// Pattern 1: Complete thinking blocks with closing tags
+			jsonStr = jsonStr.replace(/<(think|thinking|reason|reasoning)>[\s\S]*?<\/\1>/gi, "");
+			// Pattern 2: Unclosed thinking blocks (tag at start without closing)
+			jsonStr = jsonStr.replace(/^<(think|thinking|reason|reasoning)>[\s\S]*?(?=\{)/i, "");
+			// Pattern 3: Any remaining opening thinking tags that might be at the start
+			jsonStr = jsonStr.replace(/^<(think|thinking|reason|reasoning)>[\s\S]*/i, "");
+
+			jsonStr = jsonStr.trim();
+
+			// Remove markdown code blocks if present
+			if (jsonStr.startsWith("```")) {
+				jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+			}
+			const parsed = JSON.parse(jsonStr);
+			summary = parsed.summary || "";
+		} catch {
+			// Fallback: if JSON parsing fails, use the raw text as summary
+			console.warn("Failed to parse context summary JSON response, using fallback");
+			// Strip any thinking tags from fallback text too
+			let fallbackText = text.trim();
+			fallbackText = fallbackText.replace(
+				/<(think|thinking|reason|reasoning)>[\s\S]*?<\/\1>/gi,
+				"",
+			);
+			fallbackText = fallbackText.replace(/<(think|thinking|reason|reasoning)>[\s\S]*/gi, "");
+			fallbackText = fallbackText.trim();
+			summary = fallbackText.slice(0, 500);
+		}
+
+		return c.json({ summary });
+	} catch (error) {
+		console.error("Context summary generation error:", error);
+		return c.json({ error: "Failed to generate context summary" }, 500);
 	}
 });
 

@@ -28,6 +28,9 @@ export interface PreferencesSettingsState {
 	showOnlyLastSuggestion: boolean;
 	// Preview panel settings
 	previewPanelPinned: boolean;
+	// Context compression settings
+	contextCompressionEnabled: boolean;
+	contextCompressionLimit: number;
 }
 
 const getDefaults = (): PreferencesSettingsState => ({
@@ -51,6 +54,9 @@ const getDefaults = (): PreferencesSettingsState => ({
 	showOnlyLastSuggestion: false,
 	// Preview panel defaults
 	previewPanelPinned: true,
+	// Context compression defaults
+	contextCompressionEnabled: true,
+	contextCompressionLimit: 20,
 });
 
 const persistedPreferencesSettings = new PersistedState<PreferencesSettingsState>(
@@ -265,6 +271,28 @@ class PreferencesSettingsManager {
 
 	togglePreviewPanelPinned(): void {
 		this.setPreviewPanelPinned(!this.previewPanelPinned);
+	}
+
+	get contextCompressionEnabled(): boolean {
+		return persistedPreferencesSettings.current.contextCompressionEnabled;
+	}
+
+	setContextCompressionEnabled(value: boolean): void {
+		persistedPreferencesSettings.current = {
+			...persistedPreferencesSettings.current,
+			contextCompressionEnabled: value,
+		};
+	}
+
+	get contextCompressionLimit(): number {
+		return persistedPreferencesSettings.current.contextCompressionLimit;
+	}
+
+	setContextCompressionLimit(limit: number): void {
+		persistedPreferencesSettings.current = {
+			...persistedPreferencesSettings.current,
+			contextCompressionLimit: Math.max(5, Math.min(100, limit)), // Clamp between 5-100
+		};
 	}
 
 	update(partial: Partial<PreferencesSettingsState>): void {
