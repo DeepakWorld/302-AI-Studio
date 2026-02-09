@@ -210,9 +210,49 @@ export class LocalVibeService {
 		const runtimeDir = this.getRuntimeComposeDir();
 		const runtimeComposePath = this.getRuntimeComposePath();
 		const envFilePath = path.join(runtimeDir, ".env");
+		const dbDir = path.join(runtimeDir, "db");
+		const workspaceDir = path.join(runtimeDir, "workspace");
+		const dbFilePath = path.join(dbDir, "app.db");
 
 		// Copy template compose to runtime directory
 		fs.copyFileSync(templatePath, runtimeComposePath);
+
+		// Normalize known short-name image to a fully-qualified reference for Podman compatibility.
+		// Some environments disable unqualified-search registries in /etc/containers/registries.conf.
+		try {
+			const composeContent = fs.readFileSync(runtimeComposePath, "utf-8");
+			const normalizedContent = composeContent.replace(
+				/(\bimage:\s*)proxy302\/claude_code_local_api:dev\b/g,
+				"$1docker.io/proxy302/claude_code_local_api:dev",
+			);
+			if (normalizedContent !== composeContent) {
+				fs.writeFileSync(runtimeComposePath, normalizedContent, "utf-8");
+			}
+		} catch (error) {
+			console.warn("[Local Vibe] Failed to normalize runtime compose image reference:", error);
+		}
+
+		// Ensure bind-mounted directories are writable by the container user.
+		// Rootless Podman containers often run with a different uid/gid than the host user.
+		for (const dir of [runtimeDir, dbDir, workspaceDir]) {
+			if (!fs.existsSync(dir)) {
+				fs.mkdirSync(dir, { recursive: true });
+			}
+			try {
+				fs.chmodSync(dir, 0o777);
+			} catch (error) {
+				console.warn("[Local Vibe] Failed to set writable permissions for:", dir, error);
+			}
+		}
+
+		try {
+			if (!fs.existsSync(dbFilePath)) {
+				fs.writeFileSync(dbFilePath, "", "utf-8");
+			}
+			fs.chmodSync(dbFilePath, 0o666);
+		} catch (error) {
+			console.warn("[Local Vibe] Failed to prepare runtime sqlite file:", error);
+		}
 
 		// Find available port (starting from default, will find next available if occupied)
 		const hostPort = await getPort({ port: DEFAULT_SANDBOX_PORT });
@@ -570,8 +610,8 @@ export class LocalVibeService {
 				data: `Starting: ${step}`,
 			});
 
-			// Use sudo -S to read password from stdin
-			const proc = spawn("sudo", ["-S", command, ...args], {
+			// Use sudo -S to read password from stdin and suppress terminal prompt text
+			const proc = spawn("sudo", ["-S", "-p", "", command, ...args], {
 				shell: false,
 				windowsHide: true,
 			});
@@ -608,6 +648,76 @@ export class LocalVibeService {
 				resolve({ isOk: false });
 			});
 		});
+	}
+
+	/**
+	 * Runs privileged command on Linux with a GUI auth prompt when available.
+	 * Falls back to non-interactive sudo to avoid terminal password prompts.
+	 */
+	private async runLinuxPrivilegedCommandWithBroadcast(
+		command: string,
+		args: string[],
+		step: string,
+	): Promise<{ isOk: boolean; output: string }> {
+		const pkexecCheck = await this.checkCommand("pkexec --version");
+
+		if (pkexecCheck.isValid) {
+			const pkexecResult = await this.runCommandWithBroadcast(
+				"pkexec",
+				[command, ...args],
+				step,
+				false,
+			);
+
+			if (pkexecResult.isOk) {
+				return pkexecResult;
+			}
+
+			const lowerOutput = pkexecResult.output.toLowerCase();
+			if (
+				lowerOutput.includes("not authorized") ||
+				lowerOutput.includes("authentication failed") ||
+				lowerOutput.includes("dismissed") ||
+				lowerOutput.includes("no authentication agent found")
+			) {
+				const errorMessage = await this.t(
+					"需要管理员权限，但未完成图形授权。请重试并确认授权弹窗。",
+					"Administrator privileges are required, but graphical authorization was not completed. Please retry and confirm the permission prompt.",
+				);
+				broadcastService.broadcastChannelToAll("install-log", {
+					step,
+					type: "error",
+					data: errorMessage,
+				});
+				return { isOk: false, output: `${pkexecResult.output}\n${errorMessage}` };
+			}
+
+			return pkexecResult;
+		}
+
+		const sudoResult = await this.runCommandWithBroadcast(
+			"sudo",
+			["-n", command, ...args],
+			step,
+			false,
+		);
+		if (sudoResult.isOk) {
+			return sudoResult;
+		}
+
+		const noPromptMessage = await this.t(
+			"当前环境无法弹出图形授权窗口。请先在终端执行 `sudo -v` 后重试。",
+			"Unable to open a graphical privilege prompt in this environment. Please run `sudo -v` in a terminal, then retry.",
+		);
+		broadcastService.broadcastChannelToAll("install-log", {
+			step,
+			type: "error",
+			data: noPromptMessage,
+		});
+		return {
+			isOk: false,
+			output: `${sudoResult.output}\n${noPromptMessage}`,
+		};
 	}
 
 	private async checkScoop(): Promise<{
@@ -918,18 +1028,44 @@ export class LocalVibeService {
 	}
 
 	/**
-	 * Checks if podman is healthy (ai302-machine exists)
-	 * @returns { isOk: boolean; isHealth: boolean; timestamp?: number } - isOk: operation success, isHealth: podman health check result (ai302-machine exists), timestamp when called via startPodmanHealthCheck
+	 * Checks Podman health.
+	 * - Linux: checks Podman command availability (rootless mode has no machine)
+	 * - macOS/Windows: checks whether ai302-machine exists
+	 * @returns { isOk: boolean; isHealth: boolean; timestamp?: number } - isOk: operation success, isHealth: health check result, timestamp when called via startPodmanHealthCheck
 	 */
 	private async checkPodmanHealth(): Promise<{
 		isOk: boolean;
 		isHealth: boolean;
 	}> {
+		// Linux runs Podman in rootless mode (no machine abstraction).
+		// Health should be based on podman command availability.
+		if (process.platform === "linux") {
+			const podmanCheck = await this.checkCommand("podman --version");
+			return {
+				isOk: podmanCheck.isOk,
+				isHealth: podmanCheck.isValid,
+			};
+		}
+
 		const machineCheck = await this.checkPodmanMachineExists();
 		return {
 			isOk: machineCheck.isOk,
 			isHealth: machineCheck.exists,
 		};
+	}
+
+	private isExpectedSandboxHealthConnectionError(errorMessage: string): boolean {
+		const lowerMsg = errorMessage.toLowerCase();
+		return (
+			lowerMsg.includes("fetch failed") ||
+			lowerMsg.includes("failed to fetch") ||
+			lowerMsg.includes("econnrefused") ||
+			lowerMsg.includes("connection refused") ||
+			lowerMsg.includes("socket hang up") ||
+			lowerMsg.includes("network error") ||
+			lowerMsg.includes("etimedout") ||
+			lowerMsg.includes("timed out")
+		);
 	}
 
 	private async checkLocalSandboxHealth(): Promise<{
@@ -944,7 +1080,7 @@ export class LocalVibeService {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			// Suppress error logging if operating (starting/stopping) or if it's a connection error
 			// unexpected errors should still be logged
-			if (!this.isOperating) {
+			if (!this.isOperating && !this.isExpectedSandboxHealthConnectionError(errorMessage)) {
 				console.error("[LocalVibeService] Local sandbox health check failed:", errorMessage);
 			}
 			return { isOk: true, isHealth: false, error: errorMessage };
@@ -1031,10 +1167,11 @@ export class LocalVibeService {
 	}
 
 	/**
-	 * Validates if podman is installed and accessible, and ai302-machine exists
-	 * Also checks if podman-compose is available
+	 * Validates local Podman environment.
+	 * - Linux: podman + podman-compose are required
+	 * - macOS/Windows: podman + ai302-machine + podman-compose are required
 	 * @param _event The IPC main invoke event
-	 * @returns { isOk: boolean; isValid: boolean; output?: string; error?: string; details?: { podmanInstalled: boolean; machineExists: boolean; composeInstalled: boolean } } - isOk: operation success, isValid: podman installed AND machine exists AND podman-compose available, output: command output, error: error message if failed, details: detailed component status
+	 * @returns { isOk: boolean; isValid: boolean; output?: string; error?: string; details?: { podmanInstalled: boolean; machineExists: boolean; composeInstalled: boolean } } - isOk: operation success, isValid: platform-specific validation result, output: command output, error: error message if failed, details: detailed component status
 	 */
 	async validPodman(_event: IpcMainInvokeEvent): Promise<{
 		isOk: boolean;
@@ -1056,15 +1193,21 @@ export class LocalVibeService {
 				};
 			}
 
-			// Podman is installed, check if ai302-machine exists
-			const machineCheck = await this.checkPodmanMachineExists();
-			if (!machineCheck.isOk) {
-				return {
-					isOk: false,
-					isValid: false,
-					error: "Failed to check machine list",
-					details: { podmanInstalled: true, machineExists: false, composeInstalled: false },
-				};
+			const isLinux = process.platform === "linux";
+
+			// Linux rootless mode doesn't require ai302-machine.
+			let machineExists = true;
+			if (!isLinux) {
+				const machineCheck = await this.checkPodmanMachineExists();
+				if (!machineCheck.isOk) {
+					return {
+						isOk: false,
+						isValid: false,
+						error: "Failed to check machine list",
+						details: { podmanInstalled: true, machineExists: false, composeInstalled: false },
+					};
+				}
+				machineExists = machineCheck.exists;
 			}
 
 			// Check if podman-compose is available
@@ -1076,7 +1219,7 @@ export class LocalVibeService {
 					error: "Failed to check podman-compose",
 					details: {
 						podmanInstalled: true,
-						machineExists: machineCheck.exists,
+						machineExists,
 						composeInstalled: false,
 					},
 				};
@@ -1084,7 +1227,7 @@ export class LocalVibeService {
 
 			const details = {
 				podmanInstalled: true,
-				machineExists: machineCheck.exists,
+				machineExists,
 				composeInstalled: composeCheck.isValid,
 			};
 
@@ -1096,7 +1239,8 @@ export class LocalVibeService {
 				return { isOk: true, isValid: false, error: composeError, details };
 			}
 
-			return { isOk: true, isValid: machineCheck.exists, output: stdout, details };
+			const isValid = isLinux ? true : machineExists;
+			return { isOk: true, isValid, output: stdout, details };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -1286,11 +1430,17 @@ export class LocalVibeService {
 	 * @returns { isOk: boolean } - isOk: operation success
 	 */
 	async installHomebrew(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
+		// Pre-authorize sudo via app-level prompt so installer doesn't block on terminal password input.
+		const sudoAuth = await this.runSudoCommandWithBroadcast("true", [], "homebrew-auth");
+		if (!sudoAuth.isOk) {
+			return { isOk: false };
+		}
+
 		const result = await this.runCommandWithBroadcast(
 			"/bin/bash",
 			[
 				"-c",
-				'sudo -v && NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+				'sudo -n -v && NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
 			],
 			"homebrew",
 		);
@@ -1337,9 +1487,9 @@ export class LocalVibeService {
 				return pipResult;
 			}
 			// Fallback to apt-get
-			return this.runCommandWithBroadcast(
-				"sudo",
-				["apt-get", "install", "-y", "podman-compose"],
+			return this.runLinuxPrivilegedCommandWithBroadcast(
+				"apt-get",
+				["install", "-y", "podman-compose"],
 				"install-podman-compose",
 			);
 		}
@@ -1904,11 +2054,14 @@ export class LocalVibeService {
 		// 1. Check and install Homebrew
 		const brewCheck = await this.checkHomebrew();
 		if (!brewCheck.isValid) {
+			const sudoAuth = await this.runSudoCommandWithBroadcast("true", [], "install-homebrew-auth");
+			if (!sudoAuth.isOk) return { isOk: false };
+
 			const brewInstall = await this.runCommandWithBroadcast(
 				"/bin/bash",
 				[
 					"-c",
-					'sudo -v && NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+					'sudo -n -v && NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
 				],
 				"install-homebrew",
 			);
@@ -1992,9 +2145,9 @@ export class LocalVibeService {
 
 		// 1. Install Podman (only if not already installed)
 		if (!podmanCheck.isValid) {
-			const podmanInstall = await this.runCommandWithBroadcast(
-				"sudo",
-				["apt-get", "-y", "install", "podman"],
+			const podmanInstall = await this.runLinuxPrivilegedCommandWithBroadcast(
+				"apt-get",
+				["-y", "install", "podman"],
 				"install-podman",
 			);
 			if (!podmanInstall.isOk) return { isOk: false };

@@ -4,7 +4,7 @@
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { codeAgentGlobalConfigsState } from "$lib/stores/code-agent/code-agent-global-configs-state.svelte";
-	import { isMac } from "$lib/utils/platform";
+	import { isLinux, isMac } from "$lib/utils/platform";
 	import LocalPlatform from "./local-platform.svelte";
 	import RemotePlatform from "./remote-platform.svelte";
 
@@ -57,7 +57,7 @@
 		<DeployedWebsitesList />
 		<RemotePlatform />
 	{:else if selectedPlatform === "local"}
-		{#if isMac}
+		{#if isMac || isLinux}
 			<LocalPlatform />
 		{:else}
 			<UnsupportPanel />

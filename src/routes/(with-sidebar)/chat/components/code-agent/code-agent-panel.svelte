@@ -43,7 +43,7 @@
 		persistedCodeAgentConfigState,
 	} from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
-	import { isMac } from "$lib/utils/platform";
+	import { isLinux, isMac } from "$lib/utils/platform";
 	import type { CodeAgentType } from "@shared/storage/code-agent";
 	import { DEFAULT_WORKSPACE_PATH } from "../agent-preview/constants";
 	import ClaudeCodePanel from "./claude-code-panel.svelte";
@@ -154,7 +154,7 @@
 				{/if}
 			{/if}
 			{#if displayType === "local"}
-				{#if isMac}
+				{#if isMac || isLinux}
 					<div class="max-h-[500px] overflow-y-auto pr-2">
 						<LocalModePanel {onClose} />
 					</div>

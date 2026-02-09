@@ -421,7 +421,19 @@ export async function getLocalSandboxHealthStatus(): Promise<LocalSandboxHealthR
 		}
 		return validated;
 	} catch (error) {
-		console.error("[getLocalSandboxHealthStatus] Health check failed:", error);
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const lowerMsg = errorMessage.toLowerCase();
+		const isExpectedConnectionError =
+			lowerMsg.includes("fetch failed") ||
+			lowerMsg.includes("failed to fetch") ||
+			lowerMsg.includes("econnrefused") ||
+			lowerMsg.includes("connection refused") ||
+			lowerMsg.includes("etimedout") ||
+			lowerMsg.includes("timed out");
+
+		if (!isExpectedConnectionError) {
+			console.error("[getLocalSandboxHealthStatus] Health check failed:", error);
+		}
 		throw error;
 	}
 }

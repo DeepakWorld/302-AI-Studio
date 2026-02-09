@@ -1,6 +1,7 @@
 services:
   local-cc-api:
-    image: proxy302/claude_code_local_api:dev
+    # Use a fully-qualified image reference for Podman (short names are often disabled).
+    image: docker.io/proxy302/claude_code_local_api:dev
     platform: linux/amd64
     container_name: local-cc-api
     ports:
