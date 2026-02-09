@@ -240,6 +240,15 @@ class ClaudeCodeProcessor {
 			return this.handlePreDeployCheck(data);
 		}
 
+		// Handle deploy events
+		if (
+			data.type === "deploy_task_created" ||
+			data.type === "deploy_progress" ||
+			data.type === "deploy_success"
+		) {
+			return this.handleLocaldeployMessage(data);
+		}
+
 		// Handle error payload from upstream (e.g., sandbox deployment failures)
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		if ((data as any).error) {
@@ -445,6 +454,68 @@ class ClaudeCodeProcessor {
 		}
 
 		return metadataStr;
+	}
+
+	/**
+	 * Handle local deployment related messages from backend
+	 */
+	private handleLocaldeployMessage(data: ClaudeCodeEvent): string | null {
+		const results: string[] = [];
+
+		// 1. Send metadata event (for programmatic handling)
+		const metadataEvent = {
+			type: "message-metadata",
+			metadata: {
+				deploy: data,
+			},
+		};
+		results.push(`data: ${JSON.stringify(metadataEvent)}`);
+
+		// 2. Synthesize text events so user can see progress in chat
+		if (data.type === "deploy_task_created") {
+			// Ensure start event is sent if not already
+			if (!this.hasStarted) {
+				this.hasStarted = true;
+				results.push(`data: ${JSON.stringify({ type: "start", messageId: this.messageId })}`);
+			}
+
+			const textId = `deploy-text-${Date.now()}`;
+			this.openaiTextId = textId;
+			results.push(`data: ${JSON.stringify({ type: "text-start", id: textId })}`);
+			results.push(
+				`data: ${JSON.stringify({
+					type: "text-delta",
+					id: textId,
+					delta: "🚀 Deployment task created, waiting for completion...\n",
+				})}`,
+			);
+		} else if (data.type === "deploy_progress") {
+			if (this.openaiTextId) {
+				results.push(
+					`data: ${JSON.stringify({ type: "text-delta", id: this.openaiTextId, delta: "." })}`,
+				);
+			}
+		} else if (data.type === "deploy_success") {
+			if (this.openaiTextId) {
+				// Inject legacy format text so existing frontend logic can parse it
+				// Regex expects: {'success': True, 'status': '...', 'id': '...', 'url': '...', 'cover': '...'}
+				const legacyFormat = `{'success': True, 'status': 'success', 'id': '${data.id}', 'url': '${data.url}', 'cover': ''}`;
+				const magicText = `\n\n**deploy sandbox successfully**\n${legacyFormat}`;
+
+				results.push(
+					`data: ${JSON.stringify({
+						type: "text-delta",
+						id: this.openaiTextId,
+						delta: `\n\n✅ **Deployment successful!**\nURL: ${data.url}${magicText}`,
+					})}`,
+				);
+				results.push(`data: ${JSON.stringify({ type: "text-end", id: this.openaiTextId })}`);
+				this.openaiTextId = null;
+			}
+			results.push(`data: ${JSON.stringify({ type: "finish" })}`);
+		}
+
+		return results.join("\n\n");
 	}
 
 	/**
