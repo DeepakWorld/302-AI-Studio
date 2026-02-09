@@ -6,8 +6,9 @@ import { providerStorage } from "@electron/main/services/storage-service/provide
 import { isCommandNotFound, isWSLError } from "@electron/main/utils/cmd";
 import { exec, spawn, type SpawnOptions } from "child_process";
 import { app, shell, type IpcMainInvokeEvent } from "electron";
+import { isNull } from "es-toolkit/predicate";
 import fs from "fs";
-import { readdir } from "fs/promises";
+import { cp, readdir } from "fs/promises";
 import getPort from "get-port";
 import path from "path";
 import { match } from "ts-pattern";
@@ -32,6 +33,130 @@ export class LocalVibeService {
 			}
 		} catch (error) {
 			console.error("[LocalVibeService] Failed to initialize runtime directory:", error);
+		}
+	}
+
+	/**
+	 * Copy a file or directory from host system to workspace via IPC
+	 */
+	async copyToWorkspaceByIpc(
+		_event: IpcMainInvokeEvent,
+		sourcePath: string,
+		containerPath: string,
+	): Promise<{ success: boolean; error?: string }> {
+		return this._copyToWorkspace(sourcePath, containerPath);
+	}
+
+	/**
+	 * Copy a file or directory from host system to workspace (Internal use)
+	 */
+	async copyToWorkspace(
+		sourcePath: string,
+		containerPath: string,
+	): Promise<{ success: boolean; error?: string }> {
+		return this._copyToWorkspace(sourcePath, containerPath);
+	}
+
+	/**
+	 * Core logic for copying to workspace
+	 */
+	private async _copyToWorkspace(
+		sourcePath: string,
+		containerPath: string,
+	): Promise<{ success: boolean; error?: string }> {
+		try {
+			const composeDir = this.getRuntimeComposeDir();
+			// The container maps ${HOST_DATA_PATH} (composeDir) to /home/user
+			const CONTAINER_ROOT = "/home/user";
+
+			let targetPath: string;
+
+			// Normalize container path to ensure we can match the prefix
+			// On Windows, incoming path might still use forward slashes from frontend
+			const normalizedContainerPath = containerPath.replace(/\\/g, "/");
+
+			if (normalizedContainerPath.startsWith(CONTAINER_ROOT)) {
+				// Strip /home/user to map to composeDir
+				const relativePath = normalizedContainerPath.substring(CONTAINER_ROOT.length);
+				const safeRelativePath = relativePath.replace(/\.\./g, "");
+				targetPath = path.join(composeDir, safeRelativePath);
+			} else if (path.isAbsolute(containerPath)) {
+				targetPath = containerPath;
+			} else {
+				// Fallback: assume relative to workspace if not starting with /home/user
+				const workspaceDir = path.join(composeDir, "workspace");
+				const safeSubPath = normalizedContainerPath.replace(/\.\./g, "");
+				const cleanSubPath = safeSubPath.startsWith("/") ? safeSubPath.substring(1) : safeSubPath;
+				targetPath = path.join(workspaceDir, cleanSubPath);
+			}
+
+			// Ensure target directory exists
+			const targetDir = path.dirname(targetPath);
+			if (!fs.existsSync(targetDir)) {
+				fs.mkdirSync(targetDir, { recursive: true });
+			}
+
+			console.log(`[LocalVibeService] Copying ${sourcePath} to ${targetPath}`);
+			await cp(sourcePath, targetPath, { recursive: true });
+
+			return { success: true };
+		} catch (error) {
+			console.error("[LocalVibeService] Copy to workspace failed:", error);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return { success: false, error: errorMessage };
+		}
+	}
+
+	/**
+	 * Write content directly to workspace file (Internal use)
+	 */
+	async writeToWorkspace(
+		content: Buffer | string,
+		containerPath: string,
+	): Promise<{ success: boolean; error?: string }> {
+		return this._writeToWorkspace(content, containerPath);
+	}
+
+	/**
+	 * Core logic for writing to workspace
+	 */
+	private async _writeToWorkspace(
+		content: Buffer | string,
+		containerPath: string,
+	): Promise<{ success: boolean; error?: string }> {
+		try {
+			const composeDir = this.getRuntimeComposeDir();
+			const CONTAINER_ROOT = "/home/user";
+			let targetPath: string;
+
+			const normalizedContainerPath = containerPath.replace(/\\/g, "/");
+
+			if (normalizedContainerPath.startsWith(CONTAINER_ROOT)) {
+				const relativePath = normalizedContainerPath.substring(CONTAINER_ROOT.length);
+				const safeRelativePath = relativePath.replace(/\.\./g, "");
+				targetPath = path.join(composeDir, safeRelativePath);
+			} else if (path.isAbsolute(containerPath)) {
+				targetPath = containerPath;
+			} else {
+				const workspaceDir = path.join(composeDir, "workspace");
+				const safeSubPath = normalizedContainerPath.replace(/\.\./g, "");
+				const cleanSubPath = safeSubPath.startsWith("/") ? safeSubPath.substring(1) : safeSubPath;
+				targetPath = path.join(workspaceDir, cleanSubPath);
+			}
+
+			const targetDir = path.dirname(targetPath);
+			if (!fs.existsSync(targetDir)) {
+				fs.mkdirSync(targetDir, { recursive: true });
+			}
+
+			console.log(`[LocalVibeService] Writing content to ${targetPath}`);
+			fs.writeFileSync(targetPath, content);
+
+			return { success: true };
+		} catch (error) {
+			console.error("[LocalVibeService] Write to workspace failed:", error);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return { success: false, error: errorMessage };
 		}
 	}
 
@@ -255,7 +380,8 @@ export class LocalVibeService {
 		}
 
 		// Find available port (starting from default, will find next available if occupied)
-		const hostPort = await getPort({ port: DEFAULT_SANDBOX_PORT });
+		const preferredPort = isNull(this.runtimePort) ? DEFAULT_SANDBOX_PORT : this.runtimePort + 1;
+		const hostPort = await getPort({ port: preferredPort });
 
 		// Store the allocated port
 		this.runtimePort = hostPort;

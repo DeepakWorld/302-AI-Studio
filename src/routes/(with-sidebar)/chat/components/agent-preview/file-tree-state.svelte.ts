@@ -14,7 +14,7 @@ import {
 	type AgentPreviewSyncEnvelope,
 } from "$lib/stores/agent-preview-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
-import { claudeCodeAgentState } from "$lib/stores/code-agent";
+import { claudeCodeAgentState, codeAgentState } from "$lib/stores/code-agent";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 import { toast } from "svelte-sonner";
 import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
@@ -899,10 +899,13 @@ export class FileTreeState {
 			return false;
 		}
 
-		const apiKey = this.get302ApiKey();
-		if (!apiKey) {
-			toast.error(m.toast_file_operation_api_key_not_found());
-			return false;
+		// API key check is only needed for cloud mode
+		if (codeAgentState.type !== "local") {
+			const apiKey = this.get302ApiKey();
+			if (!apiKey) {
+				toast.error(m.toast_file_operation_api_key_not_found());
+				return false;
+			}
 		}
 
 		this.operatingPaths = addToSet(this.operatingPaths, targetPath);
@@ -950,6 +953,52 @@ export class FileTreeState {
 		if (!this.sandboxId) {
 			toast.error(m.toast_file_operation_sandbox_id_not_available());
 			return false;
+		}
+
+		// Local mode optimization: Direct copy without zip
+		if (codeAgentState.type === "local") {
+			const uploadToastId = toast.loading(m.toast_file_upload_selecting_folder());
+			try {
+				const result = await window.electronAPI.dataService.selectFolderForUpload();
+
+				if (!result) {
+					toast.dismiss(uploadToastId);
+					return false;
+				}
+
+				const { folderPath, folderName } = result;
+				toast.loading(m.toast_file_upload_uploading_folder(), { id: uploadToastId });
+
+				// Construct full target path: targetPath/folderName
+				const fullTargetPath = targetPath.endsWith("/")
+					? `${targetPath}${folderName}`
+					: `${targetPath}/${folderName}`;
+
+				// Call localVibeService copy directly
+				const copyResult = await window.electronAPI.localVibeService.copyToWorkspaceByIpc(
+					folderPath,
+					fullTargetPath,
+				);
+
+				if (copyResult.success) {
+					toast.success(m.toast_file_upload_folder_success(), { id: uploadToastId });
+
+					// Refresh the target directory
+					if (targetPath === this.rootPath || this.loadedDirs.has(targetPath)) {
+						await this.loadFiles(targetPath, true, true);
+					}
+					return true;
+				} else {
+					toast.error(copyResult.error || m.toast_file_upload_folder_failed(), {
+						id: uploadToastId,
+					});
+					return false;
+				}
+			} catch (e) {
+				const errorMsg = e instanceof Error ? e.message : m.toast_file_upload_folder_failed();
+				toast.error(errorMsg, { id: uploadToastId });
+				return false;
+			}
 		}
 
 		const apiKey = this.get302ApiKey();

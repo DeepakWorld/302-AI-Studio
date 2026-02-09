@@ -212,6 +212,9 @@ export function registerIpcHandlers() {
 	);
 
 	// localVibeService service registration
+	ipcMain.handle("localVibeService:copyToWorkspaceByIpc", (event, sourcePath, containerPath) =>
+		localVibeService.copyToWorkspaceByIpc(event, sourcePath, containerPath),
+	);
 	ipcMain.handle("localVibeService:getComposeDirectory", (event) =>
 		localVibeService.getComposeDirectory(event),
 	);
@@ -457,6 +460,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("dataService:zipFolderForUpload", (event) =>
 		dataService.zipFolderForUpload(event),
 	);
+	ipcMain.handle("dataService:selectFolderForUpload", (event) =>
+		dataService.selectFolderForUpload(event),
+	);
 	ipcMain.handle(
 		"dataService:exportChatToFile",
 		(event, content, extension, filterName, defaultFileName) =>
@@ -603,6 +609,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
 	ipcMain.removeHandler("windowService:navigateToThread");
 	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
+	ipcMain.removeHandler("localVibeService:copyToWorkspaceByIpc");
 	ipcMain.removeHandler("localVibeService:getComposeDirectory");
 	ipcMain.removeHandler("localVibeService:openComposeDirectory");
 	ipcMain.removeHandler("localVibeService:openWorkspaceDirectory");
@@ -678,6 +685,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:openBackupDirectory");
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
+	ipcMain.removeHandler("dataService:selectFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");

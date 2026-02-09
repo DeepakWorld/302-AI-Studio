@@ -406,6 +406,27 @@ export async function uploadSandboxFile(
 	auto_unzip: boolean = false,
 ): Promise<SandboxFileOperationResponse> {
 	try {
+		// Optimize for local mode: bypass HTTP upload if file path is available
+		if (codeAgentState.type === "local") {
+			// Cast to any to access .path property which is available in Electron but not standard File API
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const filePath = (file as any).path;
+
+			if (filePath && typeof filePath === "string") {
+				console.log("[SandboxFile] Local mode detected, using direct copy for:", filePath);
+				const result = await window.electronAPI.localVibeService.copyToWorkspaceByIpc(
+					filePath,
+					path,
+				);
+
+				if (result.success) {
+					return { success: true, result: "File copied successfully" };
+				} else {
+					return { success: false, error: result.error || "Failed to copy file to workspace" };
+				}
+			}
+		}
+
 		const kyInstance = getCodeAgentKy();
 		const formData = new FormData();
 		if (codeAgentState.type !== "local") {
