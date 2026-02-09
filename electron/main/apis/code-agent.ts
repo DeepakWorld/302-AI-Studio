@@ -75,7 +75,7 @@ export async function updateClaudeCodeSandbox(
 	max_thinking_token?: number,
 ): Promise<UpdateClaudeCodeSandboxResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await (sandbox_id === "local" ? localCodeAgentKy : _302AIKy)
 			.post("302/claude-code/sandbox/reset", {
 				json: { sandbox_id, llm_model, sandbox_name, max_thinking_token, auto_pause_seconds: 30 },
 			})
