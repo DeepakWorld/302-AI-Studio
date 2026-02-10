@@ -76,14 +76,14 @@
 					(s) => s.sandboxId === sandboxId,
 				);
 				const currentSession = currentSandbox?.sessionInfos.find((s) => s.sessionId === sessionId);
-				return currentSession?.note ?? m.title_new_chat();
+				return currentSession?.note ?? currentSession?.sessionId ?? m.title_new_chat();
 			})
 			.with("local", () => {
 				const sessionId = claudeCodeAgentState.currentSessionId;
 				const currentSession = localClaudeCodeSandboxState.sessions.find(
 					(s) => s.session_id === sessionId,
 				);
-				return currentSession?.note ?? m.title_new_chat();
+				return currentSession?.note ?? currentSession?.session_id ?? m.title_new_chat();
 			})
 			.exhaustive();
 	});
