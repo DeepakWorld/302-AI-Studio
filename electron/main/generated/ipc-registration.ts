@@ -249,6 +249,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("localVibeService:installPodman", (event) =>
 		localVibeService.installPodman(event),
 	);
+	ipcMain.handle("localVibeService:initPodmanMachine", (event) =>
+		localVibeService.initPodmanMachine(event),
+	);
 	ipcMain.handle("localVibeService:stopLocalSandboxByIpc", (event) =>
 		localVibeService.stopLocalSandboxByIpc(event),
 	);
@@ -632,6 +635,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("localVibeService:installScoop");
 	ipcMain.removeHandler("localVibeService:installHomebrew");
 	ipcMain.removeHandler("localVibeService:installPodman");
+	ipcMain.removeHandler("localVibeService:initPodmanMachine");
 	ipcMain.removeHandler("localVibeService:stopLocalSandboxByIpc");
 	ipcMain.removeHandler("localVibeService:ensureLocalSandboxRunning");
 	ipcMain.removeHandler("localVibeService:startPodmanMachine");

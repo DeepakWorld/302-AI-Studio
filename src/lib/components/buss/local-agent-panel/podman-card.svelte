@@ -10,7 +10,8 @@
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
-	import { LoaderCircle } from "@lucide/svelte";
+	import { isWindows } from "$lib/utils/platform";
+	import { ExternalLink, LoaderCircle } from "@lucide/svelte";
 	import { onDestroy, onMount } from "svelte";
 	import LogDialog from "./log-dialog.svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
@@ -56,7 +57,11 @@
 	);
 
 	async function handleInstallPodman() {
-		await onInstall();
+		if (isWindows) {
+			await localEnvState.initMachine();
+		} else {
+			await onInstall();
+		}
 	}
 
 	function handleOpenLogs() {
@@ -123,6 +128,18 @@
 				</Button>
 			{/if}
 			{#if !podmanInstalled}
+				{#if isWindows}
+					<Button
+						size="sm"
+						variant="outline"
+						onclick={() =>
+							window.open("https://studio.302.ai/zh/docs/advanced/local-sandbox/windows", "_blank")}
+						class="min-w-[80px]"
+					>
+						<ExternalLink class="mr-1.5 h-3.5 w-3.5" />
+						{m.local_platform_install_guide()}
+					</Button>
+				{/if}
 				<Button
 					size="sm"
 					onclick={handleInstallPodman}

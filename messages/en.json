@@ -1313,6 +1313,8 @@
 	"local_platform_new_session_placeholder": "New session",
 	"local_platform_new_work_directory_placeholder": "New work directory",
 	"local_platform_reinstall": "Reinstall",
+	"local_platform_install_guide": "Prerequisites Guide",
+	"local_platform_prerequisites_missing": "Please complete the prerequisites first. See the Prerequisites Guide.",
 	"local_platform_checking": "Checking",
 	"local_platform_unknown": "Unknown",
 	"title_local_mode_description": "For complex tasks, use local Cluade Code"

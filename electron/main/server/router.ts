@@ -1348,6 +1348,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		vibeMode,
 	} = await c.req.json<RouterRequestBody>();
 
+	const { data: codeAgentConfig } = await codeAgentService.getCodeAgentConfig(threadId);
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
 
 	// Notify the frontend that sandbox is ready (triggers preview panel to open)
@@ -1540,7 +1541,7 @@ CHECK BEFORE EVERY ACTION:
 	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(messagesToConvert);
 
 	const requestBody = {
-		model: (vibeMode ?? "remote") === "remote" ? sandboxId : model,
+		model: codeAgentConfig.type === "remote" ? sandboxId : model,
 		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
