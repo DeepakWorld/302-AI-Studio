@@ -20,6 +20,7 @@ import { clone } from "$lib/utils/clone";
 import { ChatErrorHandler, type ChatError } from "$lib/utils/error-handler";
 import { replaceCodeBlockAt } from "$lib/utils/markdown-code-block";
 import { Chat } from "@ai-sdk/svelte";
+import { untrack } from "svelte";
 import type { ModelProvider } from "@shared/storage/provider";
 import type { AttachmentFile, MCPServer, Model, ThreadParmas } from "@shared/types";
 import { hashApiKey } from "@shared/utils/hash";
@@ -202,6 +203,8 @@ class ChatState {
 	// AbortController for canceling pending title generation
 	private titleAbortController: AbortController | null = null;
 
+	isGeneratingTitle = $state(false);
+
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
@@ -256,6 +259,24 @@ class ChatState {
 	}
 
 	constructor() {
+		// Watch for busy state and report to ThreadStateService
+		$effect.root(() => {
+			$effect(() => {
+				const isBusy = this.isStreaming || this.isGeneratingTitle;
+				const reason = this.isStreaming
+					? "streaming"
+					: this.isGeneratingTitle
+						? "generating-title"
+						: undefined;
+				const threadId = untrack(() => this.id);
+				window.electronAPI.threadStateService.updateBusyState({
+					threadId,
+					isBusy,
+					reason,
+				});
+			});
+		});
+
 		// Watch for PersistedState hydration and sync messages to chat
 		// This handles the case where reload happens before hydration completes
 		this.hydrateCheckInterval = setInterval(() => {
@@ -1101,6 +1122,7 @@ class ChatState {
 		}
 
 		try {
+			this.isGeneratingTitle = true;
 			const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 			const serverPort = window.app?.serverPort ?? 8089;
 
@@ -1171,6 +1193,8 @@ class ChatState {
 		} catch (error) {
 			console.error("Failed to generate title manually:", error);
 			toast.error(m.toast_title_generation_failed());
+		} finally {
+			this.isGeneratingTitle = false;
 		}
 	}
 
@@ -1751,6 +1775,7 @@ export const chat = new Chat({
 			const titleAbortSignal = chatState.createTitleAbortController();
 
 			try {
+				chatState.isGeneratingTitle = true;
 				const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 				const serverPort = window.app?.serverPort ?? 8089;
 
@@ -1809,6 +1834,8 @@ export const chat = new Chat({
 				} else {
 					console.error("Failed to generate title:", error);
 				}
+			} finally {
+				chatState.isGeneratingTitle = false;
 			}
 		} else if (isFirstMessage && isDefaultTitle && titleTiming !== "off") {
 			// Fallback for firstTime mode when model is not configured

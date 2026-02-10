@@ -20,6 +20,7 @@ import { SsoService, ssoService } from "./sso-service";
 import { StorageService, storageService } from "./storage-service";
 import { TabService, tabService } from "./tab-service";
 import { ThreadService, threadService } from "./thread-service";
+import { ThreadStateService, threadStateService } from "./thread-state-service";
 import { TrayService, trayService } from "./tray-service";
 import { UpdaterService, updaterService } from "./updater-service";
 import { WindowService, windowService } from "./window-service";
@@ -48,6 +49,7 @@ export {
 	StorageService,
 	TabService,
 	ThreadService,
+	ThreadStateService,
 	TrayService,
 	UpdaterService,
 	WindowService,
@@ -77,6 +79,7 @@ export {
 	storageService,
 	tabService,
 	threadService,
+	threadStateService,
 	trayService,
 	updaterService,
 	windowService,

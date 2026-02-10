@@ -452,6 +452,7 @@
 	"label_button_close_others": "关闭其他标签页",
 	"label_button_close_offside": "关闭右侧标签页",
 	"label_button_generate_title": "生成标题",
+	"label_generating_title": "标题生成中...",
 	"label_button_screenshot_conversation": "截图当前对话",
 	"placeholder_input_search": "搜索...",
 	"ai_service": "AI服务",

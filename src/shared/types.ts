@@ -171,7 +171,8 @@ export type BroadcastEvent =
 	| "sidebar-state-changed"
 	| "apply-default-model"
 	| "models-deleted"
-	| "local-sandbox-state-changed";
+	| "local-sandbox-state-changed"
+	| "thread-busy-state-changed";
 
 export interface BroadcastEventData {
 	broadcastEvent: BroadcastEvent;

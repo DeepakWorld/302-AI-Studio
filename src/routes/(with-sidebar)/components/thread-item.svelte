@@ -1,9 +1,10 @@
 <script lang="ts">
 	import ButtonWithTooltip from "$lib/components/buss/button-with-tooltip/button-with-tooltip.svelte";
 	import * as ContextMenu from "$lib/components/ui/context-menu";
+	import { threadBusyState } from "$lib/stores/thread-busy-state.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { cn } from "$lib/utils";
-	import { Star } from "@lucide/svelte";
+	import { LoaderCircle, Star } from "@lucide/svelte";
 	import type { ThreadParmas } from "@shared/types";
 
 	interface Props {
@@ -42,6 +43,12 @@
 
 	let isHovered = $state(false);
 	let shouldShowStar = $derived(isFavorite || isHovered);
+	let displayTitle = $derived.by(() => {
+		if (threadBusyState.getReason(threadId) === "generating-title") {
+			return m.label_generating_title();
+		}
+		return thread.title;
+	});
 
 	function handleClick(threadId: string) {
 		if (isActive) return;
@@ -79,9 +86,12 @@
 		}}
 		onmouseenter={() => (isHovered = true)}
 		onmouseleave={() => (isHovered = false)}
-		title={thread.title}
+		title={displayTitle}
 	>
-		<span class="text-sm truncate w-full">{thread.title}</span>
+		{#if threadBusyState.isBusy(threadId)}
+			<LoaderCircle class="animate-spin mr-2 shrink-0" size={14} />
+		{/if}
+		<span class="text-sm truncate w-full">{displayTitle}</span>
 
 		<ButtonWithTooltip
 			tooltip={isFavorite ? m.title_button_unstar() : m.title_button_star()}

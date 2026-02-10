@@ -23,11 +23,13 @@
 	import * as ContextMenu from "$lib/components/ui/context-menu/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
+	import { threadBusyState } from "$lib/stores/thread-busy-state.svelte";
 	import { cn } from "$lib/utils";
 	import {
 		Ghost,
 		HatGlasses,
 		LayoutGrid,
+		LoaderCircle,
 		MessageCircle,
 		MessageCircleQuestionMark,
 		MonitorSmartphone,
@@ -59,6 +61,12 @@
 	let triggerRef = $state<HTMLElement | null>(null);
 	let isCompact = $state(false);
 	let windowTabsInfo = $derived(tabBarState.windowTabsInfo);
+	let displayTitle = $derived.by(() => {
+		if (threadBusyState.getReason(tab.threadId) === "generating-title") {
+			return m.label_generating_title();
+		}
+		return tab.title;
+	});
 
 	$effect(() => {
 		if (!triggerRef?.parentElement) return;
@@ -98,7 +106,9 @@
 
 {#snippet tabIcon()}
 	{@const tabType = tab.type}
-	{#if tabType === "chat"}
+	{#if tabType === "chat" && threadBusyState.isBusy(tab.threadId)}
+		<LoaderCircle class="animate-spin" />
+	{:else if tabType === "chat"}
 		{#if tab.incognitoMode}
 			<Ghost />
 		{:else}
@@ -142,7 +152,7 @@
 				onTabClose(tab.id);
 			}
 		}}
-		title={tab.title}
+		title={displayTitle}
 		role="button"
 	>
 		<div bind:this={triggerRef} class="contents">
@@ -151,11 +161,11 @@
 			</div>
 
 			{#if !isCompact}
-				<span class="max-w-tab-title min-w-0 flex-1 truncate text-xs">{tab.title}</span>
+				<span class="max-w-tab-title min-w-0 flex-1 truncate text-xs">{displayTitle}</span>
 			{/if}
 			{#if closable}
 				<Button
-					title={isCompact ? tab.title : m.label_button_close()}
+					title={isCompact ? displayTitle : m.label_button_close()}
 					variant="ghost"
 					size="icon"
 					class={cn(

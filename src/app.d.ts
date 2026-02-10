@@ -24,6 +24,9 @@ declare global {
 	interface Window {
 		electron: ElectronAPI;
 		electronAPI: ElectronAPIExtension & {
+			threadStateService: ElectronAPIExtension["threadStateService"] & {
+				getBusyThreads(): Promise<Record<string, { isBusy: boolean; reason?: string }>>;
+			};
 			theme: {
 				setTheme: (theme: Theme) => void;
 				onThemeChange: (callback: (theme: Theme) => void) => void;
@@ -47,6 +50,9 @@ declare global {
 				callback: (data: { deletedModelIds: string[]; providerId?: string }) => void,
 			) => () => void;
 			onThreadListUpdate: (callback: (eventData: BroadcastEventData) => void) => () => void;
+			onThreadBusyStateChanged: (
+				callback: (data: { threadId: string; isBusy: boolean; reason?: string }) => void,
+			) => () => void;
 			onShellWindowFullscreenChange: (
 				callback: (payload: ShellWindowFullscreenChange) => void,
 			) => () => void;

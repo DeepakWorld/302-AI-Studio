@@ -452,6 +452,7 @@
 	"label_button_close_others": "Close Other Tabs",
 	"label_button_close_offside": "Close the Offside Tabs",
 	"label_button_generate_title": "Generate Title",
+	"label_generating_title": "Generating title...",
 	"label_button_screenshot_conversation": "Screenshot Conversation",
 	"placeholder_input_search": "Search...",
 	"ai_service": "AI service",

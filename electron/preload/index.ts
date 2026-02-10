@@ -79,6 +79,18 @@ if (process.contextIsolated) {
 				});
 			},
 
+			onThreadBusyStateChanged: (
+				callback: (data: { threadId: string; isBusy: boolean }) => void,
+			) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "thread-busy-state-changed") {
+						callback(eventData.data as { threadId: string; isBusy: boolean });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
+
 			onScreenshotTriggered: (callback: (data: { threadId: string }) => void) => {
 				const listener = (_: unknown, eventData: BroadcastEventData) => {
 					if (eventData.broadcastEvent === "trigger-screenshot") {

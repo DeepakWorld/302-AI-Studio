@@ -71,21 +71,17 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="min-w-[600px] max-h-[700px] flex flex-col p-6 gap-4" showCloseButton={false}>
+	<Dialog.Content
+		class="min-w-[600px] max-h-[700px] flex flex-col p-6 gap-4"
+		showCloseButton={false}
+	>
 		{#if currentView === "list"}
 			<div class="flex flex-col gap-4 flex-1 min-h-0">
 				<div class="flex items-center gap-2">
 					<div class="flex-1">
-						<SettingSearchInput
-							bind:value={searchTerm}
-							placeholder={m.mcp_search_placeholder()}
-						/>
+						<SettingSearchInput bind:value={searchTerm} placeholder={m.mcp_search_placeholder()} />
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={() => (currentView = "add")}
-					>
+					<Button variant="outline" size="sm" onclick={() => (currentView = "add")}>
 						<Plus class="h-4 w-4" />
 						{m.mcp_add()}
 					</Button>
@@ -133,7 +129,9 @@
 													{server.name || server.id}
 												</h3>
 												{#if server.description}
-													<p class="text-muted-fg text-left text-xs truncate">{server.description}</p>
+													<p class="text-muted-fg text-left text-xs truncate">
+														{server.description}
+													</p>
 												{/if}
 											</div>
 										</div>
@@ -149,11 +147,7 @@
 			</div>
 		{:else if currentView === "add"}
 			<div class="flex-1 overflow-y-auto min-h-0">
-				<McpServerForm
-					mode="add"
-					onBack={handleBackToList}
-					onSaveSuccess={handleServerAdded}
-				/>
+				<McpServerForm mode="add" onBack={handleBackToList} onSaveSuccess={handleServerAdded} />
 			</div>
 		{/if}
 	</Dialog.Content>
