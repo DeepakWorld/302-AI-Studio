@@ -163,7 +163,7 @@ class SsoStateManager {
 				}, 3000);
 			} else {
 				this.hasError = true;
-				toast.error(fetchResult.error || m.sso_error());
+				toast.error(m.sso_error());
 			}
 		} finally {
 			this.isLoading = false;

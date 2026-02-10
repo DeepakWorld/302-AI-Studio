@@ -15,6 +15,7 @@ import { initServer } from "./server/router";
 import {
 	appService,
 	deepLinkService,
+	localVibeService,
 	shortcutService,
 	trayService,
 	windowService,
@@ -90,14 +91,20 @@ if (!gotTheLock) {
 	// Quit when all windows are closed, except on macOS. There, it's common
 	// for applications and their menu bar to stay active until the user quits
 	// explicitly with Cmd + Q.
-	app.on("window-all-closed", () => {
-		if (!isMac) app.quit();
+	app.on("window-all-closed", async () => {
+		if (!isMac) {
+			// Stop local sandbox before quitting (for Windows/Linux)
+			console.log("[Main] All windows closed, stopping local sandbox...");
+			await localVibeService.stopLocalSandbox();
+			console.log("[Main] Local sandbox stopped, quitting app...");
+			app.quit();
+		}
 	});
 
 	// macOS specific handling for Cmd+Q to ensure proper cleanup
 	if (isMac) {
 		// Handle Cmd+Q (or menu quit) - ensure window close listeners fire
-		app.on("before-quit", (event) => {
+		app.on("before-quit", async (event) => {
 			if (UpdaterService.isInstallingUpdateNow()) return;
 
 			event.preventDefault();
@@ -109,6 +116,11 @@ if (!gotTheLock) {
 			windows.forEach((window) => {
 				window.close();
 			});
+
+			// Stop local sandbox before exiting (for macOS)
+			console.log("[Main] Stopping local sandbox before exit...");
+			const result = await localVibeService.stopLocalSandbox();
+			console.log("[Main] Local sandbox stop result:", result);
 
 			app.exit();
 		});

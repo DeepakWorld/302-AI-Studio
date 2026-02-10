@@ -7,6 +7,7 @@ import { m } from "$lib/paraglide/messages";
 import type { ChatMessage } from "$lib/types/chat";
 import {
 	type CodeAgentMetadata,
+	type CodeAgentType,
 	type Skill,
 	type ThinkingBudgetType,
 } from "@shared/storage/code-agent";
@@ -78,6 +79,7 @@ class ClaudeCodeAgentState {
 	selectedSessionRemark = $state("");
 	selectedSandboxId = $state<"auto" | string>("auto");
 	selectedSandboxRemark = $state("");
+	selectedWorkspacePath = $state<"new" | string>("new");
 
 	isUpdatingThinkingBudget = $state(false);
 
@@ -88,6 +90,10 @@ class ClaudeCodeAgentState {
 	skills = $derived(persistedClaudeCodeAgentState.current?.skills ?? []);
 	thinkingBudget = $derived(persistedClaudeCodeAgentState.current?.thinkingBudget ?? "off");
 	isManualNote = $derived(persistedClaudeCodeAgentState.current?.isManualNote ?? false);
+	currentWorkspacePath = $derived(
+		persistedClaudeCodeAgentState.current?.currentWorkspacePath ?? "",
+	);
+
 	agentMode = $derived.by<"new" | "existing">(() => {
 		return this.selectedSessionId === "new" ? "new" : "existing";
 	});
@@ -153,7 +159,9 @@ class ClaudeCodeAgentState {
 			.map((part) => part.text)
 			.join("\n");
 
-		if (!textContent.includes("**deploy sandbox successfully**")) return null;
+		if (!textContent.includes("**deploy sandbox successfully**")) {
+			return null;
+		}
 
 		// Pattern matches: {'success': True, 'status': '...', 'id': '...', 'url': '...', 'cover': '...'}
 		const deployInfoRegex =
@@ -227,8 +235,32 @@ class ClaudeCodeAgentState {
 		this.updateState({ currentSessionId: sessionId, isManualNote: false });
 	}
 
+	updateCurrentWorkspacePath(workspacePath: string): void {
+		this.updateState({ currentWorkspacePath: workspacePath });
+	}
+
+	updateLocalModeState(sessionId: string, workspacePath: string): void {
+		this.updateState({
+			currentSessionId: sessionId === "new" ? "" : sessionId,
+			currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
+			sandboxId: "",
+			isManualNote: false,
+		});
+	}
+
 	updateSandboxId(sandboxId: string): void {
 		this.updateState({ sandboxId });
+	}
+
+	/**
+	 * 批量重置 session、sandbox ID 和工作区路径，避免配置混乱
+	 */
+	resetSessionAndSandbox(type: CodeAgentType): void {
+		this.updateState({
+			currentSessionId: "",
+			sandboxId: type === "remote" ? "" : "local",
+			currentWorkspacePath: "",
+		});
 	}
 
 	updateSandboxRemark(sandboxRemark: string): void {
@@ -245,21 +277,6 @@ class ClaudeCodeAgentState {
 
 	updateThinkingBudget(thinkingBudget: ThinkingBudgetType) {
 		this.updateState({ thinkingBudget });
-
-		// if (this.sandboxId) {
-		// 	this.isUpdatingThinkingBudget = true;
-		// 	try {
-		// 		const { isOK } = await updateClaudeCodeSandboxThinkingBudget(
-		// 			this.sandboxId,
-		// 			THINKING_BUDGET_MAP[thinkingBudget],
-		// 		);
-		// 		if (!isOK) {
-		// 			// toast.error("Failed to update thinking budget");
-		// 		}
-		// 	} finally {
-		// 		this.isUpdatingThinkingBudget = false;
-		// 	}
-		// }
 	}
 
 	async handleAgentModeExecute(): Promise<{
@@ -336,6 +353,22 @@ class ClaudeCodeAgentState {
 		return { isOK: false };
 	}
 
+	/**
+	 * Handle local mode execution.
+	 * Local mode doesn't need sandbox verification - it returns a virtual sandboxInfo
+	 * with "local" sandboxId since local mode runs on the user's machine.
+	 */
+	handleLocalModeExecute(): { isOK: boolean; sandboxInfo: ClaudeCodeSandboxInfo } {
+		const sandboxInfo: ClaudeCodeSandboxInfo = {
+			sandboxId: "local",
+			sandboxRemark: "",
+			llmModel: this.model,
+			diskUsage: "normal",
+		};
+
+		return { isOK: true, sandboxInfo };
+	}
+
 	async handleCreateNewSandbox(): Promise<boolean> {
 		const { isOK, sandboxId } = await createClaudeCodeSandboxByIpc(
 			threadId,
@@ -398,29 +431,51 @@ class ClaudeCodeAgentState {
 	}
 
 	handleEnabled() {
-		const [isExistingMode, sandboxId, sessionId] = [
+		const [isExistingMode, sandboxId, sessionId, workspacePath] = [
 			this.agentMode === "existing",
 			this.selectedSandboxId,
 			this.selectedSessionId,
+			this.selectedWorkspacePath,
 		];
 
 		const updateData = isExistingMode
 			? {
 					sandboxId,
 					currentSessionId: sessionId,
+					currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
 				}
 			: {
 					sandboxId: sandboxId === "auto" ? "" : sandboxId,
 					currentSessionId: "",
+					currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
 				};
 
 		this.updateState(updateData);
 	}
 
+	/**
+	 * Handle local mode enabled - similar to handleEnabled but for local mode.
+	 * Converts selected values from localClaudeCodeSandboxState to current values
+	 * and persists them. Local mode doesn't use sandboxId.
+	 */
+	handleLocalEnabled(sessionId: string, workspacePath: string): void {
+		this.updateState({
+			currentSessionId: sessionId === "new" ? "" : sessionId,
+			currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
+			sandboxId: "local", // Local mode doesn't use sandbox
+			isManualNote: false,
+		});
+	}
+
 	init() {
-		const [currentSessionId, sandboxId] = [this.currentSessionId, this.sandboxId];
+		const [currentSessionId, sandboxId, currentWorkspacePath] = [
+			this.currentSessionId,
+			this.sandboxId,
+			this.currentWorkspacePath,
+		];
 		this.selectedSessionId = currentSessionId === "" ? "new" : currentSessionId;
 		this.selectedSandboxId = sandboxId === "" ? "auto" : sandboxId;
+		this.selectedWorkspacePath = currentWorkspacePath === "" ? "new" : currentWorkspacePath;
 	}
 }
 

@@ -9,6 +9,7 @@ import { type } from "arktype";
 import JSZip from "jszip";
 import ky from "ky";
 import { _302AIKy } from "./core/_302ai-ky";
+import { localCodeAgentKy } from "./core/code-agent-ky";
 
 export const sessionInfoSchema = type({
 	session_id: "string",
@@ -55,7 +56,6 @@ export async function createClaudeCodeSandbox(
 const updateClaudeCodeSandboxResponse = type({
 	success: "boolean",
 	data: {
-		message: "string",
 		sandbox_id: "string",
 	},
 });
@@ -74,7 +74,7 @@ export async function updateClaudeCodeSandbox(
 	max_thinking_token?: number,
 ): Promise<UpdateClaudeCodeSandboxResponse> {
 	try {
-		const response = await _302AIKy
+		const response = await (sandbox_id === "local" ? localCodeAgentKy : _302AIKy)
 			.post("302/claude-code/sandbox/reset", {
 				json: { sandbox_id, llm_model, sandbox_name, max_thinking_token, auto_pause_seconds: 30 },
 			})
@@ -234,12 +234,13 @@ export type AddMcpSchema = typeof addMcpSchemaResponse.infer;
 export async function addClaudeCodeSandboxMCP(
 	sandboxId: string,
 	MCPInfos: { url: string; name: string }[],
+	mode: string,
 ): Promise<AddMcpSchema> {
 	const commands = MCPInfos.map(
 		(info) => `claude mcp add --transport http ${info.name} ${info.url}`,
 	);
 	try {
-		const response = await _302AIKy
+		const response = await (mode === "remote" ? _302AIKy : localCodeAgentKy)
 			.post("302/claude-code/sandbox/mcp/add", {
 				json: { sandbox_id: sandboxId, mcp_servers: commands },
 			})
@@ -286,8 +287,9 @@ export type BatchUploadFileResponse = typeof batchUploadFileResponseSchema.infer
  */
 export async function batchUploadFile(
 	request: BatchUploadFileRequest,
+	mode: string,
 ): Promise<BatchUploadFileResponse> {
-	const response = await _302AIKy
+	const response = await (mode === "remote" ? _302AIKy : localCodeAgentKy)
 		.post("302/claude-code/sandbox/file/upload/batch", {
 			json: request,
 			timeout: 300000,
@@ -398,5 +400,39 @@ export async function getSkillContent(
 	} catch (error) {
 		console.error(`[getSkillContent] Failed to get skill content for ${skillName}:`, error);
 		return null;
+	}
+}
+
+export const localSandboxHealthResponseSchema = type({
+	success: "boolean",
+	status: "string",
+});
+export type LocalSandboxHealthResponse = typeof localSandboxHealthResponseSchema.infer;
+
+export async function getLocalSandboxHealthStatus(): Promise<LocalSandboxHealthResponse> {
+	try {
+		const response = await localCodeAgentKy.get("302/claude-code/sandbox/health").json();
+		console.log("[getLocalSandboxHealthStatus] Health check response:", response);
+		const validated = localSandboxHealthResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate health check response:", validated.summary);
+			throw new Error(`Invalid health check response: ${validated.summary}`);
+		}
+		return validated;
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const lowerMsg = errorMessage.toLowerCase();
+		const isExpectedConnectionError =
+			lowerMsg.includes("fetch failed") ||
+			lowerMsg.includes("failed to fetch") ||
+			lowerMsg.includes("econnrefused") ||
+			lowerMsg.includes("connection refused") ||
+			lowerMsg.includes("etimedout") ||
+			lowerMsg.includes("timed out");
+
+		if (!isExpectedConnectionError) {
+			console.error("[getLocalSandboxHealthStatus] Health check failed:", error);
+		}
+		throw error;
 	}
 }

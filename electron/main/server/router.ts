@@ -74,6 +74,7 @@ export type RouterRequestBody = {
 	inTaskOrchestrationMode?: boolean;
 	workspacePath?: string;
 	thinkingBudget?: ThinkingBudgetType;
+	vibeMode?: string;
 	contextSummary?: string;
 	compressedMessageCount?: number;
 };
@@ -1576,14 +1577,13 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		inTaskOrchestrationMode,
 		workspacePath,
 		thinkingBudget,
+		vibeMode,
 	} = await c.req.json<RouterRequestBody>();
 
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);
 
 	// Notify the frontend that sandbox is ready (triggers preview panel to open)
-	if (sandboxId) {
-		tabService.notifySandboxCreated(threadId, sandboxId);
-	}
+	tabService.notifySandboxCreated(threadId, sandboxId);
 
 	console.log(
 		"[302ai-code-agent] Received request",
@@ -1600,6 +1600,7 @@ app.post("/chat/302ai-code-agent", async (c) => {
 			inTaskOrchestrationMode,
 			workspacePath,
 			thinkingBudget,
+			vibeMode,
 		}),
 	);
 
@@ -1771,7 +1772,7 @@ CHECK BEFORE EVERY ACTION:
 	const openAiMessages = convertAiSdkMessagesToOpenAiMessages(messagesToConvert);
 
 	const requestBody = {
-		model: sandboxId,
+		model: (vibeMode ?? "remote") === "remote" ? sandboxId : model,
 		messages: openAiMessages,
 		session_id: sessionId ?? "",
 		structured_output: true,
@@ -1839,21 +1840,33 @@ CHECK BEFORE EVERY ACTION:
 			controller.enqueue(encoder.encode(immediateStartEvent));
 			console.log("[302ai-code-agent] Sent immediate start event");
 
+			// Upload attachments after sending start event (non-blocking UX)
+			// This allows the UI to show "AI is typing" immediately while upload happens in background
+			// if (sandboxId && workspacePath) {
+			// 	try {
+			// 		await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
+			// 	} catch (uploadError) {
+			// 		console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
+			// 		sendStreamError(controller, "Failed to upload attachments");
+			// 		return;
+			// 	}
+			// }
 			try {
-				// Upload attachments after sending start event (non-blocking UX)
-				// This allows the UI to show "AI is typing" immediately while upload happens in background
-				if (sandboxId && workspacePath) {
-					try {
-						await uploadAttachmentsFromMessages(sandboxId, workspacePath, messages);
-					} catch (uploadError) {
-						console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
-						sendStreamError(controller, "Failed to upload attachments");
-						streamClosed = true; // sendStreamError closes the controller
-						console.log("[302ai-code-agent] Error sent, stream closed via sendStreamError");
-						return;
-					}
-				}
+				await uploadAttachmentsFromMessages(
+					sandboxId,
+					workspacePath ?? "",
+					vibeMode ?? "remote",
+					messages,
+				);
+			} catch (uploadError) {
+				console.error("[302ai-code-agent] Failed to upload attachments:", uploadError);
+				sendStreamError(controller, "Failed to upload attachments");
+				streamClosed = true; // sendStreamError closes the controller
+				console.log("[302ai-code-agent] Error sent, stream closed via sendStreamError");
+				return;
+			}
 
+			try {
 				const response = await responsePromise;
 
 				console.log("[302ai-code-agent] Response status:", response.status, response.statusText);

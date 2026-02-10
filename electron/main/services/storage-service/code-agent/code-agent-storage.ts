@@ -20,6 +20,14 @@ class CodeAgentStorage extends StorageService<CodeAgentConfigMetadata> {
 			this.removeItemInternal(`claude-code-agent-state-${threadId}`),
 		]);
 	}
+
+	async getCodeAgentConfig(
+		threadId: string,
+	): Promise<{ isOK: boolean; data: CodeAgentConfigMetadata }> {
+		const data = await this.getItemInternal(`code-agent-config-state-${threadId}`);
+		if (isNull(data)) return { isOK: false, data: {} as CodeAgentConfigMetadata };
+		return { isOK: true, data };
+	}
 }
 
 export const codeAgentStorage = new CodeAgentStorage();

@@ -40,9 +40,11 @@
 	interface Props {
 		mode: "add" | "edit";
 		serverId?: string;
+		onBack?: () => void;
+		onSaveSuccess?: (serverId: string) => void;
 	}
 
-	let { mode, serverId }: Props = $props();
+	let { mode, serverId, onBack, onSaveSuccess }: Props = $props();
 
 	const server = $derived(mode === "edit" && serverId ? mcpState.getServer(serverId) : null);
 
@@ -120,7 +122,11 @@
 	];
 
 	function handleBack() {
-		goto("/settings/mcp-settings");
+		if (onBack) {
+			onBack();
+		} else {
+			goto("/settings/mcp-settings");
+		}
 	}
 
 	function addHeader() {
@@ -224,7 +230,11 @@
 				toast.success(m.mcp_success_update());
 			}
 
-			goto("/settings/mcp-settings");
+			if (onSaveSuccess) {
+				onSaveSuccess(tempServerId);
+			} else {
+				goto("/settings/mcp-settings");
+			}
 		} catch (error) {
 			console.error("Failed to save MCP server:", error);
 			toast.error(mode === "add" ? m.mcp_error_save() : m.mcp_error_update());
@@ -241,7 +251,11 @@
 		if (mode === "edit" && serverId) {
 			mcpState.removeServer(serverId);
 			toast.success(m.mcp_success_delete());
-			goto("/settings/mcp-settings");
+			if (onBack) {
+				onBack();
+			} else {
+				goto("/settings/mcp-settings");
+			}
 		}
 	}
 

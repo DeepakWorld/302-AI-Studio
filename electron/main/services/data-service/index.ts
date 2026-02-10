@@ -440,6 +440,34 @@ export class DataService {
 	}
 
 	/**
+	 * Select a folder for upload (returns path only, no zip)
+	 * @returns Object with folder path and folder name, or null if cancelled
+	 */
+	async selectFolderForUpload(
+		_event: IpcMainInvokeEvent,
+	): Promise<{ folderPath: string; folderName: string } | null> {
+		try {
+			// Show folder selection dialog
+			const { canceled, filePaths } = await dialog.showOpenDialog({
+				title: "Select Folder to Upload",
+				properties: ["openDirectory"],
+			});
+
+			if (canceled || filePaths.length === 0) {
+				return null;
+			}
+
+			const folderPath = filePaths[0];
+			const folderName = folderPath.split(/[/\\]/).pop() || "folder";
+
+			return { folderPath, folderName };
+		} catch (error) {
+			console.error("Failed to select folder:", error);
+			throw error;
+		}
+	}
+
+	/**
 	 * Export chat content to a file
 	 * @param content - The content to export
 	 * @param extension - File extension (md, txt, json, html)

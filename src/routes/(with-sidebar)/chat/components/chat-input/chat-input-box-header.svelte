@@ -19,7 +19,11 @@
 		{ key: "vibe", label: m.title_code_agent() },
 	]);
 	const description = $derived(
-		selectedMode === "chat" ? m.title_chat_mode_description() : m.title_code_agent_description(),
+		selectedMode === "chat"
+			? m.title_chat_mode_description()
+			: codeAgentState.type === "local"
+				? m.title_local_mode_description()
+				: m.title_code_agent_description(),
 	);
 
 	function handleModeSelect(key: string) {

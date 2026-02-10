@@ -1,11 +1,16 @@
 import { deleteSession } from "$lib/api/sandbox-session";
 import { validate302Provider } from "$lib/api/webserve-deploy";
+import type { GroupedSelectData } from "$lib/components/buss/settings/setting-select.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+import { formatDateTimeShort } from "$lib/utils/date-format";
 import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
+import { SvelteSet } from "svelte/reactivity";
 import { toast } from "svelte-sonner";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
+import { codeAgentState } from "./code-agent-state.svelte";
+import { persistedLocalClaudeCodeSessionsState } from "./local-claude-code-sandbox-state.svelte";
 
 export const persistedClaudeCodeSandboxState = new PersistedState<ClaudeCodeSandboxInfo[]>(
 	"CodeAgentStorage:claude-code-sandbox-state",
@@ -61,11 +66,15 @@ class ClaudeCodeSandboxState {
 				.flatMap((sandbox) => sandbox.sessionInfos)
 				.map((session) => {
 					const name = session.note && session.note !== "" ? session.note : session.sessionId;
+					// Filter out zero/default dates (e.g. 0001-01-01)
+					const date = new Date(session.usedAt);
+					const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+
 					return {
-						key: session.workspacePath,
+						key: session.sessionId,
 						label: name,
 						value: session.sessionId,
-						extra: session.usedAt,
+						extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
 					};
 				}),
 		];
@@ -80,21 +89,94 @@ class ClaudeCodeSandboxState {
 				groupLabel: sandbox.sandboxRemark || sandbox.sandboxId,
 				items: [...sandbox.sessionInfos]
 					.sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime())
-					.map((session) => ({
-						key: session.workspacePath,
-						label: session.note || session.sessionId,
-						value: session.sessionId,
-						extra: session.usedAt,
-					})),
+					.map((session) => {
+						// Filter out zero/default dates
+						const date = new Date(session.usedAt);
+						const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+
+						return {
+							key: session.sessionId,
+							label: session.note || session.sessionId,
+							value: session.sessionId,
+							extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
+						};
+					}),
 			})),
+		};
+	});
+
+	/**
+	 * Workspace path options for the dropdown
+	 */
+	workspacePathOptions = $derived.by((): GroupedSelectData => {
+		const sandboxList = persistedClaudeCodeSandboxState.current;
+
+		// Extract all unique workspacePaths from all sessions across all sandboxes
+		const allWorkspacePaths = new SvelteSet<string>();
+		for (const sandbox of sandboxList) {
+			for (const session of sandbox.sessionInfos) {
+				if (session.workspacePath && session.workspacePath !== "") {
+					allWorkspacePaths.add(session.workspacePath);
+				}
+			}
+		}
+
+		const pathList = Array.from(allWorkspacePaths);
+
+		return {
+			standalone: [{ key: "new", label: m.local_platform_new_work_directory(), value: "new" }],
+			groups:
+				pathList.length > 0
+					? [
+							{
+								groupKey: "existing",
+								groupLabel: m.local_platform_existing_work_directory(),
+								items: pathList.map((path) => {
+									// Find all sessions that use this workspace path
+									const relatedSessions: { note: string | null; sessionId: string }[] = [];
+									for (const sandbox of sandboxList) {
+										for (const session of sandbox.sessionInfos) {
+											if (session.workspacePath === path) {
+												relatedSessions.push({
+													note: session.note,
+													sessionId: session.sessionId,
+												});
+											}
+										}
+									}
+									const sessionLabel = [
+										...new SvelteSet(relatedSessions.map((s) => s.note || m.select_session_new())),
+									].join(", ");
+									return {
+										key: path,
+										label: path,
+										value: path,
+										extra: m.local_platform_session({ session: sessionLabel }),
+									};
+								}),
+							},
+						]
+					: [],
 		};
 	});
 
 	/**
 	 * Get the workspace path for the current session
 	 * Returns the session's workspacePath if available, empty string otherwise
+	 * Supports both Local and Remote modes
 	 */
 	currentSessionWorkspacePath = $derived.by(() => {
+		// Local 模式：从 local sessions 存储中获取
+		if (codeAgentState.type === "local") {
+			const sessionId = claudeCodeAgentState.currentSessionId;
+			if (!sessionId) return "";
+
+			const localSessions = persistedLocalClaudeCodeSessionsState.current;
+			const session = localSessions.find((s) => s.session_id === sessionId);
+			return session?.workspace_path || "";
+		}
+
+		// Remote 模式：原有的逻辑（从 sandbox state 获取）
 		const sandboxId = claudeCodeAgentState.sandboxId;
 		const sessionId = claudeCodeAgentState.currentSessionId;
 
@@ -185,6 +267,12 @@ class ClaudeCodeSandboxState {
 				claudeCodeAgentState.selectedSessionRemark =
 					targetSandbox.sessionInfos.find((sessionInfo) => sessionInfo.sessionId === sessionId)
 						?.note || "";
+
+				// Sync workspacePath when selecting a session
+				const session = targetSandbox.sessionInfos.find((s) => s.sessionId === sessionId);
+				if (session?.workspacePath) {
+					claudeCodeAgentState.selectedWorkspacePath = session.workspacePath;
+				}
 			}
 		}
 
@@ -210,6 +298,11 @@ class ClaudeCodeSandboxState {
 		}
 	}
 
+	handleWorkspaceSelected(workspacePath: string): void {
+		claudeCodeAgentState.selectedWorkspacePath = workspacePath;
+		// Note: According to requirements, we do NOT reset session to "new" when selecting a workspace
+	}
+
 	async deleteSession(sandboxId: string, sessionId: string): Promise<boolean> {
 		const providerResult = validate302Provider(persistedProviderState.current);
 		if (!providerResult.valid || !providerResult.provider) {
@@ -217,7 +310,7 @@ class ClaudeCodeSandboxState {
 			return false;
 		}
 
-		const result = await deleteSession(providerResult.provider, {
+		const result = await deleteSession({
 			sandbox_id: sandboxId,
 			session_id: sessionId,
 		});
@@ -229,7 +322,7 @@ class ClaudeCodeSandboxState {
 			// Refresh sessions after successful deletion
 			await this.refreshSessions(sandboxId);
 		} else {
-			toast.error(result.error || m.delete_session_failed());
+			toast.error(m.delete_session_failed());
 		}
 
 		return result.success;

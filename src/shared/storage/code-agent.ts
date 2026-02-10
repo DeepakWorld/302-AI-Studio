@@ -67,7 +67,7 @@ export type CodeAgentSandboxStatus = typeof codeAgentSandboxStatus.infer;
 export const claudeCodeSessionInfo = type({
 	sessionId: "string",
 	workspacePath: "string",
-	note: "string",
+	note: "string | null",
 	usedAt: "string",
 });
 export type ClaudeCodeSessionInfo = typeof claudeCodeSessionInfo.infer;
@@ -120,3 +120,15 @@ export const taskSchema = type({
 });
 export const taskListSchema = taskSchema.array();
 export type Task = typeof taskSchema.infer;
+
+export const localSessionInfoSchema = type({
+	session_id: "string",
+	workspace_path: "string",
+	note: "string | null",
+});
+export type LocalSessionInfo = typeof localSessionInfoSchema.infer;
+export const listLocalClaudeCodeSessionsResponse = type({
+	success: "boolean",
+	session_list: localSessionInfoSchema.array(),
+});
+export type ListLocalClaudeCodeSessionsResponse = typeof listLocalClaudeCodeSessionsResponse.infer;

@@ -7,6 +7,7 @@ import {
 	updateClaudeCodeSandbox,
 } from "@electron/main/apis/code-agent";
 import type {
+	CodeAgentConfigMetadata,
 	CodeAgentCreateResult,
 	CreateClaudeCodeSandboxRequest,
 } from "@shared/storage/code-agent";
@@ -145,6 +146,13 @@ export class CodeAgentService {
 	async getClaudeCodeSandboxId(threadId: string): Promise<{ isOK: boolean; sandboxId: string }> {
 		const { isOK, sandboxId } = await claudeCodeStorage.getClaudeCodeSandboxId(threadId);
 		return { isOK, sandboxId };
+	}
+
+	async getCodeAgentConfig(
+		threadId: string,
+	): Promise<{ isOK: boolean; data: CodeAgentConfigMetadata }> {
+		const { isOK, data } = await codeAgentStorage.getCodeAgentConfig(threadId);
+		return { isOK, data };
 	}
 
 	// ******************************* IPC Methods ******************************* //
@@ -411,9 +419,10 @@ export class CodeAgentService {
 		_event: IpcMainInvokeEvent,
 		sandboxId: string,
 		MCPInfos: { url: string; name: string }[],
+		mode: string,
 	): Promise<{ isOK: boolean }> {
 		try {
-			const result = await addClaudeCodeSandboxMCP(sandboxId, MCPInfos);
+			const result = await addClaudeCodeSandboxMCP(sandboxId, MCPInfos, mode);
 			return { isOK: result.success };
 		} catch (error) {
 			console.error("Error adding Claude code sandbox MCP:", error);

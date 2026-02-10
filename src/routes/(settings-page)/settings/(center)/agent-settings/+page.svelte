@@ -1,8 +1,10 @@
 <script lang="ts">
+	import UnsupportPanel from "$lib/components/buss/local-agent-panel/unsupport-panel.svelte";
 	import { SettingSwitchItem } from "$lib/components/buss/settings";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { codeAgentGlobalConfigsState } from "$lib/stores/code-agent/code-agent-global-configs-state.svelte";
+	import { isLinux, isMac } from "$lib/utils/platform";
 	import LocalPlatform from "./local-platform.svelte";
 	import RemotePlatform from "./remote-platform.svelte";
 
@@ -12,10 +14,12 @@
 		{
 			key: "remote",
 			label: m.title_remote(),
+			description: m.title_remote_platform_description(),
 		},
 		{
 			key: "local",
 			label: m.title_local(),
+			description: m.title_local_platform_description(),
 		},
 	];
 
@@ -34,6 +38,8 @@
 			options={platformOptions}
 			selectedKey={selectedPlatform}
 			onSelect={handlePlatformSelect}
+			class="!h-[52px]"
+			thumbClass="!h-[40px]"
 		/>
 	</div>
 
@@ -51,6 +57,10 @@
 		<DeployedWebsitesList />
 		<RemotePlatform />
 	{:else if selectedPlatform === "local"}
-		<LocalPlatform />
+		{#if isMac || isLinux}
+			<LocalPlatform />
+		{:else}
+			<UnsupportPanel />
+		{/if}
 	{/if}
 </div>

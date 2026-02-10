@@ -24,6 +24,9 @@ declare global {
 	interface Window {
 		electron: ElectronAPI;
 		electronAPI: ElectronAPIExtension & {
+			threadStateService: ElectronAPIExtension["threadStateService"] & {
+				getBusyThreads(): Promise<Record<string, { isBusy: boolean; reason?: string }>>;
+			};
 			theme: {
 				setTheme: (theme: Theme) => void;
 				onThemeChange: (callback: (theme: Theme) => void) => void;
@@ -47,6 +50,9 @@ declare global {
 				callback: (data: { deletedModelIds: string[]; providerId?: string }) => void,
 			) => () => void;
 			onThreadListUpdate: (callback: (eventData: BroadcastEventData) => void) => () => void;
+			onThreadBusyStateChanged: (
+				callback: (data: { threadId: string; isBusy: boolean; reason?: string }) => void,
+			) => () => void;
 			onShellWindowFullscreenChange: (
 				callback: (payload: ShellWindowFullscreenChange) => void,
 			) => () => void;
@@ -87,6 +93,30 @@ declare global {
 			skill: {
 				onSkillImportRequested: (callback: (data: { url: string }) => void) => () => void;
 			};
+			onInstallLog: (
+				callback: (data: {
+					step: string;
+					type: "start" | "stdout" | "stderr" | "complete" | "error";
+					data: string;
+				}) => void,
+			) => () => void;
+			onPodmanHealthCheck: (
+				callback: (data: { isOk: boolean; isHealth: boolean; timestamp: number }) => void,
+			) => () => void;
+			onLocalSandboxHealthCheck: (
+				callback: (data: {
+					isOk: boolean;
+					isHealth: boolean;
+					error?: string;
+					timestamp: number;
+				}) => void,
+			) => () => void;
+			onLocalSandboxStateChanged: (
+				callback: (data: { starting?: boolean; running?: boolean }) => void,
+			) => () => void;
+			onWslRestartRequired: (
+				callback: (data: { reason: string; message: string }) => void,
+			) => () => void;
 		};
 		windowId: string;
 		tab: Tab;

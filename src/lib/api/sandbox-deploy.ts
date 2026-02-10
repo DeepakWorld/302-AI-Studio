@@ -1,5 +1,6 @@
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 import { type } from "arktype";
-import { _302AIKy } from "./core/_302ai-ky";
+import { getCodeAgentKy } from "./utils";
 
 export const deploySandboxRequestSchema = type({
 	sandbox_id: "string",
@@ -22,9 +23,19 @@ export async function deploySandboxProject(
 	request: DeploySandboxRequest,
 ): Promise<DeploySandboxResponse> {
 	try {
-		const response = await _302AIKy
+		const kyInstance = await getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						session_id: request.session_id,
+					}
+				: request;
+
+		const response = await kyInstance
 			.post("302/claude-code/sandbox/deploy", {
-				json: request,
+				json: requestBody,
 			})
 			.json();
 

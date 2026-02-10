@@ -4,8 +4,11 @@ import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 import { chatState } from "../chat-state.svelte";
 import { mcpState } from "../mcp-state.svelte";
+import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
+import { localClaudeCodeSandboxState } from "./local-claude-code-sandbox-state.svelte";
+import { localEnvState } from "./local-env-state.svelte";
 import { fileToBase64 } from "./utils";
 
 const { addClaudeCodeSandboxMCP } = window.electronAPI.codeAgentService;
@@ -15,6 +18,50 @@ class CodeAgentSendMessageButtonState {
 
 	showLackOfDiskDialog = $state(false);
 	isChecking = $state(false);
+
+	/**
+	 * Ensures the local sandbox is ready for use in local mode
+	 * - If not in local mode, returns success immediately
+	 * - If in local mode, checks and starts the sandbox if needed
+	 * - Shows toast notifications for starting/started states
+	 * - Uses localEnvState.sandboxStarting for shared loading state
+	 * - Updates codeAgentState.localBaseUrl on success
+	 * @returns { isOk: boolean; error?: string }
+	 */
+	async ensureLocalSandboxReady(): Promise<{ isOk: boolean; error?: string }> {
+		// Only check for local mode
+		if (codeAgentState.type !== "local") {
+			return { isOk: true };
+		}
+
+		this.isChecking = true;
+		try {
+			const result = await localEnvState.ensureSandboxRunning();
+
+			if (!result.isOk) {
+				return { isOk: false, error: result.error };
+			}
+
+			// Update localBaseUrl with the port
+			if (result.port) {
+				codeAgentState.localBaseUrl = `http://localhost:${result.port}/api/v1`;
+			}
+
+			// Show success toast only when actually started (not already running)
+			if (!result.wasAlreadyRunning) {
+				toast.success(m.code_agent_local_sandbox_started());
+				console.log("[CodeAgent] Local sandbox started successfully on port:", result.port);
+			}
+
+			return { isOk: true };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[CodeAgent] Failed to ensure local sandbox ready:", errorMessage);
+			return { isOk: false, error: errorMessage };
+		} finally {
+			this.isChecking = false;
+		}
+	}
 
 	async #attachmentToBase64(attachment: {
 		file?: unknown;
@@ -97,6 +144,14 @@ class CodeAgentSendMessageButtonState {
 		this.isChecking = true;
 
 		try {
+			// Ensure local sandbox is running if in local mode
+			const localSandboxResult = await this.ensureLocalSandboxReady();
+			if (!localSandboxResult.isOk) {
+				toast.error(m.code_agent_local_sandbox_start_failed());
+				this.isChecking = false;
+				return;
+			}
+
 			if (chatState.selectedModel && codeAgentState.currentModel !== chatState.selectedModel.id) {
 				codeAgentState.updateSandboxModel(chatState.selectedModel.id);
 			}
@@ -117,12 +172,24 @@ class CodeAgentSendMessageButtonState {
 					const { workspace_path } = await initProject({
 						sandboxId: sandboxInfo.sandboxId,
 						sessionId,
+						workspacePath: codeAgentState.currentWorkspacePath,
 					});
 
 					workspacePath = workspace_path;
 
+					// Update currentWorkspacePath with the actual path from server
+					if (workspace_path) {
+						claudeCodeAgentState.updateCurrentWorkspacePath(workspace_path);
+					}
+
 					// Refresh sessions to sync the new workspace_path to local storage
-					await window.electronAPI.codeAgentService.updateClaudeCodeSessions(sandboxInfo.sandboxId);
+					if (codeAgentState.type === "local") {
+						await localClaudeCodeSandboxState.refreshSessions();
+					} else {
+						await window.electronAPI.codeAgentService.updateClaudeCodeSessions(
+							sandboxInfo.sandboxId,
+						);
+					}
 
 					// Collect all files to upload in a single batch request
 					const filesToUpload: Array<{ content: string; save_path: string }> = [];
@@ -229,7 +296,7 @@ class CodeAgentSendMessageButtonState {
 					const infos = mcpState.getMCPInfosByIds(chatState.mcpServerIds);
 					if (infos.length > 0) {
 						try {
-							await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, infos);
+							await addClaudeCodeSandboxMCP(sandboxInfo.sandboxId, infos, codeAgentState.type);
 						} catch (error) {
 							console.error("Failed to add MCP servers:", error);
 						}

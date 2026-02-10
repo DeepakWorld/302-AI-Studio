@@ -19,7 +19,6 @@
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
 	import { chatState } from "$lib/stores/chat-state.svelte";
-	// Import directly from source files to avoid circular dependency
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
@@ -59,9 +58,9 @@
 
 	async function handleOverlayAction(type: "enabled" | "disabled" | "cancel" | "close") {
 		if (type === "enabled") {
-			codeAgentState.updateEnabled(true);
+			codeAgentState.updateEnabled(true, false);
 		} else if (type === "close") {
-			codeAgentState.updateEnabled(false);
+			codeAgentState.updateEnabled(false, false);
 		}
 
 		onClose();
@@ -107,7 +106,7 @@
 			groupedOptions={claudeCodeSandboxState.groupedSessions}
 			placeholder={m.select_session_placeholder()}
 			{disabled}
-			contentClass="max-w-[600px]"
+			contentClass="w-[var(--bits-select-anchor-width)]"
 			onValueChange={(v) => claudeCodeSandboxState.handleSessionSelected(v)}
 		/>
 	</div>
@@ -162,7 +161,23 @@
 			onValueChange={(v) => claudeCodeSandboxState.handleSelectSandbox(v)}
 			disabled={disabled || isRefreshing}
 			class="!bg-background dark:!bg-background"
-			contentClass="max-w-[500px]"
+			contentClass="w-[var(--bits-select-anchor-width)]"
+		/>
+	</div>
+{/snippet}
+
+{#snippet selectWorkspacePath()}
+	<div class="gap-settings-gap flex flex-col">
+		<Label class="text-label-fg text-xs">{m.local_platform_work_directory()}</Label>
+		<SettingSelect
+			name="workspacePath"
+			value={claudeCodeAgentState.selectedWorkspacePath}
+			groupedOptions={claudeCodeSandboxState.workspacePathOptions}
+			placeholder={m.local_platform_new_work_directory_placeholder()}
+			onValueChange={(v) => claudeCodeSandboxState.handleWorkspaceSelected(v)}
+			disabled={disabled || isRefreshing}
+			class="!bg-background dark:!bg-background"
+			contentClass="w-[var(--bits-select-anchor-width)]"
 		/>
 	</div>
 {/snippet}
@@ -185,6 +200,7 @@
 		<Collapsible.Content class="pb-2">
 			<div class="flex flex-col gap-2">
 				{@render selectSandbox()}
+				{@render selectWorkspacePath()}
 
 				<Field.Description class="text-sm">
 					{m.description_advanced_settings()}

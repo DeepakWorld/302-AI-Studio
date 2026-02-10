@@ -7,6 +7,7 @@
 		key: string;
 		icon?: typeof IconType;
 		label: string;
+		description?: string;
 		iconSize?: number;
 	}
 
@@ -110,11 +111,18 @@
 				onmousedown={() => handleSelect(option.key)}
 				aria-pressed={isActive}
 			>
-				{#if option.icon}
-					<!-- {@html option.icon} -->
-					<option.icon size={option.iconSize} />
-				{/if}
-				<span>{option.label}</span>
+				<div class="flex flex-col items-center justify-center">
+					<div class="flex items-center justify-center gap-1">
+						{#if option.icon}
+							<!-- {@html option.icon} -->
+							<option.icon size={option.iconSize} />
+						{/if}
+						<span>{option.label}</span>
+					</div>
+					{#if option.description}
+						<span class="text-[10px] opacity-60 leading-tight">{option.description}</span>
+					{/if}
+				</div>
 			</button>
 		{/each}
 	</div>

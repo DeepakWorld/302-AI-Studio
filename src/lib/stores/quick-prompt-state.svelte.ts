@@ -3,10 +3,10 @@ import {
 	type QuickPromptCategory,
 	QUICK_PROMPT_CATEGORIES,
 } from "$lib/datas/quick-prompts";
-import { quickPromptsZh } from "$lib/datas/quick-prompts-zh";
 import { quickPromptsEn } from "$lib/datas/quick-prompts-en";
-import { SvelteMap } from "svelte/reactivity";
+import { quickPromptsZh } from "$lib/datas/quick-prompts-zh";
 import { getLocale } from "$lib/paraglide/runtime";
+import { SvelteMap } from "svelte/reactivity";
 
 class QuickPromptState {
 	isOpen = $state(false);

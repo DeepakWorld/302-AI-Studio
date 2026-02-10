@@ -24,11 +24,13 @@ import { withLoadingState } from "./utils";
 export class CodeAgentTaskboardState {
 	#currentRetryCount = 0;
 	readonly #MAX_RETRY_COUNT = 3;
+	#autoExecutionHandler: ((content: string) => Promise<boolean>) | null = null;
 
 	isLoading = $state(false);
 	tasklist = $state<Task[]>([]);
 	taskboardStatus = $state<"idle" | "running" | "waiting_to_stop" | "waiting_for_chat">("idle");
 	retryExhausted = $state(false);
+	isAutoPaused = $state(false);
 
 	// Input state
 	inputValue = $state("");
@@ -80,9 +82,9 @@ export class CodeAgentTaskboardState {
 			.with("waiting_to_stop", () => m.taskboard_button_waiting_to_stop())
 			.with("waiting_for_chat", () => m.taskboard_button_waiting_for_chat())
 			.with("idle", () => {
-				if (this.tasklist.some((t) => t.status === "in_progress")) {
+				if (this.isAutoPaused) return m.taskboard_button_resume();
+				if (this.tasklist.some((t) => t.status === "in_progress"))
 					return m.taskboard_button_resume();
-				}
 				return m.taskboard_button_run();
 			})
 			.exhaustive();
@@ -92,6 +94,7 @@ export class CodeAgentTaskboardState {
 
 	stopExecution() {
 		this.taskboardStatus = "idle";
+		this.isAutoPaused = true;
 		if (this.currentExecutingTaskId) {
 			this.#updateTaskStatus(this.currentExecutingTaskId, { status: "pending" });
 		}
@@ -103,7 +106,35 @@ export class CodeAgentTaskboardState {
 	cancelWaitingForChat() {
 		if (this.taskboardStatus === "waiting_for_chat") {
 			this.taskboardStatus = "idle";
+			this.isAutoPaused = true;
 		}
+	}
+
+	registerExecutionHandler(fn: ((content: string) => Promise<boolean>) | null) {
+		this.#autoExecutionHandler = fn;
+		void this.autoStartIfPossible();
+	}
+
+	async autoStartIfPossible(): Promise<void> {
+		if (!this.#autoExecutionHandler) return;
+		if (codeAgentState.inPlanMode) return;
+
+		const hasPendingTasks = this.tasklist.some((t) => t.status === "pending");
+		if (!hasPendingTasks && this.taskboardStatus === "idle" && this.isAutoPaused) {
+			this.isAutoPaused = false;
+			return;
+		}
+
+		if (
+			this.taskboardStatus !== "idle" ||
+			this.isAutoPaused ||
+			this.retryExhausted ||
+			!hasPendingTasks
+		) {
+			return;
+		}
+
+		await this.#beginExecution(this.#autoExecutionHandler);
 	}
 
 	// ==================== Input Methods ====================
@@ -347,45 +378,57 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Starts the auto execution of tasks.
 	 */
-	async startAutoExecution(fn: (content: string) => Promise<void>): Promise<void> {
+	async startAutoExecution(fn: (content: string) => Promise<boolean>): Promise<void> {
 		match(this.taskboardStatus)
 			.with("running", () => {
 				// 正在运行时点击 -> 暂停
+				this.isAutoPaused = true;
 				this.taskboardStatus = "waiting_to_stop";
 			})
 			.with("waiting_to_stop", () => {
 				// 暂停中点击 -> 恢复运行
+				this.isAutoPaused = false;
 				this.taskboardStatus = "running";
 			})
 			.with("waiting_for_chat", () => {
 				// 等待聊天中点击 -> 取消等待
 				this.taskboardStatus = "idle";
+				this.isAutoPaused = true;
 			})
 			.with("idle", async () => {
 				// 空闲时点击 -> 检查是否需要等待聊天
-				if (chatState.isStreaming || chatState.isSubmitted) {
-					// 聊天正在进行，进入等待状态
-					this.taskboardStatus = "waiting_for_chat";
-					await this.#waitForChatCompletion();
-
-					// 聊天完成后，检查状态是否仍然是 waiting_for_chat
-					// （用户可能在等待期间取消了）
-					if (this.taskboardStatus === "waiting_for_chat") {
-						this.taskboardStatus = "running";
-						await this.#executeLoop(fn);
-					}
-				} else {
-					// 聊天未进行，直接开始执行
-					this.taskboardStatus = "running";
-					await this.#executeLoop(fn);
-				}
+				this.isAutoPaused = false;
+				await this.#beginExecution(fn);
 			});
+	}
+
+	/**
+	 * Begins execution flow from idle state.
+	 */
+	async #beginExecution(fn: (content: string) => Promise<boolean>): Promise<void> {
+		if (chatState.isStreaming || chatState.isSubmitted) {
+			// 聊天正在进行，进入等待状态
+			this.taskboardStatus = "waiting_for_chat";
+			await this.#waitForChatCompletion();
+
+			// 聊天完成后，检查状态是否仍然是 waiting_for_chat
+			// （用户可能在等待期间取消了）
+			if (this.taskboardStatus === "waiting_for_chat") {
+				this.taskboardStatus = "running";
+				await this.#executeLoop(fn);
+			}
+			return;
+		}
+
+		// 聊天未进行，直接开始执行
+		this.taskboardStatus = "running";
+		await this.#executeLoop(fn);
 	}
 
 	/**
 	 * Executes the task loop.
 	 */
-	async #executeLoop(fn: (content: string) => Promise<void>): Promise<void> {
+	async #executeLoop(fn: (content: string) => Promise<boolean>): Promise<void> {
 		while (this.taskboardStatus === "running") {
 			const nextTask = this.tasklist.find(
 				(t) => t.status === "in_progress" || t.status === "pending",
@@ -419,7 +462,7 @@ export class CodeAgentTaskboardState {
 	/**
 	 * Executes a single task.
 	 */
-	async #executeTask(task: Task, fn: (content: string) => Promise<void>): Promise<void> {
+	async #executeTask(task: Task, fn: (content: string) => Promise<boolean>): Promise<void> {
 		this.currentExecutingTaskId = task.id;
 		this.#currentRetryCount = 0;
 		this.retryExhausted = false;
@@ -453,7 +496,16 @@ export class CodeAgentTaskboardState {
 					this.#currentRetryCount === 0 ? task.content : `${m.text_continue()}: ${task.content}`;
 
 				const waitPromise = this.#waitForChatFinished();
-				await fn(message);
+				const didSend = await fn(message);
+				if (!didSend) {
+					this.taskboardStatus = "idle";
+					this.isAutoPaused = true;
+					await this.#updateTaskStatus(task.id, {
+						status: "pending",
+						executedCount: executed,
+					});
+					return;
+				}
 
 				const success = await waitPromise;
 
@@ -494,6 +546,7 @@ export class CodeAgentTaskboardState {
 
 			if (this.#currentRetryCount >= this.#MAX_RETRY_COUNT) {
 				this.retryExhausted = true;
+				this.isAutoPaused = true;
 			}
 
 			this.taskboardStatus = "idle";
@@ -595,5 +648,21 @@ $effect.root(() => {
 		codeAgentState.enabled;
 
 		codeAgentTaskboardState.tasklist = [];
+		codeAgentTaskboardState.isAutoPaused = false;
+	});
+});
+
+$effect.root(() => {
+	$effect(() => {
+		// Re-evaluate auto execution when core state changes
+		/* eslint-disable @typescript-eslint/no-unused-expressions */
+		codeAgentTaskboardState.tasklist;
+		codeAgentTaskboardState.taskboardStatus;
+		codeAgentTaskboardState.isAutoPaused;
+		codeAgentTaskboardState.retryExhausted;
+		codeAgentState.inPlanMode;
+		/* eslint-enable @typescript-eslint/no-unused-expressions */
+
+		void codeAgentTaskboardState.autoStartIfPossible();
 	});
 });

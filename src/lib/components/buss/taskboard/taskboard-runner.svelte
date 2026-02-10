@@ -4,6 +4,7 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { codeAgentSendMessageButtonState, codeAgentState } from "$lib/stores/code-agent";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";
@@ -21,6 +22,11 @@
 	const taskContent = $derived(codeAgentTaskboardState.activeTask?.content ?? "—");
 	const buttonText = $derived(codeAgentTaskboardState.buttonText);
 
+	// Check if local sandbox is starting (for disabling run button)
+	const isLocalSandboxStarting = $derived(
+		codeAgentState.type === "local" && localEnvState.sandboxStarting,
+	);
+
 	const hasConfiguredProviders = $derived(() => {
 		return persistedProviderState.current.some(
 			(provider) => provider.enabled && provider.apiKey && provider.apiKey.trim() !== "",
@@ -31,20 +37,20 @@
 		await window.electronAPI.windowService.handleOpenSettingsWindow("/settings/model-settings");
 	}
 
-	async function handleRun() {
-		if (codeAgentState.inPlanMode) {
-			toast.info(m.toast_exit_plan_mode_first());
-			return;
-		}
+	const runTask = async (content: string) => {
+		let didSend = false;
 
-		const fn = async (content: string) =>
+		const trySend = (taskContent: string) =>
 			match({
-				isEmpty: content.trim() === "" && chatState.attachments.length === 0,
+				isEmpty: taskContent.trim() === "" && chatState.attachments.length === 0,
 				noProviders: !hasConfiguredProviders(),
 				noModel: chatState.selectedModel === null,
+				isBusy: chatState.isStreaming || chatState.isSubmitted,
+				hasLoadingAttachments: chatState.loadingAttachmentIds.size > 0,
 			})
 				.with({ isEmpty: true }, () => {
 					toast.warning(m.toast_empty_message());
+					return false;
 				})
 				.with({ noProviders: true }, () => {
 					toast.info(m.toast_no_provider_configured(), {
@@ -53,6 +59,7 @@
 							onClick: () => handleGoToModelSettings(),
 						},
 					});
+					return false;
 				})
 				.with({ noModel: true }, () => {
 					toast.warning(m.toast_no_model(), {
@@ -72,30 +79,47 @@
 							},
 						},
 					});
+					return false;
 				})
+				.with({ isBusy: true }, () => false)
+				.with({ hasLoadingAttachments: true }, () => false)
 				.otherwise(() => {
+					didSend = true;
 					if (chatState.hasMessages) {
-						chatState.sendMessage({ content });
+						chatState.sendMessage({ content: taskContent });
 					} else {
-						document.startViewTransition(() => chatState.sendMessage({ content }));
+						document.startViewTransition(() => chatState.sendMessage({ content: taskContent }));
 					}
+					return true;
 				});
 
-		codeAgentTaskboardState.startAutoExecution(async (content) => {
-			if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-				await codeAgentSendMessageButtonState.handleCodeAgentFlow(() => fn(content));
-			} else {
-				await fn(content);
+		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
+			await codeAgentSendMessageButtonState.handleCodeAgentFlow(() => {
+				trySend(content);
+			});
+			return didSend;
+		}
+		if (codeAgentState.enabled && codeAgentState.type === "local") {
+			// For local mode in non-fresh tabs, only ensure sandbox is running
+			const localSandboxResult = await codeAgentSendMessageButtonState.ensureLocalSandboxReady();
+			if (!localSandboxResult.isOk) {
+				toast.error(localSandboxResult.error ?? m.code_agent_local_sandbox_start_failed());
+				return false;
 			}
-		});
+			return trySend(content);
+		}
+		return trySend(content);
+	};
 
-		// if (codeAgentState.enabled && codeAgentState.isFreshTab) {
-		// 	codeAgentTaskboardState.startAutoExecution(async () => {
-		// 		await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
-		// 	});
-		// } else {
-		// 	codeAgentTaskboardState.startAutoExecution(async () => fn());
-		// }
+	codeAgentTaskboardState.registerExecutionHandler(runTask);
+
+	async function handleRun() {
+		if (codeAgentState.inPlanMode) {
+			toast.info(m.toast_exit_plan_mode_first());
+			return;
+		}
+
+		await codeAgentTaskboardState.startAutoExecution(runTask);
 	}
 </script>
 
@@ -146,7 +170,10 @@
 						!isWaitingToStop &&
 						!isWaitingForChat &&
 						!currentTask) ||
-						(!isRunning && !isWaitingToStop && !isWaitingForChat && codeAgentState.isChecking)}
+						(!isRunning &&
+							!isWaitingToStop &&
+							!isWaitingForChat &&
+							(codeAgentState.isChecking || isLocalSandboxStarting))}
 					onclick={handleRun}
 				>
 					{buttonText}

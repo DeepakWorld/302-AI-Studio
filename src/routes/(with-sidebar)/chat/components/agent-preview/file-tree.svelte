@@ -6,6 +6,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { Input } from "$lib/components/ui/input";
 	import { m } from "$lib/paraglide/messages";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent";
 	import {
 		ArrowDownToLine,
@@ -21,6 +22,7 @@
 	} from "@lucide/svelte";
 	import { onDestroy } from "svelte";
 	import { toast } from "svelte-sonner";
+	import { DEFAULT_WORKSPACE_PATH } from "./constants";
 	import { FileTreeState, type TreeNode } from "./file-tree-state.svelte";
 
 	interface Props {
@@ -35,6 +37,25 @@
 
 	// Initialize file tree state
 	const fileTreeState = new FileTreeState(sandboxId, workspacePath);
+
+	// Check if we are in local vibe mode
+	const isLocalVibeMode = $derived(codeAgentState.enabled && codeAgentState.type === "local");
+
+	// Handle open local
+	async function handleOpenLocal(targetPath?: string) {
+		const path = targetPath ?? fileTreeState.currentDirectory;
+		if (!path) return;
+
+		// Remove workspace prefix if present to get path relative to workspace root
+		let relativePath = path;
+		if (relativePath.startsWith(DEFAULT_WORKSPACE_PATH)) {
+			relativePath = relativePath.slice(DEFAULT_WORKSPACE_PATH.length);
+		}
+
+		// Remove leading slash if present to ensure relative path
+		relativePath = relativePath.startsWith("/") ? relativePath.slice(1) : relativePath;
+		await window.electronAPI.localVibeService.openWorkspaceDirectory(relativePath);
+	}
 
 	// UI-specific state for rename dialog
 	let renamingPath = $state<string | null>(null);
@@ -507,13 +528,19 @@
 
 			<ContextMenu.Separator />
 
-			<!-- Download - always allowed -->
 			<ContextMenu.Item onSelect={() => handleDownload(node)} disabled={isDownloading}>
 				{#if isDownloading}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 				{:else}{/if}
 				<span>{m.label_file_tree_download()}</span>
 			</ContextMenu.Item>
+
+			<!-- Open Local File -->
+			{#if isLocalVibeMode}
+				<ContextMenu.Item onSelect={() => handleOpenLocal(node.path)}>
+					<span>{m.label_file_tree_open_local()}</span>
+				</ContextMenu.Item>
+			{/if}
 
 			<!-- Delete -->
 			<!-- {#if !isDir} -->
@@ -575,10 +602,18 @@
 			<span>{m.label_file_tree_upload_file()}</span>
 		</ContextMenu.Item>
 
-		<!-- Upload Folder -->
 		<ContextMenu.Item onSelect={() => handleFolderUpload()} disabled={isModificationDisabled}>
 			<span>{m.label_file_tree_upload_folder()}</span>
 		</ContextMenu.Item>
+
+		{#if isLocalVibeMode}
+			<ContextMenu.Separator />
+
+			<!-- Open Local File -->
+			<ContextMenu.Item onSelect={() => handleOpenLocal()}>
+				<span>{m.label_file_tree_open_local()}</span>
+			</ContextMenu.Item>
+		{/if}
 	</ContextMenu.Content>
 {/snippet}
 

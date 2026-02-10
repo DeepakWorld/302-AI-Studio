@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { updateSessionNote } from "$lib/api/sandbox-session";
-	import { validate302Provider } from "$lib/api/webserve-deploy";
 	import { ButtonWithTooltip } from "$lib/components/buss/button-with-tooltip";
 	import { Button } from "$lib/components/ui/button";
 	import * as ContextMenu from "$lib/components/ui/context-menu";
@@ -11,7 +10,7 @@
 		claudeCodeSandboxState,
 		persistedClaudeCodeSandboxState,
 	} from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
-	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { formatDateTimeFull } from "$lib/utils/date-format";
 	import { ExternalLink, Loader2 } from "@lucide/svelte";
 	import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
@@ -29,7 +28,7 @@
 	type SessionType = {
 		sessionId: string;
 		workspacePath: string;
-		note?: string;
+		note?: string | null;
 		usedAt?: string;
 	};
 
@@ -97,13 +96,12 @@
 	async function handleConfirmSessionRename(newRemark: string) {
 		if (!sandbox || !targetSession) return;
 
-		const providerResult = validate302Provider(persistedProviderState.current);
-		if (!providerResult.valid || !providerResult.provider) {
+		if (codeAgentState.type !== "remote") {
 			toast.error("No 302.AI provider available");
 			return;
 		}
 
-		const result = await updateSessionNote(providerResult.provider, {
+		const result = await updateSessionNote({
 			sandbox_id: sandbox.sandboxId,
 			session_id: targetSession.sessionId,
 			note: newRemark,
@@ -339,6 +337,3 @@
 	onClose={() => (isSessionDeleteDialogOpen = false)}
 	onConfirm={handleConfirmSessionDelete}
 />
-
-<style>
-</style>

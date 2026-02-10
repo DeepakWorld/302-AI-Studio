@@ -1,0 +1,550 @@
+/**
+ * Local Environment State Store
+ *
+ * Manages Podman installation status, health status, and installation logs
+ * for the Code Agent local mode.
+ */
+
+import { m } from "$lib/paraglide/messages";
+import { toast } from "svelte-sonner";
+
+export type PodmanHealthStatus = "unknown" | "healthy" | "unhealthy";
+export type SandboxHealthStatus = "unknown" | "healthy" | "unhealthy";
+export type PodmanComponentStatus = "unknown" | "missing" | "installed";
+
+export interface InstallLogEntry {
+	step: string;
+	type: "start" | "stdout" | "stderr" | "complete" | "error";
+	data: string;
+	ts: number;
+}
+
+export interface PodmanHealthCheckData {
+	isOk: boolean;
+	isHealth: boolean;
+	timestamp: number;
+}
+
+export interface PodmanValidationDetails {
+	podmanInstalled: boolean;
+	machineExists: boolean;
+	composeInstalled: boolean;
+}
+
+class LocalEnvState {
+	// Podman installation status
+	podmanInstalled = $state(false);
+
+	// Detailed component status for better diagnostics
+	podmanComponentStatus = $state<PodmanValidationDetails>({
+		podmanInstalled: false,
+		machineExists: false,
+		composeInstalled: false,
+	});
+
+	// Podman health status
+	podmanHealth = $state<PodmanHealthStatus>("unknown");
+
+	// Loading states
+	checking = $state(false);
+	installing = $state(false);
+	sandboxStarting = $state(false);
+
+	// Installation result
+	installFailed = $state(false);
+
+	// Sandbox running status (independent of podman health)
+	sandboxRunning = $state(false);
+
+	// Sandbox health status
+	sandboxHealthStatus = $state<SandboxHealthStatus>("unknown");
+
+	// Installation logs
+	installLogs = $state<InstallLogEntry[]>([]);
+
+	// WSL restart required notification
+	wslRestartRequired = $state<{
+		reason: string;
+		message: string;
+	} | null>(null);
+
+	// Unsubscribe functions for broadcast listeners
+	private unsubscribeInstallLog: (() => void) | null = null;
+	private unsubscribeHealthCheck: (() => void) | null = null;
+	private unsubscribeSandboxHealth: (() => void) | null = null;
+	private unsubscribeSandboxState: (() => void) | null = null;
+
+	// Health check resolvers for waiting on first health check after start
+	private healthCheckResolvers: Array<() => void> = [];
+	private unsubscribeWslRestart: (() => void) | null = null;
+
+	constructor() {
+		// Sync podmanInstalled status on initialization
+		this.syncPodmanInstalledStatus();
+	}
+
+	/**
+	 * Sync podmanInstalled status from main process on initialization
+	 */
+	private async syncPodmanInstalledStatus(): Promise<void> {
+		try {
+			const result = await window.electronAPI.localVibeService.validPodman();
+			this.podmanInstalled = result.isOk && result.isValid;
+
+			if (result.details) {
+				this.podmanComponentStatus = result.details;
+			}
+
+			console.log("[LocalEnvState] Initial podmanInstalled sync:", this.podmanInstalled);
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to sync initial podmanInstalled status:", error);
+		}
+	}
+
+	/**
+	 * Refresh Podman installation status by calling localVibeService.validPodman()
+	 */
+	async refreshPodmanStatus(): Promise<void> {
+		this.checking = true;
+		try {
+			const result = await window.electronAPI.localVibeService.validPodman();
+			this.podmanInstalled = result.isOk && result.isValid;
+
+			// Save detailed component status for UI display
+			if (result.details) {
+				this.podmanComponentStatus = result.details;
+			}
+
+			// Print command output
+			if (result.output) {
+				console.log("[Local Vibe] validPodman:", result.output);
+			}
+			if (result.error) {
+				console.error("[Local Vibe] validPodman error:", result.error);
+			}
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to check Podman status:", error);
+			this.podmanInstalled = false;
+		} finally {
+			this.checking = false;
+		}
+	}
+
+	/**
+	 * Start Podman health check scheduler (only when Podman is installed)
+	 */
+	async ensurePodmanHealthCheckStarted(): Promise<void> {
+		if (!this.podmanInstalled) {
+			return;
+		}
+
+		try {
+			await window.electronAPI.localVibeService.startPodmanHealthCheck();
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to start Podman health check:", error);
+		}
+	}
+
+	/**
+	 * Install Podman - clears logs first, then calls localVibeService.installPodman()
+	 */
+	async installPodman(): Promise<void> {
+		// Clear previous logs before starting new installation
+		this.installLogs = [];
+		this.installing = true;
+		this.installFailed = false;
+
+		try {
+			const result = await window.electronAPI.localVibeService.installPodman();
+			this.installFailed = !result.isOk;
+
+			// Refresh status after installation
+			await this.refreshPodmanStatus();
+
+			// Start health check if installation succeeded
+			if (result.isOk) {
+				await this.ensurePodmanHealthCheckStarted();
+			}
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to install Podman:", error);
+			this.installFailed = true;
+		} finally {
+			this.installing = false;
+		}
+	}
+
+	/**
+	 * Start Podman machine (sandbox)
+	 * Calls localVibeService.startPodmanMachine() and prints output with [Local Vibe] prefix
+	 */
+	async startSandbox(): Promise<boolean> {
+		toast.info(m.code_agent_local_sandbox_starting());
+		if (!this.podmanInstalled) {
+			console.error("[LocalEnvState] Cannot start sandbox: Podman not installed");
+			return false;
+		}
+
+		this.sandboxStarting = true;
+		this.broadcastSandboxState({ starting: true });
+		this.sandboxHealthStatus = "unknown";
+		try {
+			const result = await window.electronAPI.localVibeService.startPodmanMachine();
+
+			// Print Podman machine output
+			if (result.output) {
+				console.log("[Local Vibe] startPodmanMachine:", result.output);
+			}
+			if (result.error) {
+				console.error("[Local Vibe] startPodmanMachine error:", result.error);
+			}
+
+			// Print docker-compose output
+			if (result.composeOutput) {
+				console.log("[Local Vibe] docker-compose up:", result.composeOutput);
+			}
+			if (result.composeError) {
+				console.error("[Local Vibe] docker-compose error:", result.composeError);
+			}
+
+			// Toggle sandbox running state on success
+			if (result.isOk) {
+				this.sandboxRunning = true;
+				this.broadcastSandboxState({ running: true });
+				this.sandboxHealthStatus = "unknown";
+
+				// Wait for the first health check result
+				await this.waitForHealthCheck(100);
+			}
+
+			return result.isOk;
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to start sandbox:", error);
+			return false;
+		} finally {
+			this.sandboxStarting = false;
+			this.broadcastSandboxState({ starting: false });
+		}
+	}
+
+	/**
+	 * Stop Podman machine (sandbox)
+	 * Calls localVibeService.stopLocalSandboxByIpc() and prints output with [Local Vibe] prefix
+	 */
+	async stopSandbox(): Promise<boolean> {
+		this.sandboxStarting = true;
+		this.broadcastSandboxState({ starting: true });
+		try {
+			const result = await window.electronAPI.localVibeService.stopLocalSandboxByIpc();
+
+			// Print command output with [Local Vibe] prefix
+			if (result.output) {
+				console.log("[Local Vibe] stopLocalSandboxByIpc:", result.output);
+			}
+			if (result.error) {
+				console.error("[Local Vibe] stopLocalSandboxByIpc error:", result.error);
+			}
+
+			// Toggle sandbox running state on success
+			if (result.isOk) {
+				this.sandboxRunning = false;
+				this.broadcastSandboxState({ running: false });
+				this.sandboxHealthStatus = "unknown";
+			}
+
+			return result.isOk;
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to stop sandbox:", error);
+			return false;
+		} finally {
+			this.sandboxStarting = false;
+			this.broadcastSandboxState({ starting: false });
+		}
+	}
+
+	/**
+	 * Start listening to Podman-related broadcast channels (install logs and health checks)
+	 */
+	startPodmanListening(): void {
+		// Subscribe to install-log channel
+		if (!this.unsubscribeInstallLog) {
+			this.unsubscribeInstallLog = window.electronAPI.onInstallLog(
+				(data: Omit<InstallLogEntry, "ts">) => {
+					this.installLogs = [
+						...this.installLogs,
+						{
+							...data,
+							ts: Date.now(),
+						},
+					];
+				},
+			);
+		}
+
+		// Subscribe to podman-health-check channel
+		if (!this.unsubscribeHealthCheck) {
+			this.unsubscribeHealthCheck = window.electronAPI.onPodmanHealthCheck(
+				(data: PodmanHealthCheckData) => {
+					if (data.isOk) {
+						this.podmanHealth = data.isHealth ? "healthy" : "unhealthy";
+					} else {
+						this.podmanHealth = "unknown";
+					}
+
+					console.log("[LocalEnvState] Podman health check:", this.podmanHealth);
+				},
+			);
+		}
+
+		// Subscribe to wsl-restart-required channel
+		if (!this.unsubscribeWslRestart) {
+			this.unsubscribeWslRestart = window.electronAPI.onWslRestartRequired(
+				async (data: { reason: string; message: string }) => {
+					this.wslRestartRequired = data;
+					console.log("[LocalEnvState] WSL restart required:", data);
+
+					// Show dialog immediately in the callback
+					const result = confirm(
+						`${data.message}\n\n点击"确定"立即重启系统，点击"取消"稍后手动重启。`,
+					);
+
+					if (result) {
+						// User chose to restart now
+						console.log("[LocalEnvState] User confirmed restart, triggering system restart...");
+						await window.electronAPI.localVibeService.triggerSystemRestart();
+					} else {
+						console.log("[LocalEnvState] User cancelled restart");
+					}
+
+					// Clear the notification
+					this.wslRestartRequired = null;
+				},
+			);
+		}
+	}
+
+	/**
+	 * Stop listening to Podman-related broadcast channels
+	 */
+	stopPodmanListening(): void {
+		if (this.unsubscribeInstallLog) {
+			this.unsubscribeInstallLog();
+			this.unsubscribeInstallLog = null;
+		}
+
+		if (this.unsubscribeHealthCheck) {
+			this.unsubscribeHealthCheck();
+			this.unsubscribeHealthCheck = null;
+		}
+	}
+
+	/**
+	 * Broadcast sandbox state change to all tabs
+	 */
+	private broadcastSandboxState(state: { starting?: boolean; running?: boolean }): void {
+		window.electronAPI.broadcastService.broadcastToAll("local-sandbox-state-changed", state);
+	}
+
+	/**
+	 * Wait for the first health check result after starting the sandbox
+	 * @param timeout Timeout in milliseconds (default: 10000ms)
+	 * @returns Promise that resolves when health check arrives or timeout occurs
+	 */
+	private async waitForHealthCheck(timeout: number = 10000): Promise<void> {
+		// If already healthy, return immediately
+		if (this.sandboxHealthStatus === "healthy") {
+			return;
+		}
+
+		return new Promise((resolve) => {
+			const timeoutId = setTimeout(() => {
+				// Remove this resolver from the array
+				const index = this.healthCheckResolvers.indexOf(wrappedResolve);
+				if (index > -1) {
+					this.healthCheckResolvers.splice(index, 1);
+				}
+				console.warn("[LocalEnvState] Health check timeout, proceeding anyway");
+				resolve();
+			}, timeout);
+
+			// Wrapped resolve that clears timeout
+			const wrappedResolve = () => {
+				clearTimeout(timeoutId);
+				resolve();
+			};
+
+			// Add to waiting list
+			this.healthCheckResolvers.push(wrappedResolve);
+		});
+	}
+
+	/**
+	 * Sync initial state from main process
+	 * Used when a new tab is opened to check if sandbox is already running
+	 */
+	async syncInitialState(): Promise<void> {
+		try {
+			const status = (await window.electronAPI.localVibeService.getSandboxStatus()) as {
+				isRunning: boolean;
+				isOperating: boolean;
+			};
+			if (status.isRunning) {
+				this.sandboxRunning = true;
+				this.sandboxHealthStatus = "healthy";
+			}
+			if (status.isOperating) {
+				this.sandboxStarting = true;
+			}
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to sync initial state:", error);
+		}
+	}
+
+	/**
+	 * Start listening to Sandbox-related broadcast channels
+	 */
+	startSandboxListening(): void {
+		// Sync initial state first
+		this.syncInitialState();
+
+		// Subscribe to local-sandbox-health-check channel
+		if (!this.unsubscribeSandboxHealth) {
+			this.unsubscribeSandboxHealth = window.electronAPI.onLocalSandboxHealthCheck(
+				(data: { isOk: boolean; isHealth: boolean; error?: string; timestamp: number }) => {
+					if (data.isOk) {
+						if (data.isHealth) {
+							this.sandboxHealthStatus = "healthy";
+							// When sandbox is healthy, also set running state to true
+							// so that new tabs can correctly display sandbox as started
+							this.sandboxRunning = true;
+
+							// Trigger all waiting health check resolvers
+							this.healthCheckResolvers.forEach((resolve) => resolve());
+							this.healthCheckResolvers = [];
+						} else {
+							this.sandboxHealthStatus = "unhealthy";
+						}
+					} else {
+						this.sandboxHealthStatus = "unknown";
+					}
+					console.log(
+						"[LocalEnvState] Sandbox health check:",
+						this.sandboxHealthStatus,
+						data.error ?? "no error",
+					);
+				},
+			);
+		}
+
+		// Subscribe to local-sandbox-state-changed channel
+		if (!this.unsubscribeSandboxState) {
+			this.unsubscribeSandboxState = window.electronAPI.onLocalSandboxStateChanged(
+				(data: { starting?: boolean; running?: boolean }) => {
+					if (data.starting !== undefined) {
+						this.sandboxStarting = data.starting;
+						console.log("[LocalEnvState] Sandbox starting state changed:", data.starting);
+					}
+					if (data.running !== undefined) {
+						this.sandboxRunning = data.running;
+						console.log("[LocalEnvState] Sandbox running state changed:", data.running);
+					}
+				},
+			);
+		}
+	}
+
+	/**
+	 * Stop listening to Sandbox-related broadcast channels
+	 */
+	stopSandboxListening(): void {
+		if (this.unsubscribeSandboxHealth) {
+			this.unsubscribeSandboxHealth();
+			this.unsubscribeSandboxHealth = null;
+		}
+
+		if (this.unsubscribeSandboxState) {
+			this.unsubscribeSandboxState();
+			this.unsubscribeSandboxState = null;
+		}
+	}
+
+	/**
+	 * Clear installation logs
+	 */
+	clearLogs(): void {
+		this.installLogs = [];
+	}
+
+	/**
+	 * Reset state (useful when switching away from local mode)
+	 */
+	reset(): void {
+		this.podmanHealth = "unknown";
+		this.installFailed = false;
+	}
+
+	/**
+	 * Ensures the local sandbox is running, starting it if necessary.
+	 * This is an idempotent operation - safe to call multiple times.
+	 * Shares state with SandboxCard via sandboxStarting flag.
+	 * @returns { isOk: boolean; port?: number; error?: string; wasAlreadyRunning: boolean }
+	 */
+	async ensureSandboxRunning(): Promise<{
+		isOk: boolean;
+		port?: number;
+		error?: string;
+		wasAlreadyRunning: boolean;
+	}> {
+		// If already starting, wait for completion (prevent concurrent starts)
+		if (this.sandboxStarting) {
+			// Wait for the current start operation to complete
+			await new Promise<void>((resolve) => {
+				const checkInterval = setInterval(() => {
+					if (!this.sandboxStarting) {
+						clearInterval(checkInterval);
+						resolve();
+					}
+				}, 100);
+			});
+			// Return current state after waiting
+			return {
+				isOk: this.sandboxRunning,
+				wasAlreadyRunning: true,
+			};
+		}
+
+		// Check if already running and healthy
+		if (this.sandboxRunning && this.sandboxHealthStatus === "healthy") {
+			return { isOk: true, wasAlreadyRunning: true };
+		}
+
+		// Call IPC method to ensure sandbox is running
+		// This sets sandboxStarting internally via startSandbox flow
+		this.sandboxStarting = true;
+		this.broadcastSandboxState({ starting: true });
+		this.sandboxHealthStatus = "unknown";
+
+		try {
+			const result = await window.electronAPI.localVibeService.ensureLocalSandboxRunning();
+
+			if (result.isOk) {
+				this.sandboxRunning = true;
+			}
+
+			return {
+				isOk: result.isOk,
+				port: result.port,
+				error: result.error,
+				wasAlreadyRunning: result.wasAlreadyRunning,
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("[LocalEnvState] Failed to ensure sandbox running:", errorMessage);
+			return { isOk: false, error: errorMessage, wasAlreadyRunning: false };
+		} finally {
+			this.sandboxStarting = false;
+			this.broadcastSandboxState({ starting: false });
+		}
+	}
+}
+
+export const localEnvState = new LocalEnvState();
