@@ -113,9 +113,12 @@ class CodeAgentState {
 		await this.#showNotificationForChatFinished(event);
 	};
 
-	handleThreadTitleUpdated = (event: { title: string }) => {
+	handleThreadTitleUpdated = async (event: { title: string }) => {
 		if (this.currentAgentId === "claude-code") {
-			claudeCodeAgentState.handleThreadTitleUpdated(event);
+			await claudeCodeAgentState.handleThreadTitleUpdated(event);
+			if (this.type === "local") {
+				await localClaudeCodeSandboxState.refreshSessions();
+			}
 		}
 	};
 
@@ -397,6 +400,10 @@ class CodeAgentState {
 				const isOK = await match(this.currentAgentId)
 					.with("claude-code", () => claudeCodeAgentState.updateSessionRemark(remark, true))
 					.otherwise(() => false);
+
+				if (isOK && this.type === "local") {
+					await localClaudeCodeSandboxState.refreshSessions();
+				}
 
 				return isOK;
 			},

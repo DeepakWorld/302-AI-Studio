@@ -42,9 +42,12 @@
 		codeAgentState,
 		persistedCodeAgentConfigState,
 	} from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { isLinux, isMac } from "$lib/utils/platform";
 	import type { CodeAgentType } from "@shared/storage/code-agent";
+
+	import { match } from "ts-pattern";
 	import { DEFAULT_WORKSPACE_PATH } from "../agent-preview/constants";
 	import ClaudeCodePanel from "./claude-code-panel.svelte";
 	import LocalModePanel from "./local-mode-panel.svelte";
@@ -65,13 +68,24 @@
 	});
 
 	let currentSessionRemark = $derived.by(() => {
-		const sandboxId = claudeCodeAgentState.sandboxId;
-		const sessionId = claudeCodeAgentState.currentSessionId;
-		const currentSandbox = persistedClaudeCodeSandboxState.current.find(
-			(s) => s.sandboxId === sandboxId,
-		);
-		const currentSession = currentSandbox?.sessionInfos.find((s) => s.sessionId === sessionId);
-		return currentSession?.note ?? "";
+		return match(codeAgentState.type)
+			.with("remote", () => {
+				const sandboxId = claudeCodeAgentState.sandboxId;
+				const sessionId = claudeCodeAgentState.currentSessionId;
+				const currentSandbox = persistedClaudeCodeSandboxState.current.find(
+					(s) => s.sandboxId === sandboxId,
+				);
+				const currentSession = currentSandbox?.sessionInfos.find((s) => s.sessionId === sessionId);
+				return currentSession?.note ?? m.title_new_chat();
+			})
+			.with("local", () => {
+				const sessionId = claudeCodeAgentState.currentSessionId;
+				const currentSession = localClaudeCodeSandboxState.sessions.find(
+					(s) => s.session_id === sessionId,
+				);
+				return currentSession?.note ?? m.title_new_chat();
+			})
+			.exhaustive();
 	});
 
 	let isSandboxRemarkChanged = $derived(tempSandboxRemark !== currentSandboxRemark);
