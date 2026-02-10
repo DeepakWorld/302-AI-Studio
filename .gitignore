@@ -42,3 +42,4 @@ plugins/external
 temp
 
 ai302/
+.worktrees/
