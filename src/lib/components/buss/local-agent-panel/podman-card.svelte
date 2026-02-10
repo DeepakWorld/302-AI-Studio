@@ -9,6 +9,7 @@
 	import { Button } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import { m } from "$lib/paraglide/messages";
+	import { getLocale } from "$lib/paraglide/runtime";
 	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { isWindows } from "$lib/utils/platform";
 	import { ExternalLink, LoaderCircle } from "@lucide/svelte";
@@ -129,11 +130,11 @@
 			{/if}
 			{#if !podmanInstalled}
 				{#if isWindows}
+					{@const docUrl = `https://studio.302.ai/${getLocale()}/docs/advanced/local-sandbox/windows`}
 					<Button
 						size="sm"
 						variant="outline"
-						onclick={() =>
-							window.open("https://studio.302.ai/zh/docs/advanced/local-sandbox/windows", "_blank")}
+						onclick={() => window.open(docUrl, "_blank")}
 						class="min-w-[80px]"
 					>
 						<ExternalLink class="mr-1.5 h-3.5 w-3.5" />
