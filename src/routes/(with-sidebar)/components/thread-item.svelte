@@ -127,7 +127,10 @@
 			{m.label_button_generate_title()}
 		</ContextMenu.Item>
 
-		<ContextMenu.Item onSelect={() => onThreadClearMessages(threadId)}>
+		<ContextMenu.Item
+			onSelect={() => onThreadClearMessages(threadId)}
+			disabled={threadBusyState.isBusy(threadId)}
+		>
 			{m.settings_shortcut_clearMessages()}
 		</ContextMenu.Item>
 
@@ -137,7 +140,7 @@
 
 		<ContextMenu.Separator />
 
-		<ContextMenu.Item onSelect={handleDelete}>
+		<ContextMenu.Item onSelect={handleDelete} disabled={threadBusyState.isBusy(threadId)}>
 			{m.title_button_delete()}
 		</ContextMenu.Item>
 	</ContextMenu.Content>

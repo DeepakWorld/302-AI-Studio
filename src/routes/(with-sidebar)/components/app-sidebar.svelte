@@ -212,6 +212,15 @@
 				const currentSessionId = (claudeState as CodeAgentMetadata)?.currentSessionId;
 
 				if (sandboxId && currentSessionId) {
+					// Handle local mode
+					if (sandboxId === "local") {
+						return {
+							isCodeAgent: true,
+							sandboxId: sandboxId,
+							sessionId: currentSessionId,
+						};
+					}
+
 					// Wait for sandbox state to be hydrated before accessing
 					if (!persistedClaudeCodeSandboxState.isHydrated) {
 						await persistedClaudeCodeSandboxState.refresh();
