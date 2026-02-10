@@ -1,10 +1,8 @@
 <script lang="ts">
-	import UnsupportPanel from "$lib/components/buss/local-agent-panel/unsupport-panel.svelte";
 	import { SettingSwitchItem } from "$lib/components/buss/settings";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { codeAgentGlobalConfigsState } from "$lib/stores/code-agent/code-agent-global-configs-state.svelte";
-	import { isLinux, isMac } from "$lib/utils/platform";
 	import LocalPlatform from "./local-platform.svelte";
 	import RemotePlatform from "./remote-platform.svelte";
 
@@ -43,24 +41,21 @@
 		/>
 	</div>
 
+	<SettingSwitchItem
+		label={m.auto_deploy()}
+		checked={codeAgentGlobalConfigsState.autoDeploy}
+		onCheckedChange={() => codeAgentGlobalConfigsState.toggleAutoDeploy()}
+	/>
+	<SettingSwitchItem
+		label={m.settings_notificationsEnabled()}
+		checked={codeAgentGlobalConfigsState.notificationsEnabled}
+		onCheckedChange={() => codeAgentGlobalConfigsState.toggleNotificationsEnabled()}
+	/>
+
 	{#if selectedPlatform === "remote"}
-		<SettingSwitchItem
-			label={m.auto_deploy()}
-			checked={codeAgentGlobalConfigsState.autoDeploy}
-			onCheckedChange={() => codeAgentGlobalConfigsState.toggleAutoDeploy()}
-		/>
-		<SettingSwitchItem
-			label={m.settings_notificationsEnabled()}
-			checked={codeAgentGlobalConfigsState.notificationsEnabled}
-			onCheckedChange={() => codeAgentGlobalConfigsState.toggleNotificationsEnabled()}
-		/>
 		<DeployedWebsitesList />
 		<RemotePlatform />
 	{:else if selectedPlatform === "local"}
-		{#if isMac || isLinux}
-			<LocalPlatform />
-		{:else}
-			<UnsupportPanel />
-		{/if}
+		<LocalPlatform />
 	{/if}
 </div>

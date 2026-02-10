@@ -174,6 +174,46 @@ class LocalEnvState {
 	}
 
 	/**
+	 * Initialize Podman machine only (without installing prerequisites).
+	 * Used on Windows where users manually install dependencies and only need machine init.
+	 */
+	async initMachine(): Promise<void> {
+		// Pre-check: ensure podman CLI and podman-compose are installed
+		try {
+			const validation = await window.electronAPI.localVibeService.validPodman();
+			const details = validation.details;
+			if (!details?.podmanInstalled || !details?.composeInstalled) {
+				toast.error(m.local_platform_prerequisites_missing());
+				return;
+			}
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to validate Podman prerequisites:", error);
+			toast.error(m.local_platform_prerequisites_missing());
+			return;
+		}
+
+		this.installLogs = [];
+		this.installing = true;
+		this.installFailed = false;
+
+		try {
+			const result = await window.electronAPI.localVibeService.initPodmanMachine();
+			this.installFailed = !result.isOk;
+
+			await this.refreshPodmanStatus();
+
+			if (result.isOk) {
+				await this.ensurePodmanHealthCheckStarted();
+			}
+		} catch (error) {
+			console.error("[LocalEnvState] Failed to init Podman machine:", error);
+			this.installFailed = true;
+		} finally {
+			this.installing = false;
+		}
+	}
+
+	/**
 	 * Start Podman machine (sandbox)
 	 * Calls localVibeService.startPodmanMachine() and prints output with [Local Vibe] prefix
 	 */

@@ -3,7 +3,7 @@ import { PLATFORM } from "@electron/main/constants/index";
 import { broadcastService } from "@electron/main/services/broadcast-service";
 import { generalSettingsService } from "@electron/main/services/settings-service/general-settings-service";
 import { providerStorage } from "@electron/main/services/storage-service/provider-storage";
-import { isCommandNotFound, isWSLError } from "@electron/main/utils/cmd";
+import { isCommandNotFound } from "@electron/main/utils/cmd";
 import { exec, spawn, type SpawnOptions } from "child_process";
 import { app, shell, type IpcMainInvokeEvent } from "electron";
 import { isNull } from "es-toolkit/predicate";
@@ -1232,30 +1232,6 @@ export class LocalVibeService {
 			}>;
 			const exists = machines.some((machine) => machine.Name === "ai302-machine");
 
-			// On Windows, also check WSL for orphaned podman machines
-			if (!exists && process.platform === "win32") {
-				try {
-					// WSL outputs UTF-16 encoded text, use chcp 65001 to get UTF-8
-					const { stdout: wslOutput } = await execAsync("chcp 65001 >nul && wsl --list --quiet", {
-						encoding: "utf8",
-					});
-					// Remove null characters that may appear in UTF-16 to UTF-8 conversion
-					const cleanOutput = wslOutput.replace(/\0/g, "").toLowerCase();
-					const existsInWSL =
-						cleanOutput.includes("podman-ai302-machine") ||
-						cleanOutput.includes("podman-machine-ai302-machine");
-					if (existsInWSL) {
-						console.log(
-							"[LocalVibeService] Machine not in Podman list but exists in WSL distributions",
-						);
-					}
-					return { isOk: true, exists, existsInWSL };
-				} catch (_wslError) {
-					// WSL check failed, ignore
-					return { isOk: true, exists };
-				}
-			}
-
 			return { isOk: true, exists };
 		} catch (error) {
 			if (isCommandNotFound(error)) {
@@ -1790,135 +1766,8 @@ export class LocalVibeService {
 			return { isOk: true };
 		}
 
-		// Handle orphaned WSL distribution (exists in WSL but not in Podman list)
-		if (machineCheck.existsInWSL && process.platform === "win32") {
-			broadcastService.broadcastChannelToAll("install-log", {
-				step: "init-podman",
-				type: "stdout",
-				data: await this.t(
-					"检测到孤立的 WSL 分发，正在清理...",
-					"Detected orphaned WSL distribution, cleaning up...",
-				),
-			});
-
-			// Try to unregister the orphaned WSL distribution
-			try {
-				await execAsync("wsl --unregister podman-ai302-machine");
-				broadcastService.broadcastChannelToAll("install-log", {
-					step: "init-podman",
-					type: "stdout",
-					data: await this.t("WSL 分发清理完成", "WSL distribution cleaned up"),
-				});
-			} catch (_cleanupError) {
-				// Try alternative name format
-				try {
-					await execAsync("wsl --unregister podman-machine-ai302-machine");
-				} catch (_altCleanupError) {
-					console.log("[LocalVibeService] Could not clean up orphaned WSL distribution");
-				}
-			}
-		}
-
 		// Initialize Podman Machine with retry logic
-		let machineInit = await this._initPodmanMachineWithRetry(3);
-		let lastError = machineInit.output || "";
-
-		// Handle case: "Error: system connection "ai302-machine" (or -root) already exists"
-		// This happens when the machine was deleted but the connection record remains
-		// Need to check for both user and root connection errors
-		if (
-			!machineInit.isOk &&
-			(lastError?.includes('system connection "ai302-machine" already exists') ||
-				lastError?.includes('system connection "ai302-machine-root" already exists'))
-		) {
-			broadcastService.broadcastChannelToAll("install-log", {
-				step: "init-podman",
-				type: "stdout",
-				data: await this.t(
-					"检测到失效的系统连接，正在修复...",
-					"Detected stale system connection, attempting to fix...",
-				),
-			});
-
-			// Remove both stale connections to be safe
-			try {
-				await execAsync("podman system connection rm ai302-machine");
-			} catch (e) {
-				console.debug(
-					"[LocalVibeService] Failed to remove ai302-machine connection (likely did not exist):",
-					e,
-				);
-			}
-			try {
-				await execAsync("podman system connection rm ai302-machine-root");
-			} catch (e) {
-				console.debug(
-					"[LocalVibeService] Failed to remove ai302-machine-root connection (likely did not exist):",
-					e,
-				);
-			}
-
-			// Retry initialization with retry logic
-			machineInit = await this._initPodmanMachineWithRetry(3);
-			lastError = machineInit.output || "";
-		}
-
-		// Handle case: "Error: the WSL import of guest OS failed ... ERROR_ALREADY_EXISTS"
-		// This happens when the WSL distribution already exists but podman doesn't know about it
-		if (
-			!machineInit.isOk &&
-			lastError?.includes("WSL import of guest OS failed") &&
-			(lastError?.includes("ERROR_ALREADY_EXISTS") || lastError?.includes("0xffffffff"))
-		) {
-			broadcastService.broadcastChannelToAll("install-log", {
-				step: "init-podman",
-				type: "stdout",
-				data: await this.t(
-					"检测到残留的 WSL 分发，正在清理...",
-					"Detected residual WSL distribution, cleaning up...",
-				),
-			});
-
-			// Unregister conflicting WSL distributions
-			if (process.platform === "win32") {
-				try {
-					await execAsync("wsl --unregister podman-ai302-machine");
-				} catch (e) {
-					console.debug(
-						"[LocalVibeService] Failed to unregister podman-ai302-machine (likely did not exist):",
-						e,
-					);
-				}
-				try {
-					await execAsync("wsl --unregister podman-machine-ai302-machine");
-				} catch (e) {
-					console.debug(
-						"[LocalVibeService] Failed to unregister podman-machine-ai302-machine (likely did not exist):",
-						e,
-					);
-				}
-			}
-
-			// Retry initialization again with retry logic
-			machineInit = await this._initPodmanMachineWithRetry(3);
-			lastError = machineInit.output || "";
-		}
-
-		// Handle case where machine already exists on hypervisor level (fallback check)
-		// This can happen if machine exists in WSL but not in Podman's registry
-		// IMPORTANT: Must ensure we don't treat "system connection already exists" as success
-		if (
-			!machineInit.isOk &&
-			(lastError?.includes("already exists") || lastError?.includes("VM already exists")) &&
-			!lastError?.includes("system connection") // Exclude connection errors
-		) {
-			broadcastService.broadcastChannelToAll("install-log", {
-				step: "init-podman",
-				type: "stdout",
-				data: "Machine 'ai302-machine' already exists on hypervisor, treating as success",
-			});
-			return { isOk: true };
-		}
+		const machineInit = await this._initPodmanMachineWithRetry(3);
 
 		return machineInit;
 	}
@@ -1952,6 +1801,21 @@ export class LocalVibeService {
 			});
 
 		// Start health check after successful installation
+		if (result.isOk) {
+			await this.startPodmanHealthCheck(_event);
+		}
+
+		return result;
+	}
+
+	/**
+	 * Initialize Podman machine only (without installing prerequisites).
+	 * Used on Windows where users manually install WSL, Scoop, Podman, and podman-compose,
+	 * and only need the app to handle `podman machine init ai302-machine`.
+	 */
+	async initPodmanMachine(_event: IpcMainInvokeEvent): Promise<{ isOk: boolean }> {
+		const result = await this._initPodmanMachine();
+
 		if (result.isOk) {
 			await this.startPodmanHealthCheck(_event);
 		}
@@ -2612,64 +2476,6 @@ export class LocalVibeService {
 						"Podman is not installed. Please install Podman first.",
 					);
 					return { isOk: false, error: notInstalledMsg };
-				} else if (isWSLError(errorMessage)) {
-					// WSL-specific errors - machine exists but WSL distribution is missing
-					console.log("[Local Vibe] WSL error detected, checking WSL state...");
-
-					// Check if WSL has any distributions installed
-					const wslListCheck = await this.checkWSLDistributions();
-					if (!wslListCheck.hasDistributions) {
-						// WSL is installed but has no distributions
-						// Need to install WSL with a distribution
-						const noDistroMsg = await this.t(
-							"WSL 未安装任何 Linux 发行版。请运行 'wsl --install' 并重启计算机后再试。",
-							"WSL has no Linux distributions installed. Please run 'wsl --install' and restart your computer, then try again.",
-						);
-						return { isOk: false, error: noDistroMsg };
-					}
-
-					// Recover by deleting and re-initializing the machine
-					console.log("[Local Vibe] WSL is available, recovering by re-initializing machine...");
-					const recoverMsg = await this.t(
-						"检测到 WSL 错误，正在重新初始化 Podman 机器...",
-						"WSL error detected, re-initializing Podman machine...",
-					);
-					broadcastService.broadcastChannelToAll("install-log", {
-						step: "podman-machine-recover",
-						type: "stdout",
-						data: recoverMsg,
-					});
-
-					// Delete the broken machine
-					await this.runCommandWithBroadcast(
-						"podman",
-						["machine", "rm", "ai302-machine", "-f"],
-						"podman-machine-rm",
-					);
-
-					// Re-initialize
-					const initResult = await this._initPodmanMachine();
-					if (!initResult.isOk) {
-						const initErrorMsg = await this.t(
-							"重新初始化 Podman 机器失败。请确保 WSL 已正确安装。",
-							"Failed to re-initialize Podman machine. Please ensure WSL is properly installed.",
-						);
-						return { isOk: false, error: initErrorMsg };
-					}
-
-					// Try starting again
-					const retryResult = await this.runCommandWithBroadcast(
-						"podman",
-						["machine", "start", "ai302-machine"],
-						"podman-machine-start-retry",
-					);
-					if (!retryResult.isOk) {
-						const retryErrorMsg = await this.t(
-							"重新启动 Podman 机器失败",
-							"Failed to restart Podman machine after recovery",
-						);
-						return { isOk: false, error: retryErrorMsg, output: retryResult.output };
-					}
 				} else {
 					// Other errors
 					return { isOk: false, error: errorMessage };

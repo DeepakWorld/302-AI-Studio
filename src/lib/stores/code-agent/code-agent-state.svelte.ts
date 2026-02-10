@@ -5,7 +5,6 @@ import * as m from "$lib/paraglide/messages";
 import { chatState } from "$lib/stores/chat-state.svelte";
 import { persistedTabState } from "$lib/stores/tab-bar-state.svelte";
 import type { ChatMessage } from "$lib/types/chat";
-import { isWindows } from "$lib/utils/platform";
 import type { Model } from "@302ai/studio-plugin-sdk";
 import {
 	CodeAgentConfigMetadata,
@@ -66,10 +65,7 @@ class CodeAgentState {
 	localBaseUrl = $state("");
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
-	type = $derived.by(() => {
-		if (isWindows) return "remote";
-		return persistedCodeAgentConfigState.current?.type ?? "remote";
-	});
+	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
 	currentAgentId = $derived.by(
 		() => persistedCodeAgentConfigState.current?.currentAgentId ?? "claude-code",
 	);
@@ -229,11 +225,9 @@ class CodeAgentState {
 
 	updateType(type: CodeAgentType): void {
 		this.updateState({ type });
-
-		if (isWindows) return;
-
+		// 切换模式时重置 session 和 sandbox ID，避免配置混乱和竞态问题
 		claudeCodeAgentState.resetSessionAndSandbox(type);
-
+		// 重置 local session 选择
 		localClaudeCodeSandboxState.reset();
 	}
 
