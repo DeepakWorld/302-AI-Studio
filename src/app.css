@@ -230,6 +230,10 @@
 	[data-slot="dialog-content"][data-mcp-import-dialog] {
 		max-width: 42rem !important;
 	}
+	[data-slot="dialog-content"][data-mcp-selector-dialog] {
+		width: min(600px, calc(100vw - 2rem)) !important;
+		max-width: none !important;
+	}
 
 	/* Search keyword highlighting with fade-out animation */
 	mark.search-highlight {

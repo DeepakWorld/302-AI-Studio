@@ -20,6 +20,7 @@ import {
 	trayService,
 	windowService,
 } from "./services";
+import { preferencesStorage } from "./services/storage-service/preferences-storage";
 import { UpdaterService } from "./services/updater-service";
 import { setupNetworkInterceptor } from "./utils/network-interceptor";
 
@@ -151,6 +152,9 @@ async function init() {
 	registerIpcHandlers();
 
 	await appService.initFromStorage();
+
+	// Run storage migrations
+	await preferencesStorage.ensureMigrated();
 
 	// Initialize plugin system
 	try {
