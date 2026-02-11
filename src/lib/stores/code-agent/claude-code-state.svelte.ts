@@ -1,5 +1,5 @@
 import { deploySandboxProject, type DeploySandboxResponse } from "$lib/api/sandbox-deploy";
-import { _updateSessionNote } from "$lib/api/sandbox-session";
+import { updateSessionNote } from "$lib/api/sandbox-session";
 import { listSkills } from "$lib/api/skills";
 import { type ListSkillsResponse } from "$lib/api/skills/base-apis";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
@@ -202,7 +202,7 @@ class ClaudeCodeAgentState {
 	}
 
 	async updateSessionRemark(remark: string, isManual: boolean = false): Promise<boolean> {
-		const { success } = await _updateSessionNote({
+		const { success } = await updateSessionNote({
 			note: remark,
 			sandbox_id: this.sandboxId,
 			session_id: this.currentSessionId,
