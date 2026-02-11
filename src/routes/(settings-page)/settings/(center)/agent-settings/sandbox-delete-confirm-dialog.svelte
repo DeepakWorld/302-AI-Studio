@@ -7,7 +7,9 @@
 		persistedClaudeCodeSandboxState,
 	} from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { formatDateTimeShort } from "$lib/utils/date-format";
+	import { toast } from "svelte-sonner";
 	import { Loader2 } from "@lucide/svelte";
 	import type { ClaudeCodeSandboxInfo, LocalSessionInfo } from "@shared/storage/code-agent";
 
@@ -64,6 +66,10 @@
 		try {
 			if (mode === "local") {
 				if (!session) return;
+				if (!localEnvState.sandboxRunning) {
+					toast.error(m.code_agent_local_container_not_started());
+					return;
+				}
 				await localClaudeCodeSandboxState.deleteSession(session.session_id);
 			} else {
 				if (!sandbox) return;
