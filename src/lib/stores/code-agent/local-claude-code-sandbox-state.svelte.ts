@@ -1,8 +1,9 @@
-import { listLocalClaudeCodeSessions } from "$lib/api/sandbox-session";
+import { deleteLocalSession, listLocalSessions } from "$lib/api/sandbox-session";
 import type { GroupedSelectData } from "$lib/components/buss/settings/setting-select.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import type { LocalSessionInfo } from "@shared/storage/code-agent";
+import { toast } from "svelte-sonner";
 
 /**
  * Persisted state for local Claude Code sessions.
@@ -83,7 +84,6 @@ class LocalClaudeCodeSandboxState {
 									const sessionLabel = relatedSessions
 										.map((s) => s.note || m.local_platform_new_session())
 										.join(", ");
-									console.log("relatedSessions", relatedSessions);
 									return {
 										value: dir,
 										label: dir,
@@ -102,7 +102,7 @@ class LocalClaudeCodeSandboxState {
 	async refreshSessions(): Promise<void> {
 		this.isLoading = true;
 		try {
-			const response = await listLocalClaudeCodeSessions();
+			const response = await listLocalSessions();
 			if (response.success) {
 				persistedLocalClaudeCodeSessionsState.current = response.session_list;
 			}
@@ -139,6 +139,51 @@ class LocalClaudeCodeSandboxState {
 	reset(): void {
 		this.selectedSessionId = "new";
 		this.selectedWorkspacePath = "new";
+	}
+
+	/**
+	 * Delete a local session
+	 */
+	async deleteSession(sessionId: string): Promise<boolean> {
+		// Find workspace path before deletion (we need it for directory cleanup)
+		const session = this.sessions.find((s) => s.session_id === sessionId);
+		const workspacePath = session?.workspace_path;
+
+		const result = await deleteLocalSession(sessionId);
+
+		if (result.success) {
+			// Delete the local workspace directory if it exists.
+			// workspace_path is a container-internal path (e.g. "/home/user/workspace/icr6cz4lnm")
+			// We extract the last segment as subPath for the local directory mapping.
+			if (workspacePath) {
+				// Extract "icr6cz4lnm" from "/home/user/workspace/icr6cz4lnm"
+				const segments = workspacePath.replace(/\\/g, "/").split("/").filter(Boolean);
+				const subPath = segments[segments.length - 1];
+				if (subPath) {
+					try {
+						await window.electronAPI.localVibeService.deleteWorkspaceDirectory(subPath);
+					} catch (error) {
+						console.error(
+							"[LocalClaudeCodeSandboxState] Failed to delete workspace directory:",
+							subPath,
+							error,
+						);
+					}
+				}
+			}
+
+			toast.success(m.delete_session_success());
+
+			// Mark threads using this session as deleted (shows SessionDeleted UI)
+			// "local" is the virtual sandboxId used in local mode
+			await window.electronAPI.codeAgentService.deleteClaudeCodeSession("local", sessionId);
+
+			await this.refreshSessions();
+		} else {
+			toast.error(m.delete_session_failed());
+		}
+
+		return result.success;
 	}
 }
 

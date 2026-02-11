@@ -254,6 +254,40 @@ export class LocalVibeService {
 	}
 
 	/**
+	 * Delete a specific workspace directory via IPC
+	 * @param subPath - subdirectory name under workspace (e.g. "icr6cz4lnm")
+	 */
+	async deleteWorkspaceDirectory(
+		_event: IpcMainInvokeEvent,
+		subPath: string,
+	): Promise<{ success: boolean; error?: string }> {
+		const composeDir = this.getRuntimeComposeDir();
+		const workspaceDir = path.join(composeDir, "workspace");
+
+		// Prevent directory traversal
+		const safeSubPath = subPath.replace(/\.\./g, "");
+		const targetDir = path.join(workspaceDir, safeSubPath);
+
+		// Safety: ensure targetDir is actually inside workspaceDir
+		if (!targetDir.startsWith(workspaceDir)) {
+			console.error("[LocalVibeService] Path traversal attempt blocked:", subPath);
+			return { success: false, error: "Invalid path" };
+		}
+
+		try {
+			if (fs.existsSync(targetDir)) {
+				fs.rmSync(targetDir, { recursive: true, force: true });
+				console.log("[LocalVibeService] Deleted workspace directory:", targetDir);
+			}
+			return { success: true };
+		} catch (error) {
+			console.error("[LocalVibeService] Failed to delete workspace directory:", error);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return { success: false, error: errorMessage };
+		}
+	}
+
+	/**
 	 * List existing work directories in ai302/workspace
 	 * Returns array of directory names (not full paths)
 	 */
