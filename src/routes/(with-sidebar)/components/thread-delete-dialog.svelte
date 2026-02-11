@@ -5,7 +5,9 @@
 	import { m } from "$lib/paraglide/messages";
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { Loader2 } from "@lucide/svelte";
+	import { toast } from "svelte-sonner";
 
 	interface Props {
 		open?: boolean;
@@ -42,6 +44,10 @@
 			if (deleteRemoteSession && sandboxId && sessionId) {
 				let success: boolean;
 				if (sandboxId === "local") {
+					if (!localEnvState.sandboxRunning) {
+						toast.error(m.code_agent_local_container_not_started());
+						return;
+					}
 					success = await localClaudeCodeSandboxState.deleteSession(sessionId);
 				} else {
 					success = await claudeCodeSandboxState.deleteSession(sandboxId, sessionId);
