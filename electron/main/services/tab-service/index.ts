@@ -97,11 +97,17 @@ export class TabService {
 		if (this.memoryManagerStarted) return;
 		this.memoryManagerStarted = true;
 		this.memoryManager.start(() => this.checkAndSleepTabs());
+		this.memoryManager.requestImmediateCheck();
 	}
 
 	private trackInitialViewLoad(view: WebContentsView) {
 		if (this.memoryManagerStarted) return;
 		this.initialLoadTracker.track(view);
+	}
+
+	private requestMemoryCheckOnNewView() {
+		if (!this.memoryManagerStarted) return;
+		this.memoryManager.requestImmediateCheck();
 	}
 
 	private async checkAndSleepTabs() {
@@ -413,6 +419,7 @@ export class TabService {
 		});
 
 		this.trackInitialViewLoad(view);
+		this.requestMemoryCheckOnNewView();
 
 		// Attach shortcut engine to tab view
 		shortcutService.getEngine().attachToView(view, windowId, tab.id);

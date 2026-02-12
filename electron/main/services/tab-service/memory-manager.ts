@@ -45,6 +45,7 @@ export interface MemoryManagerOptions {
 	logger?: (message: string) => void;
 	setTimeoutFn?: typeof setTimeout;
 	clearTimeoutFn?: typeof clearTimeout;
+	immediateDelayMs?: number;
 }
 
 const KB_PER_MB = 1024;
@@ -144,9 +145,11 @@ export class MemoryManager {
 	private readonly logger: (message: string) => void;
 	private readonly setTimeoutFn: typeof setTimeout;
 	private readonly clearTimeoutFn: typeof clearTimeout;
+	private readonly immediateDelayMs: number;
 	private memoryState: MemoryState;
 	private lastEvaluation: MemoryEvaluationResult | null;
 	private timer: ReturnType<typeof setTimeout> | null;
+	private immediateTimer: ReturnType<typeof setTimeout> | null;
 	private isRunning: boolean;
 	private isTickRunning: boolean;
 	private onTick: (() => void | Promise<void>) | null;
@@ -160,8 +163,10 @@ export class MemoryManager {
 		this.logger = options.logger ?? console.log;
 		this.setTimeoutFn = options.setTimeoutFn ?? setTimeout;
 		this.clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
+		this.immediateDelayMs = options.immediateDelayMs ?? 1000;
 		this.lastEvaluation = null;
 		this.timer = null;
+		this.immediateTimer = null;
 		this.isRunning = false;
 		this.isTickRunning = false;
 		this.onTick = null;
@@ -192,6 +197,20 @@ export class MemoryManager {
 			this.clearTimeoutFn(this.timer);
 			this.timer = null;
 		}
+		if (this.immediateTimer) {
+			this.clearTimeoutFn(this.immediateTimer);
+			this.immediateTimer = null;
+		}
+	}
+
+	requestImmediateCheck() {
+		if (!this.isRunning || this.isTickRunning) return;
+		if (this.immediateTimer) return;
+
+		this.immediateTimer = this.setTimeoutFn(() => {
+			this.immediateTimer = null;
+			void this.runCycle();
+		}, this.immediateDelayMs);
 	}
 
 	private scheduleNext(intervalMs: number) {

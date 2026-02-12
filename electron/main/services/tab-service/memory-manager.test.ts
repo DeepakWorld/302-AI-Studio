@@ -176,5 +176,24 @@ describe("memory-manager", () => {
 
 			expect(onTick).not.toHaveBeenCalled();
 		});
+
+		it("requestImmediateCheck triggers onTick sooner than scheduled interval", async () => {
+			vi.useFakeTimers();
+			const onTick = vi.fn();
+			const policy = {
+				...DEFAULT_MEMORY_POLICY,
+				emaAlpha: 1,
+				highIntervalMs: 5000,
+			};
+			const getSnapshot = vi.fn(() => makeSnapshot({ totalKB: 1000, freeKB: 50 }));
+			const manager = new MemoryManager({ policy, getSnapshot });
+
+			manager.start(onTick);
+			manager.requestImmediateCheck();
+
+			await vi.advanceTimersByTimeAsync(1000);
+
+			expect(onTick).toHaveBeenCalledTimes(1);
+		});
 	});
 });
