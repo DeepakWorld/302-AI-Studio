@@ -10,6 +10,7 @@
 	import texmath from "markdown-it-texmath";
 	import type Token from "markdown-it/lib/token.mjs";
 	import { onMount } from "svelte";
+	import { SvelteSet } from "svelte/reactivity";
 	import BlockLoading from "./code-agent/block-loading.svelte";
 	import TodoListRenderer from "./code-agent/todo-list-renderer.svelte";
 	import WriteToolRenderer from "./code-agent/write-tool-renderer.svelte";
@@ -97,6 +98,8 @@
 	let blocks = $state<BlockDescriptor[]>([]);
 	let lastConfigSignature = "";
 	let lastContentSnapshot = "";
+	let lastMessageId = "";
+	let seenBlockIds = new SvelteSet<string>();
 
 	const normalizePlugins = (plugins: MarkdownPluginInput[] = []): MarkdownPluginObject[] =>
 		plugins.map((entry) => {
@@ -636,7 +639,14 @@
 			props.configure ? true : false,
 			props.inline ? "inline" : "block",
 		]);
-		const { content } = props;
+		const { content, messageId } = props;
+
+		// Reset seen blocks when message changes or content is cleared
+		if (messageId !== lastMessageId || content === "") {
+			lastMessageId = messageId ?? "";
+			seenBlockIds = new SvelteSet();
+		}
+
 		if (configSignature !== lastConfigSignature || content !== lastContentSnapshot) {
 			lastConfigSignature = configSignature;
 			lastContentSnapshot = content;
@@ -668,37 +678,59 @@
 			},
 		};
 	};
+
+	/**
+	 * Determines if a block should have the streaming fade animation.
+	 * Returns true if streaming is active and the block hasn't been seen yet.
+	 * Also marks the block as seen after first render.
+	 */
+	const shouldAnimateBlock = (blockId: string): boolean => {
+		if (!props.isStreaming) return false;
+		if (seenBlockIds.has(blockId)) return false;
+		// Mark as seen for next render
+		seenBlockIds.add(blockId);
+		return true;
+	};
 </script>
 
 <div class="prose max-w-none [&_a]:break-all">
 	{#each blocks as block (block.id)}
+		{@const animate = shouldAnimateBlock(block.id)}
 		{#if block.kind === "code"}
-			<CodeBlock
-				blockId={block.id}
-				code={block.code}
-				language={block.language}
-				meta={block.meta}
-				theme={props.codeTheme ?? DEFAULT_THEME}
-				messageId={props.messageId}
-				messagePartIndex={props.messagePartIndex}
-				isStreaming={props.isStreaming}
-			/>
+			<div class={animate ? "streaming-fade-in" : ""}>
+				<CodeBlock
+					blockId={block.id}
+					code={block.code}
+					language={block.language}
+					meta={block.meta}
+					theme={props.codeTheme ?? DEFAULT_THEME}
+					messageId={props.messageId}
+					messagePartIndex={props.messagePartIndex}
+					isStreaming={props.isStreaming}
+				/>
+			</div>
 		{:else if block.kind === "todo"}
-			<TodoListRenderer todos={block.todos} />
+			<div class={animate ? "streaming-fade-in" : ""}>
+				<TodoListRenderer todos={block.todos} />
+			</div>
 		{:else if block.kind === "tool-loading" && block.toolType && props.isStreaming}
-			<BlockLoading type={block.toolType} />
+			<div class={animate ? "streaming-fade-in" : ""}>
+				<BlockLoading type={block.toolType} />
+			</div>
 		{:else if block.kind === "write"}
-			<WriteToolRenderer
-				blockId={block.id}
-				filePath={block.filePath}
-				code={block.code}
-				language={block.language}
-				theme={props.codeTheme ?? DEFAULT_THEME}
-				messageId={props.messageId}
-				messagePartIndex={props.messagePartIndex}
-			/>
+			<div class={animate ? "streaming-fade-in" : ""}>
+				<WriteToolRenderer
+					blockId={block.id}
+					filePath={block.filePath}
+					code={block.code}
+					language={block.language}
+					theme={props.codeTheme ?? DEFAULT_THEME}
+					messageId={props.messageId}
+					messagePartIndex={props.messagePartIndex}
+				/>
+			</div>
 		{:else if block.kind === "html"}
-			<div use:handleExternalLinks>
+			<div class={animate ? "streaming-fade-in" : ""} use:handleExternalLinks>
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 				{@html block.html}
 			</div>
