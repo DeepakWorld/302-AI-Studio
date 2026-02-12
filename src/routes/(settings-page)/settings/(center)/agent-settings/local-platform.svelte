@@ -32,7 +32,8 @@
 		return sessions.filter(
 			(session) =>
 				session.session_id.toLowerCase().includes(query) ||
-				(session.note?.toLowerCase().includes(query) ?? false),
+				(session.note?.toLowerCase().includes(query) ?? false) ||
+				(session.workspace_path?.toLowerCase().includes(query) ?? false),
 		);
 	});
 
