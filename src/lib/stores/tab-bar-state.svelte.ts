@@ -24,6 +24,7 @@ class TabBarState {
 	#isShellView = $state<boolean>(false);
 	#fallbackTabCreationInFlight = false;
 	#lastFallbackAttemptAt = 0;
+	#isLastTabCloseHandling = false;
 
 	get currentWindowId(): string {
 		return this.#windowId;
@@ -108,13 +109,27 @@ class TabBarState {
 		if (this.#isShellView) {
 			$effect.root(() => {
 				$effect(() => {
+					console.log(
+						"[TabBarState] $effect triggered, #isLastTabCloseHandling:",
+						this.#isLastTabCloseHandling,
+						"#windowId:",
+						this.#windowId,
+						"isHydrated:",
+						persistedTabState.isHydrated,
+					);
 					if (!persistedTabState.isHydrated) return;
 					if (!this.#windowId) return;
+					if (this.#isLastTabCloseHandling) {
+						console.log("[TabBarState] $effect: skipping because #isLastTabCloseHandling is true");
+						return;
+					}
 
 					const current = persistedTabState.current;
 					const tabs = current?.[this.#windowId]?.tabs ?? [];
+					console.log("[TabBarState] $effect: tabs.length =", tabs.length);
 					if (tabs.length > 0) return;
 
+					console.log("[TabBarState] $effect: tabs.length === 0, creating fallback tab");
 					const now = Date.now();
 					if (this.#fallbackTabCreationInFlight) return;
 					if (now - this.#lastFallbackAttemptAt < 800) return;
@@ -172,6 +187,10 @@ class TabBarState {
 
 	// ******************************* Private Methods ******************************* //
 	#safeUpdateWindowTabs(windowId: string, tabs: Tab[]): void {
+		console.log(
+			"[TabBarState] #safeUpdateWindowTabs called, #isLastTabCloseHandling:",
+			this.#isLastTabCloseHandling,
+		);
 		persistedTabState.current = {
 			...persistedTabState.current,
 			[windowId]: { tabs },
@@ -253,11 +272,19 @@ class TabBarState {
 
 			await tabService.handleTabClose(tabId, newActiveTabId);
 		} else {
+			console.log("[TabBarState] handleTabClose: setting #isLastTabCloseHandling = true");
+			this.#isLastTabCloseHandling = true;
 			this.#safeUpdateWindowTabs(this.#windowId, []);
 			console.log("handleTabClose: currentTabs.length === 1");
 
-			setTimeout(() => {
-				this.handleNewTab(m.title_new_chat());
+			setTimeout(async () => {
+				try {
+					console.log("[TabBarState] handleTabClose: setTimeout callback, creating new tab");
+					await this.handleNewTab(m.title_new_chat());
+				} finally {
+					console.log("[TabBarState] handleTabClose: setting #isLastTabCloseHandling = false");
+					this.#isLastTabCloseHandling = false;
+				}
 			}, 300);
 		}
 	}
@@ -322,6 +349,7 @@ class TabBarState {
 		content?: string,
 		previewId?: string,
 	) {
+		console.log("[TabBarState] handleNewTab called with title:", title, "type:", type);
 		// This method can be called from both shell views and tab views
 		// Use real window.windowId to ensure correct behavior
 		const currentWindowId = this.currentWindowId;

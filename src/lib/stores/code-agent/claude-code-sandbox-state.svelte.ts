@@ -6,8 +6,8 @@ import { m } from "$lib/paraglide/messages";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 import { formatDateTimeShort } from "$lib/utils/date-format";
 import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
-import { SvelteSet } from "svelte/reactivity";
 import { toast } from "svelte-sonner";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
 import { persistedLocalClaudeCodeSessionsState } from "./local-claude-code-sandbox-state.svelte";
@@ -38,7 +38,7 @@ $effect.root(() => {
 });
 
 class ClaudeCodeSandboxState {
-	sandboxRemarkMap = $state(new Map<string, string>());
+	sandboxRemarkMap = $state(new SvelteMap<string, string>());
 
 	sandboxes = $derived.by(() => {
 		return [
@@ -82,26 +82,46 @@ class ClaudeCodeSandboxState {
 
 	groupedSessions = $derived.by(() => {
 		const sandboxes = persistedClaudeCodeSandboxState.current;
-		return {
-			standalone: [newSessionItem],
-			groups: sandboxes.map((sandbox) => ({
-				groupKey: sandbox.sandboxId,
-				groupLabel: sandbox.sandboxRemark || sandbox.sandboxId,
-				items: [...sandbox.sessionInfos]
-					.sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime())
-					.map((session) => {
-						// Filter out zero/default dates
+		const groupsWithMeta = sandboxes.map((sandbox) => {
+			const sortedSessions = [...sandbox.sessionInfos].sort(
+				(a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime(),
+			);
+
+			const latestTimestamp =
+				sortedSessions.length > 0 ? new Date(sortedSessions[0].usedAt).getTime() : 0;
+
+			const sandboxLabel = sandbox.sandboxRemark || sandbox.sandboxId;
+
+			return {
+				timestamp: latestTimestamp,
+				group: {
+					groupKey: sandbox.sandboxId,
+					groupLabel: sandboxLabel,
+					items: sortedSessions.map((session) => {
 						const date = new Date(session.usedAt);
 						const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+						const dateLabel = hasValidDate
+							? formatDateTimeShort(session.usedAt)
+							: m.local_platform_unknown();
 
 						return {
 							key: session.sessionId,
 							label: session.note || session.sessionId,
 							value: session.sessionId,
-							extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
+							extra: dateLabel,
 						};
 					}),
-			})),
+				},
+			};
+		});
+
+		const sortedGroups = groupsWithMeta
+			.sort((a, b) => b.timestamp - a.timestamp)
+			.map((g) => g.group);
+
+		return {
+			standalone: [newSessionItem],
+			groups: sortedGroups,
 		};
 	});
 
@@ -111,55 +131,88 @@ class ClaudeCodeSandboxState {
 	workspacePathOptions = $derived.by((): GroupedSelectData => {
 		const sandboxList = persistedClaudeCodeSandboxState.current;
 
-		// Extract all unique workspacePaths from all sessions across all sandboxes
-		const allWorkspacePaths = new SvelteSet<string>();
+		// Map workspacePath to its latest usedAt and related sessions
+		const workspaceMap = new SvelteMap<
+			string,
+			{ latestUsedAt: number; relatedSessions: { note: string | null; sessionId: string }[] }
+		>();
+
 		for (const sandbox of sandboxList) {
 			for (const session of sandbox.sessionInfos) {
 				if (session.workspacePath && session.workspacePath !== "") {
-					allWorkspacePaths.add(session.workspacePath);
+					if (!workspaceMap.has(session.workspacePath)) {
+						workspaceMap.set(session.workspacePath, { latestUsedAt: 0, relatedSessions: [] });
+					}
+					const data = workspaceMap.get(session.workspacePath)!;
+					data.relatedSessions.push({ note: session.note, sessionId: session.sessionId });
+
+					const usedAtTime = new Date(session.usedAt).getTime();
+					if (!isNaN(usedAtTime) && usedAtTime > data.latestUsedAt) {
+						data.latestUsedAt = usedAtTime;
+					}
 				}
 			}
 		}
 
-		const pathList = Array.from(allWorkspacePaths);
+		// Sort paths by time first (newest first)
+		const sortedPaths = Array.from(workspaceMap.entries()).sort(
+			(a, b) => b[1].latestUsedAt - a[1].latestUsedAt,
+		);
+
+		// Group by combined label
+		const groupsMap = new SvelteMap<
+			string,
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			{ label: string; maxTimestamp: number; items: any[] }
+		>();
+
+		for (const [path, data] of sortedPaths) {
+			const date = new Date(data.latestUsedAt);
+			const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+			const dateLabel = hasValidDate
+				? formatDateTimeShort(data.latestUsedAt)
+				: m.local_platform_unknown();
+
+			const sessionLabelRaw = [
+				...new SvelteSet(data.relatedSessions.map((s) => s.note || m.select_session_new())),
+			].join(", ");
+
+			// Combine session info and date into group label
+			const groupLabel = `${m.local_platform_session({ session: sessionLabelRaw })} - ${dateLabel}`;
+
+			if (!groupsMap.has(groupLabel)) {
+				groupsMap.set(groupLabel, {
+					label: groupLabel,
+					maxTimestamp: data.latestUsedAt,
+					items: [],
+				});
+			}
+
+			const group = groupsMap.get(groupLabel)!;
+			if (data.latestUsedAt > group.maxTimestamp) {
+				group.maxTimestamp = data.latestUsedAt;
+			}
+
+			group.items.push({
+				key: path,
+				label: path,
+				value: path,
+			});
+		}
+
+		const groups = Array.from(groupsMap.values())
+			.sort((a, b) => b.maxTimestamp - a.maxTimestamp)
+			.map((g) => ({
+				groupKey: g.label,
+				groupLabel: g.label,
+				items: g.items,
+			}));
 
 		return {
 			standalone: [{ key: "new", label: m.local_platform_new_work_directory(), value: "new" }],
-			groups:
-				pathList.length > 0
-					? [
-							{
-								groupKey: "existing",
-								groupLabel: m.local_platform_existing_work_directory(),
-								items: pathList.map((path) => {
-									// Find all sessions that use this workspace path
-									const relatedSessions: { note: string | null; sessionId: string }[] = [];
-									for (const sandbox of sandboxList) {
-										for (const session of sandbox.sessionInfos) {
-											if (session.workspacePath === path) {
-												relatedSessions.push({
-													note: session.note,
-													sessionId: session.sessionId,
-												});
-											}
-										}
-									}
-									const sessionLabel = [
-										...new SvelteSet(relatedSessions.map((s) => s.note || m.select_session_new())),
-									].join(", ");
-									return {
-										key: path,
-										label: path,
-										value: path,
-										extra: m.local_platform_session({ session: sessionLabel }),
-									};
-								}),
-							},
-						]
-					: [],
+			groups: groups,
 		};
 	});
-
 	/**
 	 * Get the workspace path for the current session
 	 * Returns the session's workspacePath if available, empty string otherwise

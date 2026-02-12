@@ -264,9 +264,7 @@
 	async function processFiles(files: File[], fromPaste = false) {
 		for (const file of files) {
 			if (chatState.attachments.length >= maxAttachmentLimit) {
-				toast.warning(
-					m.toast_max_attachments_reached?.() || `已达到最大附件数量：${maxAttachmentLimit}`,
-				);
+				toast.warning(m.toast_max_attachments_reached());
 				break;
 			}
 

@@ -125,6 +125,7 @@ export const localSessionInfoSchema = type({
 	session_id: "string",
 	workspace_path: "string",
 	note: "string | null",
+	used_at: "string",
 });
 export type LocalSessionInfo = typeof localSessionInfoSchema.infer;
 export const listLocalClaudeCodeSessionsResponse = type({
