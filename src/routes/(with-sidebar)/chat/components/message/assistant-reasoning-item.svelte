@@ -46,14 +46,14 @@
 		}
 	});
 
-	// Snapshot when streaming ends or on first mount if not yet persisted
+	// Snapshot when streaming ends
 	let wasStreaming = $state(false);
 	$effect(() => {
 		if (isCurrentMessageStreaming) {
 			wasStreaming = true;
 		} else {
-			// When stream ends, or if this is a non-streaming message and we don't have a persisted state yet
-			if (wasStreaming || chatUIState.getReasoningState(messageId, index) === undefined) {
+			// When stream ends
+			if (wasStreaming) {
 				chatUIState.setReasoningState(messageId, index, isExpanded);
 			}
 			wasStreaming = false;
