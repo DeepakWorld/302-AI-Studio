@@ -10,7 +10,6 @@
 	import texmath from "markdown-it-texmath";
 	import type Token from "markdown-it/lib/token.mjs";
 	import { onMount } from "svelte";
-	import { SvelteSet } from "svelte/reactivity";
 	import BlockLoading from "./code-agent/block-loading.svelte";
 	import TodoListRenderer from "./code-agent/todo-list-renderer.svelte";
 	import WriteToolRenderer from "./code-agent/write-tool-renderer.svelte";
@@ -99,7 +98,6 @@
 	let lastConfigSignature = "";
 	let lastContentSnapshot = "";
 	let lastMessageId = "";
-	let seenBlockIds = new SvelteSet<string>();
 
 	const normalizePlugins = (plugins: MarkdownPluginInput[] = []): MarkdownPluginObject[] =>
 		plugins.map((entry) => {
@@ -641,10 +639,9 @@
 		]);
 		const { content, messageId } = props;
 
-		// Reset seen blocks when message changes or content is cleared
+		// Reset state when message changes or content is cleared
 		if (messageId !== lastMessageId || content === "") {
 			lastMessageId = messageId ?? "";
-			seenBlockIds = new SvelteSet();
 		}
 
 		if (configSignature !== lastConfigSignature || content !== lastContentSnapshot) {
@@ -680,24 +677,109 @@
 	};
 
 	/**
-	 * Determines if a block should have the streaming fade animation.
-	 * Returns true if streaming is active and the block hasn't been seen yet.
-	 * Also marks the block as seen after first render.
+	 * Svelte action that applies fade-in animation to newly added text content.
+	 * Tracks the previous text length and animates only the new portion.
 	 */
-	const shouldAnimateBlock = (blockId: string): boolean => {
-		if (!props.isStreaming) return false;
-		if (seenBlockIds.has(blockId)) return false;
-		// Mark as seen for next render
-		seenBlockIds.add(blockId);
-		return true;
+	const streamingFadeAction = (node: HTMLElement) => {
+		let prevTextLength = 0;
+		let animationFrame: number | null = null;
+
+		const applyFadeToNewContent = () => {
+			if (!props.isStreaming) {
+				prevTextLength = node.textContent?.length || 0;
+				return;
+			}
+
+			const currentTextLength = node.textContent?.length || 0;
+
+			// Only animate if content was added (not removed or unchanged)
+			if (currentTextLength > prevTextLength) {
+				// Find all text nodes and wrap new content
+				const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
+				let charCount = 0;
+				const nodesToWrap: { node: Text; startOffset: number; endOffset: number }[] = [];
+
+				while (walker.nextNode()) {
+					const textNode = walker.currentNode as Text;
+					const nodeLength = textNode.length;
+					const nodeStart = charCount;
+					const nodeEnd = charCount + nodeLength;
+
+					// Check if this text node contains new content
+					if (nodeEnd > prevTextLength) {
+						const startOffset = Math.max(0, prevTextLength - nodeStart);
+						nodesToWrap.push({
+							node: textNode,
+							startOffset,
+							endOffset: nodeLength,
+						});
+					}
+
+					charCount += nodeLength;
+				}
+
+				// Wrap new content in animated spans
+				for (const { node: textNode, startOffset, endOffset } of nodesToWrap.reverse()) {
+					if (startOffset < endOffset && textNode.parentNode) {
+						const newText = textNode.textContent?.slice(startOffset, endOffset) || "";
+						if (newText) {
+							const span = document.createElement("span");
+							span.className = "streaming-fade-in";
+							span.textContent = newText;
+
+							// Split the text node
+							const beforeText = textNode.textContent?.slice(0, startOffset) || "";
+							textNode.textContent = beforeText;
+							textNode.parentNode.insertBefore(span, textNode.nextSibling);
+
+							// Remove animation class after animation completes
+							setTimeout(() => {
+								if (span.parentNode) {
+									const textContent = span.textContent || "";
+									const newTextNode = document.createTextNode(textContent);
+									span.parentNode.replaceChild(newTextNode, span);
+								}
+							}, 200);
+						}
+					}
+				}
+			}
+
+			prevTextLength = currentTextLength;
+		};
+
+		// Use MutationObserver to detect content changes
+		const observer = new MutationObserver(() => {
+			if (animationFrame) {
+				cancelAnimationFrame(animationFrame);
+			}
+			animationFrame = requestAnimationFrame(applyFadeToNewContent);
+		});
+
+		observer.observe(node, {
+			childList: true,
+			subtree: true,
+			characterData: true,
+		});
+
+		// Initial setup
+		prevTextLength = node.textContent?.length || 0;
+
+		return {
+			destroy() {
+				observer.disconnect();
+				if (animationFrame) {
+					cancelAnimationFrame(animationFrame);
+				}
+			},
+		};
 	};
 </script>
 
-<div class="prose max-w-none [&_a]:break-all">
+<div class="prose max-w-none [&_a]:break-all" use:streamingFadeAction>
 	{#each blocks as block (block.id)}
-		{@const animate = shouldAnimateBlock(block.id)}
 		{#if block.kind === "code"}
-			<div class={animate ? "streaming-fade-in" : ""}>
+			<div>
 				<CodeBlock
 					blockId={block.id}
 					code={block.code}
@@ -710,15 +792,15 @@
 				/>
 			</div>
 		{:else if block.kind === "todo"}
-			<div class={animate ? "streaming-fade-in" : ""}>
+			<div>
 				<TodoListRenderer todos={block.todos} />
 			</div>
 		{:else if block.kind === "tool-loading" && block.toolType && props.isStreaming}
-			<div class={animate ? "streaming-fade-in" : ""}>
+			<div>
 				<BlockLoading type={block.toolType} />
 			</div>
 		{:else if block.kind === "write"}
-			<div class={animate ? "streaming-fade-in" : ""}>
+			<div>
 				<WriteToolRenderer
 					blockId={block.id}
 					filePath={block.filePath}
@@ -730,7 +812,7 @@
 				/>
 			</div>
 		{:else if block.kind === "html"}
-			<div class={animate ? "streaming-fade-in" : ""} use:handleExternalLinks>
+			<div use:handleExternalLinks>
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 				{@html block.html}
 			</div>
