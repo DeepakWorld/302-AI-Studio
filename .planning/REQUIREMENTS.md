@@ -34,15 +34,15 @@ Deferred to later milestones.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ANIM-01 | — | Pending |
-| ANIM-02 | — | Pending |
-| ANIM-03 | — | Pending |
+| ANIM-01 | Phase 10 | Pending |
+| ANIM-02 | Phase 10 | Pending |
+| ANIM-03 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 3 total
-- Mapped to phases: 0
-- Unmapped: 3 ⚠️
+- Mapped to phases: 3
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after initial definition*
+*Last updated: 2026-02-12 — traceability updated with phase mappings*
