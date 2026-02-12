@@ -65,7 +65,10 @@ class CodeAgentState {
 	localBaseUrl = $state("");
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
-	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
+	type = $derived.by(() => {
+		if (threadId === "shell") return "remote";
+		return persistedCodeAgentConfigState.current?.type ?? "remote";
+	});
 	currentAgentId = $derived.by(
 		() => persistedCodeAgentConfigState.current?.currentAgentId ?? "claude-code",
 	);

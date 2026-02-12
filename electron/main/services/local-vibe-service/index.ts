@@ -189,14 +189,14 @@ export class LocalVibeService {
 	 * Get the runtime compose directory
 	 * In development: <project-root>/ai302
 	 * In production (macOS): <documents>/ai302
-	 * In production (others): <userData>/ai302
+	 * In production (others): <home>/ai302 (e.g. C:\Users\{username}\ai302 on Windows)
 	 */
 	private getRuntimeComposeDir(): string {
 		return match(app.isPackaged)
 			.with(true, () =>
 				match(PLATFORM.IS_MAC)
 					.with(true, () => path.join(app.getPath("documents"), "ai302"))
-					.otherwise(() => path.join(app.getPath("userData"), "ai302")),
+					.otherwise(() => path.join(app.getPath("home"), "ai302")),
 			)
 			.otherwise(() => path.join(process.cwd(), "ai302"));
 	}
@@ -1731,11 +1731,10 @@ export class LocalVibeService {
 				await new Promise((resolve) => setTimeout(resolve, delayMs));
 			}
 
-			const result = await this.runCommandWithBroadcast(
-				"podman",
-				["machine", "init", "ai302-machine"],
-				"init-podman",
-			);
+			const initArgs = PLATFORM.IS_WINDOWS
+				? ["machine", "init", "--rootful", "ai302-machine"]
+				: ["machine", "init", "ai302-machine"];
+			const result = await this.runCommandWithBroadcast("podman", initArgs, "init-podman");
 
 			if (result.isOk) {
 				return { isOk: true, output: result.output };
