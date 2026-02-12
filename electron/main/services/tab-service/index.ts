@@ -130,6 +130,7 @@ export class TabService {
 						await Promise.all([
 							storageService.removeItemInternal(`app-thread:${capturedTab.threadId}`),
 							storageService.removeItemInternal(`app-chat-messages:${capturedTab.threadId}`),
+							storageService.removeItemInternal(`app-chat-ui-state:${capturedTab.threadId}`),
 							storageService.removeItemInternal(`plan-answers:${capturedTab.threadId}`),
 							storageService.removeItemInternal(`html-preview-deployments:${capturedTab.threadId}`),
 							storageService.removeItemInternal(
@@ -297,6 +298,7 @@ export class TabService {
 					);
 					await storageService.removeItemInternal("app-thread:" + tab.threadId);
 					await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
+					await storageService.removeItemInternal("app-chat-ui-state:" + tab.threadId);
 					isPrivateChat = true;
 
 					// Track if we removed the active tab

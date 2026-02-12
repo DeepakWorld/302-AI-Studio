@@ -17,11 +17,6 @@
 	} from "$lib/components/buss/markdown/download-utils";
 	import { MarkdownRenderer } from "$lib/components/buss/markdown/index.js";
 	import { ModelIcon } from "$lib/components/buss/model-icon/index.js";
-	import {
-		Collapsible,
-		CollapsibleContent,
-		CollapsibleTrigger,
-	} from "$lib/components/ui/collapsible";
 	import { m } from "$lib/paraglide/messages.js";
 	import { getLocale } from "$lib/paraglide/runtime";
 	import { chatState } from "$lib/stores/chat-state.svelte";
@@ -32,8 +27,6 @@
 	import { persistedThemeState } from "$lib/stores/theme.state.svelte";
 	import type { ChatMessage } from "$lib/types/chat";
 	import {
-		ChevronDown,
-		Lightbulb,
 		MessageSquareShare,
 		Server,
 		ThumbsDown,
@@ -58,6 +51,7 @@
 		isMcpToolType,
 	} from "./claude-code-tools";
 	import AgentTaskResult from "./code-agent/agent-task-result.svelte";
+	import AssistantReasoningItem from "./assistant-reasoning-item.svelte";
 	import ExportDialog from "./export-dialog.svelte";
 	import MessageActions from "./message-actions.svelte";
 	import MessageContextMenu from "./message-context-menu.svelte";
@@ -66,7 +60,6 @@
 
 	let { message }: Props = $props();
 
-	let isReasoningExpanded = $state(!preferencesSettings.autoCollapseThink);
 	let selectedToolPart = $state<DynamicToolUIPart | null>(null);
 	let isToolModalOpen = $state(false);
 	let isExportDialogOpen = $state(false);
@@ -196,15 +189,6 @@
 
 			checkVoices();
 			window.speechSynthesis.onvoiceschanged = checkVoices;
-		}
-	});
-
-	$effect(() => {
-		if (isStreamingReasoning) {
-			isReasoningExpanded = true;
-		} else if (!isCurrentMessageStreaming) {
-			// When streaming ends, restore to the initial state based on settings
-			isReasoningExpanded = !preferencesSettings.autoCollapseThink;
 		}
 	});
 
@@ -519,53 +503,13 @@
 					/>
 				{/if}
 			{:else if part.type === "reasoning"}
-				{#if !preferencesSettings.autoHideReason}
-					<Collapsible
-						bind:open={isReasoningExpanded}
-						class="mb-4 rounded-lg border bg-muted/30 p-3"
-					>
-						<CollapsibleTrigger
-							class="flex w-full items-center justify-between text-left transition-colors hover:bg-muted/20 rounded-md p-2"
-						>
-							<div class="flex items-center gap-2">
-								<Lightbulb class="h-4 w-4 text-muted-foreground" />
-								<span class="text-sm font-medium text-muted-foreground">{m.title_thinking()}</span>
-							</div>
-							<ChevronDown
-								class="h-4 w-4 text-muted-foreground transition-transform duration-200 {isReasoningExpanded
-									? 'rotate-180'
-									: ''}"
-							/>
-						</CollapsibleTrigger>
-						<CollapsibleContent class="space-y-2">
-							<div class="pt-3">
-								{#if preferencesSettings.autoDisableMarkdown}
-									<div class="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-										{part.text}
-									</div>
-								{:else}
-									<div class="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-										{part.text.replace(/\\n/g, "\n").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
-									</div>
-								{/if}
-							</div>
-
-							{#if isStreamingReasoning}
-								<div class="flex items-center gap-2 pt-2 animate-in fade-in duration-300">
-									<LdrsLoader
-										type="dot-pulse"
-										size={16}
-										speed={1.2}
-										color={persistedThemeState.current.shouldUseDarkColors ? "#a1a1aa" : "#71717a"}
-									/>
-									<span class="text-xs text-muted-foreground italic">
-										{m.title_thinking()}...
-									</span>
-								</div>
-							{/if}
-						</CollapsibleContent>
-					</Collapsible>
-				{/if}
+				<AssistantReasoningItem
+					text={part.text}
+					messageId={message.id}
+					index={partIndex}
+					{isStreamingReasoning}
+					{isCurrentMessageStreaming}
+				/>
 			{:else if part.type === "dynamic-tool"}
 				{#if isClaudeCodeTool(part.toolName)}
 					<!-- Claude Code Tools - Render specialized cards -->

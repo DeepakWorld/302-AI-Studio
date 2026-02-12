@@ -65,6 +65,7 @@ export class ThreadStorage extends StorageService<ThreadMetadata> {
 			await Promise.all([
 				storageService.removeItemInternal("app-thread:" + threadId),
 				storageService.removeItemInternal("app-chat-messages:" + threadId),
+				storageService.removeItemInternal("app-chat-ui-state:" + threadId),
 				storageService.removeItemInternal("plan-answers:" + threadId),
 				storageService.removeItemInternal("html-preview-deployments:" + threadId),
 				storageService.removeItemInternal("AgentPreviewStorage:agent-preview-data-" + threadId),
