@@ -318,19 +318,10 @@
 				return;
 			}
 
-			// Handle deployment update from any source (including self)
-			// This is needed when onFinish saves deployment info and we need to refresh the UI
-			if (
-				message.type === "fileListUpdated" &&
-				message.sourceInstanceId === agentPreviewState.syncIdentifier
-			) {
-				// Force re-check deployment info by clearing the restored key
-				lastRestoredKey = "";
-				// Trigger a state restore to pick up the new deployment info
-				untrack(() => {
-					restoreState(sandboxId, sessionId);
-				});
-			}
+			// Note: We intentionally do NOT call restoreState() on fileListUpdated from self
+			// because file list updates don't change deployment info.
+			// restoreState() is already triggered by the $effect at line 457-470 when
+			// sandboxId/sessionId/isVisible changes, which covers the case of deployment updates.
 
 			// Handle file deletion: when file list is updated, check if the currently
 			// previewed file was deleted (directly or as part of a deleted folder)
