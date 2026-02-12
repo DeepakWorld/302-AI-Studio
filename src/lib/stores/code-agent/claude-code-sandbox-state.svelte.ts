@@ -134,16 +134,28 @@ class ClaudeCodeSandboxState {
 		// Map workspacePath to its latest usedAt and related sessions
 		const workspaceMap = new SvelteMap<
 			string,
-			{ latestUsedAt: number; relatedSessions: { note: string | null; sessionId: string }[] }
+			{
+				latestUsedAt: number;
+				relatedSessions: { note: string | null; sessionId: string }[];
+				sandboxId: string;
+				sandboxRemark: string;
+			}
 		>();
 
 		for (const sandbox of sandboxList) {
 			for (const session of sandbox.sessionInfos) {
 				if (session.workspacePath && session.workspacePath !== "") {
-					if (!workspaceMap.has(session.workspacePath)) {
-						workspaceMap.set(session.workspacePath, { latestUsedAt: 0, relatedSessions: [] });
+					// Use a composite key to distinguish same paths in different sandboxes
+					const compositeKey = `${sandbox.sandboxId}:${session.workspacePath}`;
+					if (!workspaceMap.has(compositeKey)) {
+						workspaceMap.set(compositeKey, {
+							latestUsedAt: 0,
+							relatedSessions: [],
+							sandboxId: sandbox.sandboxId,
+							sandboxRemark: sandbox.sandboxRemark,
+						});
 					}
-					const data = workspaceMap.get(session.workspacePath)!;
+					const data = workspaceMap.get(compositeKey)!;
 					data.relatedSessions.push({ note: session.note, sessionId: session.sessionId });
 
 					const usedAtTime = new Date(session.usedAt).getTime();
@@ -166,9 +178,10 @@ class ClaudeCodeSandboxState {
 			{ label: string; maxTimestamp: number; items: any[] }
 		>();
 
-		for (const [path, data] of sortedPaths) {
+		for (const [compositeKey, data] of sortedPaths) {
+			const workspacePath = compositeKey.split(":")[1];
 			const date = new Date(data.latestUsedAt);
-			const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+			const hasValidDate = !isNaN(data.latestUsedAt) && date.getFullYear() > 2020;
 			const dateLabel = hasValidDate
 				? formatDateTimeShort(data.latestUsedAt)
 				: m.local_platform_unknown();
@@ -177,8 +190,10 @@ class ClaudeCodeSandboxState {
 				...new SvelteSet(data.relatedSessions.map((s) => s.note || m.select_session_new())),
 			].join(", ");
 
-			// Combine session info and date into group label
-			const groupLabel = `${m.local_platform_session({ session: sessionLabelRaw })} - ${dateLabel}`;
+			const sandboxLabel = data.sandboxRemark || data.sandboxId;
+
+			// Combine sandbox info, session info and date into group label
+			const groupLabel = `${sandboxLabel} - ${m.local_platform_session({ session: sessionLabelRaw })} - ${dateLabel}`;
 
 			if (!groupsMap.has(groupLabel)) {
 				groupsMap.set(groupLabel, {
@@ -194,9 +209,9 @@ class ClaudeCodeSandboxState {
 			}
 
 			group.items.push({
-				key: path,
-				label: path,
-				value: path,
+				key: compositeKey,
+				label: workspacePath,
+				value: workspacePath,
 			});
 		}
 
