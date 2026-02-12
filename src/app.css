@@ -269,6 +269,20 @@
 			background-color: transparent;
 		}
 	}
+
+	/* Streaming text fade-in animation for AI chat responses */
+	@keyframes streaming-fade {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	.streaming-fade-in {
+		animation: streaming-fade 180ms ease-out;
+	}
 }
 
 /* Design System tokens for new buss components */
