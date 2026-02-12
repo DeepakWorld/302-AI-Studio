@@ -27,6 +27,11 @@
 2. Animation feels smooth (~150-200ms) without jarring or flickering
 3. Animation works identically in regular chat and Code Agent streaming responses
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 10-01-PLAN.md — Streaming fade animation CSS + MarkdownRenderer integration
+
 ## Shipped Milestones
 
 <details>
@@ -63,8 +68,8 @@ See: `.planning/milestones/v1.2-ROADMAP.md`
 | 7. Backend Summarization | v1.2 | 1/1 | Complete | 2026-02-06 |
 | 8. Router Integration | v1.2 | 2/2 | Complete | 2026-02-06 |
 | 9. UI Indicators | v1.2 | 1/1 | Complete | 2026-02-06 |
-| 10. Streaming Fade Animation | v1.3 | 0/? | Pending | — |
+| 10. Streaming Fade Animation | v1.3 | 0/1 | Planned | — |
 
 ---
 *Roadmap created: 2026-02-04*
-*Last updated: 2026-02-12 — v1.3 milestone added*
+*Last updated: 2026-02-12 — Phase 10 planned*
