@@ -61,10 +61,15 @@ export class ThreadStorage extends StorageService<ThreadMetadata> {
 			// Remove from metadata first
 			await this.removeThread(threadId);
 
-			// Delete the actual thread data file
-			const threadKey = "app-thread:" + threadId;
-			await storageService.removeItemInternal(threadKey);
-			await storageService.removeItemInternal("app-chat-messages:" + threadId);
+			// Parallel removal of all thread-related data
+			await Promise.all([
+				storageService.removeItemInternal("app-thread:" + threadId),
+				storageService.removeItemInternal("app-chat-messages:" + threadId),
+				storageService.removeItemInternal("plan-answers:" + threadId),
+				storageService.removeItemInternal("html-preview-deployments:" + threadId),
+				storageService.removeItemInternal("AgentPreviewStorage:agent-preview-data-" + threadId),
+			]);
+
 			emitter.emit("thread:thread-deleted", { threadId });
 		} catch (error) {
 			console.error(`Failed to delete thread ${threadId}:`, error);
