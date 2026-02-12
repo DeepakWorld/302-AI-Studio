@@ -12,6 +12,7 @@ import {
 	deepLinkService,
 	localVibeService,
 	codeAgentService,
+	threadStateService,
 	tabService,
 	aiApplicationService,
 	appService,
@@ -21,7 +22,6 @@ import {
 	notificationService,
 	providerService,
 	threadService,
-	threadStateService,
 	updaterService,
 } from "../services";
 
@@ -329,6 +329,14 @@ export function registerIpcHandlers() {
 			codeAgentService.setIsManualNoteBySession(event, sandboxId, sessionId, isManualNote),
 	);
 
+	// threadStateService service registration
+	ipcMain.handle("threadStateService:updateBusyState", (event, data) =>
+		threadStateService.updateBusyState(event, data),
+	);
+	ipcMain.handle("threadStateService:getBusyThreads", (event) =>
+		threadStateService.getBusyThreads(event),
+	);
+
 	// tabService service registration
 	ipcMain.handle(
 		"tabService:handleNewTabWithThread",
@@ -529,14 +537,6 @@ export function registerIpcHandlers() {
 		threadService.clearDeletedModelReferences(event, deletedModelIds),
 	);
 
-	// threadStateService service registration
-	ipcMain.handle("threadStateService:updateBusyState", (event, data) =>
-		threadStateService.updateBusyState(event, data),
-	);
-	ipcMain.handle("threadStateService:getBusyThreads", (event) =>
-		threadStateService.getBusyThreads(event),
-	);
-
 	// updaterService service registration
 	ipcMain.handle("updaterService:checkForUpdatesManually", (event) =>
 		updaterService.checkForUpdatesManually(event),
@@ -654,6 +654,8 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:createThreadForSession");
 	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
 	ipcMain.removeHandler("codeAgentService:setIsManualNoteBySession");
+	ipcMain.removeHandler("threadStateService:updateBusyState");
+	ipcMain.removeHandler("threadStateService:getBusyThreads");
 	ipcMain.removeHandler("tabService:handleNewTabWithThread");
 	ipcMain.removeHandler("tabService:handleNewTab");
 	ipcMain.removeHandler("tabService:handleActivateTab");
@@ -716,8 +718,6 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("threadService:removeFavorite");
 	ipcMain.removeHandler("threadService:deleteThreadsByApiKeyHash");
 	ipcMain.removeHandler("threadService:clearDeletedModelReferences");
-	ipcMain.removeHandler("threadStateService:updateBusyState");
-	ipcMain.removeHandler("threadStateService:getBusyThreads");
 	ipcMain.removeHandler("updaterService:checkForUpdatesManually");
 	ipcMain.removeHandler("updaterService:quitAndInstall");
 	ipcMain.removeHandler("updaterService:isUpdateDownloaded");

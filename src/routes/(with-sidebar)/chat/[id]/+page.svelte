@@ -46,20 +46,53 @@
 			});
 		}
 	}
+	onMount(() => {
+		// Restore UI state if available (Tab Rehydration)
+		const uiState = window.tab?.uiState;
+		if (uiState) {
+			console.log("[Chat Page] Restoring UI state:", uiState);
+			if (uiState.inputValue) {
+				chatState.inputValue = uiState.inputValue;
+			}
+
+			if (uiState.scrollPosition) {
+				// Wait for message list to render
+				setTimeout(() => {
+					const viewport = document.querySelector('[data-slot="scroll-area-viewport"]');
+					if (viewport) {
+						viewport.scrollTop = uiState.scrollPosition ?? 0;
+						console.log("[Chat Page] Restored scroll position:", uiState.scrollPosition);
+					}
+				}, 100);
+			}
+		}
+
+		// Listen for snapshot requests (Tab Sleeping)
+		const unsubSnapshot = window.electronAPI.onTabRequestSnapshot(() => {
+			console.log("[Chat Page] Generating UI snapshot");
+			const viewport = document.querySelector('[data-slot="scroll-area-viewport"]');
+			return {
+				scrollPosition: viewport?.scrollTop || 0,
+				inputValue: chatState.inputValue || "",
+			};
+		});
+
+		return () => unsubSnapshot();
+	});
 
 	onMount(() => {
 		// 确保覆盖层状态重置
 		fileUploadOverlayRef?.resetOverlay();
 
 		// Listen for clear messages event from main process
-		const unsubClear = window.electronAPI?.onTabClearMessages?.(({ tabId, threadId }) => {
+		const unsubClear = window.electronAPI.onTabClearMessages(({ tabId, threadId }) => {
 			console.log("[Chat Page] Received clear messages event:", { tabId, threadId });
 			// Clear the in-memory chat state
 			chatState.clearMessages();
 		});
 
 		// Listen for generate title event from main process
-		const unsubGenerateTitle = window.electronAPI?.onTabGenerateTitle?.(
+		const unsubGenerateTitle = window.electronAPI.onTabGenerateTitle(
 			async ({ tabId, threadId }) => {
 				console.log("[Chat Page] Received generate title event:", { tabId, threadId });
 				// Generate title for the current chat
@@ -68,7 +101,7 @@
 		);
 
 		// Listen for trigger send message event (for branch and send)
-		const unsubTriggerSend = window.electronAPI?.onTriggerSendMessage?.(
+		const unsubTriggerSend = window.electronAPI.onTriggerSendMessage(
 			async (data: { threadId: string }) => {
 				console.log("[Chat Page] Received trigger-send-message event:", data);
 				// Only trigger send if this is the target thread
@@ -84,7 +117,7 @@
 		);
 
 		// Listen for show toast event (from shell view, e.g. tab context menu)
-		const unsubShowToast = window.electronAPI?.onShowToast?.(
+		const unsubShowToast = window.electronAPI.onShowToast(
 			(data: { type: string; message: string; threadId?: string }) => {
 				console.log("[Chat Page] Received show-toast event:", data);
 
@@ -116,7 +149,7 @@
 		// Note: sandboxId is already persisted by main process via claudeCodeStorage.setClaudeCodeSandboxId
 		// The renderer's PersistedState will sync automatically via persisted-state:sync event
 		// We only need to open the preview panel here
-		const unsubSandboxCreated = window.electronAPI?.onSandboxCreated?.(
+		const unsubSandboxCreated = window.electronAPI.onSandboxCreated(
 			({ threadId, sandboxId }: { threadId: string; sandboxId: string }) => {
 				console.log("[Chat Page] Received sandbox-created event:", { threadId, sandboxId });
 
@@ -130,7 +163,7 @@
 		);
 
 		// Listen for create skill summary event
-		const unsubCreateSkillSummary = window.electronAPI?.onTriggerCreateSkillSummary?.(
+		const unsubCreateSkillSummary = window.electronAPI.onTriggerCreateSkillSummary(
 			async ({ threadId }: { threadId: string }) => {
 				console.log("[Chat Page] Received create-skill-summary event:", { threadId });
 
@@ -145,7 +178,7 @@
 		);
 
 		// Listen for apply default model event from SSO login
-		const unsubApplyDefaultModel = window.electronAPI?.onApplyDefaultModel?.(
+		const unsubApplyDefaultModel = window.electronAPI.onApplyDefaultModel(
 			(data: { model: unknown }) => {
 				if (chatState.selectedModel === null && data.model) {
 					chatState.selectedModel = data.model as Model;
@@ -204,13 +237,13 @@
 		}, 100);
 
 		return () => {
-			unsubClear?.();
-			unsubGenerateTitle?.();
-			unsubTriggerSend?.();
-			unsubShowToast?.();
-			unsubSandboxCreated?.();
-			unsubCreateSkillSummary?.();
-			unsubApplyDefaultModel?.();
+			unsubClear();
+			unsubGenerateTitle();
+			unsubTriggerSend();
+			unsubShowToast();
+			unsubSandboxCreated();
+			unsubCreateSkillSummary();
+			unsubApplyDefaultModel();
 		};
 	});
 

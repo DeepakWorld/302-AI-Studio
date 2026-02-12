@@ -10,6 +10,7 @@ export const emitter = mitt<{
 	"general-settings:language-changed": { language: LanguageCode };
 	"provider:302ai-provider-changed": { apiKey: string };
 	"thread:thread-deleted": { threadId: string };
+	"thread-busy-state-changed": { threadId: string; isBusy: boolean; reason?: string };
 }>();
 
 export class BroadcastService {

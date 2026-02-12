@@ -1,5 +1,5 @@
 import type { IpcMainInvokeEvent } from "electron";
-import { broadcastService } from "../broadcast-service";
+import { broadcastService, emitter } from "../broadcast-service";
 
 export class ThreadStateService {
 	private busyThreads = new Map<string, { isBusy: boolean; reason?: string }>();
@@ -18,6 +18,9 @@ export class ThreadStateService {
 			this.busyThreads.delete(threadId);
 		}
 
+		// Emit internal event for other main process services (e.g. TabService)
+		emitter.emit("thread-busy-state-changed", data);
+
 		// Trigger broadcast through broadcastService
 		await broadcastService.broadcastToAll(_event, "thread-busy-state-changed", data);
 	}
@@ -29,6 +32,10 @@ export class ThreadStateService {
 		_event: IpcMainInvokeEvent,
 	): Promise<Record<string, { isBusy: boolean; reason?: string }>> {
 		return Object.fromEntries(this.busyThreads);
+	}
+
+	isThreadBusy(threadId: string): boolean {
+		return this.busyThreads.has(threadId);
 	}
 }
 
