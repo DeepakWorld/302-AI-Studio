@@ -198,7 +198,7 @@
 			<ContextMenu.Separator />
 		{/if}
 
-		{#if tab.type === "aiApplications"}
+		{#if tab.type === "aiApplications" || tab.type === "helpDocs" || tab.type === "skillsHub"}
 			<ContextMenu.Item onSelect={() => handleAiApplicationReloadIpc(tab.id)}>
 				{m.label_button_reload()}
 			</ContextMenu.Item>
