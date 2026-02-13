@@ -62,6 +62,10 @@ class LocalEnvState {
 	// Installation logs
 	installLogs = $state<InstallLogEntry[]>([]);
 
+	// Sandbox startup logs
+	sandboxLogs = $state<string[]>([]);
+	sandboxFailed = $state(false);
+
 	// WSL restart required notification
 	wslRestartRequired = $state<{
 		reason: string;
@@ -225,25 +229,35 @@ class LocalEnvState {
 		}
 
 		this.sandboxStarting = true;
+		this.sandboxFailed = false;
+		this.sandboxLogs = [];
 		this.broadcastSandboxState({ starting: true });
 		this.sandboxHealthStatus = "unknown";
 		try {
 			const result = await window.electronAPI.localVibeService.startPodmanMachine();
 
-			// Print Podman machine output
+			// Capture Podman machine output
 			if (result.output) {
 				console.log("[Local Vibe] startPodmanMachine:", result.output);
+				this.sandboxLogs.push(`[INFO] [podman-machine] ${result.output}`);
 			}
 			if (result.error) {
 				console.error("[Local Vibe] startPodmanMachine error:", result.error);
+				this.sandboxLogs.push(`[ERROR] [podman-machine] ${result.error}`);
 			}
 
-			// Print docker-compose output
+			// Capture docker-compose output
 			if (result.composeOutput) {
 				console.log("[Local Vibe] docker-compose up:", result.composeOutput);
+				this.sandboxLogs.push(`[INFO] [docker-compose] ${result.composeOutput}`);
 			}
 			if (result.composeError) {
 				console.error("[Local Vibe] docker-compose error:", result.composeError);
+				this.sandboxLogs.push(`[ERROR] [docker-compose] ${result.composeError}`);
+			}
+
+			if (!result.isOk) {
+				this.sandboxFailed = true;
 			}
 
 			// Toggle sandbox running state on success
@@ -276,12 +290,14 @@ class LocalEnvState {
 		try {
 			const result = await window.electronAPI.localVibeService.stopLocalSandboxByIpc();
 
-			// Print command output with [Local Vibe] prefix
+			// Capture command output
 			if (result.output) {
 				console.log("[Local Vibe] stopLocalSandboxByIpc:", result.output);
+				this.sandboxLogs.push(`[INFO] [stop-sandbox] ${result.output}`);
 			}
 			if (result.error) {
 				console.error("[Local Vibe] stopLocalSandboxByIpc error:", result.error);
+				this.sandboxLogs.push(`[ERROR] [stop-sandbox] ${result.error}`);
 			}
 
 			// Toggle sandbox running state on success

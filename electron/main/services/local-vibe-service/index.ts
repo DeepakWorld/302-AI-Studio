@@ -1131,6 +1131,37 @@ export class LocalVibeService {
 	}
 
 	/**
+	 * Refreshes process.env.PATH on Windows by reading the latest user PATH from registry.
+	 * This is needed after installing tools like Scoop or Python that modify the user PATH,
+	 * because the current Electron process still has the old PATH from startup.
+	 */
+	private async refreshWindowsPath(): Promise<void> {
+		if (process.platform !== "win32") return;
+
+		try {
+			// Read current user PATH from registry
+			const { stdout } = await execAsync(
+				"powershell.exe -Command \"[Environment]::GetEnvironmentVariable('Path', 'User')\"",
+			);
+			const userPath = stdout.trim();
+
+			if (userPath) {
+				// Get system PATH (Machine level)
+				const { stdout: systemPathOut } = await execAsync(
+					"powershell.exe -Command \"[Environment]::GetEnvironmentVariable('Path', 'Machine')\"",
+				);
+				const systemPath = systemPathOut.trim();
+
+				// Combine: user PATH + system PATH
+				process.env.PATH = `${userPath};${systemPath}`;
+				console.log("[LocalVibeService] Refreshed process PATH from registry");
+			}
+		} catch (error) {
+			console.error("[LocalVibeService] Failed to refresh PATH:", error);
+		}
+	}
+
+	/**
 	 * Wait for Podman to be ready by polling `podman ps` command
 	 * This is needed on Windows/WSL where machine startup can take time
 	 * @param timeoutMs Maximum time to wait in milliseconds
@@ -1599,7 +1630,19 @@ export class LocalVibeService {
 		const platform = process.platform;
 
 		if (platform === "win32") {
-			// Windows: Install via pip (podman is installed via scoop which includes pip)
+			// Windows: Install via pip (install python via scoop first if pip is not available)
+			const pipCheck = await this.checkCommand("pip --version");
+			if (!pipCheck.isValid) {
+				const pythonInstall = await this.runCommandWithBroadcast(
+					"scoop",
+					["install", "python"],
+					"install-python",
+				);
+				if (!pythonInstall.isOk) return { isOk: false };
+
+				// Refresh PATH so pip is available in this process
+				await this.refreshWindowsPath();
+			}
 			return this.runCommandWithBroadcast(
 				"pip",
 				["install", "podman-compose"],
@@ -1799,6 +1842,39 @@ export class LocalVibeService {
 			return { isOk: true };
 		}
 
+		// Clean up stale machine and system connections before init
+		// This handles the case where a previous install left orphaned state
+		try {
+			try {
+				await execAsync("podman machine stop ai302-machine");
+			} catch {
+				// Machine not running or doesn't exist, fine
+			}
+			try {
+				await execAsync("podman machine rm -f ai302-machine");
+			} catch {
+				// Machine doesn't exist, fine
+			}
+			try {
+				await execAsync("podman system connection rm ai302-machine");
+			} catch {
+				// Connection doesn't exist, fine
+			}
+			try {
+				await execAsync("podman system connection rm ai302-machine-root");
+			} catch {
+				// Connection doesn't exist, fine
+			}
+			console.log("[LocalVibeService] Cleaned up stale machine/connections for 'ai302-machine'");
+			broadcastService.broadcastChannelToAll("install-log", {
+				step: "init-podman",
+				type: "stdout",
+				data: "Cleaned up stale ai302-machine configuration",
+			});
+		} catch {
+			// Cleanup errors are non-fatal
+		}
+
 		// Initialize Podman Machine with retry logic
 		const machineInit = await this._initPodmanMachineWithRetry(3);
 
@@ -1880,125 +1956,15 @@ export class LocalVibeService {
 			return { isOk: true };
 		}
 
-		// 1. Check WSL status comprehensively (feature state + operational state)
+		// 1. Tip: recommend updating WSL (requires admin, so we just inform the user)
+		const wslTip = await this.t(
+			"提示：如果您稍后遇到 Podman 启动问题，请尝试在管理员终端中运行 'wsl --update' 来更新 WSL。",
+			"Tip: If you encounter issues starting Podman later, please ensure WSL is up-to-date by running 'wsl --update' in an Administrator terminal.",
+		);
 		broadcastService.broadcastChannelToAll("install-log", {
-			step: "check-wsl",
-			type: "start",
-			data: await this.t("检查 WSL 状态...", "Checking WSL status..."),
-		});
-
-		const wslStatus = await this.checkWSLStatus();
-
-		if (!wslStatus.isOk) {
-			broadcastService.broadcastChannelToAll("install-log", {
-				step: "check-wsl",
-				type: "error",
-				data: wslStatus.error || (await this.t("WSL 状态检查失败", "WSL status check failed")),
-			});
-			return { isOk: false };
-		}
-
-		// Handle WSL not enabled
-		if (wslStatus.featureState === "disabled") {
-			broadcastService.broadcastChannelToAll("install-log", {
-				step: "check-wsl",
-				type: "stdout",
-				data: await this.t("WSL 功能未启用，正在启用...", "WSL feature not enabled, enabling..."),
-			});
-
-			const enableResult = await this.enableWSLFeature();
-
-			if (!enableResult.isOk) {
-				if (enableResult.wasCancelled) {
-					broadcastService.broadcastChannelToAll("install-log", {
-						step: "enable-wsl",
-						type: "error",
-						data: await this.t(
-							"安装已取消：需要管理员权限来启用 WSL",
-							"Installation cancelled: Administrator privileges required to enable WSL",
-						),
-					});
-				} else {
-					broadcastService.broadcastChannelToAll("install-log", {
-						step: "enable-wsl",
-						type: "error",
-						data: enableResult.error || (await this.t("WSL 启用失败", "Failed to enable WSL")),
-					});
-				}
-				return { isOk: false };
-			}
-
-			// WSL enabled successfully, but needs reboot
-			if (enableResult.needsReboot) {
-				broadcastService.broadcastChannelToAll("wsl-restart-required", {
-					reason: "wsl-enabled",
-					message: await this.t(
-						"WSL 功能已启用，需要重启系统才能继续。请重启后重新安装 Podman。",
-						"WSL feature has been enabled. System restart required to continue. Please restart and retry Podman installation.",
-					),
-				});
-				return { isOk: false };
-			}
-		}
-
-		// Handle WSL enabled but needs restart
-		if (wslStatus.requiresRestart) {
-			broadcastService.broadcastChannelToAll("wsl-restart-required", {
-				reason: "wsl-pending-reboot",
-				message: await this.t(
-					"WSL 功能已启用但需要重启系统。请重启后继续安装。",
-					"WSL feature is enabled but requires system restart. Please restart to continue.",
-				),
-			});
-			return { isOk: false };
-		}
-
-		// Check if WSL is operational
-		if (!wslStatus.isOperational) {
-			// WSL feature is enabled but not operational - try to install/update WSL kernel
-			broadcastService.broadcastChannelToAll("install-log", {
-				step: "check-wsl",
-				type: "stdout",
-				data: await this.t(
-					"WSL 未完全安装，正在安装 WSL 内核...",
-					"WSL is not fully installed, installing WSL kernel...",
-				),
-			});
-
-			// Try running wsl --update to install the WSL kernel
-			const updateResult = await this.runCommandWithBroadcast("wsl", ["--update"], "wsl-update");
-
-			if (!updateResult.isOk) {
-				// wsl --update failed, check if restart is needed
-				broadcastService.broadcastChannelToAll("wsl-restart-required", {
-					reason: "wsl-kernel-installed",
-					message: await this.t(
-						"WSL 内核已更新，可能需要重启系统。请重启后重新安装 Podman。",
-						"WSL kernel has been updated. System restart may be required. Please restart and retry Podman installation.",
-					),
-				});
-				return { isOk: false };
-			}
-
-			// Re-check if WSL is now operational after update
-			const recheckStatus = await this.checkWSLStatus();
-			if (!recheckStatus.isOperational) {
-				// Still not operational after update - likely needs restart
-				broadcastService.broadcastChannelToAll("wsl-restart-required", {
-					reason: "wsl-kernel-installed",
-					message: await this.t(
-						"WSL 内核已安装/更新，需要重启系统才能继续。请重启后重新安装 Podman。",
-						"WSL kernel has been installed/updated. System restart required to continue.",
-					),
-				});
-				return { isOk: false };
-			}
-		}
-
-		broadcastService.broadcastChannelToAll("install-log", {
-			step: "check-wsl",
-			type: "complete",
-			data: await this.t("WSL 状态正常", "WSL is operational"),
+			step: "tip",
+			type: "stdout",
+			data: wslTip,
 		});
 
 		// 2. Check and install Scoop
@@ -2017,16 +1983,58 @@ export class LocalVibeService {
 				false,
 			);
 			if (!scoopInstall.isOk) return { isOk: false };
+
+			// Refresh PATH so scoop commands are available in this process
+			await this.refreshWindowsPath();
 		}
 
 		// 3. Install Podman (only if not already installed)
 		if (!podmanCheck.isValid) {
-			const podmanInstall = await this.runCommandWithBroadcast(
-				"scoop",
-				["install", "podman"],
-				"install-podman",
-			);
-			if (!podmanInstall.isOk) return { isOk: false };
+			const maxRetries = 3;
+			let podmanInstalled = false;
+
+			for (let attempt = 1; attempt <= maxRetries; attempt++) {
+				if (attempt > 1) {
+					broadcastService.broadcastChannelToAll("install-log", {
+						step: "install-podman",
+						type: "stdout",
+						data: `Retrying Podman installation (attempt ${attempt}/${maxRetries})...`,
+					});
+					// Clean up failed install before retry
+					try {
+						await execAsync("scoop uninstall podman");
+					} catch {
+						// May not exist, that's fine
+					}
+				}
+
+				await this.runCommandWithBroadcast("scoop", ["install", "podman@5.7.0"], "install-podman");
+
+				// Refresh PATH so podman command is available in this process
+				await this.refreshWindowsPath();
+
+				// Verify podman was actually installed (scoop can return exit code 0 even if download failed)
+				const podmanVerify = await this.checkCommand("podman --version");
+				if (podmanVerify.isValid) {
+					podmanInstalled = true;
+					break;
+				}
+
+				broadcastService.broadcastChannelToAll("install-log", {
+					step: "install-podman",
+					type: "stderr",
+					data: `Podman installation verification failed (attempt ${attempt}/${maxRetries})`,
+				});
+			}
+
+			if (!podmanInstalled) {
+				broadcastService.broadcastChannelToAll("install-log", {
+					step: "install-podman",
+					type: "error",
+					data: "Podman installation failed after 3 attempts. Please check your network and try again.",
+				});
+				return { isOk: false };
+			}
 		} else {
 			broadcastService.broadcastChannelToAll("install-log", {
 				step: "install-podman",
@@ -2450,7 +2458,7 @@ export class LocalVibeService {
 					);
 
 					// Wait for Podman to be ready even if machine is already running
-					const ready = await this.waitForPodmanReady(30_000); // 30 second timeout
+					const ready = await this.waitForPodmanReady(60_000); // 60 second timeout
 					if (!ready) {
 						console.log(
 							"[Local Vibe] Podman not responding despite machine being 'running', attempting recovery...",
@@ -2493,7 +2501,7 @@ export class LocalVibeService {
 						}
 
 						// Wait for it to be ready after restart
-						const restartReady = await this.waitForPodmanReady(30_000);
+						const restartReady = await this.waitForPodmanReady(60_000);
 						if (!restartReady) {
 							const timeoutMsg = await this.t(
 								"Podman machine 重启后仍然超时，请手动检查 Podman 状态",
@@ -2509,6 +2517,13 @@ export class LocalVibeService {
 						"Podman is not installed. Please install Podman first.",
 					);
 					return { isOk: false, error: notInstalledMsg };
+				} else if (errorMessage.includes("All pipe instances are busy")) {
+					// Handle specific WSL pipe error
+					const pipeErrorMsg = await this.t(
+						"WSL 管道冲突。请尝试以下步骤：\n1. 以管理员身份运行终端并执行 'wsl --update'\n2. 执行 'podman machine rm ai302-machine'\n3. 重新在应用中安装 Podman",
+						"WSL pipe conflict detected. Please try:\n1. Run 'wsl --update' in Administrator terminal\n2. Run 'podman machine rm ai302-machine'\n3. Reinstall Podman in the app",
+					);
+					return { isOk: false, error: pipeErrorMsg };
 				} else {
 					// Other errors
 					return { isOk: false, error: errorMessage };
@@ -2518,7 +2533,10 @@ export class LocalVibeService {
 			// Wait for Podman to be ready before running compose
 			// This is especially important on Windows/WSL where machine startup takes time
 			if (!alreadyStarted) {
-				const ready = await this.waitForPodmanReady(30_000); // 30 second timeout
+				// Refresh PATH to ensure podman command is findable in current process
+				await this.refreshWindowsPath();
+
+				const ready = await this.waitForPodmanReady(60_000); // 60 second timeout
 				if (!ready) {
 					const timeoutMsg = await this.t(
 						"Podman machine 启动超时，请检查 Podman 状态",
