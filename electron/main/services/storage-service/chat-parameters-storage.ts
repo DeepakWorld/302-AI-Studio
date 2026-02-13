@@ -1,16 +1,11 @@
 import type { ChatParameters } from "@shared/storage/chat-parameters";
 import { prefixStorage } from "@shared/types";
 import { StorageService } from ".";
-import { emitter } from "../broadcast-service";
 
 class ChatParametersStorage extends StorageService<ChatParameters> {
 	constructor() {
 		super();
 		this.storage = prefixStorage(this.storage, "app-chat-parameters");
-
-		emitter.on("thread:thread-deleted", ({ threadId }) => {
-			this.removeChatParameters(threadId);
-		});
 	}
 
 	async removeChatParameters(threadId: string): Promise<void> {

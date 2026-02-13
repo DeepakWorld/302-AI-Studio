@@ -11,13 +11,12 @@ import {
 	withLoadHandlers,
 } from "../../mixins/web-contents-mixins";
 import { TempStorage } from "../../utils/temp-storage";
-import { chatParametersService } from "../chat-parameters-service";
-import { codeAgentService } from "../code-agent-service";
 import { shortcutService } from "../shortcut-service";
 import { storageService } from "../storage-service";
 import { providerStorage } from "../storage-service/provider-storage";
 import { sessionStorage } from "../storage-service/session-storage";
 import { tabStorage } from "../storage-service/tab-storage";
+import { threadStorage } from "../storage-service/thread-storage";
 
 type TabConfig = {
 	title: string;
@@ -126,19 +125,8 @@ export class TabService {
 					]);
 
 					if (thread?.isPrivateChatActive || messages?.length === 0) {
-						// Parallel removal of all thread-related data
-						await Promise.all([
-							storageService.removeItemInternal(`app-thread:${capturedTab.threadId}`),
-							storageService.removeItemInternal(`app-chat-messages:${capturedTab.threadId}`),
-							storageService.removeItemInternal(`app-chat-ui-state:${capturedTab.threadId}`),
-							storageService.removeItemInternal(`plan-answers:${capturedTab.threadId}`),
-							storageService.removeItemInternal(`html-preview-deployments:${capturedTab.threadId}`),
-							storageService.removeItemInternal(
-								`AgentPreviewStorage:agent-preview-data-${capturedTab.threadId}`,
-							),
-							codeAgentService.removeCodeAgentState(capturedTab.threadId),
-							chatParametersService.removeChatParameters(capturedTab.threadId),
-						]);
+						// Use unified cleanup method from ThreadStorage
+						await threadStorage.cleanupThreadData(capturedTab.threadId);
 					}
 				}
 				// === Business cleanup ended ===
@@ -296,9 +284,8 @@ export class TabService {
 					console.log(
 						`[Privacy] Deleting private chat data for tab ${tab.id}, thread ${tab.threadId}`,
 					);
-					await storageService.removeItemInternal("app-thread:" + tab.threadId);
-					await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
-					await storageService.removeItemInternal("app-chat-ui-state:" + tab.threadId);
+					// Use unified cleanup method from ThreadStorage
+					await threadStorage.cleanupThreadData(tab.threadId);
 					isPrivateChat = true;
 
 					// Track if we removed the active tab

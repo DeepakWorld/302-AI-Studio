@@ -2,16 +2,11 @@ import { CodeAgentConfigMetadata, type CodeAgentGlobalConfigs } from "@shared/st
 import { prefixStorage } from "@shared/types";
 import { isNull } from "es-toolkit";
 import { StorageService } from "..";
-import { emitter } from "../../broadcast-service";
 
 class CodeAgentStorage extends StorageService<CodeAgentConfigMetadata> {
 	constructor() {
 		super();
 		this.storage = prefixStorage(this.storage, "CodeAgentStorage");
-
-		emitter.on("thread:thread-deleted", ({ threadId }) => {
-			this.removeCodeAgentState(threadId);
-		});
 	}
 
 	async removeCodeAgentState(threadId: string): Promise<void> {
