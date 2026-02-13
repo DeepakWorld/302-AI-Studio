@@ -1322,7 +1322,7 @@
 	"local_platform_new_session_placeholder": "新建会话",
 	"local_platform_new_work_directory_placeholder": "新建工作目录",
 	"local_platform_reinstall": "重新安装",
-	"local_platform_install_guide": "前置安装指南",
+	"local_platform_install_guide": "手动安装指南",
 	"local_platform_prerequisites_missing": "请先完成前置安装，参考「前置安装指南」",
 	"local_platform_checking": "检测中",
 	"local_platform_unknown": "未知",

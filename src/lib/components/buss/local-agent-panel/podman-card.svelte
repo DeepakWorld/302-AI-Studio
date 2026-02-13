@@ -58,11 +58,7 @@
 	);
 
 	async function handleInstallPodman() {
-		if (isWindows) {
-			await localEnvState.initMachine();
-		} else {
-			await onInstall();
-		}
+		await onInstall();
 	}
 
 	function handleOpenLogs() {
