@@ -318,10 +318,14 @@
 				return;
 			}
 
-			// Note: We intentionally do NOT call restoreState() on fileListUpdated from self
-			// because file list updates don't change deployment info.
-			// restoreState() is already triggered by the $effect at line 457-470 when
-			// sandboxId/sessionId/isVisible changes, which covers the case of deployment updates.
+			// Deployment updates are handled by a dedicated sync event and should refresh
+			// preview immediately in both current window and other windows.
+			if (message.type === "deploymentUpdated") {
+				deployment.url = message.url;
+				deployment.deploymentId = message.deploymentId;
+				iframeRefreshKey++;
+				return;
+			}
 
 			// Handle file deletion: when file list is updated, check if the currently
 			// previewed file was deleted (directly or as part of a deleted folder)
