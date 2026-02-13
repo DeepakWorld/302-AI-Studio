@@ -6,7 +6,7 @@
 	import { Overlay } from "$lib/components/buss/overlay";
 	import SegButton from "$lib/components/buss/settings/seg-button.svelte";
 	import { SkillList } from "$lib/components/buss/skill-list";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { Button, buttonVariants } from "$lib/components/ui/button";
 	import { Label } from "$lib/components/ui/label";
 	import * as Popover from "$lib/components/ui/popover";
 	import {
@@ -31,9 +31,11 @@
 		ListTodo,
 		Settings2,
 		Sparkles,
+		ToolCase,
 		Zap,
 	} from "@lucide/svelte";
 	import type { ThinkingBudgetType } from "@shared/types";
+	import type { Component } from "svelte";
 	import { toast } from "svelte-sonner";
 	import { AttachmentUploader } from "../attachment";
 	import ParametersPanel from "./parameter/parameters-panel.svelte";
@@ -107,60 +109,155 @@
 		}
 		codeAgentState.updatePlanMode(!codeAgentState.inPlanMode);
 	}
+
+	// For responsiveness
+	let containerWidth = $state(0);
+	const COLLAPSE_THRESHOLD = 260;
+	let isCollapsed = $derived(containerWidth < COLLAPSE_THRESHOLD);
+
+	// Determine if any tool is currently active
+	let hasActiveTool = $derived.by(() => {
+		if (codeAgentState.enabled) {
+			return (
+				codeAgentState.inPlanMode ||
+				codeAgentState.skills.some((s) => s.forceUse) ||
+				codeAgentState.thinkingBudget !== "off" ||
+				chatState.isMCPActive
+			);
+		} else {
+			return (
+				(chatState.providerType === "302ai" &&
+					(chatState.isOnlineSearchActive || chatState.isThinkingActive)) ||
+				chatState.isMCPActive
+			);
+		}
+	});
 </script>
 
-{#snippet actionEnableThinking()}
-	<ButtonWithTooltip
+{#snippet menuButton(config: {
+	icon: Component | string;
+	label: string;
+	active?: boolean;
+	disabled?: boolean;
+	onclick?: () => void;
+	isImg?: boolean;
+	loading?: boolean;
+})}
+	<button
 		class={cn(
-			"hover:!bg-chat-action-hover",
-			chatState.isThinkingActive && "!bg-chat-action-active hover:!bg-chat-action-active",
+			"flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-accent",
+			config.active && "bg-chat-action-active/10 text-chat-action-active-fg",
+			(config.disabled || config.loading) && "cursor-not-allowed opacity-50",
 		)}
-		tooltip={actionDisabled ? m.title_unsupport_action() : m.title_thinking()}
-		onclick={() => chatState.handleThinkingActiveChange(!chatState.isThinkingActive)}
-		{disabled}
+		onclick={config.onclick}
+		disabled={config.disabled || config.loading}
 	>
-		<Lightbulb class={cn(chatState.isThinkingActive && "!text-chat-action-active-fg")} />
-	</ButtonWithTooltip>
+		<div class="flex size-4 items-center justify-center shrink-0">
+			{#if config.loading}
+				<LdrsLoader type="line-spinner" size={14} />
+			{:else if config.isImg}
+				<img
+					src={config.icon as string}
+					alt={config.label}
+					class={cn(
+						"size-4 dark:invert",
+						config.active &&
+							"[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)]",
+					)}
+				/>
+			{:else}
+				{@const Icon = config.icon as Component}
+				<Icon class={cn("size-4", config.active && "text-chat-action-active-fg")} />
+			{/if}
+		</div>
+		<span class="truncate">{config.label}</span>
+	</button>
 {/snippet}
 
-{#snippet actionEnableOnlineSearch()}
-	<ButtonWithTooltip
-		class={cn(
-			"hover:!bg-chat-action-hover",
-			chatState.isOnlineSearchActive && "!bg-chat-action-active hover:!bg-chat-action-active",
-		)}
-		tooltip={actionDisabled ? m.title_unsupport_action() : m.title_online_search()}
-		onclick={() => chatState.handleOnlineSearchActiveChange(!chatState.isOnlineSearchActive)}
-		{disabled}
-	>
-		<Globe class={cn(chatState.isOnlineSearchActive && "!text-chat-action-active-fg")} />
-	</ButtonWithTooltip>
+{#snippet actionEnableThinking(isMenu = false)}
+	{#if isMenu}
+		{@render menuButton({
+			icon: Lightbulb,
+			label: actionDisabled ? m.title_unsupport_action() : m.title_thinking(),
+			active: chatState.isThinkingActive,
+			disabled: disabled || actionDisabled,
+			onclick: () => chatState.handleThinkingActiveChange(!chatState.isThinkingActive),
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class={cn(
+				"hover:!bg-chat-action-hover",
+				chatState.isThinkingActive && "!bg-chat-action-active hover:!bg-chat-action-active",
+			)}
+			tooltip={actionDisabled ? m.title_unsupport_action() : m.title_thinking()}
+			onclick={() => chatState.handleThinkingActiveChange(!chatState.isThinkingActive)}
+			{disabled}
+		>
+			<Lightbulb class={cn(chatState.isThinkingActive && "!text-chat-action-active-fg")} />
+		</ButtonWithTooltip>
+	{/if}
 {/snippet}
 
-{#snippet actionEnableMCP()}
-	<ButtonWithTooltip
-		class={cn(
-			"hover:!bg-chat-action-hover",
-			chatState.isMCPActive && "!bg-chat-action-active hover:!bg-chat-action-active",
-		)}
-		tooltip={m.title_mcpServers()}
-		onclick={handleMCPClick}
-		disabled={disabled || addingMCP}
-	>
-		{#if addingMCP}
-			<LdrsLoader type="line-spinner" size={16} />
-		{:else}
-			<img
-				src={mcpIcon}
-				alt="MCP"
-				class={cn(
-					"size-chat-icon group-hover:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:invert",
-					chatState.isMCPActive &&
-						"[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)]",
-				)}
-			/>
-		{/if}
-	</ButtonWithTooltip>
+{#snippet actionEnableOnlineSearch(isMenu = false)}
+	{#if isMenu}
+		{@render menuButton({
+			icon: Globe,
+			label: actionDisabled ? m.title_unsupport_action() : m.title_online_search(),
+			active: chatState.isOnlineSearchActive,
+			disabled: disabled || actionDisabled,
+			onclick: () => chatState.handleOnlineSearchActiveChange(!chatState.isOnlineSearchActive),
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class={cn(
+				"hover:!bg-chat-action-hover",
+				chatState.isOnlineSearchActive && "!bg-chat-action-active hover:!bg-chat-action-active",
+			)}
+			tooltip={actionDisabled ? m.title_unsupport_action() : m.title_online_search()}
+			onclick={() => chatState.handleOnlineSearchActiveChange(!chatState.isOnlineSearchActive)}
+			{disabled}
+		>
+			<Globe class={cn(chatState.isOnlineSearchActive && "!text-chat-action-active-fg")} />
+		</ButtonWithTooltip>
+	{/if}
+{/snippet}
+
+{#snippet actionEnableMCP(isMenu = false)}
+	{#if isMenu}
+		{@render menuButton({
+			icon: mcpIcon,
+			isImg: true,
+			label: m.title_mcpServers(),
+			active: chatState.isMCPActive,
+			disabled: disabled,
+			loading: addingMCP,
+			onclick: handleMCPClick,
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class={cn(
+				"hover:!bg-chat-action-hover",
+				chatState.isMCPActive && "!bg-chat-action-active hover:!bg-chat-action-active",
+			)}
+			tooltip={m.title_mcpServers()}
+			onclick={handleMCPClick}
+			disabled={disabled || addingMCP}
+		>
+			{#if addingMCP}
+				<LdrsLoader type="line-spinner" size={16} />
+			{:else}
+				<img
+					src={mcpIcon}
+					alt="MCP"
+					class={cn(
+						"size-chat-icon group-hover:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:invert",
+						chatState.isMCPActive &&
+							"[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)] dark:[filter:brightness(0)_saturate(100%)_invert(35%)_sepia(84%)_saturate(2329%)_hue-rotate(244deg)_brightness(92%)_contrast(96%)]",
+					)}
+				/>
+			{/if}
+		</ButtonWithTooltip>
+	{/if}
 
 	<McpServerSelector
 		bind:open={isMCPSelectorOpen}
@@ -170,15 +267,24 @@
 	/>
 {/snippet}
 
-{#snippet actionSetParameters()}
-	<ButtonWithTooltip
-		class="hover:!bg-chat-action-hover"
-		tooltip={m.title_chat_parameters()}
-		onclick={() => (chatState.isParametersOpen = true)}
-		{disabled}
-	>
-		<Settings2 />
-	</ButtonWithTooltip>
+{#snippet actionSetParameters(isMenu = false)}
+	{#if isMenu}
+		{@render menuButton({
+			icon: Settings2,
+			label: m.title_chat_parameters(),
+			onclick: () => (chatState.isParametersOpen = true),
+			disabled,
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class="hover:!bg-chat-action-hover"
+			tooltip={m.title_chat_parameters()}
+			onclick={() => (chatState.isParametersOpen = true)}
+			{disabled}
+		>
+			<Settings2 />
+		</ButtonWithTooltip>
+	{/if}
 
 	<Overlay
 		title={m.title_chat_parameters()}
@@ -190,42 +296,65 @@
 {/snippet}
 
 {#snippet actionUploadAttachment()}
-	<AttachmentUploader {disabled} />
+	<div class="shrink-0">
+		<AttachmentUploader {disabled} />
+	</div>
 {/snippet}
 
-{#snippet actionOpenQuickPrompt()}
-	<ButtonWithTooltip
-		class={cn(
-			"hover:!bg-chat-action-hover",
-			quickPromptState.isOpen && "!bg-chat-action-active hover:!bg-chat-action-active",
-		)}
-		tooltip={m.quick_prompt_panel_title()}
-		onclick={() => (quickPromptState.isOpen ? quickPromptState.close() : quickPromptState.open())}
-		{disabled}
-	>
-		<Sparkles class={cn(quickPromptState.isOpen && "!text-chat-action-active-fg")} />
-	</ButtonWithTooltip>
+{#snippet actionOpenQuickPrompt(isMenu = false)}
+	{#if isMenu}
+		{@render menuButton({
+			icon: Sparkles,
+			label: m.quick_prompt_panel_title(),
+			active: quickPromptState.isOpen,
+			onclick: () => (quickPromptState.isOpen ? quickPromptState.close() : quickPromptState.open()),
+			disabled,
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class={cn(
+				"hover:!bg-chat-action-hover",
+				quickPromptState.isOpen && "!bg-chat-action-active hover:!bg-chat-action-active",
+			)}
+			tooltip={m.quick_prompt_panel_title()}
+			onclick={() => (quickPromptState.isOpen ? quickPromptState.close() : quickPromptState.open())}
+			{disabled}
+		>
+			<Sparkles class={cn(quickPromptState.isOpen && "!text-chat-action-active-fg")} />
+		</ButtonWithTooltip>
+	{/if}
 {/snippet}
 
-{#snippet actionEnableSkills()}
+{#snippet actionEnableSkills(isMenu = false)}
 	{@const hasForceUseSkills = codeAgentState.skills.some((s) => s.forceUse)}
-	<ButtonWithTooltip
-		class={cn(
-			"hover:!bg-chat-action-hover",
-			hasForceUseSkills &&
-				!codeAgentState.isLoadingSkills &&
-				"!bg-chat-action-active hover:!bg-chat-action-active",
-		)}
-		tooltip={m.title_skills()}
-		onclick={handleSkillsPanelToggle}
-		disabled={codeAgentState.isLoadingSkills || codeAgentState.isChecking}
-	>
-		{#if codeAgentState.isLoadingSkills}
-			<LdrsLoader type="line-spinner" size={16} />
-		{:else}
-			<Zap class={cn(hasForceUseSkills && "!text-chat-action-active-fg")} />
-		{/if}
-	</ButtonWithTooltip>
+	{#if isMenu}
+		{@render menuButton({
+			icon: Zap,
+			label: m.title_skills(),
+			active: hasForceUseSkills && !codeAgentState.isLoadingSkills,
+			loading: codeAgentState.isLoadingSkills,
+			disabled: codeAgentState.isChecking,
+			onclick: handleSkillsPanelToggle,
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class={cn(
+				"hover:!bg-chat-action-hover",
+				hasForceUseSkills &&
+					!codeAgentState.isLoadingSkills &&
+					"!bg-chat-action-active hover:!bg-chat-action-active",
+			)}
+			tooltip={m.title_skills()}
+			onclick={handleSkillsPanelToggle}
+			disabled={codeAgentState.isLoadingSkills || codeAgentState.isChecking}
+		>
+			{#if codeAgentState.isLoadingSkills}
+				<LdrsLoader type="line-spinner" size={16} />
+			{:else}
+				<Zap class={cn(hasForceUseSkills && "!text-chat-action-active-fg")} />
+			{/if}
+		</ButtonWithTooltip>
+	{/if}
 
 	<Overlay
 		title={m.title_skills_management()}
@@ -248,52 +377,88 @@
 	</Overlay>
 {/snippet}
 
-{#snippet actionEnabledAgentThinking()}
+{#snippet actionEnabledAgentThinking(isMenu = false)}
 	<Popover.Root bind:open={isThinkingBudgetOpen}>
-		<TooltipProvider delayDuration={500}>
-			<Tooltip ignoreNonKeyboardFocus={true}>
-				<TooltipTrigger>
-					{#snippet child({ props: tooltipProps })}
-						<Popover.Trigger>
-							{#snippet child({ props: popoverProps })}
-								<button
-									{...tooltipProps}
-									{...popoverProps}
+		{#if isMenu}
+			<Popover.Trigger class="w-full">
+				{#snippet child({ props: popoverProps })}
+					<button
+						{...popoverProps}
+						class={cn(
+							"flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors hover:bg-accent",
+							codeAgentState.thinkingBudget !== "off" &&
+								"bg-chat-action-active/10 text-chat-action-active-fg",
+							(disabled || codeAgentState.isUpdatingThinkingBudget || codeAgentState.isChecking) &&
+								"cursor-not-allowed opacity-50",
+						)}
+						disabled={disabled ||
+							codeAgentState.isUpdatingThinkingBudget ||
+							codeAgentState.isChecking}
+					>
+						<div class="flex size-4 items-center justify-center shrink-0">
+							{#if codeAgentState.isUpdatingThinkingBudget}
+								<LdrsLoader type="line-spinner" size={14} />
+							{:else}
+								<Lightbulb
 									class={cn(
-										buttonVariants({ variant: "ghost", size: "icon" }),
-										"group rounded-[10px]",
-										"hover:!bg-chat-action-hover",
-										codeAgentState.thinkingBudget !== "off" &&
-											"!bg-chat-action-active hover:!bg-chat-action-active",
+										"size-4",
+										codeAgentState.thinkingBudget !== "off" && "text-chat-action-active-fg",
 									)}
-									disabled={disabled ||
-										codeAgentState.isUpdatingThinkingBudget ||
-										codeAgentState.isChecking}
-								>
-									{#if codeAgentState.isUpdatingThinkingBudget}
-										<LdrsLoader type="line-spinner" size={16} />
-									{:else}
-										<Lightbulb
-											class={cn(
-												codeAgentState.thinkingBudget !== "off" && "!text-chat-action-active-fg",
-											)}
-										/>
-									{/if}
-								</button>
-							{/snippet}
-						</Popover.Trigger>
-					{/snippet}
-				</TooltipTrigger>
-				<TooltipContent
-					side="top"
-					class="bg-overlay text-overlay-foreground rounded-[10px] border px-2.5 py-1.5 text-sm/6"
-					arrowClasses="hidden"
-					sideOffset={5}
-				>
-					{actionDisabled ? m.title_unsupport_action() : m.title_thinking()}
-				</TooltipContent>
-			</Tooltip>
-		</TooltipProvider>
+								/>
+							{/if}
+						</div>
+						<span class="truncate">
+							{actionDisabled ? m.title_unsupport_action() : m.title_thinking()}
+						</span>
+					</button>
+				{/snippet}
+			</Popover.Trigger>
+		{:else}
+			<TooltipProvider delayDuration={500}>
+				<Tooltip ignoreNonKeyboardFocus={true}>
+					<TooltipTrigger>
+						{#snippet child({ props: tooltipProps })}
+							<Popover.Trigger>
+								{#snippet child({ props: popoverProps })}
+									<button
+										{...tooltipProps}
+										{...popoverProps}
+										class={cn(
+											buttonVariants({ variant: "ghost", size: "icon" }),
+											"group rounded-[10px]",
+											"hover:!bg-chat-action-hover",
+											codeAgentState.thinkingBudget !== "off" &&
+												"!bg-chat-action-active hover:!bg-chat-action-active",
+										)}
+										disabled={disabled ||
+											codeAgentState.isUpdatingThinkingBudget ||
+											codeAgentState.isChecking}
+									>
+										{#if codeAgentState.isUpdatingThinkingBudget}
+											<LdrsLoader type="line-spinner" size={16} />
+										{:else}
+											<Lightbulb
+												class={cn(
+													codeAgentState.thinkingBudget !== "off" && "!text-chat-action-active-fg",
+												)}
+											/>
+										{/if}
+									</button>
+								{/snippet}
+							</Popover.Trigger>
+						{/snippet}
+					</TooltipTrigger>
+					<TooltipContent
+						side="top"
+						class="bg-overlay text-overlay-foreground rounded-[10px] border px-2.5 py-1.5 text-sm/6"
+						arrowClasses="hidden"
+						sideOffset={5}
+					>
+						{actionDisabled ? m.title_unsupport_action() : m.title_thinking()}
+					</TooltipContent>
+				</Tooltip>
+			</TooltipProvider>
+		{/if}
 
 		<Popover.Content class="w-[400px] p-4" align="center" side="bottom" sideOffset={10}>
 			<div class="flex flex-col gap-2">
@@ -312,51 +477,123 @@
 	</Popover.Root>
 {/snippet}
 
-{#snippet actionTaskOrchestration()}
-	<ButtonWithTooltip
-		class="hover:!bg-chat-action-hover"
-		tooltip={m.label_tab_taskboard()}
-		onclick={handleTaskboardPanelToggle}
-		disabled={disabled || codeAgentState.isChecking}
-	>
-		<ListTodo />
-	</ButtonWithTooltip>
+{#snippet actionTaskOrchestration(isMenu = false)}
+	{#if isMenu}
+		{@render menuButton({
+			icon: ListTodo,
+			label: m.label_tab_taskboard(),
+			disabled: disabled || codeAgentState.isChecking,
+			onclick: handleTaskboardPanelToggle,
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class="hover:!bg-chat-action-hover"
+			tooltip={m.label_tab_taskboard()}
+			onclick={handleTaskboardPanelToggle}
+			disabled={disabled || codeAgentState.isChecking}
+		>
+			<ListTodo />
+		</ButtonWithTooltip>
+	{/if}
 {/snippet}
 
-{#snippet actionEnablePlanMode()}
-	<ButtonWithTooltip
-		class={cn(
-			"hover:!bg-chat-action-hover",
-			codeAgentState.inPlanMode && "!bg-chat-action-active hover:!bg-chat-action-active",
-		)}
-		tooltip={m.title_plan_mode()}
-		onclick={handlePlanModeToggle}
-		{disabled}
-	>
-		<ClipboardList class={cn(codeAgentState.inPlanMode && "!text-chat-action-active-fg")} />
-	</ButtonWithTooltip>
+{#snippet actionEnablePlanMode(isMenu = false)}
+	{#if isMenu}
+		{@render menuButton({
+			icon: ClipboardList,
+			label: m.title_plan_mode(),
+			active: codeAgentState.inPlanMode,
+			disabled: disabled,
+			onclick: handlePlanModeToggle,
+		})}
+	{:else}
+		<ButtonWithTooltip
+			class={cn(
+				"hover:!bg-chat-action-hover",
+				codeAgentState.inPlanMode && "!bg-chat-action-active hover:!bg-chat-action-active",
+			)}
+			tooltip={m.title_plan_mode()}
+			onclick={handlePlanModeToggle}
+			{disabled}
+		>
+			<ClipboardList class={cn(codeAgentState.inPlanMode && "!text-chat-action-active-fg")} />
+		</ButtonWithTooltip>
+	{/if}
 {/snippet}
 
-<div class="flex h-chat-bar items-center gap-chat-bar-gap">
+{#snippet actionToolCase()}
+	<Popover.Root>
+		<Popover.Trigger class="shrink-0">
+			{#snippet child({ props })}
+				<Button
+					{...props}
+					variant="ghost"
+					class={cn(
+						"flex items-center gap-1.5 rounded-[10px] px-2.5 text-sm text-foreground/70 hover:!bg-chat-action-hover",
+						hasActiveTool &&
+							"!bg-chat-action-active hover:!bg-chat-action-active !text-chat-action-active-fg",
+					)}
+				>
+					<ToolCase class={cn("size-4", hasActiveTool && "!text-chat-action-active-fg")} />
+					<span>{m.mcp_tools()}</span>
+				</Button>
+			{/snippet}
+		</Popover.Trigger>
+		<Popover.Content class="w-52 p-1.5" align="start" side="top" sideOffset={10}>
+			<div class="flex flex-col gap-0.5">
+				{#if !codeAgentState.enabled}
+					{@render actionOpenQuickPrompt(true)}
+				{/if}
+
+				{#if !codeAgentState.enabled && chatState.providerType === "302ai"}
+					{@render actionEnableOnlineSearch(true)}
+					{@render actionEnableThinking(true)}
+				{/if}
+
+				{@render actionEnableMCP(true)}
+
+				{#if codeAgentState.enabled}
+					{@render actionEnablePlanMode(true)}
+					{@render actionEnableSkills(true)}
+					{@render actionEnabledAgentThinking(true)}
+					{@render actionTaskOrchestration(true)}
+				{:else}
+					{@render actionSetParameters(true)}
+				{/if}
+			</div>
+		</Popover.Content>
+	</Popover.Root>
+{/snippet}
+
+<div
+	class="flex h-chat-bar min-w-0 w-full items-center gap-chat-bar-gap overflow-hidden"
+	bind:clientWidth={containerWidth}
+>
 	{@render actionUploadAttachment()}
 
-	{#if !codeAgentState.enabled}
-		{@render actionOpenQuickPrompt()}
-	{/if}
-
-	{#if !codeAgentState.enabled && chatState.providerType === "302ai"}
-		{@render actionEnableOnlineSearch()}
-		{@render actionEnableThinking()}
-	{/if}
-
-	{@render actionEnableMCP()}
-
-	{#if codeAgentState.enabled}
-		{@render actionEnablePlanMode()}
-		{@render actionEnableSkills()}
-		{@render actionEnabledAgentThinking()}
-		{@render actionTaskOrchestration()}
+	{#if isCollapsed}
+		{@render actionToolCase()}
 	{:else}
-		{@render actionSetParameters()}
+		<div class="flex items-center gap-chat-bar-gap shrink-0">
+			{#if !codeAgentState.enabled}
+				{@render actionOpenQuickPrompt()}
+			{/if}
+
+			{#if !codeAgentState.enabled && chatState.providerType === "302ai"}
+				{@render actionEnableOnlineSearch()}
+				{@render actionEnableThinking()}
+			{/if}
+
+			{@render actionEnableMCP()}
+
+			{#if codeAgentState.enabled}
+				{@render actionEnablePlanMode()}
+				{@render actionEnableSkills()}
+				{@render actionEnabledAgentThinking()}
+				{@render actionTaskOrchestration()}
+			{:else}
+				{@render actionSetParameters()}
+			{/if}
+		</div>
 	{/if}
 </div>
