@@ -14,12 +14,12 @@ import {
 	type AgentPreviewSyncEnvelope,
 } from "$lib/stores/agent-preview-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
-import { claudeCodeAgentState } from "$lib/stores/code-agent";
+import { claudeCodeAgentState, codeAgentState } from "$lib/stores/code-agent";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 import { toast } from "svelte-sonner";
 import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
 import { DEFAULT_WORKSPACE_PATH } from "./constants";
-import { handleError, validatePath, validateSandboxId, withRetry } from "./utils";
+import { handleError, validatePath, validateSandboxId } from "./utils";
 
 export interface TreeNode extends SandboxFileInfo {
 	children: TreeNode[];
@@ -411,11 +411,7 @@ export class FileTreeState {
 				return;
 			}
 
-			const response = await withRetry(
-				() => listSandboxFiles(this.sandboxId, path, apiKey, undefined, 2),
-				3,
-				1000,
-			);
+			const response = await listSandboxFiles(this.sandboxId, path, 2);
 
 			if (response.success && response.filelist) {
 				if (merge) {
@@ -628,7 +624,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_renaming());
 
 		try {
-			const response = await renameSandboxFile(this.sandboxId, oldPath, newPath, validation.apiKey);
+			const response = await renameSandboxFile(this.sandboxId, oldPath, newPath);
 
 			if (response.success) {
 				toast.success(m.toast_file_rename_success(), { id: toastId });
@@ -677,7 +673,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_deleting());
 
 		try {
-			const response = await deleteSandboxFile(this.sandboxId, path, validation.apiKey);
+			const response = await deleteSandboxFile(this.sandboxId, path);
 
 			if (response.success) {
 				toast.success(m.toast_file_delete_success(), { id: toastId });
@@ -781,14 +777,6 @@ export class FileTreeState {
 
 		this.operatingPaths = addToSet(this.operatingPaths, sourcePath);
 
-		// Find source file
-		const sourceFile = this.files.find((f) => f.path === sourcePath);
-		if (!sourceFile) {
-			toast.error(m.toast_file_paste_failed());
-			this.operatingPaths = removeFromSet(this.operatingPaths, sourcePath);
-			return false;
-		}
-
 		// Build destination path with unique name to avoid duplicates
 		const sourceName = pathUtils.getFileName(sourcePath);
 		const uniqueName = this.generateUniqueName(targetDir.path, sourceName);
@@ -797,12 +785,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_pasting());
 
 		try {
-			const response = await copySandboxFile(
-				this.sandboxId,
-				sourcePath,
-				destPath,
-				validation.apiKey,
-			);
+			const response = await copySandboxFile(this.sandboxId, sourcePath, destPath);
 
 			if (response.success) {
 				toast.success(m.toast_file_paste_success(), { id: toastId });
@@ -859,7 +842,7 @@ export class FileTreeState {
 			// Create an empty file
 			const file = new File([""], filename, { type: "text/plain" });
 
-			const response = await uploadSandboxFile(this.sandboxId, fullPath, file, apiKey);
+			const response = await uploadSandboxFile(this.sandboxId, fullPath, file);
 
 			if (response.success) {
 				toast.success(m.toast_file_create_success(), { id: toastId });
@@ -908,10 +891,13 @@ export class FileTreeState {
 			return false;
 		}
 
-		const apiKey = this.get302ApiKey();
-		if (!apiKey) {
-			toast.error(m.toast_file_operation_api_key_not_found());
-			return false;
+		// API key check is only needed for cloud mode
+		if (codeAgentState.type !== "local") {
+			const apiKey = this.get302ApiKey();
+			if (!apiKey) {
+				toast.error(m.toast_file_operation_api_key_not_found());
+				return false;
+			}
 		}
 
 		this.operatingPaths = addToSet(this.operatingPaths, targetPath);
@@ -924,7 +910,7 @@ export class FileTreeState {
 				? `${targetPath}${file.name}`
 				: `${targetPath}/${file.name}`;
 
-			const response = await uploadSandboxFile(this.sandboxId, fullPath, file, apiKey);
+			const response = await uploadSandboxFile(this.sandboxId, fullPath, file);
 
 			if (response.success) {
 				toast.success(m.toast_file_upload_success(), { id: toastId });
@@ -959,6 +945,52 @@ export class FileTreeState {
 		if (!this.sandboxId) {
 			toast.error(m.toast_file_operation_sandbox_id_not_available());
 			return false;
+		}
+
+		// Local mode optimization: Direct copy without zip
+		if (codeAgentState.type === "local") {
+			const uploadToastId = toast.loading(m.toast_file_upload_selecting_folder());
+			try {
+				const result = await window.electronAPI.dataService.selectFolderForUpload();
+
+				if (!result) {
+					toast.dismiss(uploadToastId);
+					return false;
+				}
+
+				const { folderPath, folderName } = result;
+				toast.loading(m.toast_file_upload_uploading_folder(), { id: uploadToastId });
+
+				// Construct full target path: targetPath/folderName
+				const fullTargetPath = targetPath.endsWith("/")
+					? `${targetPath}${folderName}`
+					: `${targetPath}/${folderName}`;
+
+				// Call localVibeService copy directly
+				const copyResult = await window.electronAPI.localVibeService.copyToWorkspaceByIpc(
+					folderPath,
+					fullTargetPath,
+				);
+
+				if (copyResult.success) {
+					toast.success(m.toast_file_upload_folder_success(), { id: uploadToastId });
+
+					// Refresh the target directory
+					if (targetPath === this.rootPath || this.loadedDirs.has(targetPath)) {
+						await this.loadFiles(targetPath, true, true);
+					}
+					return true;
+				} else {
+					toast.error(copyResult.error || m.toast_file_upload_folder_failed(), {
+						id: uploadToastId,
+					});
+					return false;
+				}
+			} catch (e) {
+				const errorMsg = e instanceof Error ? e.message : m.toast_file_upload_folder_failed();
+				toast.error(errorMsg, { id: uploadToastId });
+				return false;
+			}
 		}
 
 		const apiKey = this.get302ApiKey();
@@ -999,8 +1031,6 @@ export class FileTreeState {
 				this.sandboxId,
 				zipUploadPath,
 				zipFile,
-				apiKey,
-				undefined,
 				true, // auto_unzip
 			);
 
@@ -1051,7 +1081,7 @@ export class FileTreeState {
 		const toastId = toast.loading(m.toast_file_creating_folder());
 
 		try {
-			const response = await createSandboxFolder(this.sandboxId, targetPath, apiKey);
+			const response = await createSandboxFolder(this.sandboxId, targetPath);
 
 			if (response.success) {
 				toast.success(m.toast_file_create_folder_success(), { id: toastId });
@@ -1103,7 +1133,7 @@ export class FileTreeState {
 		const downloadToastId = toast.loading(m.toast_downloading_file({ fileName }));
 
 		try {
-			const response = await downloadSandboxFile(this.sandboxId, file.path, apiKey);
+			const response = await downloadSandboxFile(this.sandboxId, file.path);
 
 			if (!response.result || response.result.length === 0) {
 				toast.error(m.toast_download_no_info(), { id: downloadToastId });

@@ -91,8 +91,7 @@
 			};
 		} catch (error) {
 			console.error("Failed to load skill content:", error);
-			const errorMessage =
-				error instanceof Error ? error.message : m.skills_load_failed?.() || "Failed to load skill";
+			const errorMessage = error instanceof Error ? error.message : m.skills_load_failed();
 			toast.error(errorMessage);
 			handleClose();
 		} finally {
@@ -229,15 +228,15 @@
 			});
 
 			if (result.success) {
-				toast.success(m.toast_save_success?.() || "Skill saved successfully");
+				toast.success(m.toast_save_success());
 				onSave?.(skill, { ...formData });
 				handleClose();
 			} else {
-				toast.error(result.message || m.skills_load_failed?.() || "Failed to save skill");
+				toast.error(m.skills_load_failed());
 			}
 		} catch (error) {
 			console.error("Failed to save skill:", error);
-			toast.error(m.skills_load_failed?.() || "Failed to save skill");
+			toast.error(m.skills_load_failed());
 		} finally {
 			isSaving = false;
 		}
@@ -308,7 +307,7 @@
 				{#if isSaving}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 				{/if}
-				{m.text_button_save?.() || "Save"}
+				{m.text_button_save()}
 			</Button>
 		</div>
 	</Dialog.Content>

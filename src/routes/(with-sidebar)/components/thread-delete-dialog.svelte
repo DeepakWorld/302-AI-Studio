@@ -4,7 +4,10 @@
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
+	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { Loader2 } from "@lucide/svelte";
+	import { toast } from "svelte-sonner";
 
 	interface Props {
 		open?: boolean;
@@ -37,12 +40,20 @@
 	async function handleDelete() {
 		isDeleting = true;
 		try {
-			// If checkbox is checked and we have sandbox/session info, delete the remote session first
+			// If checkbox is checked and we have sandbox/session info, delete the session first
 			if (deleteRemoteSession && sandboxId && sessionId) {
-				const success = await claudeCodeSandboxState.deleteSession(sandboxId, sessionId);
+				let success: boolean;
+				if (sandboxId === "local") {
+					if (!localEnvState.sandboxRunning) {
+						toast.error(m.code_agent_local_container_not_started());
+						return;
+					}
+					success = await localClaudeCodeSandboxState.deleteSession(sessionId);
+				} else {
+					success = await claudeCodeSandboxState.deleteSession(sandboxId, sessionId);
+				}
 				if (!success) {
-					// Even if remote deletion fails, we might still want to delete the local thread
-					console.error("Failed to delete remote session, but continuing with thread deletion");
+					console.error("Failed to delete session, but continuing with thread deletion");
 				}
 			}
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createSkill, createSkillFromGitHub, updateSkill, deleteSkill } from "$lib/api/skills";
+	import { createSkill, createSkillFromGitHub, deleteSkill, updateSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { m } from "$lib/paraglide/messages";
@@ -152,7 +152,7 @@ description:
 						onCreate?.(currentView, { ...manualFormData });
 						handleClose();
 					} else {
-						toast.error(result.error?.message || result.message || m.skills_create_failed());
+						toast.error(m.skills_create_failed());
 					}
 				} else {
 					// 默认视图，只创建 SKILL.md
@@ -170,7 +170,7 @@ description:
 						onCreate?.(currentView, { ...manualFormData });
 						handleClose();
 					} else {
-						toast.error(result.error?.message || result.message || m.skills_create_failed());
+						toast.error(m.skills_create_failed());
 					}
 				}
 			} catch (error) {
@@ -203,7 +203,7 @@ description:
 					onCreate?.(currentView, formData);
 					handleClose();
 				} else {
-					toast.error(result.error?.message || result.message || m.skills_create_failed());
+					toast.error(m.skills_create_failed());
 				}
 			} catch (error) {
 				console.error("Failed to create skill from upload:", error);
@@ -272,7 +272,7 @@ description:
 					onCreate?.(currentView, { githubUrl });
 					handleClose();
 				} else {
-					toast.error(result.error?.message || result.message || m.skills_create_failed());
+					toast.error(m.skills_create_failed());
 				}
 			} catch (error) {
 				console.error("Failed to create skill from GitHub:", error);

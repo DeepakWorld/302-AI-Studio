@@ -13,6 +13,7 @@
 	import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
+	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { fileToBase64 } from "$lib/stores/code-agent/utils";
 	import { modelPanelState } from "$lib/stores/model-panel-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
@@ -36,6 +37,11 @@
 	// Get skills that have forceUse=true
 	const forcedSkills = $derived(codeAgentState.skills.filter((s) => s.forceUse));
 	const maxAttachmentLimit = $derived(codeAgentState.enabled ? 20 : MAX_ATTACHMENT_COUNT);
+
+	// Check if local sandbox is starting (for disabling send button)
+	const isLocalSandboxStarting = $derived(
+		codeAgentState.type === "local" && localEnvState.sandboxStarting,
+	);
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 
@@ -62,11 +68,11 @@
 	);
 
 	// Button should be enabled for taskboard redirection even during streaming
-	const canSendOrRedirect = $derived(
-		chatState.sendMessageEnabled ||
-			(shouldRedirectToTaskboard &&
-				(chatState.inputValue.trim() !== "" || chatState.attachments.length > 0)),
-	);
+	// const canSendOrRedirect = $derived(
+	// 	chatState.sendMessageEnabled ||
+	// 		(shouldRedirectToTaskboard &&
+	// 			(chatState.inputValue.trim() !== "" || chatState.attachments.length > 0)),
+	// );
 
 	function isInCompositionCooldown(): boolean {
 		return Date.now() - compositionEndTime < COMPOSITION_COOLDOWN_MS;
@@ -211,6 +217,14 @@
 
 		if (codeAgentState.enabled && codeAgentState.isFreshTab) {
 			await codeAgentSendMessageButtonState.handleCodeAgentFlow(fn);
+		} else if (codeAgentState.enabled && codeAgentState.type === "local") {
+			// For local mode in non-fresh tabs, only ensure sandbox is running
+			const localSandboxResult = await codeAgentSendMessageButtonState.ensureLocalSandboxReady();
+			if (!localSandboxResult.isOk) {
+				toast.error(localSandboxResult.error ?? m.code_agent_local_sandbox_start_failed());
+				return;
+			}
+			fn();
 		} else {
 			fn();
 		}
@@ -250,9 +264,7 @@
 	async function processFiles(files: File[], fromPaste = false) {
 		for (const file of files) {
 			if (chatState.attachments.length >= maxAttachmentLimit) {
-				toast.warning(
-					m.toast_max_attachments_reached?.() || `已达到最大附件数量：${maxAttachmentLimit}`,
-				);
+				toast.warning(m.toast_max_attachments_reached());
 				break;
 			}
 
@@ -495,72 +507,95 @@
 				</div>
 			{/if}
 
-			<div class="mt-1.5 flex flex-row justify-between gap-2 min-w-0 overflow-hidden shrink-0">
-				<div class="flex items-center gap-2 shrink-0">
+			<div
+				class="mt-1.5 flex flex-row items-center justify-between gap-1 min-w-0 overflow-hidden shrink-0"
+			>
+				<!-- Actions Area (Left) -->
+
+				<div class="flex-1 min-w-0 max-w-[400px]">
 					<ChatActions disabled={codeAgentState.isDeleted} />
 				</div>
 
-				<div class="flex items-center gap-2 min-w-0">
-					<ModelSelect
-						selectedModel={chatState.selectedModel}
-						onModelSelect={(model) => handleModelSelect(model)}
-					>
-						{#snippet trigger({ onclick })}
-							{((openModelSelect = () => {
-								if (!hasConfiguredProviders()) {
-									handleGoToModelSettings();
-									return;
-								}
-								onclick();
-							}),
-							"")}
-							<Button
-								variant="ghost"
-								class="relative text-sm text-foreground/50 hover:!bg-chat-action-hover min-w-0 max-w-[300px] !shrink overflow-visible"
-								onclick={() => {
+				<!-- Model & Send Area (Right) -->
+
+				<div class="flex-none flex items-center gap-2 min-w-0">
+					<div class="shrink-0 min-w-0">
+						<ModelSelect
+							selectedModel={chatState.selectedModel}
+							onModelSelect={(model) => handleModelSelect(model)}
+						>
+							{#snippet trigger({ onclick })}
+								{((openModelSelect = () => {
 									if (!hasConfiguredProviders()) {
 										handleGoToModelSettings();
+
 										return;
 									}
-									openModelSelect?.();
-								}}
-								disabled={isCodeAgentModelChanging || codeAgentState.isDeleted}
-							>
-								{#if !hasConfiguredProviders()}
-									<span
-										class="absolute top-0 right-0 size-2 rounded-full bg-red-500 pointer-events-none"
-									></span>
-								{/if}
-								{#if isCodeAgentModelChanging}
-									<LdrsLoader type="line-spinner" size={16} />
-								{:else}
-									<p class="truncate">
-										{chatState.selectedModel?.name ?? m.text_button_select_model()}
-									</p>
-								{/if}
-							</Button>
-						{/snippet}
-					</ModelSelect>
+
+									onclick();
+								}),
+								"")}
+
+								<Button
+									variant="ghost"
+									class="relative text-sm text-foreground/50 hover:!bg-chat-action-hover min-w-0 max-w-[300px] shrink overflow-visible"
+									onclick={() => {
+										if (!hasConfiguredProviders()) {
+											handleGoToModelSettings();
+
+											return;
+										}
+
+										openModelSelect?.();
+									}}
+									disabled={isCodeAgentModelChanging || codeAgentState.isDeleted}
+								>
+									{#if !hasConfiguredProviders()}
+										<span
+											class="absolute top-0 right-0 size-2 rounded-full bg-red-500 pointer-events-none"
+										></span>
+									{/if}
+
+									{#if isCodeAgentModelChanging}
+										<LdrsLoader type="line-spinner" size={16} />
+									{:else}
+										<p class="truncate">
+											{chatState.selectedModel?.name ?? m.text_button_select_model()}
+										</p>
+									{/if}
+								</Button>
+							{/snippet}
+						</ModelSelect>
+					</div>
 
 					<Separator
 						orientation="vertical"
 						class="shrink-0 rounded-2xl data-[orientation=vertical]:h-1/2 data-[orientation=vertical]:w-0.5"
 					/>
 
-					{#if codeAgentState.enabled && codeAgentState.isFreshTab}
-						<SendMessageButton onClick={handleSendMessage} />
-					{:else}
-						<button
-							disabled={!canSendOrRedirect}
-							class={cn(
-								"shrink-0 flex size-9 items-center cursor-pointer justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
-								"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",
-							)}
-							onclick={handleSendMessage}
-						>
-							<img src={sendMessageIcon} alt="plane" class="size-5" />
-						</button>
-					{/if}
+					<div class="shrink-0">
+						{#if codeAgentState.enabled && codeAgentState.isFreshTab}
+							<SendMessageButton onClick={handleSendMessage} />
+						{:else}
+							<button
+								disabled={!chatState.sendMessageEnabled ||
+									isLocalSandboxStarting ||
+									codeAgentSendMessageButtonState.isChecking}
+								class={cn(
+									"shrink-0 flex size-9 items-center cursor-pointer justify-center rounded-[10px] bg-chat-send-message-button text-foreground hover:!bg-chat-send-message-button/80",
+
+									"disabled:cursor-not-allowed disabled:bg-chat-send-message-button/50 disabled:hover:!bg-chat-send-message-button/50",
+								)}
+								onclick={handleSendMessage}
+							>
+								{#if isLocalSandboxStarting || codeAgentSendMessageButtonState.isChecking}
+									<LdrsLoader type="line-spinner" size={18} />
+								{:else}
+									<img src={sendMessageIcon} alt="plane" class="size-5" />
+								{/if}
+							</button>
+						{/if}
+					</div>
 				</div>
 			</div>
 		</div>

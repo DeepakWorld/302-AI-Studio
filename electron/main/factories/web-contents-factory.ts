@@ -50,6 +50,7 @@ export class WebContentsFactory {
 
 		const view = new WebContentsView({
 			webPreferences: {
+				backgroundThrottling: true,
 				preload: path.join(import.meta.dirname, "../preload/index.cjs"),
 				devTools: true,
 				webgl: true,

@@ -10,13 +10,13 @@ import {
 } from "$lib/transport/dynamic-chat-transport";
 import type { ChatMessage, MessageMetadata } from "$lib/types/chat";
 import {
-	addAttachmentReference,
-	removeAttachmentReference,
-} from "$lib/utils/attachment-text-utils";
-import {
 	convertAttachmentsToMessageParts,
 	type MessagePart,
 } from "$lib/utils/attachment-converter";
+import {
+	addAttachmentReference,
+	removeAttachmentReference,
+} from "$lib/utils/attachment-text-utils";
 import { clone } from "$lib/utils/clone";
 import { ChatErrorHandler, type ChatError } from "$lib/utils/error-handler";
 import { replaceCodeBlockAt } from "$lib/utils/markdown-code-block";
@@ -25,6 +25,7 @@ import type { ModelProvider } from "@shared/storage/provider";
 import type { AttachmentFile, MCPServer, Model, ThreadParmas } from "@shared/types";
 import { hashApiKey } from "@shared/utils/hash";
 import { nanoid } from "nanoid";
+import { untrack } from "svelte";
 import { toast } from "svelte-sonner";
 
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
@@ -34,6 +35,7 @@ import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.s
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { claudeCodeSandboxState, codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
 import { codeAgentTaskboardState } from "./code-agent/code-agent-taskboard-state.svelte";
+import { localEnvState } from "./code-agent/local-env-state.svelte";
 import { generalSettings } from "./general-settings.state.svelte";
 import { mcpState } from "./mcp-state.svelte";
 import { notificationState } from "./notification-state.svelte";
@@ -205,6 +207,8 @@ class ChatState {
 	// AbortController for canceling pending context summary generation
 	private summaryAbortController: AbortController | null = null;
 
+	isGeneratingTitle = $state(false);
+
 	// Track loading state for attachments (not persisted)
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
@@ -282,6 +286,24 @@ class ChatState {
 	}
 
 	constructor() {
+		// Watch for busy state and report to ThreadStateService
+		$effect.root(() => {
+			$effect(() => {
+				const isBusy = this.isStreaming || this.isGeneratingTitle;
+				const reason = this.isStreaming
+					? "streaming"
+					: this.isGeneratingTitle
+						? "generating-title"
+						: undefined;
+				const threadId = untrack(() => this.id);
+				window.electronAPI.threadStateService.updateBusyState({
+					threadId,
+					isBusy,
+					reason,
+				});
+			});
+		});
+
 		// Watch for PersistedState hydration and sync messages to chat
 		// This handles the case where reload happens before hydration completes
 		this.hydrateCheckInterval = setInterval(() => {
@@ -905,6 +927,23 @@ class ChatState {
 			return;
 		}
 
+		// For local mode, ensure sandbox is running before regenerating
+		if (codeAgentState.enabled && codeAgentState.type === "local") {
+			const result = await localEnvState.ensureSandboxRunning();
+			if (!result.isOk) {
+				toast.error(result.error ?? m.code_agent_local_sandbox_start_failed());
+				return;
+			}
+			// Update localBaseUrl with the port
+			if (result.port) {
+				codeAgentState.localBaseUrl = `http://localhost:${result.port}/api/v1`;
+			}
+			// Show success toast only when actually started (not already running)
+			if (!result.wasAlreadyRunning) {
+				toast.success(m.code_agent_local_sandbox_started());
+			}
+		}
+
 		// Cancel any pending suggestions generation to avoid race conditions
 		this.cancelPendingSuggestions();
 		// Cancel any pending title generation to avoid race conditions
@@ -1163,6 +1202,7 @@ class ChatState {
 		}
 
 		try {
+			this.isGeneratingTitle = true;
 			const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 			const serverPort = window.app?.serverPort ?? 8089;
 
@@ -1233,6 +1273,8 @@ class ChatState {
 		} catch (error) {
 			console.error("Failed to generate title manually:", error);
 			toast.error(m.toast_title_generation_failed());
+		} finally {
+			this.isGeneratingTitle = false;
 		}
 	}
 
@@ -1630,7 +1672,7 @@ export const chat = new Chat({
 				inTaskOrchestrationMode:
 					codeAgentEnabled && codeAgentTaskboardState.taskboardStatus === "running",
 				workspacePath: codeAgentEnabled && claudeCodeSandboxState.currentSessionWorkspacePath,
-
+				vibeMode: codeAgentEnabled && codeAgentState.type,
 				// Context compression (only sent when compression is active)
 				...(chatState.shouldApplyCompression &&
 					chatState.contextSummary && {
@@ -1803,11 +1845,6 @@ export const chat = new Chat({
 			currentTitle === "新会话";
 		const isFirstMessage = messages.length === 2; // User message + AI response
 
-		// // 计算当前对话轮数（一轮 = 用户消息 + 助手回复）
-		// const conversationRounds = Math.floor(messages.length / 2);
-		// // 每隔多少轮更新一次标题（首次对话模式下）
-		// const TITLE_UPDATE_INTERVAL = 5;
-
 		let shouldGenerateTitle = false;
 
 		if (titleTiming === "off") {
@@ -1815,11 +1852,6 @@ export const chat = new Chat({
 		} else if (titleTiming === "firstTime") {
 			// 仅在首次对话时生成标题（当标题为默认值时）
 			shouldGenerateTitle = isFirstMessage && isDefaultTitle;
-
-			// // 首次生成 或 每隔 N 轮更新一次
-			// shouldGenerateTitle =
-			// 	(isFirstMessage && isDefaultTitle) ||
-			// 	(conversationRounds > 1 && conversationRounds % TITLE_UPDATE_INTERVAL === 0);
 		} else if (titleTiming === "everyTime") {
 			shouldGenerateTitle = messages.length >= 2;
 		}
@@ -1829,6 +1861,7 @@ export const chat = new Chat({
 			const titleAbortSignal = chatState.createTitleAbortController();
 
 			try {
+				chatState.isGeneratingTitle = true;
 				const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
 				const serverPort = window.app?.serverPort ?? 8089;
 
@@ -1887,6 +1920,8 @@ export const chat = new Chat({
 				} else {
 					console.error("Failed to generate title:", error);
 				}
+			} finally {
+				chatState.isGeneratingTitle = false;
 			}
 		} else if (isFirstMessage && isDefaultTitle && titleTiming !== "off") {
 			// Fallback for firstTime mode when model is not configured

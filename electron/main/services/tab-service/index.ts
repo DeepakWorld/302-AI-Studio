@@ -11,13 +11,12 @@ import {
 	withLoadHandlers,
 } from "../../mixins/web-contents-mixins";
 import { TempStorage } from "../../utils/temp-storage";
-import { chatParametersService } from "../chat-parameters-service";
-import { codeAgentService } from "../code-agent-service";
 import { shortcutService } from "../shortcut-service";
 import { storageService } from "../storage-service";
 import { providerStorage } from "../storage-service/provider-storage";
 import { sessionStorage } from "../storage-service/session-storage";
 import { tabStorage } from "../storage-service/tab-storage";
+import { threadStorage } from "../storage-service/thread-storage";
 
 type TabConfig = {
 	title: string;
@@ -107,9 +106,32 @@ export class TabService {
 		// Add lifecycle handlers
 		const capturedTabId = tab.id;
 		const capturedWindowId = windowId;
+		// Capture tab data for business cleanup in onDestroyed
+		const capturedTab = tab;
 		withLifecycleHandlers(view, {
-			onDestroyed: () => {
-				console.log(`Tab ${capturedTabId} webContents destroyed, cleaning up all mappings`);
+			onDestroyed: async () => {
+				console.log(`Tab ${capturedTabId} webContents destroyed, cleaning up...`);
+
+				// === Business cleanup: handle private chat and empty thread data ===
+				if (capturedTab.threadId) {
+					// Parallel query for thread and messages
+					const [thread, messages] = await Promise.all([
+						storageService.getItemInternal(
+							`app-thread:${capturedTab.threadId}`,
+						) as Promise<ThreadParmas | null>,
+						storageService.getItemInternal(`app-chat-messages:${capturedTab.threadId}`) as Promise<
+							ChatMessage[] | null
+						>,
+					]);
+
+					if (thread?.isPrivateChatActive || messages?.length === 0) {
+						// Use unified cleanup method from ThreadStorage
+						await threadStorage.cleanupThreadData(capturedTab.threadId);
+					}
+				}
+				// === Business cleanup ended ===
+
+				// === Technical cleanup: remove mappings ===
 				this.tabViewMap.delete(capturedTabId);
 				this.tabMap.delete(capturedTabId);
 
@@ -126,24 +148,7 @@ export class TabService {
 
 				this.cleanupTabTempFiles(capturedTabId);
 
-				// Check if all mappings related to the destroyed tab have been properly cleaned up
-				console.log(
-					"Checking tabViewMap ---> ",
-					this.tabViewMap.has(capturedTabId) ? "failed" : "passed",
-				);
-				console.log("Checking tabMap ---> ", this.tabMap.has(capturedTabId) ? "failed" : "passed");
-				console.log(
-					"Checking windowTabView ---> ",
-					(this.windowTabView.get(capturedWindowId)?.includes(view) ?? false) ? "failed" : "passed",
-				);
-				console.log(
-					"Checking windowActiveTabId ---> ",
-					this.windowActiveTabId.get(capturedWindowId) === capturedTabId ? "failed" : "passed",
-				);
-				// console.log(
-				// 	"Checking tempFileRegistry ---> ",
-				// 	this.tempFileRegistry.has(capturedTabId) ? "failed" : "passed",
-				// );
+				console.log(`Tab ${capturedTabId} cleanup completed`);
 			},
 			onWillPreventUnload: () => {
 				console.log("view will prevent unload");
@@ -184,28 +189,6 @@ export class TabService {
 				TempStorage.cleanupFile(filePath);
 			});
 			this.tempFileRegistry.delete(tabId);
-		}
-	}
-
-	private async afterTabClose(tab: Tab) {
-		const thread = (await storageService.getItemInternal(
-			"app-thread:" + tab.threadId,
-		)) as ThreadParmas | null;
-		const messages = (await storageService.getItemInternal("app-chat-messages:" + tab.threadId)) as
-			| ChatMessage[]
-			| null;
-
-		if (thread?.isPrivateChatActive) {
-			console.log(`[Privacy] Deleting private chat data for tab ${tab.id}, thread ${tab.threadId}`);
-			await storageService.removeItemInternal("app-thread:" + tab.threadId);
-			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
-			await codeAgentService.removeCodeAgentState(tab.threadId);
-			await chatParametersService.removeChatParameters(tab.threadId);
-		} else if (messages?.length === 0) {
-			await storageService.removeItemInternal("app-thread:" + tab.threadId);
-			await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
-			await codeAgentService.removeCodeAgentState(tab.threadId);
-			await chatParametersService.removeChatParameters(tab.threadId);
 		}
 	}
 
@@ -258,12 +241,8 @@ export class TabService {
 		const window = BrowserWindow.fromId(windowId);
 		if (isNull(window)) return;
 
-		// Check each tab and delete private chat data
+		// Remove all tabs - business cleanup (private chat data) handled automatically in onDestroyed
 		for (const tab of windowTabs) {
-			if (tab.type === "chat" && tab.threadId) {
-				this.afterTabClose(tab);
-			}
-
 			this.removeTab(window, tab.id);
 		}
 
@@ -305,8 +284,8 @@ export class TabService {
 					console.log(
 						`[Privacy] Deleting private chat data for tab ${tab.id}, thread ${tab.threadId}`,
 					);
-					await storageService.removeItemInternal("app-thread:" + tab.threadId);
-					await storageService.removeItemInternal("app-chat-messages:" + tab.threadId);
+					// Use unified cleanup method from ThreadStorage
+					await threadStorage.cleanupThreadData(tab.threadId);
 					isPrivateChat = true;
 
 					// Track if we removed the active tab
@@ -974,12 +953,7 @@ export class TabService {
 			this.switchActiveTab(window, newActiveTabId);
 		}
 
-		// Check if this tab is a private chat and delete its data
-		const tab = this.tabMap.get(tabId);
-		if (tab?.type === "chat" && tab.threadId) {
-			this.afterTabClose(tab);
-		}
-
+		// Business cleanup (private chat data) handled automatically in onDestroyed
 		this.removeTab(window, tabId);
 	}
 
@@ -989,13 +963,8 @@ export class TabService {
 
 		this.switchActiveTab(window, tabId);
 
-		// Check each tab and delete private chat data before removing
+		// Business cleanup (private chat data) handled automatically in onDestroyed
 		for (const tabIdToClose of tabIdsToClose) {
-			const tab = this.tabMap.get(tabIdToClose);
-			if (tab?.type === "chat" && tab.threadId) {
-				this.afterTabClose(tab);
-			}
-
 			this.removeTab(window, tabIdToClose);
 		}
 	}
@@ -1014,13 +983,8 @@ export class TabService {
 			this.switchActiveTab(window, tabId);
 		}
 
-		// Check each tab and delete private chat data before removing
+		// Business cleanup (private chat data) handled automatically in onDestroyed
 		for (const tabIdToClose of tabIdsToClose) {
-			const tab = this.tabMap.get(tabIdToClose);
-			if (tab?.type === "chat" && tab.threadId) {
-				this.afterTabClose(tab);
-			}
-
 			this.removeTab(window, tabIdToClose);
 		}
 	}

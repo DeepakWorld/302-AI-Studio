@@ -73,6 +73,14 @@ type AgentPreviewSyncMessage =
 			modifiedTime?: string;
 	  }
 	| {
+			type: "deploymentUpdated";
+			sandboxId: string;
+			sessionId: string;
+			url: string;
+			deploymentId: string;
+			deployedAt: string;
+	  }
+	| {
 			type: "fileContentsCleared";
 			sandboxId: string;
 			sessionId: string;
@@ -583,6 +591,18 @@ export class AgentPreviewState {
 				}),
 				new SvelteDate(envelope.timestamp).toISOString(),
 			);
+		} else if (envelope.type === "deploymentUpdated") {
+			this.updateState(
+				sandboxId,
+				sessionId,
+				(state) => ({
+					...state,
+					deployedUrl: envelope.url,
+					deploymentId: envelope.deploymentId,
+					deployedAt: envelope.deployedAt,
+				}),
+				new SvelteDate(envelope.timestamp).toISOString(),
+			);
 		} else if (envelope.type === "fileContentsCleared") {
 			this.updateState(
 				sandboxId,
@@ -612,13 +632,14 @@ export class AgentPreviewState {
 		}
 
 		const storage = await this.loadFromStorage(sandboxId, sessionId);
+		const deployedAt = getISOString();
 		const updatedStorage: AgentPreviewStorage = {
 			fileList: storage?.fileList || [],
 			fileContents: storage?.fileContents || {},
 			lastUpdated: getISOString(),
 			deployedUrl: url,
 			deploymentId: deploymentId,
-			deployedAt: getISOString(),
+			deployedAt,
 			selectedFilePath: storage?.selectedFilePath, // Preserve selected file path
 			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
 			currentWorkingDirectory: storage?.currentWorkingDirectory,
@@ -627,15 +648,14 @@ export class AgentPreviewState {
 		};
 		await this.saveToStorage(sandboxId, sessionId, updatedStorage);
 
-		// Fire a sync event to trigger state restoration in all preview panels
-		// This ensures the UI updates when deployment info changes
+		// Broadcast deployment changes as a dedicated event instead of reusing file list updates.
 		this.syncBus.publish({
-			type: "fileListUpdated",
+			type: "deploymentUpdated",
 			sandboxId,
 			sessionId,
-			fileList: storage?.fileList || [],
-			selectedFilePath: storage?.selectedFilePath,
-			fileTreeCurrentDirectory: storage?.fileTreeCurrentDirectory,
+			url,
+			deploymentId,
+			deployedAt,
 		});
 	}
 

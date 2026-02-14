@@ -2,16 +2,11 @@ import { CodeAgentConfigMetadata, type CodeAgentGlobalConfigs } from "@shared/st
 import { prefixStorage } from "@shared/types";
 import { isNull } from "es-toolkit";
 import { StorageService } from "..";
-import { emitter } from "../../broadcast-service";
 
 class CodeAgentStorage extends StorageService<CodeAgentConfigMetadata> {
 	constructor() {
 		super();
 		this.storage = prefixStorage(this.storage, "CodeAgentStorage");
-
-		emitter.on("thread:thread-deleted", ({ threadId }) => {
-			this.removeCodeAgentState(threadId);
-		});
 	}
 
 	async removeCodeAgentState(threadId: string): Promise<void> {
@@ -19,6 +14,14 @@ class CodeAgentStorage extends StorageService<CodeAgentConfigMetadata> {
 			this.removeItemInternal(`code-agent-config-state-${threadId}`),
 			this.removeItemInternal(`claude-code-agent-state-${threadId}`),
 		]);
+	}
+
+	async getCodeAgentConfig(
+		threadId: string,
+	): Promise<{ isOK: boolean; data: CodeAgentConfigMetadata }> {
+		const data = await this.getItemInternal(`code-agent-config-state-${threadId}`);
+		if (isNull(data)) return { isOK: false, data: {} as CodeAgentConfigMetadata };
+		return { isOK: true, data };
 	}
 }
 

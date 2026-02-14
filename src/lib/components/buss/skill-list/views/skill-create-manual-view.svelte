@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createSkill, updateSkill, deleteSkill } from "$lib/api/skills";
+	import { createSkill, deleteSkill, updateSkill } from "$lib/api/skills";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import { m } from "$lib/paraglide/messages";
 	import { skillsPanelState } from "$lib/stores/skills-panel-state.svelte";
@@ -59,7 +59,7 @@ description:
 					onRefresh?.();
 					skillsPanelState.reset();
 				} else {
-					toast.error(result.error?.message || result.message || m.skills_create_failed());
+					toast.error(m.skills_create_failed());
 				}
 			} else {
 				// 默认视图，只创建 SKILL.md
@@ -77,7 +77,7 @@ description:
 					onRefresh?.();
 					skillsPanelState.reset();
 				} else {
-					toast.error(result.error?.message || result.message || m.skills_create_failed());
+					toast.error(m.skills_create_failed());
 				}
 			}
 		} catch (error) {

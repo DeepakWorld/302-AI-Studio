@@ -20,6 +20,8 @@ import { claudeCodeAgentState, type ClaudeCodeSandboxInfo } from "./claude-code-
 import { codeAgentGlobalConfigsState } from "./code-agent-global-configs-state.svelte";
 import { codeAgentSendMessageButtonState } from "./code-agent-send-message-button-state.svelte";
 import { codeAgentTaskboardState } from "./code-agent-taskboard-state.svelte";
+import { localClaudeCodeSandboxState } from "./local-claude-code-sandbox-state.svelte";
+import { localEnvState } from "./local-env-state.svelte";
 import { withLoadingState } from "./utils";
 
 const tab = window.tab ?? null;
@@ -60,9 +62,13 @@ class CodeAgentState {
 	isLoadingSkills = $state(false);
 	isUpdatingSandboxRemark = $state(false);
 	isUpdatingSessionRemark = $state(false);
+	localBaseUrl = $state("");
 
 	enabled = $derived.by(() => persistedCodeAgentConfigState.current?.enabled ?? false);
-	type = $derived.by(() => persistedCodeAgentConfigState.current?.type ?? "remote");
+	type = $derived.by(() => {
+		if (threadId === "shell") return "remote";
+		return persistedCodeAgentConfigState.current?.type ?? "remote";
+	});
 	currentAgentId = $derived.by(
 		() => persistedCodeAgentConfigState.current?.currentAgentId ?? "claude-code",
 	);
@@ -72,6 +78,17 @@ class CodeAgentState {
 	isFreshTab = $derived(!chatState.hasMessages);
 	inCodeAgentMode = $derived(!this.isFreshTab && this.enabled);
 	isChecking = $derived(codeAgentSendMessageButtonState.isChecking);
+
+	async refreshLocalBaseUrl() {
+		try {
+			const url = await window.electronAPI.localVibeService.getLocalBaseUrl();
+			if (url) {
+				this.localBaseUrl = url + "/api/v1";
+			}
+		} catch (error) {
+			console.error("[CodeAgentState] Failed to refresh local base URL:", error);
+		}
+	}
 
 	sandboxStatus = $derived.by<CodeAgentSandboxStatus>(() => {
 		return match(this.currentAgentId)
@@ -95,9 +112,12 @@ class CodeAgentState {
 		await this.#showNotificationForChatFinished(event);
 	};
 
-	handleThreadTitleUpdated = (event: { title: string }) => {
+	handleThreadTitleUpdated = async (event: { title: string }) => {
 		if (this.currentAgentId === "claude-code") {
-			claudeCodeAgentState.handleThreadTitleUpdated(event);
+			await claudeCodeAgentState.handleThreadTitleUpdated(event);
+			if (this.type === "local") {
+				await localClaudeCodeSandboxState.refreshSessions();
+			}
 		}
 	};
 
@@ -208,27 +228,32 @@ class CodeAgentState {
 
 	updateType(type: CodeAgentType): void {
 		this.updateState({ type });
+		// 切换模式时重置 session 和 sandbox ID，避免配置混乱和竞态问题
+		claudeCodeAgentState.resetSessionAndSandbox(type);
+		// 重置 local session 选择
+		localClaudeCodeSandboxState.reset();
 	}
 
-	updateEnabled(enabled: boolean): void {
+	updateEnabled(enabled: boolean, shouldReset = true): void {
 		this.updateState({ enabled });
+		if (shouldReset) {
+			claudeCodeAgentState.resetSessionAndSandbox(this.type);
+
+			localClaudeCodeSandboxState.reset();
+		}
 	}
 
 	updatePlanMode(inPlanMode: boolean): void {
 		this.updateState({ inPlanMode });
 	}
 
-	getCodeAgentCfgs(): CodeAgentCfgs {
-		return match(this.currentAgentId)
-			.with("claude-code", () => ({
-				baseUrl: claudeCodeAgentState.baseUrl,
-				model: claudeCodeAgentState.sandboxId,
-			}))
-			.otherwise(() => ({ baseUrl: "", model: "" }));
-	}
-
 	async executeCodeAgentMode(): Promise<{ isOK: boolean; sandboxInfo?: ClaudeCodeSandboxInfo }> {
 		if (this.currentAgentId === "claude-code") {
+			// Local mode: skip sandbox verification, return virtual sandboxInfo
+			if (this.type === "local") {
+				return claudeCodeAgentState.handleLocalModeExecute();
+			}
+			// Remote mode: verify sandbox and return real sandboxInfo
 			return claudeCodeAgentState.handleAgentModeExecute();
 		}
 		return { isOK: false };
@@ -242,10 +267,18 @@ class CodeAgentState {
 
 	get codeAgentCfgs(): CodeAgentCfgs {
 		return match(this.currentAgentId)
-			.with("claude-code", () => ({
-				baseUrl: claudeCodeAgentState.baseUrl,
-				model: claudeCodeAgentState.sandboxId,
-			}))
+			.with("claude-code", () => {
+				if (this.type === "local") {
+					return {
+						baseUrl: this.localBaseUrl,
+						model: claudeCodeAgentState.model,
+					};
+				}
+				return {
+					baseUrl: claudeCodeAgentState.baseUrl,
+					model: claudeCodeAgentState.sandboxId,
+				};
+			})
 			.otherwise(() => ({ baseUrl: "", model: "" }));
 	}
 
@@ -270,6 +303,12 @@ class CodeAgentState {
 	get currentModel(): string {
 		return match(this.currentAgentId)
 			.with("claude-code", () => claudeCodeAgentState.model)
+			.otherwise(() => "");
+	}
+
+	get currentWorkspacePath(): string {
+		return match(this.currentAgentId)
+			.with("claude-code", () => claudeCodeAgentState.currentWorkspacePath)
 			.otherwise(() => "");
 	}
 
@@ -359,6 +398,10 @@ class CodeAgentState {
 					.with("claude-code", () => claudeCodeAgentState.updateSessionRemark(remark, true))
 					.otherwise(() => false);
 
+				if (isOK && this.type === "local") {
+					await localClaudeCodeSandboxState.refreshSessions();
+				}
+
 				return isOK;
 			},
 		);
@@ -393,4 +436,25 @@ $effect.root(() => {
 			};
 		}
 	});
+
+	// Auto-refresh local baseUrl when mode is local and sandbox is running
+	// This handles both scenarios:
+	// 1. Current tab: when sandbox state changes from not running to running
+	// 2. New tab: when the tab opens and sandbox is already running
+	$effect(() => {
+		if (codeAgentState.type === "local" && localEnvState.sandboxRunning) {
+			codeAgentState.refreshLocalBaseUrl();
+		}
+	});
+
+	// Listen to local sandbox state changes, refresh baseUrl when sandbox is running
+	const offLocalSandboxState = window.electronAPI.onLocalSandboxStateChanged((data) => {
+		if (data.running && codeAgentState.type === "local") {
+			codeAgentState.refreshLocalBaseUrl();
+		}
+	});
+
+	return () => {
+		offLocalSandboxState();
+	};
 });

@@ -222,8 +222,9 @@ class ClaudeCodeProcessor {
 		try {
 			const data = JSON.parse(jsonStr) as ClaudeCodeEvent;
 			return this.transformEvent(data);
-		} catch {
-			// If JSON parsing fails, skip
+		} catch (e) {
+			// If JSON parsing fails, log and skip
+			console.log("[ClaudeCodeProcessor] JSON parse failed for:", jsonStr, "Error:", e);
 			return null;
 		}
 	}
@@ -237,6 +238,15 @@ class ClaudeCodeProcessor {
 		// Handle pre_deploy_check event
 		if (data.type === "pre_deploy_check") {
 			return this.handlePreDeployCheck(data);
+		}
+
+		// Handle deploy events
+		if (
+			data.type === "deploy_task_created" ||
+			data.type === "deploy_progress" ||
+			data.type === "deploy_success"
+		) {
+			return this.handleLocaldeployMessage(data);
 		}
 
 		// Handle error payload from upstream (e.g., sandbox deployment failures)
@@ -277,6 +287,12 @@ class ClaudeCodeProcessor {
 			return this.transformAnthropicEvent(data.event);
 		}
 
+		console.log(
+			"[ClaudeCodeProcessor] Unhandled event type:",
+			data.type,
+			"data:",
+			JSON.stringify(data).slice(0, 200),
+		);
 		return null;
 	}
 
@@ -390,7 +406,7 @@ class ClaudeCodeProcessor {
 			duration_ms: data.duration_ms,
 			duration_api_ms: data.duration_api_ms,
 			num_turns: data.num_turns,
-			content: data.choices?.[0]?.delta?.content ?? "",
+			content: data.choices?.[0]?.delta?.content ?? data.result ?? "",
 			session_id: data.session_id,
 			total_cost_usd: data.total_cost_usd,
 			uuid: data.uuid,
@@ -438,6 +454,68 @@ class ClaudeCodeProcessor {
 		}
 
 		return metadataStr;
+	}
+
+	/**
+	 * Handle local deployment related messages from backend
+	 */
+	private handleLocaldeployMessage(data: ClaudeCodeEvent): string | null {
+		const results: string[] = [];
+
+		// 1. Send metadata event (for programmatic handling)
+		const metadataEvent = {
+			type: "message-metadata",
+			metadata: {
+				deploy: data,
+			},
+		};
+		results.push(`data: ${JSON.stringify(metadataEvent)}`);
+
+		// 2. Synthesize text events so user can see progress in chat
+		if (data.type === "deploy_task_created") {
+			// Ensure start event is sent if not already
+			if (!this.hasStarted) {
+				this.hasStarted = true;
+				results.push(`data: ${JSON.stringify({ type: "start", messageId: this.messageId })}`);
+			}
+
+			const textId = `deploy-text-${Date.now()}`;
+			this.openaiTextId = textId;
+			results.push(`data: ${JSON.stringify({ type: "text-start", id: textId })}`);
+			results.push(
+				`data: ${JSON.stringify({
+					type: "text-delta",
+					id: textId,
+					delta: "🚀 Deployment task created, waiting for completion...\n",
+				})}`,
+			);
+		} else if (data.type === "deploy_progress") {
+			if (this.openaiTextId) {
+				results.push(
+					`data: ${JSON.stringify({ type: "text-delta", id: this.openaiTextId, delta: "." })}`,
+				);
+			}
+		} else if (data.type === "deploy_success") {
+			if (this.openaiTextId) {
+				// Inject legacy format text so existing frontend logic can parse it
+				// Regex expects: {'success': True, 'status': '...', 'id': '...', 'url': '...', 'cover': '...'}
+				const legacyFormat = `{'success': True, 'status': 'success', 'id': '${data.id}', 'url': '${data.url}', 'cover': ''}`;
+				const magicText = `\n\n**deploy sandbox successfully**\n${legacyFormat}`;
+
+				results.push(
+					`data: ${JSON.stringify({
+						type: "text-delta",
+						id: this.openaiTextId,
+						delta: `\n\n✅ **Deployment successful!**\nURL: ${data.url}${magicText}`,
+					})}`,
+				);
+				results.push(`data: ${JSON.stringify({ type: "text-end", id: this.openaiTextId })}`);
+				this.openaiTextId = null;
+			}
+			results.push(`data: ${JSON.stringify({ type: "finish" })}`);
+		}
+
+		return results.join("\n\n");
 	}
 
 	/**
@@ -912,13 +990,13 @@ function interceptSSEResponse(response: Response, processor: ClaudeCodeProcessor
 					const chunk = decoder.decode(value, { stream: true });
 
 					// Debug: Log raw SSE chunk
-					console.debug("[ClaudeCodeProcessor] Raw SSE chunk:", chunk);
+					console.log("[ClaudeCodeProcessor] Raw SSE chunk:", chunk);
 
 					const processedChunk = processor.processSSEChunk(chunk);
 
 					if (processedChunk) {
 						// Debug: Log processed SSE chunk
-						console.debug("[ClaudeCodeProcessor] Processed SSE chunk:", processedChunk);
+						console.log("[ClaudeCodeProcessor] Processed SSE chunk:", processedChunk);
 						try {
 							controller.enqueue(encoder.encode(processedChunk));
 						} catch (_error) {

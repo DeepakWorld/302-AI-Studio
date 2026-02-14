@@ -33,6 +33,7 @@
 	import { claudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { localClaudeCodeSandboxState } from "$lib/stores/code-agent/local-claude-code-sandbox-state.svelte";
 
 	import { TaskboardPanel } from "$lib/components/buss/taskboard";
 	import { htmlPreviewState } from "$lib/stores/html-preview-state.svelte";
@@ -56,7 +57,7 @@
 	import FileTree from "./file-tree.svelte";
 	import SessionDeleted from "./session-deleted.svelte";
 	import Terminal from "./terminal.svelte";
-	import { handleError, isFileStillSelected, withRetry } from "./utils";
+	import { handleError, isFileStillSelected } from "./utils";
 
 	// --- Utils (Move strictly pure functions outside) ---
 	const LANGUAGE_MAP: Record<string, string> = {
@@ -317,18 +318,13 @@
 				return;
 			}
 
-			// Handle deployment update from any source (including self)
-			// This is needed when onFinish saves deployment info and we need to refresh the UI
-			if (
-				message.type === "fileListUpdated" &&
-				message.sourceInstanceId === agentPreviewState.syncIdentifier
-			) {
-				// Force re-check deployment info by clearing the restored key
-				lastRestoredKey = "";
-				// Trigger a state restore to pick up the new deployment info
-				untrack(() => {
-					restoreState(sandboxId, sessionId);
-				});
+			// Deployment updates are handled by a dedicated sync event and should refresh
+			// preview immediately in both current window and other windows.
+			if (message.type === "deploymentUpdated") {
+				deployment.url = message.url;
+				deployment.deploymentId = message.deploymentId;
+				iframeRefreshKey++;
+				return;
 			}
 
 			// Handle file deletion: when file list is updated, check if the currently
@@ -402,14 +398,18 @@
 			return;
 		}
 
-		if (!deployment.url) {
-			isRestoringState = true;
-		}
+		// Set isRestoringState immediately to prevent race conditions
+		// This must be set before any async operations to block concurrent calls
+		isRestoringState = true;
 
 		try {
 			// Then refresh sessions to get workspace_path for the current session
 			// This ensures the file tree has the correct workspace path before loading
-			await claudeCodeSandboxState.refreshSessions(sandboxId);
+			if (codeAgentState.type === "local") {
+				await localClaudeCodeSandboxState.refreshSessions();
+			} else {
+				await claudeCodeSandboxState.refreshSessions(sandboxId);
+			}
 
 			const [info, savedPath] = await Promise.all([
 				agentPreviewState.getDeploymentInfo(sandboxId, sessionId),
@@ -488,7 +488,11 @@
 
 				// Refresh sessions to get updated workspace_path after agent completes
 				// This is important because session/workspace is created after agent's first response
-				claudeCodeSandboxState.refreshSessions(currentSandboxId);
+				if (codeAgentState.type === "local") {
+					localClaudeCodeSandboxState.refreshSessions();
+				} else {
+					claudeCodeSandboxState.refreshSessions(currentSandboxId);
+				}
 			}
 		}
 		previousStreamingState = isStreaming;
@@ -595,11 +599,7 @@
 				}
 
 				// Fetch from API
-				const content = await withRetry(
-					() => getFileContent(currentSandboxId!, file.path, apiKey, undefined, signal),
-					3,
-					1000,
-				);
+				const content = await getFileContent(currentSandboxId!, file.path, signal);
 
 				if (signal.aborted) return;
 
@@ -627,11 +627,7 @@
 				previewType === "pdf"
 			) {
 				// Binary files: download and create blob URL with retry
-				const response = await withRetry(
-					() => downloadSandboxFile(currentSandboxId!, file.path, apiKey),
-					3,
-					1000,
-				);
+				const response = await downloadSandboxFile(currentSandboxId!, file.path);
 
 				if (signal.aborted) return;
 
@@ -917,7 +913,7 @@
 				type: file.type,
 			});
 
-			const response = await uploadSandboxFile(currentSandboxId, filePath, file, apiKey);
+			const response = await uploadSandboxFile(currentSandboxId, filePath, file);
 
 			if (response.success) {
 				// Update local cache and view

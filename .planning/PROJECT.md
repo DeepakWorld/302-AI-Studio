@@ -8,7 +8,16 @@
 
 Efficient AI conversations through smart context compression — users get coherent responses without hitting token limits or losing conversation history.
 
-## Current State (v1.2 Shipped)
+## Current Milestone: v1.3 Streaming Text Animation
+
+**Goal:** Smooth fade-in animation for streaming AI responses — text flows in gracefully instead of appearing character-by-character.
+
+**Target features:**
+- Per-chunk opacity fade animation during streaming
+- Fast transition (~150-200ms) for subtle, non-distracting effect
+- Applies to all streaming contexts (regular chat, Code Agent)
+
+## Previous State (v1.2 Shipped)
 
 **Shipped:** 2026-02-06
 
@@ -60,7 +69,9 @@ Auto context compression is now live:
 
 ### Active
 
-(None — ready for next milestone)
+- [ ] ANIM-01: Streaming text chunks fade in with opacity animation
+- [ ] ANIM-02: Animation duration ~150-200ms per chunk
+- [ ] ANIM-03: Animation applies to all streaming contexts (chat, Code Agent)
 
 ### Out of Scope
 
@@ -104,4 +115,4 @@ Auto context compression is now live:
 | Summary prepended to system prompt | Works with all providers; clean injection point | ✓ Good |
 
 ---
-*Last updated: 2026-02-06 after v1.2 milestone shipped*
+*Last updated: 2026-02-12 after v1.3 milestone started*

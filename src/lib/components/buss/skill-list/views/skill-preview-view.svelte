@@ -61,8 +61,7 @@
 			skillRootDir = getSkillRootDir(skillMdPath);
 		} catch (error) {
 			console.error("Failed to load skill content:", error);
-			const errorMessage =
-				error instanceof Error ? error.message : m.skills_load_failed?.() || "Failed to load skill";
+			const errorMessage = error instanceof Error ? error.message : m.skills_load_failed();
 			toast.error(errorMessage);
 			skillsPanelState.pop();
 		} finally {

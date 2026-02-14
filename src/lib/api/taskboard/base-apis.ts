@@ -1,5 +1,6 @@
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 import { type } from "arktype";
-import { _302AIKy } from "../core/_302ai-ky";
+import { getCodeAgentKy } from "../utils";
 
 export const executeCommandRequestSchema = type({
 	sandboxId: "string",
@@ -28,12 +29,22 @@ export async function executeCommand(
 	request: ExecuteCommandRequest,
 ): Promise<ExecuteCommandResponse> {
 	try {
-		const response = await _302AIKy
+		const kyInstance = await getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						command: request.command,
+					}
+				: {
+						sandbox_id: request.sandboxId,
+						command: request.command,
+					};
+
+		const response = await kyInstance
 			.post("302/claude-code/commands", {
-				json: {
-					sandbox_id: request.sandboxId,
-					command: request.command,
-				},
+				json: requestBody,
 			})
 			.json();
 
@@ -75,15 +86,20 @@ export async function uploadFileToSandbox(
 	auto_unzip: boolean = false,
 ): Promise<SandboxFileOperationResponse> {
 	try {
+		const kyInstance = await getCodeAgentKy();
 		const formData = new FormData();
-		formData.append("sandbox_id", sandboxId);
+
+		// Local mode doesn't need sandbox_id
+		if (codeAgentState.type !== "local") {
+			formData.append("sandbox_id", sandboxId);
+		}
 		formData.append("path", path);
 		formData.append("file", file);
 		if (auto_unzip) {
 			formData.append("auto_unzip", "true");
 		}
 
-		const response = await _302AIKy
+		const response = await kyInstance
 			.post("302/claude-code/sandbox/file/upload", {
 				body: formData,
 			})
@@ -117,13 +133,23 @@ export type InitProjectResponse = typeof initProjectResponseSchema.infer;
 
 export async function initProject(request: InitProjectRequest): Promise<InitProjectResponse> {
 	try {
-		const response = await _302AIKy
+		// Local mode only needs session_id + workspace_path, remote mode needs sandbox_id too
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						session_id: request.sessionId,
+						workspace_path: request.workspacePath ?? "",
+					}
+				: {
+						sandbox_id: request.sandboxId,
+						session_id: request.sessionId,
+						workspace_path: request.workspacePath ?? "",
+					};
+
+		const kyInstance = await getCodeAgentKy();
+		const response = await kyInstance
 			.post("302/claude-code/sandbox/project/init", {
-				json: {
-					sandbox_id: request.sandboxId,
-					session_id: request.sessionId,
-					workspace_path: request.workspacePath ?? "",
-				},
+				json: requestBody,
 			})
 			.json();
 
@@ -170,9 +196,19 @@ export async function batchUploadFile(
 	request: BatchUploadFileRequest,
 ): Promise<BatchUploadFileResponse> {
 	try {
-		const response = await _302AIKy
+		const kyInstance = await getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						file_list: request.file_list,
+					}
+				: request;
+
+		const response = await kyInstance
 			.post("302/claude-code/sandbox/file/upload/batch", {
-				json: request,
+				json: requestBody,
 				timeout: 300000,
 			})
 			.json();
@@ -218,13 +254,24 @@ export async function downloadFilesFromSandbox(
 ): Promise<DownloadFilesResponse> {
 	const { sandboxId, path, format } = request;
 	try {
-		const response = await _302AIKy
+		const kyInstance = await getCodeAgentKy();
+
+		// Local mode doesn't need sandbox_id
+		const requestBody =
+			codeAgentState.type === "local"
+				? {
+						path,
+						format,
+					}
+				: {
+						sandbox_id: sandboxId,
+						path,
+						format,
+					};
+
+		const response = await kyInstance
 			.post("302/claude-code/sandbox/file/download", {
-				json: {
-					sandbox_id: sandboxId,
-					path,
-					format,
-				},
+				json: requestBody,
 			})
 			.json();
 

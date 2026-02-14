@@ -3,67 +3,37 @@
  * 302.AI 沙盒会话 API
  */
 
-import type { ModelProvider } from "@shared/types";
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+import {
+	listLocalClaudeCodeSessionsResponse,
+	type ListLocalClaudeCodeSessionsResponse,
+} from "@shared/types";
 import { type } from "arktype";
-import { _302AIKy } from "./core/_302ai-ky";
-import { getApiKeyByProvider } from "./utils";
+import { createLocalCodeAgentKy } from "./core/local-code-agent-ky";
+import { getCodeAgentKy } from "./utils";
 
-export interface UpdateSessionNoteRequest {
-	/**
-	 * 备注
-	 */
-	note: string;
-	/**
-	 * 沙盒id
-	 */
-	sandbox_id: string;
-	/**
-	 * 对话id
-	 */
-	session_id: string;
-}
-
-export const updateSessionNoteRequestSchema = type({
-	note: "string",
-	sandbox_id: "string",
-	session_id: "string",
-});
-export type _UpdateSessionNoteRequest = typeof updateSessionNoteRequestSchema.infer;
-
-export const updateSessionNoteResponseSchema = type({
-	message: "string",
-	note: "string",
-	sandbox_id: "string",
-	session_id: "string",
-	success: "boolean",
-});
-export type _UpdateSessionNoteResponse = typeof updateSessionNoteResponseSchema.infer;
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Add or modify conversation note (New implementation)
- * 添加/修改对话备注
+ * Strip `sandbox_id` in local mode (local sandbox doesn't use it).
  */
-export async function _updateSessionNote(
-	request: _UpdateSessionNoteRequest,
-): Promise<_UpdateSessionNoteResponse> {
-	try {
-		const response = await _302AIKy
-			.post("302/claude-code/sandbox/session", {
-				json: request,
-			})
-			.json();
-
-		const validated = updateSessionNoteResponseSchema(response);
-		if (validated instanceof type.errors) {
-			console.error("Failed to validate update session note response:", validated.summary);
-			throw new Error("Invalid response format from update session note API");
-		}
-
-		return validated;
-	} catch (error) {
-		console.error("Failed to update session note:", error);
-		throw error;
+function buildParams<T extends { sandbox_id: string }>(params: T): Omit<T, "sandbox_id"> | T {
+	if (codeAgentState.type === "local") {
+		const { sandbox_id: _, ...rest } = params;
+		return rest;
 	}
+	return params;
+}
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface UpdateSessionNoteRequest {
+	/** 备注 */
+	note: string;
+	/** 沙盒id */
+	sandbox_id: string;
+	/** 对话id */
+	session_id: string;
 }
 
 export interface UpdateSessionNoteResponse {
@@ -81,13 +51,9 @@ export interface UpdateSessionNoteResult {
 }
 
 export interface DeleteSessionRequest {
-	/**
-	 * 沙盒id
-	 */
+	/** 沙盒id */
 	sandbox_id: string;
-	/**
-	 * 对话id
-	 */
+	/** 对话id */
 	session_id: string;
 }
 
@@ -104,80 +70,61 @@ export interface DeleteSessionResult {
 	error?: string;
 }
 
+// ─── Schemas (arktype) ──────────────────────────────────────────────────────
+
+export const updateSessionNoteRequestSchema = type({
+	note: "string",
+	sandbox_id: "string",
+	session_id: "string",
+});
+export type _UpdateSessionNoteRequest = typeof updateSessionNoteRequestSchema.infer;
+
+export const updateSessionNoteResponseSchema = type({
+	message: "string",
+	note: "string",
+	sandbox_id: "string",
+	session_id: "string",
+	success: "boolean",
+});
+export type _UpdateSessionNoteResponse = typeof updateSessionNoteResponseSchema.infer;
+
+// ─── API Functions ──────────────────────────────────────────────────────────
+
 /**
- * Add or modify conversation note
- * 添加/修改对话备注
+ * Update session note (with arktype validation).
+ * Automatically adapts to local/remote mode.
+ *
+ * 添加/修改对话备注（带 arktype 校验）
  */
 export async function updateSessionNote(
-	provider: ModelProvider,
 	request: UpdateSessionNoteRequest,
 ): Promise<UpdateSessionNoteResult> {
 	try {
-		// Use the base URL without /v1 suffix
-		const baseUrl = provider.baseUrl.replace(/\/v1\/?$/, "");
-		const endpoint = `${baseUrl}/302/claude-code/sandbox/session`;
+		const kyInstance = await getCodeAgentKy();
 
-		const response = await fetch(endpoint, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${getApiKeyByProvider(provider)}`,
-			},
-			body: JSON.stringify(request),
-		});
+		const response = await kyInstance
+			.post("302/claude-code/sandbox/session", {
+				json: buildParams(request),
+			})
+			.json();
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
-
-			try {
-				const errorData = JSON.parse(errorText);
-				if (errorData.error) {
-					if (typeof errorData.error === "object" && errorData.error.message) {
-						errorMessage = errorData.error.message;
-					} else if (typeof errorData.error === "string") {
-						errorMessage = errorData.error;
-					}
-				} else if (errorData.message) {
-					errorMessage = errorData.message;
-				}
-			} catch {
-				if (errorText) {
-					errorMessage = errorText;
-				}
-			}
-
+		const validated = updateSessionNoteResponseSchema(response);
+		if (validated instanceof type.errors) {
+			console.error("Failed to validate update session note response:", validated.summary);
 			return {
 				success: false,
-				error: errorMessage,
+				error: "Invalid response format from update session note API",
 			};
 		}
 
-		const data = await response.json();
-
-		if (data.success === false) {
+		if (validated.success === false) {
 			return {
 				success: false,
-				error: data.message || "Failed to update session note",
+				error: validated.message || "Failed to update session note",
 			};
 		}
 
-		// Refresh sandbox/session list so UI stays in sync with latest note
-		if (typeof window !== "undefined") {
-			try {
-				await window.electronAPI?.codeAgentService?.updateClaudeCodeSandboxesByIpc?.();
-			} catch (refreshError) {
-				console.error(
-					"Failed to refresh Claude code sandboxes after updating session note:",
-					refreshError,
-				);
-			}
-		}
-
-		return {
-			success: true,
-			data: data,
-		};
+		return { success: true, data: validated };
 	} catch (error) {
 		return {
 			success: false,
@@ -187,57 +134,23 @@ export async function updateSessionNote(
 }
 
 /**
- * Delete a session
- * 删除对话
+ * Delete a session (state-dependent: remote or local based on codeAgentState.type).
+ * Used by code that works in both modes (e.g. remote sandbox state store).
+ *
+ * 删除对话（根据全局状态自动适配 local/remote）
  */
-export async function deleteSession(
-	provider: ModelProvider,
-	request: DeleteSessionRequest,
-): Promise<DeleteSessionResult> {
+export async function deleteSession(request: DeleteSessionRequest): Promise<DeleteSessionResult> {
 	try {
-		// Use the base URL without /v1 suffix
-		const baseUrl = provider.baseUrl.replace(/\/v1\/?$/, "");
-		const params = new URLSearchParams({
+		const kyInstance = await getCodeAgentKy();
+
+		const searchParams = buildParams({
 			sandbox_id: request.sandbox_id,
 			session_id: request.session_id,
 		});
-		const endpoint = `${baseUrl}/302/claude-code/sandbox/session?${params.toString()}`;
 
-		const response = await fetch(endpoint, {
-			method: "DELETE",
-			headers: {
-				Authorization: `Bearer ${getApiKeyByProvider(provider)}`,
-			},
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
-
-			try {
-				const errorData = JSON.parse(errorText);
-				if (errorData.error) {
-					if (typeof errorData.error === "object" && errorData.error.message) {
-						errorMessage = errorData.error.message;
-					} else if (typeof errorData.error === "string") {
-						errorMessage = errorData.error;
-					}
-				} else if (errorData.message) {
-					errorMessage = errorData.message;
-				}
-			} catch {
-				if (errorText) {
-					errorMessage = errorText;
-				}
-			}
-
-			return {
-				success: false,
-				error: errorMessage,
-			};
-		}
-
-		const data = await response.json();
+		const data = (await kyInstance
+			.delete("302/claude-code/sandbox/session", { searchParams })
+			.json()) as DeleteSessionResponse;
 
 		if (data.success === false) {
 			return {
@@ -246,14 +159,68 @@ export async function deleteSession(
 			};
 		}
 
-		return {
-			success: true,
-			data: data,
-		};
+		return { success: true, data };
 	} catch (error) {
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : "Failed to delete session",
 		};
+	}
+}
+
+/**
+ * Delete a local session (always uses local ky instance, no global state dependency).
+ * Used by local-specific code paths.
+ *
+ * 删除本地对话（始终使用本地 ky 实例，不依赖全局状态）
+ */
+export async function deleteLocalSession(sessionId: string): Promise<DeleteSessionResult> {
+	try {
+		const kyInstance = await createLocalCodeAgentKy();
+
+		const data = (await kyInstance
+			.delete("302/claude-code/sandbox/session", {
+				searchParams: { session_id: sessionId },
+			})
+			.json()) as DeleteSessionResponse;
+
+		if (data.success === false) {
+			return {
+				success: false,
+				error: data.message || "Failed to delete session",
+			};
+		}
+
+		return { success: true, data };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : "Failed to delete session",
+		};
+	}
+}
+
+/**
+ * List local sessions (always uses local ky instance, no global state dependency).
+ *
+ * 列出本地会话（始终使用本地 ky 实例）
+ */
+export async function listLocalSessions(): Promise<ListLocalClaudeCodeSessionsResponse> {
+	try {
+		const kyInstance = await createLocalCodeAgentKy();
+		const response = await kyInstance.get("302/claude-code/sandbox/session").json();
+
+		const validated = listLocalClaudeCodeSessionsResponse(response);
+		if (validated instanceof type.errors) {
+			console.error(
+				"Failed to validate list local claude code sessions response:",
+				validated.summary,
+			);
+			throw new Error("Invalid response format from list local claude code sessions API");
+		}
+		return validated;
+	} catch (error) {
+		console.error("Failed to list local claude code sessions:", error);
+		throw error;
 	}
 }

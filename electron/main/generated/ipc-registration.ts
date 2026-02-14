@@ -8,9 +8,10 @@ import {
 	ssoService,
 	ghostWindowService,
 	shortcutService,
+	localVibeService,
+	codeAgentService,
 	windowService,
 	deepLinkService,
-	codeAgentService,
 	tabService,
 	aiApplicationService,
 	appService,
@@ -20,6 +21,7 @@ import {
 	notificationService,
 	providerService,
 	threadService,
+	threadStateService,
 	updaterService,
 } from "../services";
 
@@ -180,34 +182,57 @@ export function registerIpcHandlers() {
 	ipcMain.handle("shortcutService:getConflicts", (event) => shortcutService.getConflicts(event));
 	ipcMain.handle("shortcutService:getSyncInfo", (event) => shortcutService.getSyncInfo(event));
 
-	// windowService service registration
-	ipcMain.handle("windowService:handleOpenSettingsWindow", (event, route) =>
-		windowService.handleOpenSettingsWindow(event, route),
+	// localVibeService service registration
+	ipcMain.handle("localVibeService:copyToWorkspaceByIpc", (event, sourcePath, containerPath) =>
+		localVibeService.copyToWorkspaceByIpc(event, sourcePath, containerPath),
 	);
-	ipcMain.handle("windowService:handleNavigateToUrl", (event, title, type, href) =>
-		windowService.handleNavigateToUrl(event, title, type, href),
+	ipcMain.handle("localVibeService:getComposeDirectory", (event) =>
+		localVibeService.getComposeDirectory(event),
 	);
-	ipcMain.handle("windowService:focusWindow", (event, windowId, tabId) =>
-		windowService.focusWindow(event, windowId, tabId),
+	ipcMain.handle("localVibeService:openComposeDirectory", (event) =>
+		localVibeService.openComposeDirectory(event),
 	);
-	ipcMain.handle("windowService:handleDropAtPointer", (event, tabId, pointer) =>
-		windowService.handleDropAtPointer(event, tabId, pointer),
+	ipcMain.handle("localVibeService:openWorkspaceDirectory", (event, subPath) =>
+		localVibeService.openWorkspaceDirectory(event, subPath),
 	);
-	ipcMain.handle("windowService:handleSplitShellWindow", (event, triggerTabId) =>
-		windowService.handleSplitShellWindow(event, triggerTabId),
+	ipcMain.handle("localVibeService:deleteWorkspaceDirectory", (event, subPath) =>
+		localVibeService.deleteWorkspaceDirectory(event, subPath),
 	);
-	ipcMain.handle(
-		"windowService:handleMoveTabIntoExistingWindow",
-		(event, triggerTabId, windowId, insertIndex) =>
-			windowService.handleMoveTabIntoExistingWindow(event, triggerTabId, windowId, insertIndex),
+	ipcMain.handle("localVibeService:listWorkspaceDirectories", (event) =>
+		localVibeService.listWorkspaceDirectories(event),
 	);
-	ipcMain.handle("windowService:navigateToThread", (event, threadId, sourceWindowId) =>
-		windowService.navigateToThread(event, threadId, sourceWindowId),
+	ipcMain.handle("localVibeService:getLocalBaseUrl", (event) =>
+		localVibeService.getLocalBaseUrl(event),
 	);
-
-	// deepLinkService service registration
-	ipcMain.handle("deepLinkService:simulateDeepLink", (event, url) =>
-		deepLinkService.simulateDeepLink(event, url),
+	ipcMain.handle("localVibeService:getSandboxStatus", (event) =>
+		localVibeService.getSandboxStatus(event),
+	);
+	ipcMain.handle("localVibeService:triggerSystemRestart", (event) =>
+		localVibeService.triggerSystemRestart(event),
+	);
+	ipcMain.handle("localVibeService:validPodman", (event) => localVibeService.validPodman(event));
+	ipcMain.handle("localVibeService:startPodmanHealthCheck", (event) =>
+		localVibeService.startPodmanHealthCheck(event),
+	);
+	ipcMain.handle("localVibeService:installWSL", (event) => localVibeService.installWSL(event));
+	ipcMain.handle("localVibeService:installScoop", (event) => localVibeService.installScoop(event));
+	ipcMain.handle("localVibeService:installHomebrew", (event) =>
+		localVibeService.installHomebrew(event),
+	);
+	ipcMain.handle("localVibeService:installPodman", (event) =>
+		localVibeService.installPodman(event),
+	);
+	ipcMain.handle("localVibeService:initPodmanMachine", (event) =>
+		localVibeService.initPodmanMachine(event),
+	);
+	ipcMain.handle("localVibeService:stopLocalSandboxByIpc", (event) =>
+		localVibeService.stopLocalSandboxByIpc(event),
+	);
+	ipcMain.handle("localVibeService:ensureLocalSandboxRunning", (event) =>
+		localVibeService.ensureLocalSandboxRunning(event),
+	);
+	ipcMain.handle("localVibeService:startPodmanMachine", (event) =>
+		localVibeService.startPodmanMachine(event),
 	);
 
 	// codeAgentService service registration
@@ -252,8 +277,8 @@ export function registerIpcHandlers() {
 	ipcMain.handle("codeAgentService:findClaudeCodeSandboxWithValidDisk", (event, threadId) =>
 		codeAgentService.findClaudeCodeSandboxWithValidDisk(event, threadId),
 	);
-	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos) =>
-		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos),
+	ipcMain.handle("codeAgentService:addClaudeCodeSandboxMCP", (event, sandboxId, MCPInfos, mode) =>
+		codeAgentService.addClaudeCodeSandboxMCP(event, sandboxId, MCPInfos, mode),
 	);
 	ipcMain.handle(
 		"codeAgentService:createThreadForSession",
@@ -275,6 +300,36 @@ export function registerIpcHandlers() {
 		"codeAgentService:setIsManualNoteBySession",
 		(event, sandboxId, sessionId, isManualNote) =>
 			codeAgentService.setIsManualNoteBySession(event, sandboxId, sessionId, isManualNote),
+	);
+
+	// windowService service registration
+	ipcMain.handle("windowService:handleOpenSettingsWindow", (event, route) =>
+		windowService.handleOpenSettingsWindow(event, route),
+	);
+	ipcMain.handle("windowService:handleNavigateToUrl", (event, title, type, href) =>
+		windowService.handleNavigateToUrl(event, title, type, href),
+	);
+	ipcMain.handle("windowService:focusWindow", (event, windowId, tabId) =>
+		windowService.focusWindow(event, windowId, tabId),
+	);
+	ipcMain.handle("windowService:handleDropAtPointer", (event, tabId, pointer) =>
+		windowService.handleDropAtPointer(event, tabId, pointer),
+	);
+	ipcMain.handle("windowService:handleSplitShellWindow", (event, triggerTabId) =>
+		windowService.handleSplitShellWindow(event, triggerTabId),
+	);
+	ipcMain.handle(
+		"windowService:handleMoveTabIntoExistingWindow",
+		(event, triggerTabId, windowId, insertIndex) =>
+			windowService.handleMoveTabIntoExistingWindow(event, triggerTabId, windowId, insertIndex),
+	);
+	ipcMain.handle("windowService:navigateToThread", (event, threadId, sourceWindowId) =>
+		windowService.navigateToThread(event, threadId, sourceWindowId),
+	);
+
+	// deepLinkService service registration
+	ipcMain.handle("deepLinkService:simulateDeepLink", (event, url) =>
+		deepLinkService.simulateDeepLink(event, url),
 	);
 
 	// tabService service registration
@@ -412,6 +467,9 @@ export function registerIpcHandlers() {
 	ipcMain.handle("dataService:zipFolderForUpload", (event) =>
 		dataService.zipFolderForUpload(event),
 	);
+	ipcMain.handle("dataService:selectFolderForUpload", (event) =>
+		dataService.selectFolderForUpload(event),
+	);
 	ipcMain.handle(
 		"dataService:exportChatToFile",
 		(event, content, extension, filterName, defaultFileName) =>
@@ -472,6 +530,14 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("threadService:clearDeletedModelReferences", (event, deletedModelIds) =>
 		threadService.clearDeletedModelReferences(event, deletedModelIds),
+	);
+
+	// threadStateService service registration
+	ipcMain.handle("threadStateService:updateBusyState", (event, data) =>
+		threadStateService.updateBusyState(event, data),
+	);
+	ipcMain.handle("threadStateService:getBusyThreads", (event) =>
+		threadStateService.getBusyThreads(event),
 	);
 
 	// updaterService service registration
@@ -550,14 +616,25 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("shortcutService:updateShortcuts");
 	ipcMain.removeHandler("shortcutService:getConflicts");
 	ipcMain.removeHandler("shortcutService:getSyncInfo");
-	ipcMain.removeHandler("windowService:handleOpenSettingsWindow");
-	ipcMain.removeHandler("windowService:handleNavigateToUrl");
-	ipcMain.removeHandler("windowService:focusWindow");
-	ipcMain.removeHandler("windowService:handleDropAtPointer");
-	ipcMain.removeHandler("windowService:handleSplitShellWindow");
-	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
-	ipcMain.removeHandler("windowService:navigateToThread");
-	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
+	ipcMain.removeHandler("localVibeService:copyToWorkspaceByIpc");
+	ipcMain.removeHandler("localVibeService:getComposeDirectory");
+	ipcMain.removeHandler("localVibeService:openComposeDirectory");
+	ipcMain.removeHandler("localVibeService:openWorkspaceDirectory");
+	ipcMain.removeHandler("localVibeService:deleteWorkspaceDirectory");
+	ipcMain.removeHandler("localVibeService:listWorkspaceDirectories");
+	ipcMain.removeHandler("localVibeService:getLocalBaseUrl");
+	ipcMain.removeHandler("localVibeService:getSandboxStatus");
+	ipcMain.removeHandler("localVibeService:triggerSystemRestart");
+	ipcMain.removeHandler("localVibeService:validPodman");
+	ipcMain.removeHandler("localVibeService:startPodmanHealthCheck");
+	ipcMain.removeHandler("localVibeService:installWSL");
+	ipcMain.removeHandler("localVibeService:installScoop");
+	ipcMain.removeHandler("localVibeService:installHomebrew");
+	ipcMain.removeHandler("localVibeService:installPodman");
+	ipcMain.removeHandler("localVibeService:initPodmanMachine");
+	ipcMain.removeHandler("localVibeService:stopLocalSandboxByIpc");
+	ipcMain.removeHandler("localVibeService:ensureLocalSandboxRunning");
+	ipcMain.removeHandler("localVibeService:startPodmanMachine");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxModel");
 	ipcMain.removeHandler("codeAgentService:checkClaudeCodeSandbox");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxesByIpc");
@@ -573,6 +650,14 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("codeAgentService:createThreadForSession");
 	ipcMain.removeHandler("codeAgentService:getThreadIdBySessionId");
 	ipcMain.removeHandler("codeAgentService:setIsManualNoteBySession");
+	ipcMain.removeHandler("windowService:handleOpenSettingsWindow");
+	ipcMain.removeHandler("windowService:handleNavigateToUrl");
+	ipcMain.removeHandler("windowService:focusWindow");
+	ipcMain.removeHandler("windowService:handleDropAtPointer");
+	ipcMain.removeHandler("windowService:handleSplitShellWindow");
+	ipcMain.removeHandler("windowService:handleMoveTabIntoExistingWindow");
+	ipcMain.removeHandler("windowService:navigateToThread");
+	ipcMain.removeHandler("deepLinkService:simulateDeepLink");
 	ipcMain.removeHandler("tabService:handleNewTabWithThread");
 	ipcMain.removeHandler("tabService:handleNewTab");
 	ipcMain.removeHandler("tabService:handleActivateTab");
@@ -617,6 +702,7 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:openBackupDirectory");
 	ipcMain.removeHandler("dataService:checkOldVersionData");
 	ipcMain.removeHandler("dataService:zipFolderForUpload");
+	ipcMain.removeHandler("dataService:selectFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
@@ -634,6 +720,8 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("threadService:removeFavorite");
 	ipcMain.removeHandler("threadService:deleteThreadsByApiKeyHash");
 	ipcMain.removeHandler("threadService:clearDeletedModelReferences");
+	ipcMain.removeHandler("threadStateService:updateBusyState");
+	ipcMain.removeHandler("threadStateService:getBusyThreads");
 	ipcMain.removeHandler("updaterService:checkForUpdatesManually");
 	ipcMain.removeHandler("updaterService:quitAndInstall");
 	ipcMain.removeHandler("updaterService:isUpdateDownloaded");

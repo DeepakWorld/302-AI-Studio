@@ -40,3 +40,6 @@ plugins/external
 
 # Temporary files
 temp
+
+ai302/
+.worktrees/

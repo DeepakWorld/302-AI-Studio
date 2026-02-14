@@ -1,11 +1,16 @@
 import { deleteSession } from "$lib/api/sandbox-session";
 import { validate302Provider } from "$lib/api/webserve-deploy";
+import type { GroupedSelectData } from "$lib/components/buss/settings/setting-select.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+import { formatDateTimeShort } from "$lib/utils/date-format";
 import type { ClaudeCodeSandboxInfo } from "@shared/storage/code-agent";
 import { toast } from "svelte-sonner";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
+import { codeAgentState } from "./code-agent-state.svelte";
+import { persistedLocalClaudeCodeSessionsState } from "./local-claude-code-sandbox-state.svelte";
 
 export const persistedClaudeCodeSandboxState = new PersistedState<ClaudeCodeSandboxInfo[]>(
 	"CodeAgentStorage:claude-code-sandbox-state",
@@ -33,7 +38,7 @@ $effect.root(() => {
 });
 
 class ClaudeCodeSandboxState {
-	sandboxRemarkMap = $state(new Map<string, string>());
+	sandboxRemarkMap = $state(new SvelteMap<string, string>());
 
 	sandboxes = $derived.by(() => {
 		return [
@@ -61,11 +66,15 @@ class ClaudeCodeSandboxState {
 				.flatMap((sandbox) => sandbox.sessionInfos)
 				.map((session) => {
 					const name = session.note && session.note !== "" ? session.note : session.sessionId;
+					// Filter out zero/default dates (e.g. 0001-01-01)
+					const date = new Date(session.usedAt);
+					const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+
 					return {
-						key: session.workspacePath,
+						key: session.sessionId,
 						label: name,
 						value: session.sessionId,
-						extra: session.usedAt,
+						extra: hasValidDate ? formatDateTimeShort(session.usedAt) : undefined,
 					};
 				}),
 		];
@@ -73,28 +82,169 @@ class ClaudeCodeSandboxState {
 
 	groupedSessions = $derived.by(() => {
 		const sandboxes = persistedClaudeCodeSandboxState.current;
+		const groupsWithMeta = sandboxes.map((sandbox) => {
+			const sortedSessions = [...sandbox.sessionInfos].sort(
+				(a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime(),
+			);
+
+			const latestTimestamp =
+				sortedSessions.length > 0 ? new Date(sortedSessions[0].usedAt).getTime() : 0;
+
+			const sandboxLabel = sandbox.sandboxRemark || sandbox.sandboxId;
+
+			return {
+				timestamp: latestTimestamp,
+				group: {
+					groupKey: sandbox.sandboxId,
+					groupLabel: sandboxLabel,
+					items: sortedSessions.map((session) => {
+						const date = new Date(session.usedAt);
+						const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+						const dateLabel = hasValidDate
+							? formatDateTimeShort(session.usedAt)
+							: m.local_platform_unknown();
+
+						return {
+							key: session.sessionId,
+							label: session.note || session.sessionId,
+							value: session.sessionId,
+							extra: dateLabel,
+						};
+					}),
+				},
+			};
+		});
+
+		const sortedGroups = groupsWithMeta
+			.sort((a, b) => b.timestamp - a.timestamp)
+			.map((g) => g.group);
+
 		return {
 			standalone: [newSessionItem],
-			groups: sandboxes.map((sandbox) => ({
-				groupKey: sandbox.sandboxId,
-				groupLabel: sandbox.sandboxRemark || sandbox.sandboxId,
-				items: [...sandbox.sessionInfos]
-					.sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime())
-					.map((session) => ({
-						key: session.workspacePath,
-						label: session.note || session.sessionId,
-						value: session.sessionId,
-						extra: session.usedAt,
-					})),
-			})),
+			groups: sortedGroups,
 		};
 	});
 
 	/**
+	 * Workspace path options for the dropdown
+	 */
+	workspacePathOptions = $derived.by((): GroupedSelectData => {
+		const sandboxList = persistedClaudeCodeSandboxState.current;
+
+		// Map workspacePath to its latest usedAt and related sessions
+		const workspaceMap = new SvelteMap<
+			string,
+			{
+				latestUsedAt: number;
+				relatedSessions: { note: string | null; sessionId: string }[];
+				sandboxId: string;
+				sandboxRemark: string;
+			}
+		>();
+
+		for (const sandbox of sandboxList) {
+			for (const session of sandbox.sessionInfos) {
+				if (session.workspacePath && session.workspacePath !== "") {
+					// Use a composite key to distinguish same paths in different sandboxes
+					const compositeKey = `${sandbox.sandboxId}:${session.workspacePath}`;
+					if (!workspaceMap.has(compositeKey)) {
+						workspaceMap.set(compositeKey, {
+							latestUsedAt: 0,
+							relatedSessions: [],
+							sandboxId: sandbox.sandboxId,
+							sandboxRemark: sandbox.sandboxRemark,
+						});
+					}
+					const data = workspaceMap.get(compositeKey)!;
+					data.relatedSessions.push({ note: session.note, sessionId: session.sessionId });
+
+					const usedAtTime = new Date(session.usedAt).getTime();
+					if (!isNaN(usedAtTime) && usedAtTime > data.latestUsedAt) {
+						data.latestUsedAt = usedAtTime;
+					}
+				}
+			}
+		}
+
+		// Sort paths by time first (newest first)
+		const sortedPaths = Array.from(workspaceMap.entries()).sort(
+			(a, b) => b[1].latestUsedAt - a[1].latestUsedAt,
+		);
+
+		// Group by combined label
+		const groupsMap = new SvelteMap<
+			string,
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			{ label: string; maxTimestamp: number; items: any[] }
+		>();
+
+		for (const [compositeKey, data] of sortedPaths) {
+			const workspacePath = compositeKey.split(":")[1];
+			const date = new Date(data.latestUsedAt);
+			const hasValidDate = !isNaN(data.latestUsedAt) && date.getFullYear() > 2020;
+			const dateLabel = hasValidDate
+				? formatDateTimeShort(data.latestUsedAt)
+				: m.local_platform_unknown();
+
+			const sessionLabelRaw = [
+				...new SvelteSet(data.relatedSessions.map((s) => s.note || m.select_session_new())),
+			].join(", ");
+
+			const sandboxLabel = data.sandboxRemark || data.sandboxId;
+
+			// Combine sandbox info, session info and date into group label
+			const groupLabel = `${sandboxLabel} - ${m.local_platform_session({ session: sessionLabelRaw })} - ${dateLabel}`;
+
+			if (!groupsMap.has(groupLabel)) {
+				groupsMap.set(groupLabel, {
+					label: groupLabel,
+					maxTimestamp: data.latestUsedAt,
+					items: [],
+				});
+			}
+
+			const group = groupsMap.get(groupLabel)!;
+			if (data.latestUsedAt > group.maxTimestamp) {
+				group.maxTimestamp = data.latestUsedAt;
+			}
+
+			group.items.push({
+				key: compositeKey,
+				label: workspacePath,
+				value: workspacePath,
+			});
+		}
+
+		const groups = Array.from(groupsMap.values())
+			.sort((a, b) => b.maxTimestamp - a.maxTimestamp)
+			.map((g) => ({
+				groupKey: g.label,
+				groupLabel: g.label,
+				items: g.items,
+			}));
+
+		return {
+			standalone: [{ key: "new", label: m.local_platform_new_work_directory(), value: "new" }],
+			groups: groups,
+		};
+	});
+	/**
 	 * Get the workspace path for the current session
 	 * Returns the session's workspacePath if available, empty string otherwise
+	 * Supports both Local and Remote modes
 	 */
 	currentSessionWorkspacePath = $derived.by(() => {
+		// Local 模式：从 local sessions 存储中获取
+		if (codeAgentState.type === "local") {
+			const sessionId = claudeCodeAgentState.currentSessionId;
+			if (!sessionId) return "";
+
+			const localSessions = persistedLocalClaudeCodeSessionsState.current;
+			const session = localSessions.find((s) => s.session_id === sessionId);
+			return session?.workspace_path || "";
+		}
+
+		// Remote 模式：原有的逻辑（从 sandbox state 获取）
 		const sandboxId = claudeCodeAgentState.sandboxId;
 		const sessionId = claudeCodeAgentState.currentSessionId;
 
@@ -185,6 +335,12 @@ class ClaudeCodeSandboxState {
 				claudeCodeAgentState.selectedSessionRemark =
 					targetSandbox.sessionInfos.find((sessionInfo) => sessionInfo.sessionId === sessionId)
 						?.note || "";
+
+				// Sync workspacePath when selecting a session
+				const session = targetSandbox.sessionInfos.find((s) => s.sessionId === sessionId);
+				if (session?.workspacePath) {
+					claudeCodeAgentState.selectedWorkspacePath = session.workspacePath;
+				}
 			}
 		}
 
@@ -210,6 +366,11 @@ class ClaudeCodeSandboxState {
 		}
 	}
 
+	handleWorkspaceSelected(workspacePath: string): void {
+		claudeCodeAgentState.selectedWorkspacePath = workspacePath;
+		// Note: According to requirements, we do NOT reset session to "new" when selecting a workspace
+	}
+
 	async deleteSession(sandboxId: string, sessionId: string): Promise<boolean> {
 		const providerResult = validate302Provider(persistedProviderState.current);
 		if (!providerResult.valid || !providerResult.provider) {
@@ -217,7 +378,7 @@ class ClaudeCodeSandboxState {
 			return false;
 		}
 
-		const result = await deleteSession(providerResult.provider, {
+		const result = await deleteSession({
 			sandbox_id: sandboxId,
 			session_id: sessionId,
 		});
@@ -229,7 +390,7 @@ class ClaudeCodeSandboxState {
 			// Refresh sessions after successful deletion
 			await this.refreshSessions(sandboxId);
 		} else {
-			toast.error(result.error || m.delete_session_failed());
+			toast.error(m.delete_session_failed());
 		}
 
 		return result.success;

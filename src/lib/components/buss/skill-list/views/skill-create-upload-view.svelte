@@ -39,7 +39,7 @@
 				onRefresh?.();
 				skillsPanelState.reset();
 			} else {
-				toast.error(result.error?.message || result.message || m.skills_create_failed());
+				toast.error(m.skills_create_failed());
 			}
 		} catch (error) {
 			console.error("Failed to create skill from upload:", error);

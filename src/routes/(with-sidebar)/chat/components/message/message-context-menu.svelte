@@ -3,6 +3,7 @@
 	import { m } from "$lib/paraglide/messages";
 
 	import { toast } from "svelte-sonner";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 
 	interface Props {
 		onCopy?: () => void | Promise<void>;
@@ -120,7 +121,7 @@
 			</ContextMenu.Item>
 		{/if}
 
-		{#if onCreateBranch}
+		{#if onCreateBranch && !codeAgentState.enabled}
 			<ContextMenu.Item onSelect={onCreateBranch}>
 				{m.common_create_branch()}
 			</ContextMenu.Item>

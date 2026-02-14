@@ -335,7 +335,7 @@
 	<div class="flex h-full overflow-hidden relative">
 		{#if agentPreviewState.isPinned}
 			<Resizable.PaneGroup direction="horizontal" class="h-full">
-				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 320px;">
+				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 450px;">
 					<div class="flex h-full flex-col relative">
 						<PageHeader />
 						<div class="flex flex-1 flex-col items-center justify-center gap-y-6">
@@ -389,7 +389,7 @@
 	<div class="flex h-full overflow-hidden relative">
 		{#if agentPreviewState.isPinned}
 			<Resizable.PaneGroup direction="horizontal" class="h-full">
-				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 320px;">
+				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 450px;">
 					<div class="flex h-full flex-col min-w-0">
 						<div class="flex-1 overflow-hidden relative">
 							<PageHeader />
@@ -433,7 +433,7 @@
 	<div class="flex h-full overflow-hidden relative">
 		{#if htmlPreviewState.isPinned}
 			<Resizable.PaneGroup direction="horizontal" class="h-full">
-				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 320px;">
+				<Resizable.Pane defaultSize={50} minSize={30} class="min-w-0" style="min-width: 450px;">
 					<div class="flex h-full flex-col min-w-0">
 						<div class="flex-1 overflow-hidden relative">
 							<PageHeader />

@@ -939,10 +939,11 @@ export function appendPromptToSystemMessage(
 export async function uploadAttachmentsFromMessages(
 	sandboxId: string,
 	workspacePath: string,
+	mode: string,
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	messages: any[],
 ): Promise<void> {
-	if (!sandboxId || !workspacePath || messages.length === 0) {
+	if (!workspacePath || messages.length === 0) {
 		return;
 	}
 
@@ -999,10 +1000,13 @@ export async function uploadAttachmentsFromMessages(
 		}>;
 
 		if (validFiles.length > 0) {
-			const uploadResponse = await batchUploadFile({
-				sandbox_id: sandboxId,
-				file_list: validFiles,
-			});
+			const uploadResponse = await batchUploadFile(
+				{
+					sandbox_id: sandboxId,
+					file_list: validFiles,
+				},
+				mode,
+			);
 
 			const failedUploads = uploadResponse.result.filter((r) => !r.success);
 			if (!uploadResponse.success || failedUploads.length > 0) {

@@ -7,17 +7,20 @@ import { DataService, dataService } from "./data-service";
 import { DeepLinkService, deepLinkService } from "./deep-link-service";
 import { ExternalLinkService, externalLinkService } from "./external-link-service";
 import { GhostWindowService, ghostWindowService } from "./ghost-window-service";
+import { localVibeService, LocalVibeService } from "./local-vibe-service";
 import { McpService, mcpService } from "./mcp-service";
 import { NotificationService, notificationService } from "./notification-service";
 import { PluginService, pluginService } from "./plugin-service";
 import { providerService, ProviderService } from "./provider-service";
 import { RegistryService, registryService } from "./registry-service";
+import { SchedulerService, schedulerService } from "./scheduler-service";
 import { GeneralSettingsService, generalSettingsService } from "./settings-service";
 import { ShortcutService, shortcutService } from "./shortcut-service";
 import { SsoService, ssoService } from "./sso-service";
 import { StorageService, storageService } from "./storage-service";
 import { TabService, tabService } from "./tab-service";
 import { ThreadService, threadService } from "./thread-service";
+import { ThreadStateService, threadStateService } from "./thread-state-service";
 import { TrayService, trayService } from "./tray-service";
 import { UpdaterService, updaterService } from "./updater-service";
 import { WindowService, windowService } from "./window-service";
@@ -34,16 +37,19 @@ export {
 	ExternalLinkService,
 	GeneralSettingsService,
 	GhostWindowService,
+	LocalVibeService,
 	McpService,
 	NotificationService,
 	PluginService,
 	ProviderService,
 	RegistryService,
+	SchedulerService,
 	ShortcutService,
 	SsoService,
 	StorageService,
 	TabService,
 	ThreadService,
+	ThreadStateService,
 	TrayService,
 	UpdaterService,
 	WindowService,
@@ -61,16 +67,19 @@ export {
 	externalLinkService,
 	generalSettingsService,
 	ghostWindowService,
+	localVibeService,
 	mcpService,
 	notificationService,
 	pluginService,
 	providerService,
 	registryService,
+	schedulerService,
 	shortcutService,
 	ssoService,
 	storageService,
 	tabService,
 	threadService,
+	threadStateService,
 	trayService,
 	updaterService,
 	windowService,

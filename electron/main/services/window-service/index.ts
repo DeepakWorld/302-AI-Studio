@@ -789,6 +789,7 @@ export class WindowService {
 		// Create a single view for settings content
 		const settingsView = new WebContentsView({
 			webPreferences: {
+				backgroundThrottling: true,
 				preload: path.join(import.meta.dirname, "../preload/index.cjs"),
 				devTools: true,
 				sandbox: false,

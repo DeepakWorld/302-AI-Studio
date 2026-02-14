@@ -179,7 +179,7 @@
 				throw new Error("302.AI provider not found");
 			}
 
-			const result = await executeSandboxCommand(provider, {
+			const result = await executeSandboxCommand({
 				sandbox_id: sandboxId,
 				session_id: sessionId || undefined,
 				command: cmd,

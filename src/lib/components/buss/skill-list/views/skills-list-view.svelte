@@ -32,7 +32,7 @@
 	import type { Skill } from "@shared/types";
 	import { onMount } from "svelte";
 	import { toast } from "svelte-sonner";
-	import { SvelteSet, SvelteMap } from "svelte/reactivity";
+	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 	import SkillCard from "../skill-card.svelte";
 
 	interface Props {
@@ -364,12 +364,12 @@
 
 	async function handleSync() {
 		if (!currentSandboxId) {
-			toast.error(m.skills_sync_no_sandbox?.() ?? "No sandbox available for sync");
+			toast.error(m.skills_sync_no_sandbox());
 			return;
 		}
 
 		isSyncing = true;
-		const toastId = toast.loading(m.skills_syncing?.() ?? "Syncing skills...");
+		const toastId = toast.loading(m.skills_syncing());
 
 		try {
 			const response = await syncSkills({
@@ -380,7 +380,7 @@
 			toast.dismiss(toastId);
 
 			if (response.success && response.result.exit_code === 0) {
-				toast.success(m.skills_sync_success?.() ?? "Skills synced successfully");
+				toast.success(m.skills_sync_success());
 				onRefresh?.();
 			} else {
 				const errorMsg = response.result.stderr || response.result.error || "Sync failed";
@@ -391,7 +391,7 @@
 			toast.dismiss(toastId);
 
 			// Try to extract error message from response
-			let errorMessage = m.skills_sync_failed?.() ?? "Failed to sync skills";
+			let errorMessage = m.skills_sync_failed();
 			if (e && typeof e === "object" && "response" in e) {
 				try {
 					const httpError = e as { response: Response };
@@ -429,9 +429,7 @@
 				size="icon"
 				class="shrink-0"
 				onclick={toggleViewMode}
-				title={viewMode === "flat"
-					? (m.skills_view_grouped?.() ?? "Group by category")
-					: (m.skills_view_flat?.() ?? "Show all")}
+				title={viewMode === "flat" ? m.skills_view_grouped() : m.skills_view_flat()}
 			>
 				{#if viewMode === "flat"}
 					<LayoutGrid class="h-4 w-4" />
@@ -439,10 +437,10 @@
 					<Grid3x3 class="h-4 w-4" />
 				{/if}
 			</Button>
-			{#if currentSandboxId}
+			{#if currentSandboxId && currentSandboxId !== "local"}
 				<Button variant="outline" class="gap-2" onclick={handleSync} disabled={isSyncing}>
 					<RefreshCw class="h-4 w-4 {isSyncing ? 'animate-spin' : ''}" />
-					{m.skills_sync?.() ?? "Sync"}
+					{m.skills_sync()}
 				</Button>
 			{/if}
 			<Button class="gap-2 bg-violet-500 hover:bg-violet-600" onclick={handleNew}>
@@ -486,7 +484,7 @@
 						)}
 						onclick={() => handleCategorySelect(null)}
 					>
-						{m.skills_category_all?.() ?? "All"}
+						{m.skills_category_all()}
 					</button>
 					<!-- Category buttons -->
 					{#each categories as category (category.id)}
@@ -516,7 +514,7 @@
 						)}
 						onclick={() => handleCategorySelect(UNCATEGORIZED_SLUG)}
 					>
-						{m.skills_category_uncategorized?.() ?? "Uncategorized"}
+						{m.skills_category_uncategorized()}
 						<span class="ml-1 text-xs opacity-70">({categoryLocalCounts().uncategorizedCount})</span
 						>
 					</button>
@@ -537,8 +535,7 @@
 			{#if groups && groups.length > 0}
 				<div class="space-y-6">
 					{#each groups as [slug, group] (slug)}
-						{@const categoryName =
-							group.category?.name ?? m.skills_category_uncategorized?.() ?? "Uncategorized"}
+						{@const categoryName = group.category?.name ?? m.skills_category_uncategorized()}
 						<div class="space-y-3">
 							<!-- Category Header -->
 							<div class="flex items-center gap-2">
@@ -550,7 +547,7 @@
 									class="ml-auto flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
 									onclick={() => handleCategorySelect(slug)}
 								>
-									{m.skills_view_category?.() ?? "View all"}
+									{m.skills_view_category()}
 									<ChevronRight class="h-3 w-3" />
 								</button>
 							</div>
