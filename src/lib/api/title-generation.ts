@@ -1,6 +1,9 @@
 import type { ChatMessage } from "$lib/types/chat";
 import type { ModelProvider } from "@shared/storage/provider";
 import type { Model } from "@shared/types";
+import { withGenerationFallback, type FallbackModelConfig } from "./generation-fallback";
+
+export type { FallbackModelConfig } from "./generation-fallback";
 
 export interface GenerateTitleRequest {
 	messages: ChatMessage[];
@@ -21,15 +24,6 @@ export interface GenerateTitleResult {
 	title: string;
 	summary: string;
 }
-
-export interface FallbackModelConfig {
-	model: Model;
-	provider: ModelProvider | undefined;
-}
-
-// 兜底模型配置
-const FALLBACK_MODEL_ID = "gpt-4o-mini";
-const FALLBACK_RETRY_DELAY = 500;
 
 async function generateTitleRequest(
 	messages: ChatMessage[],
@@ -80,63 +74,23 @@ export async function generateTitle(
 ): Promise<GenerateTitleResult | null> {
 	const port = serverPort ?? 8089;
 
-	try {
-		// 首次尝试使用配置的模型
-		return await generateTitleRequest(
-			messages,
-			model.id,
-			provider,
-			port,
-			previousSummary,
-			isFirstGeneration,
-			signal,
-		);
-	} catch (error) {
-		// Check if aborted before retry
-		if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-		console.error("Title generation failed with configured model:", error);
-
-		// 等待 500ms 后重试
-		console.log(`Retrying title generation after ${FALLBACK_RETRY_DELAY}ms...`);
-		await new Promise((resolve) => setTimeout(resolve, FALLBACK_RETRY_DELAY));
-
-		// 确定兜底使用的模型和 provider
-		let fallbackModelId: string;
-		let fallbackProvider: ModelProvider | undefined;
-
-		if (fallbackConfig) {
-			// 使用传入的兜底配置（当前聊天模型）
-			fallbackModelId = fallbackConfig.model.id;
-			fallbackProvider = fallbackConfig.provider;
-			console.log(`Using chat model as fallback: ${fallbackModelId}`);
-		} else {
-			// 使用硬编码的 gpt-4o-mini
-			fallbackModelId = FALLBACK_MODEL_ID;
-			fallbackProvider = provider;
-			console.log(`Using default fallback model: ${fallbackModelId}`);
-		}
-
-		// 如果兜底模型和原模型相同，直接返回 null
-		if (fallbackModelId === model.id && fallbackProvider?.id === provider?.id) {
-			console.error("Fallback model is same as original, giving up");
-			return null;
-		}
-
-		try {
-			return await generateTitleRequest(
+	return await withGenerationFallback({
+		operation: "title generation",
+		model,
+		provider,
+		fallbackConfig,
+		signal,
+		request: (modelId, selectedProvider) =>
+			generateTitleRequest(
 				messages,
-				fallbackModelId,
-				fallbackProvider,
+				modelId,
+				selectedProvider,
 				port,
 				previousSummary,
 				isFirstGeneration,
 				signal,
-			);
-		} catch (fallbackError) {
-			console.error("Title generation failed with fallback model:", fallbackError);
-			return null;
-		}
-	}
+			),
+	});
 }
 
 const reasoningBlockPattern = /<(think|thinking|reason|reasoning)>[\s\S]*?<\/\1>/gi;

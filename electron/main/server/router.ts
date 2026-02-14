@@ -1408,20 +1408,19 @@ app.post("/generate-suggestions", async (c) => {
 			}
 
 			const suggestions = JSON.parse(cleanText);
-			if (Array.isArray(suggestions) && suggestions.length > 0) {
+			if (Array.isArray(suggestions)) {
 				console.log("[Suggestions] Parsed suggestions:", suggestions);
 				return c.json({ suggestions: suggestions.slice(0, count) });
-			} else {
-				console.log("[Suggestions] Invalid suggestions format");
-				return c.json({ suggestions: [] });
 			}
+			console.log("[Suggestions] Invalid suggestions format");
+			return c.json({ error: "Invalid suggestions format" }, 500);
 		} catch (parseError) {
 			console.error("[Suggestions] Failed to parse JSON:", parseError);
-			return c.json({ suggestions: [] });
+			return c.json({ error: "Failed to parse suggestions" }, 500);
 		}
 	} catch (error) {
 		console.error("[Suggestions] Failed to generate suggestions:", error);
-		return c.json({ suggestions: [] });
+		return c.json({ error: "Failed to generate suggestions" }, 500);
 	}
 });
 
