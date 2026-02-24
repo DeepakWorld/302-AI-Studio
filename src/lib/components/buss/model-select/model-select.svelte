@@ -18,8 +18,6 @@
 	import * as Command from "$lib/components/ui/command";
 	import * as ScrollArea from "$lib/components/ui/scroll-area";
 	import { m } from "$lib/paraglide/messages";
-	import { SvelteMap } from "svelte/reactivity";
-	// import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import {
 		persistedModelState,
 		persistedProviderState,
@@ -28,9 +26,9 @@
 	import { cn } from "$lib/utils";
 	import { getFilteredModels } from "$lib/utils/model-filters.js";
 	import { ChevronRight, Star } from "@lucide/svelte";
-	// import { CLUADE_CODE_MODELS } from "@shared/constants/codeAgentModel";
 	import type { Model, ModelCapability, Model as ProviderModel } from "@shared/types";
 	import { onMount } from "svelte";
+	import { SvelteMap } from "svelte/reactivity";
 
 	const { onShortcutAction } = window.electronAPI.shortcut;
 

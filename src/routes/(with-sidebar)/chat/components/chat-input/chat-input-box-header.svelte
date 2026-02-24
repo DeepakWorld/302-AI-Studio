@@ -23,8 +23,12 @@
 		selectedMode === "chat"
 			? m.title_chat_mode_description()
 			: codeAgentState.type === "local"
-				? m.title_local_mode_description()
-				: m.title_code_agent_description(),
+				? m.title_local_mode_description({
+						type: `<span class="text-primary">${m.title_local()}</span>`,
+					})
+				: m.title_code_agent_description({
+						type: `<span class="text-primary">${m.title_remote()}</span>`,
+					}),
 	);
 
 	function handleModeSelect(key: string) {
@@ -107,6 +111,7 @@
 	</div>
 
 	{#if !chatState.hasMessages}
-		<p class="text-xs text-muted-foreground">{description}</p>
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+		<p class="text-xs text-muted-foreground">{@html description}</p>
 	{/if}
 </div>
