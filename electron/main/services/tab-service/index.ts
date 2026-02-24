@@ -56,6 +56,7 @@ export class TabService {
 	private tabAccessHistory: Map<string, TabAccessInfo>;
 	private tabWindowMap: Map<string, number>; // tabId -> windowId
 	private pendingDestroyTabs: Set<string>;
+	private pendingDestroyTimers: Map<string, NodeJS.Timeout>;
 	private memoryManager: MemoryManager;
 	private memoryManagerStarted: boolean;
 	private initialLoadTracker: ViewLoadTracker;
@@ -70,6 +71,7 @@ export class TabService {
 		this.tabAccessHistory = new Map();
 		this.tabWindowMap = new Map();
 		this.pendingDestroyTabs = new Set();
+		this.pendingDestroyTimers = new Map();
 		this.memoryManager = new MemoryManager({ getSnapshot: createElectronSnapshotProvider() });
 		this.memoryManagerStarted = false;
 		this.initialLoadTracker = new ViewLoadTracker();
@@ -168,16 +170,33 @@ export class TabService {
 					`[TabService] Thread ${threadId} is no longer busy, executing pending destruction for tab ${tabId}`,
 				);
 
+				// Cancel any existing timer for this tab to prevent duplicates
+				const existingTimer = this.pendingDestroyTimers.get(tabId);
+				if (existingTimer) {
+					clearTimeout(existingTimer);
+				}
+
 				// Use a small delay to ensure frontend persistence is complete
-				setTimeout(() => {
+				const timer = setTimeout(() => {
+					this.pendingDestroyTimers.delete(tabId);
 					this.forceDestroyTab(tabId);
 				}, 5000);
+				this.pendingDestroyTimers.set(tabId, timer);
 			}
 		}
 	}
 
 	private forceDestroyTab(tabId: string) {
+		// Guard: if tab was resurrected, it's no longer in pendingDestroyTabs — skip destruction
+		if (!this.pendingDestroyTabs.has(tabId)) {
+			console.log(
+				`[TabService] Tab ${tabId} is no longer pending destruction (resurrected?), skipping`,
+			);
+			return;
+		}
+
 		this.pendingDestroyTabs.delete(tabId);
+		this.pendingDestroyTimers.delete(tabId);
 		const view = this.tabViewMap.get(tabId);
 		if (view && !view.webContents.isDestroyed()) {
 			console.log(`[TabService] Force destroying tab ${tabId}`);
@@ -224,11 +243,21 @@ export class TabService {
 		// 2. Remove from pending list (Rescue it)
 		this.pendingDestroyTabs.delete(pendingTabId);
 
-		// 3. Update Window Mapping
+		// 3. Cancel any pending destruction timer
+		const pendingTimer = this.pendingDestroyTimers.get(pendingTabId);
+		if (pendingTimer) {
+			clearTimeout(pendingTimer);
+			this.pendingDestroyTimers.delete(pendingTabId);
+			console.log(
+				`[TabService] Cancelled pending destruction timer for resurrected tab ${pendingTabId}`,
+			);
+		}
+
+		// 4. Update Window Mapping
 		const oldWindowId = this.tabWindowMap.get(pendingTabId);
 		this.tabWindowMap.set(pendingTabId, targetWindow.id);
 
-		// 4. Handle Cross-Window migration if necessary
+		// 5. Handle Cross-Window migration if necessary
 		if (oldWindowId !== targetWindow.id) {
 			// Update renderer's window context
 			view.webContents
@@ -248,17 +277,17 @@ export class TabService {
 			shortcutService.getEngine().attachToView(view, targetWindow.id, pendingTabId);
 		}
 
-		// 5. Re-attach View
+		// 6. Re-attach View
 		this.attachViewToWindow(targetWindow, view);
 
-		// 6. Add to Window Views list
+		// 7. Add to Window Views list
 		const views = this.windowTabView.get(targetWindow.id) || [];
 		if (!views.includes(view)) {
 			views.push(view);
 			this.windowTabView.set(targetWindow.id, views);
 		}
 
-		// 7. Update Storage (Add it back to UI)
+		// 8. Update Storage (Add it back to UI)
 		// We do this BEFORE switchActiveTab to ensure state consistency
 		const windowIdStr = targetWindow.id.toString();
 		const tabState = await tabStorage.getItemInternal("tab-bar-state");
@@ -271,7 +300,7 @@ export class TabService {
 			await tabStorage.setItemInternal("tab-bar-state", tabState);
 		}
 
-		// 8. Finally switch focus
+		// 9. Finally switch focus
 		await this.switchActiveTab(targetWindow, pendingTabId);
 
 		return tab;
