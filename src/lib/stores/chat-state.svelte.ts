@@ -1,14 +1,9 @@
-import { generateContextSummary } from "$lib/api/context-summary-generation";
-import { generateSuggestions } from "$lib/api/suggestions-generation";
 import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
+import { onChatFinishPostPersist, onChatFinishPrePersist } from "$lib/hooks/chat-hook.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages.js";
-import {
-	clearPendingResultMetadata,
-	DynamicChatTransport,
-	pendingResultMetadata,
-} from "$lib/transport/dynamic-chat-transport";
-import type { ChatMessage, MessageMetadata } from "$lib/types/chat";
+import { DynamicChatTransport } from "$lib/transport/dynamic-chat-transport";
+import type { ChatMessage } from "$lib/types/chat";
 import {
 	convertAttachmentsToMessageParts,
 	type MessagePart,
@@ -30,7 +25,6 @@ import { toast } from "svelte-sonner";
 
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 
-import { emitter, EventNames } from "$lib/event/emitter";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { claudeCodeSandboxState, codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
@@ -45,7 +39,6 @@ import {
 	persistedProviderState,
 	providerState,
 } from "./provider-state.svelte";
-import { sessionState } from "./session-state.svelte";
 import { tabBarState } from "./tab-bar-state.svelte";
 
 const { broadcastService, threadService, storageService, pluginService } = window.electronAPI;
@@ -1686,436 +1679,24 @@ export const chat = new Chat({
 		console.error("[Chat onError]", error);
 	},
 	onFinish: async ({ messages, isAbort, isDisconnect, isError }) => {
-		const onFinishStartTime = performance.now();
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		console.log("[onFinish] Stream completion received at:", new Date().toISOString());
-		console.log("更新完成", $state.snapshot(messages));
-		console.debug("[onFinish] messages", JSON.stringify($state.snapshot(messages), null, 2));
-		console.log("[onFinish] isAbort:", isAbort, "isDisconnect:", isDisconnect, "isError:", isError);
-
-		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
-		if (lastUserMessage) {
-			const updatedMessages = messages.map((msg) => {
-				if (msg.id === lastUserMessage.id) {
-					return {
-						...msg,
-						metadata: {
-							...msg.metadata,
-							userPromptTemplateContent: chatParameters.userPromptTemplateContent,
-							userPromptTemplateVariables: chatParameters.userPromptTemplateVariables,
-							userPromptTemplateMap: chatParameters.userPromptTemplateMap,
-						},
-					};
-				}
-				return msg;
-			});
-
-			// Update both messages array and persisted state
-			chat.messages = updatedMessages;
-			messages = updatedMessages;
-		}
-
-		// Save systemPrompt to the last assistant message
-		const lastAssistantMessage = [...messages].reverse().find((msg) => msg.role === "assistant");
-		if (lastAssistantMessage && chatParameters.systemPromptContent) {
-			const resolvedSystemPrompt = resolvePrompt(chatParameters.systemPromptContent, {
-				modelId: chatState.selectedModel?.id ?? "",
-				language: generalSettings.language,
-				cachedMap: chatParameters.systemPromptMap,
-				variables: chatParameters.systemPromptVariables,
-			});
-
-			const updatedMessages = messages.map((msg) => {
-				if (msg.id === lastAssistantMessage.id) {
-					return {
-						...msg,
-						metadata: {
-							...msg.metadata,
-							systemPromptContent: resolvedSystemPrompt.content,
-							systemPromptVariables: [...chatParameters.systemPromptVariables],
-							systemPromptMap: { ...chatParameters.systemPromptMap },
-						},
-					};
-				}
-				return msg;
-			});
-
-			chat.messages = updatedMessages;
-			messages = updatedMessages;
-		}
-
-		const codeAgentEnabled = codeAgentState.enabled;
-		console.log("onFinish: async ({ messages }) pendingResultMetadata", pendingResultMetadata);
-		if (codeAgentEnabled && pendingResultMetadata) {
-			const lastMessage = messages[messages.length - 1];
-			if (lastMessage && lastMessage.role === "assistant") {
-				const currentMetadata = (lastMessage.metadata as MessageMetadata) || {};
-				lastMessage.metadata = {
-					...currentMetadata,
-					result: pendingResultMetadata,
-				};
-				console.log("[ChatState] Merged result metadata into message:", pendingResultMetadata);
-			}
-			clearPendingResultMetadata();
-		}
-
-		console.log("onFinish: async ({ messages }) codeAgentEnabled", codeAgentEnabled);
-		console.log(
-			"onFinish: async ({ messages }) autoDeploy",
-			codeAgentGlobalConfigsState.autoDeploy,
-		);
-
-		const isDeployCommand =
-			lastUserMessage?.parts.some(
-				(part) => part.type === "text" && part.text.trim() === "/deploy",
-			) ?? false;
-
-		emitter.emit(EventNames.CHAT_FINISHED, {
-			canDeploy: codeAgentEnabled && (codeAgentGlobalConfigsState.autoDeploy || isDeployCommand),
-			lastMessage: messages[messages.length - 1],
+		const { messages: updatedMessages, onFinishStartTime } = await onChatFinishPrePersist({
+			messages,
+			isAbort,
+			isDisconnect,
+			isError,
+			chatState,
+			codeAgentEnabled: codeAgentState.enabled,
+			autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 		});
-		console.log(
-			"[onFinish] CHAT_FINISHED emitted, elapsed:",
-			(performance.now() - onFinishStartTime).toFixed(2),
-			"ms",
-		);
 
-		persistedMessagesState.current = messages;
+		persistedMessagesState.current = updatedMessages;
 
-		sessionState.latestUsedModel = chatState.selectedModel ?? null;
-
-		// Execute after send message hook
-		try {
-			const lastMessage = messages[messages.length - 1];
-			const userMessage = messages[messages.length - 2]; // Assuming last is AI, second-to-last is user
-
-			if (lastMessage && userMessage && chatState.selectedModel && chatState.currentProvider) {
-				const messageContext = {
-					messages: messages,
-					userMessage: userMessage,
-					model: chatState.selectedModel,
-					provider: chatState.currentProvider,
-					parameters: {
-						temperature: chatState.temperature,
-						topP: chatState.topP,
-						maxTokens: chatState.maxTokens,
-						frequencyPenalty: chatState.frequencyPenalty,
-						presencePenalty: chatState.presencePenalty,
-					},
-					options: {
-						isThinkingActive: chatState.isThinkingActive,
-						isOnlineSearchActive: chatState.isOnlineSearchActive,
-						isMCPActive: chatState.isMCPActive,
-						mcpServerIds: chatState.mcpServerIds,
-						autoParseUrl: preferencesSettings.autoParseUrl,
-						speedOptions: {
-							enabled: preferencesSettings.streamOutputEnabled,
-							speed: preferencesSettings.streamSpeed,
-						},
-					},
-				};
-
-				const response = {
-					message: lastMessage,
-					usage: undefined,
-					model: chatState.selectedModel.id,
-					finishReason: "stop",
-					metadata: {},
-				};
-
-				// Serialize context and response to remove Svelte Proxy objects
-				const serializedContext = JSON.parse(JSON.stringify(messageContext));
-				const serializedResponse = JSON.parse(JSON.stringify(response));
-
-				await pluginService.executeAfterSendMessageHook(serializedContext, serializedResponse);
-				console.log("[ChatState] After send message hook executed successfully");
-			}
-		} catch (hookError) {
-			console.error("[ChatState] After send message hook failed:", hookError);
-			// Continue execution even if hook fails
-		}
-
-		const titleTiming = preferencesSettings.titleGenerationTiming;
-		const titleModel = preferencesSettings.titleGenerationModel;
-		const currentTitle = persistedChatParamsState.current.title;
-		const isDefaultTitle =
-			!currentTitle ||
-			currentTitle === "New Chat" ||
-			currentTitle === "新对话" ||
-			currentTitle === "新会话";
-		const isFirstMessage = messages.length === 2; // User message + AI response
-
-		let shouldGenerateTitle = false;
-
-		if (titleTiming === "off") {
-			shouldGenerateTitle = false;
-		} else if (titleTiming === "firstTime") {
-			// 仅在首次对话时生成标题（当标题为默认值时）
-			shouldGenerateTitle = isFirstMessage && isDefaultTitle;
-		} else if (titleTiming === "everyTime") {
-			shouldGenerateTitle = messages.length >= 2;
-		}
-
-		if (shouldGenerateTitle && titleModel) {
-			// Create AbortController for title generation - will be cancelled if user sends new message
-			const titleAbortSignal = chatState.createTitleAbortController();
-
-			try {
-				chatState.isGeneratingTitle = true;
-				const provider = persistedProviderState.current.find((p) => p.id === titleModel.providerId);
-				const serverPort = window.app?.serverPort ?? 8089;
-
-				// Get previous summary for incremental generation
-				const previousSummary = persistedChatParamsState.current.incrementalSummary;
-
-				// Prepare messages for incremental generation
-				let messagesToSend: ChatMessage[];
-				if (isFirstMessage) {
-					// First generation: only send the first user message
-					messagesToSend = messages.filter((m) => m.role === "user").slice(0, 1);
-				} else {
-					// Incremental: send previous assistant message + latest user message
-					const userMessages = messages.filter((m) => m.role === "user");
-					const assistantMessages = messages.filter((m) => m.role === "assistant");
-					const lastUserMsg = userMessages.at(-1);
-					const prevAssistantMsg = assistantMessages.at(-1);
-					messagesToSend = [prevAssistantMsg, lastUserMsg].filter(Boolean) as ChatMessage[];
-				}
-
-				// 准备兜底配置：如果 302AI provider 未配置，使用当前聊天模型
-				let fallbackConfig: FallbackModelConfig | undefined;
-				if (!provider && chatState.selectedModel && chatState.currentProvider) {
-					fallbackConfig = {
-						model: chatState.selectedModel,
-						provider: chatState.currentProvider,
-					};
-				}
-
-				const result = await generateTitle(
-					messagesToSend,
-					titleModel,
-					provider,
-					serverPort,
-					previousSummary,
-					isFirstMessage,
-					fallbackConfig,
-					titleAbortSignal,
-				);
-
-				// Check if request was aborted or new stream started - skip state updates
-				if (titleAbortSignal.aborted || chatState.isStreaming || chatState.isSubmitted) {
-					console.log("[Title] Skipped: request was aborted or new stream in progress");
-				} else if (result) {
-					persistedChatParamsState.current.title = result.title;
-					persistedChatParamsState.current.incrementalSummary = result.summary;
-
-					emitter.emit(EventNames.THREAD_TITLE_UPDATED, { title: result.title });
-
-					await tabBarState.updateTabTitle(persistedChatParamsState.current.id, result.title);
-				}
-			} catch (error) {
-				// AbortError is expected when user sends a new message, don't log as error
-				if (error instanceof DOMException && error.name === "AbortError") {
-					console.log("[Title] Generation cancelled");
-				} else {
-					console.error("Failed to generate title:", error);
-				}
-			} finally {
-				chatState.isGeneratingTitle = false;
-			}
-		} else if (isFirstMessage && isDefaultTitle && titleTiming !== "off") {
-			// Fallback for firstTime mode when model is not configured
-			const firstUserMessage = messages.find((msg) => msg.role === "user");
-			if (firstUserMessage) {
-				const textPart = firstUserMessage.parts.find((part) => part.type === "text");
-				if (textPart && "text" in textPart) {
-					const text = textPart.text.trim();
-					const titleText = [...text].slice(0, 10).join("");
-					if (titleText) {
-						persistedChatParamsState.current.title = titleText;
-						await tabBarState.updateTabTitle(persistedChatParamsState.current.id, titleText);
-					}
-				}
-			}
-		}
-
-		// Update the updatedAt timestamp
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		persistedChatParamsState.current.updatedAt = new Date();
-
-		// Force flush to ensure all changes are persisted before broadcasting
-		persistedChatParamsState.flush();
-
-		await broadcastService.broadcastToAll("thread-list-updated", {});
-
-		// Context summary auto-update
-		if (chatState.shouldApplyCompression) {
-			const compressionLimit = preferencesSettings.contextCompressionLimit;
-			const totalMessages = messages.length;
-
-			if (totalMessages > compressionLimit) {
-				const summaryModel = preferencesSettings.titleGenerationModel;
-				if (summaryModel) {
-					const summaryAbortSignal = chatState.createSummaryAbortController();
-					try {
-						const provider = persistedProviderState.current.find(
-							(p) => p.id === summaryModel.providerId,
-						);
-						const serverPort = window.app?.serverPort ?? 8089;
-
-						const existingCompressed = chatState.compressedMessageCount ?? 0;
-						const keepRecentCount = Math.min(compressionLimit, totalMessages);
-						const newCompressionEnd = totalMessages - keepRecentCount;
-
-						if (newCompressionEnd > existingCompressed) {
-							const messagesToCompress = messages.slice(existingCompressed, newCompressionEnd);
-
-							if (messagesToCompress.length >= 2) {
-								let fallbackConfig: FallbackModelConfig | undefined;
-								if (!provider && chatState.selectedModel && chatState.currentProvider) {
-									fallbackConfig = {
-										model: chatState.selectedModel,
-										provider: chatState.currentProvider,
-									};
-								}
-
-								const summaryResult = await generateContextSummary(
-									messagesToCompress,
-									summaryModel,
-									provider,
-									serverPort,
-									chatState.contextSummary,
-									generalSettings.language,
-									fallbackConfig,
-									summaryAbortSignal,
-								);
-
-								if (summaryAbortSignal.aborted || chatState.isStreaming || chatState.isSubmitted) {
-									console.log("[ContextSummary] Skipped: aborted or stream in progress");
-								} else if (summaryResult) {
-									chatState.contextSummary = summaryResult;
-									chatState.compressedMessageCount = newCompressionEnd;
-									chatState.lastCompressionMessageId = messages[newCompressionEnd - 1]?.id;
-									persistedChatParamsState.flush();
-									console.log(`[ContextSummary] Updated: ${newCompressionEnd} messages compressed`);
-								}
-							}
-						}
-					} catch (error) {
-						if (error instanceof DOMException && error.name === "AbortError") {
-							console.log("[ContextSummary] Generation cancelled");
-						} else {
-							console.error("[ContextSummary] Failed:", error);
-						}
-					}
-				}
-			}
-		}
-
-		// Generate suggestions asynchronously (non-blocking)
-		// This runs in the background and updates the last message when ready
-		// Check if suggestions are enabled and timing is set to auto
-		if (
-			preferencesSettings.suggestionsEnabled &&
-			preferencesSettings.suggestionsTiming === "auto" &&
-			chatState.selectedModel &&
-			chatState.currentProvider
-		) {
-			const lastMessage = messages[messages.length - 1];
-			if (lastMessage && lastMessage.role === "assistant") {
-				const serverPort = window.app?.serverPort ?? 8089;
-				const targetMessageId = lastMessage.id;
-
-				// Create AbortController for this suggestions generation
-				// This will be cancelled if user sends a new message
-				const abortSignal = chatState.createSuggestionsAbortController();
-
-				// Don't await - let this run in the background
-				generateSuggestions(
-					messages,
-					chatState.selectedModel,
-					chatState.currentProvider,
-					generalSettings.language,
-					preferencesSettings.suggestionsCount,
-					serverPort,
-					abortSignal,
-				)
-					.then((suggestions) => {
-						// Check if request was aborted (user sent a new message)
-						if (abortSignal.aborted) {
-							console.log("[Suggestions] Skipped: request was aborted");
-							return;
-						}
-
-						// Check if a new stream is in progress - don't update chat.messages
-						// to avoid breaking the ongoing stream
-						if (chatState.isStreaming || chatState.isSubmitted) {
-							console.log("[Suggestions] Skipped: new stream in progress");
-							return;
-						}
-
-						if (suggestions && suggestions.length > 0) {
-							console.log("[Suggestions] Adding to message:", suggestions);
-
-							// Find the message again (it might have changed)
-							const currentMessages = persistedMessagesState.current;
-							const messageIndex = currentMessages.findIndex((m) => m.id === targetMessageId);
-
-							if (messageIndex !== -1) {
-								// Check if suggestions already exist
-								const hasSuggestions = currentMessages[messageIndex].parts.some(
-									(part) => part.type === "data-suggestions",
-								);
-
-								if (!hasSuggestions) {
-									// Create a new message object with suggestions
-									const updatedMessage = {
-										...currentMessages[messageIndex],
-										parts: [
-											...currentMessages[messageIndex].parts,
-											{
-												type: "data-suggestions" as const,
-												data: {
-													suggestions: suggestions,
-												},
-											},
-										],
-									};
-
-									// Update the messages array
-									const updatedMessages = [...currentMessages];
-									updatedMessages[messageIndex] = updatedMessage;
-
-									// Update persisted state first
-									persistedMessagesState.current = updatedMessages;
-
-									// Only update chat.messages if not streaming/submitted
-									// This is a double-check since state could have changed during updates
-									if (!chatState.isStreaming && !chatState.isSubmitted) {
-										chat.messages = updatedMessages;
-										console.log("[Suggestions] Successfully added to message");
-									} else {
-										console.log(
-											"[Suggestions] Saved to persisted state, skipped chat.messages update due to active stream",
-										);
-									}
-								}
-							}
-						}
-					})
-					.catch((error) => {
-						// AbortError is expected when user sends a new message, don't log as error
-						if (error instanceof Error && error.name === "AbortError") {
-							return;
-						}
-						console.error("[Suggestions] Failed to generate:", error);
-					});
-			}
-		}
-		console.log(
-			"[onFinish] Callback complete, total elapsed:",
-			(performance.now() - onFinishStartTime).toFixed(2),
-			"ms",
-		);
+		await onChatFinishPostPersist({
+			messages,
+			chatState,
+			persistedChatParamsState,
+			persistedMessagesState,
+			onFinishStartTime,
+		});
 	},
 });

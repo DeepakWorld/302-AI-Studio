@@ -253,12 +253,12 @@ class TabBarState {
 
 			await tabService.handleTabClose(tabId, newActiveTabId);
 		} else {
+			// Clear tabs - the $effect fallback will create a new tab
+			// We don't create explicitly to avoid race conditions with the reactive system
 			this.#safeUpdateWindowTabs(this.#windowId, []);
-			console.log("handleTabClose: currentTabs.length === 1");
 
-			setTimeout(() => {
-				this.handleNewTab(m.title_new_chat());
-			}, 300);
+			// Also close the backend tab view
+			await tabService.handleTabClose(tabId, null);
 		}
 	}
 

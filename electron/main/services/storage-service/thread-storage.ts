@@ -6,6 +6,8 @@ import {
 } from "@shared/types";
 import { storageService, StorageService } from ".";
 import { emitter } from "../broadcast-service";
+import { codeAgentService } from "../code-agent-service";
+import { chatParametersService } from "../chat-parameters-service";
 
 export class ThreadStorage extends StorageService<ThreadMetadata> {
 	constructor() {
@@ -56,15 +58,40 @@ export class ThreadStorage extends StorageService<ThreadMetadata> {
 		}
 	}
 
+	/**
+	 * Clean up all thread-related data from storage and services
+	 * This method removes all data associated with a thread, including:
+	 * - Thread metadata
+	 * - Chat messages
+	 * - UI state
+	 * - Plan answers
+	 * - HTML preview deployments
+	 * - Agent preview data
+	 * - Code agent state
+	 * - Chat parameters
+	 * @param threadId - The thread ID to clean up
+	 */
+	async cleanupThreadData(threadId: string): Promise<void> {
+		await Promise.all([
+			storageService.removeItemInternal("app-thread:" + threadId),
+			storageService.removeItemInternal("app-chat-messages:" + threadId),
+			storageService.removeItemInternal("app-chat-ui-state:" + threadId),
+			storageService.removeItemInternal("plan-answers:" + threadId),
+			storageService.removeItemInternal("html-preview-deployments:" + threadId),
+			storageService.removeItemInternal("AgentPreviewStorage:agent-preview-data-" + threadId),
+			codeAgentService.removeCodeAgentState(threadId),
+			chatParametersService.removeChatParameters(threadId),
+		]);
+	}
+
 	async deleteThread(threadId: string): Promise<void> {
 		try {
 			// Remove from metadata first
 			await this.removeThread(threadId);
 
-			// Delete the actual thread data file
-			const threadKey = "app-thread:" + threadId;
-			await storageService.removeItemInternal(threadKey);
-			await storageService.removeItemInternal("app-chat-messages:" + threadId);
+			// Use unified cleanup method
+			await this.cleanupThreadData(threadId);
+
 			emitter.emit("thread:thread-deleted", { threadId });
 		} catch (error) {
 			console.error(`Failed to delete thread ${threadId}:`, error);

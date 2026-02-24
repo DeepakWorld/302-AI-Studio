@@ -777,14 +777,6 @@ export class FileTreeState {
 
 		this.operatingPaths = addToSet(this.operatingPaths, sourcePath);
 
-		// Find source file
-		const sourceFile = this.files.find((f) => f.path === sourcePath);
-		if (!sourceFile) {
-			toast.error(m.toast_file_paste_failed());
-			this.operatingPaths = removeFromSet(this.operatingPaths, sourcePath);
-			return false;
-		}
-
 		// Build destination path with unique name to avoid duplicates
 		const sourceName = pathUtils.getFileName(sourcePath);
 		const uniqueName = this.generateUniqueName(targetDir.path, sourceName);

@@ -1,8 +1,11 @@
-import { listLocalClaudeCodeSessions } from "$lib/api/sandbox-session";
+import { deleteLocalSession, listLocalSessions } from "$lib/api/sandbox-session";
 import type { GroupedSelectData } from "$lib/components/buss/settings/setting-select.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
+import { formatDateTimeShort } from "$lib/utils/date-format";
 import type { LocalSessionInfo } from "@shared/storage/code-agent";
+import { toast } from "svelte-sonner";
+import { SvelteMap } from "svelte/reactivity";
 
 /**
  * Persisted state for local Claude Code sessions.
@@ -49,50 +52,138 @@ class LocalClaudeCodeSandboxState {
 
 	// Derived: Session options for dropdown
 	sessionOptions = $derived.by((): GroupedSelectData => {
+		const groupsMap = new SvelteMap<
+			string,
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			{ workspacePath: string; maxTimestamp: number; items: any[] }
+		>();
+
+		for (const session of this.sessions) {
+			const wsPath = session.workspace_path || "No Workspace";
+			if (!groupsMap.has(wsPath)) {
+				groupsMap.set(wsPath, { workspacePath: wsPath, maxTimestamp: 0, items: [] });
+			}
+
+			const group = groupsMap.get(wsPath)!;
+			const usedAt = new Date(session.used_at).getTime();
+			if (!isNaN(usedAt) && usedAt > group.maxTimestamp) {
+				group.maxTimestamp = usedAt;
+			}
+
+			group.items.push(session);
+		}
+
+		const groups = Array.from(groupsMap.values())
+			.map((g) => {
+				const date = new Date(g.maxTimestamp);
+				const hasValidDate = !isNaN(g.maxTimestamp) && date.getFullYear() > 2020;
+				const dateLabel = hasValidDate
+					? formatDateTimeShort(g.maxTimestamp)
+					: m.local_platform_unknown();
+
+				const groupLabel = `${m.local_platform_work_directory()}: ${g.workspacePath} - ${dateLabel}`;
+
+				return {
+					timestamp: g.maxTimestamp,
+					groupKey: g.workspacePath,
+					groupLabel: groupLabel,
+					items: g.items
+						.sort((a, b) => new Date(b.used_at).getTime() - new Date(a.used_at).getTime())
+						.map((s) => ({
+							value: s.session_id,
+							label: s.note || s.session_id,
+						})),
+				};
+			})
+			.sort((a, b) => b.timestamp - a.timestamp)
+			.map((g) => ({
+				groupKey: g.groupKey,
+				groupLabel: g.groupLabel,
+				items: g.items,
+			}));
+
 		return {
 			standalone: [newSessionItem],
-			groups:
-				this.sessions.length > 0
-					? [
-							{
-								groupKey: "existing",
-								groupLabel: m.local_platform_existing_sessions(),
-								items: this.sessions.map((s) => ({
-									value: s.session_id,
-									label: s.note || s.session_id,
-									extra: `${m.local_platform_work_directory()}: ${s.workspace_path}`,
-								})),
-							},
-						]
-					: [],
+			groups: groups,
 		};
 	});
 
 	// Derived: Workspace options for dropdown
 	workspaceOptions = $derived.by((): GroupedSelectData => {
+		const workspaceMap = new SvelteMap<
+			string,
+			{ latestUsedAt: number; relatedSessions: { note: string | null; session_id: string }[] }
+		>();
+
+		for (const session of this.sessions) {
+			if (session.workspace_path && session.workspace_path !== "") {
+				if (!workspaceMap.has(session.workspace_path)) {
+					workspaceMap.set(session.workspace_path, { latestUsedAt: 0, relatedSessions: [] });
+				}
+				const data = workspaceMap.get(session.workspace_path)!;
+				data.relatedSessions.push({ note: session.note, session_id: session.session_id });
+
+				const usedAtTime = new Date(session.used_at).getTime();
+				if (!isNaN(usedAtTime) && usedAtTime > data.latestUsedAt) {
+					data.latestUsedAt = usedAtTime;
+				}
+			}
+		}
+
+		const sortedPaths = Array.from(workspaceMap.entries()).sort(
+			(a, b) => b[1].latestUsedAt - a[1].latestUsedAt,
+		);
+
+		const groupsMap = new SvelteMap<
+			string,
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			{ label: string; maxTimestamp: number; items: any[] }
+		>();
+
+		for (const [dir, data] of sortedPaths) {
+			const date = new Date(data.latestUsedAt);
+			const hasValidDate = !isNaN(date.getTime()) && date.getFullYear() > 2020;
+			const dateLabel = hasValidDate
+				? formatDateTimeShort(data.latestUsedAt)
+				: m.local_platform_unknown();
+
+			const sessionLabelRaw = data.relatedSessions
+				.map((s) => s.note || m.local_platform_new_session())
+				.join(", ");
+
+			// Combine session info and date into group label
+			const groupLabel = `${m.local_platform_session({ session: sessionLabelRaw })} - ${dateLabel}`;
+
+			if (!groupsMap.has(groupLabel)) {
+				groupsMap.set(groupLabel, {
+					label: groupLabel,
+					maxTimestamp: data.latestUsedAt,
+					items: [],
+				});
+			}
+
+			const group = groupsMap.get(groupLabel)!;
+			if (data.latestUsedAt > group.maxTimestamp) {
+				group.maxTimestamp = data.latestUsedAt;
+			}
+
+			group.items.push({
+				value: dir,
+				label: dir,
+			});
+		}
+
+		const groups = Array.from(groupsMap.values())
+			.sort((a, b) => b.maxTimestamp - a.maxTimestamp)
+			.map((g) => ({
+				groupKey: g.label,
+				groupLabel: g.label,
+				items: g.items,
+			}));
+
 		return {
 			standalone: [{ value: "new", label: m.local_platform_new_work_directory() }],
-			groups:
-				this.workspaceDirectories.length > 0
-					? [
-							{
-								groupKey: "existing",
-								groupLabel: m.local_platform_existing_work_directory(),
-								items: this.workspaceDirectories.map((dir) => {
-									const relatedSessions = this.sessions.filter((s) => s.workspace_path === dir);
-									const sessionLabel = relatedSessions
-										.map((s) => s.note || m.local_platform_new_session())
-										.join(", ");
-									console.log("relatedSessions", relatedSessions);
-									return {
-										value: dir,
-										label: dir,
-										extra: m.local_platform_session({ session: sessionLabel }),
-									};
-								}),
-							},
-						]
-					: [],
+			groups: groups,
 		};
 	});
 
@@ -102,7 +193,7 @@ class LocalClaudeCodeSandboxState {
 	async refreshSessions(): Promise<void> {
 		this.isLoading = true;
 		try {
-			const response = await listLocalClaudeCodeSessions();
+			const response = await listLocalSessions();
 			if (response.success) {
 				persistedLocalClaudeCodeSessionsState.current = response.session_list;
 			}
@@ -139,6 +230,51 @@ class LocalClaudeCodeSandboxState {
 	reset(): void {
 		this.selectedSessionId = "new";
 		this.selectedWorkspacePath = "new";
+	}
+
+	/**
+	 * Delete a local session
+	 */
+	async deleteSession(sessionId: string): Promise<boolean> {
+		// Find workspace path before deletion (we need it for directory cleanup)
+		const session = this.sessions.find((s) => s.session_id === sessionId);
+		const workspacePath = session?.workspace_path;
+
+		const result = await deleteLocalSession(sessionId);
+
+		if (result.success) {
+			// Delete the local workspace directory if it exists.
+			// workspace_path is a container-internal path (e.g. "/home/user/workspace/icr6cz4lnm")
+			// We extract the last segment as subPath for the local directory mapping.
+			if (workspacePath) {
+				// Extract "icr6cz4lnm" from "/home/user/workspace/icr6cz4lnm"
+				const segments = workspacePath.replace(/\\/g, "/").split("/").filter(Boolean);
+				const subPath = segments[segments.length - 1];
+				if (subPath) {
+					try {
+						await window.electronAPI.localVibeService.deleteWorkspaceDirectory(subPath);
+					} catch (error) {
+						console.error(
+							"[LocalClaudeCodeSandboxState] Failed to delete workspace directory:",
+							subPath,
+							error,
+						);
+					}
+				}
+			}
+
+			toast.success(m.delete_session_success());
+
+			// Mark threads using this session as deleted (shows SessionDeleted UI)
+			// "local" is the virtual sandboxId used in local mode
+			await window.electronAPI.codeAgentService.deleteClaudeCodeSession("local", sessionId);
+
+			await this.refreshSessions();
+		} else {
+			toast.error(m.delete_session_failed());
+		}
+
+		return result.success;
 	}
 }
 

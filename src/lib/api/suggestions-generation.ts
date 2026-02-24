@@ -1,6 +1,7 @@
 import type { ChatMessage } from "$lib/types/chat";
 import type { ModelProvider } from "@shared/storage/provider";
 import type { Model } from "@shared/types";
+import { withGenerationFallback, type FallbackModelConfig } from "./generation-fallback";
 
 export interface GenerateSuggestionsRequest {
 	messages: ChatMessage[];
@@ -16,6 +17,40 @@ export interface GenerateSuggestionsResponse {
 	suggestions: string[];
 }
 
+async function generateSuggestionsRequest(
+	messages: ChatMessage[],
+	modelId: string,
+	provider: ModelProvider | undefined,
+	serverPort: number,
+	language?: string,
+	count?: number,
+	signal?: AbortSignal,
+): Promise<string[]> {
+	const response = await fetch(`http://localhost:${serverPort}/generate-suggestions`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			messages,
+			model: modelId,
+			apiKey: provider?.apiKey,
+			baseUrl: provider?.baseUrl,
+			providerType: provider?.apiType || "openai",
+			language,
+			count: count ?? 3,
+		} satisfies GenerateSuggestionsRequest),
+		signal,
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to generate suggestions: ${response.statusText}`);
+	}
+
+	const data: GenerateSuggestionsResponse = await response.json();
+	return data.suggestions;
+}
+
 export async function generateSuggestions(
 	messages: ChatMessage[],
 	model: Model,
@@ -23,40 +58,40 @@ export async function generateSuggestions(
 	language?: string,
 	count?: number,
 	serverPort?: number,
-	abortSignal?: AbortSignal,
+	fallbackConfig?: FallbackModelConfig,
+	signal?: AbortSignal,
 ): Promise<string[]> {
 	const port = serverPort ?? 8089;
 
 	try {
 		console.log("[Suggestions] Starting async generation...");
-		const response = await fetch(`http://localhost:${port}/generate-suggestions`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				messages,
-				model: model.id,
-				apiKey: provider?.apiKey,
-				baseUrl: provider?.baseUrl,
-				providerType: provider?.apiType || "openai",
-				language,
-				count: count ?? 3,
-			} satisfies GenerateSuggestionsRequest),
-			signal: abortSignal,
+		const suggestions = await withGenerationFallback({
+			operation: "suggestions generation",
+			model,
+			provider,
+			fallbackConfig,
+			signal,
+			request: (modelId, selectedProvider) =>
+				generateSuggestionsRequest(
+					messages,
+					modelId,
+					selectedProvider,
+					port,
+					language,
+					count,
+					signal,
+				),
 		});
 
-		if (!response.ok) {
-			console.error("[Suggestions] Failed to generate:", response.statusText);
+		if (!suggestions || suggestions.length === 0) {
 			return [];
 		}
 
-		const data: GenerateSuggestionsResponse = await response.json();
-		console.log("[Suggestions] Received suggestions:", data.suggestions);
-		return data.suggestions;
+		console.log("[Suggestions] Received suggestions:", suggestions);
+		return suggestions;
 	} catch (error) {
 		// Don't log abort errors as they are expected when user sends a new message
-		if (error instanceof Error && error.name === "AbortError") {
+		if (error instanceof DOMException && error.name === "AbortError") {
 			console.log("[Suggestions] Generation aborted");
 			return [];
 		}

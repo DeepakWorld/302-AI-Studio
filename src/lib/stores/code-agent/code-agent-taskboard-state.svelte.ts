@@ -16,6 +16,7 @@ import { nanoid } from "nanoid";
 import { toast } from "svelte-sonner";
 import { match } from "ts-pattern";
 import { chat, chatState } from "../chat-state.svelte";
+import { shouldPauseAfterTaskRestore } from "./taskboard-auto-execution-policy";
 import { claudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
 import { claudeCodeAgentState } from "./claude-code-state.svelte";
 import { codeAgentState } from "./code-agent-state.svelte";
@@ -316,6 +317,7 @@ export class CodeAgentTaskboardState {
 							claudeCodeSandboxState.currentSessionWorkspacePath,
 						];
 						if (path) {
+							const hadLocalTasksBeforeSync = this.tasklist.length > 0;
 							const { isOk, tasks } = await _getTasklist(sandboxId, path);
 
 							// Strategy: Prefer local data if remote is suspiciously empty/corrupted
@@ -329,7 +331,18 @@ export class CodeAgentTaskboardState {
 									await this.updateTasklist(this.tasklist);
 								} else {
 									// Remote has data, or both are empty. Trust remote.
-									this.tasklist = this.#sortTasks(tasks);
+									const sortedTasks = this.#sortTasks(tasks);
+									this.tasklist = sortedTasks;
+
+									if (
+										shouldPauseAfterTaskRestore({
+											hadLocalTasksBeforeSync,
+											taskboardStatus: this.taskboardStatus,
+											restoredTasks: sortedTasks,
+										})
+									) {
+										this.isAutoPaused = true;
+									}
 								}
 							} else {
 								// Get failed completely.

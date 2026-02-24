@@ -72,8 +72,9 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content
-		class="min-w-[600px] max-h-[700px] flex flex-col p-6 gap-4"
+		class="max-h-[700px] flex flex-col p-6 gap-4"
 		showCloseButton={false}
+		data-mcp-selector-dialog
 	>
 		{#if currentView === "list"}
 			<div class="flex flex-col gap-4 flex-1 min-h-0">

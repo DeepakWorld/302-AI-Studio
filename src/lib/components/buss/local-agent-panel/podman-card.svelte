@@ -58,11 +58,7 @@
 	);
 
 	async function handleInstallPodman() {
-		if (isWindows) {
-			await localEnvState.initMachine();
-		} else {
-			await onInstall();
-		}
+		await onInstall();
 	}
 
 	function handleOpenLogs() {
@@ -122,33 +118,23 @@
 				</div>
 			{/if}
 		</div>
-		<div class="flex gap-2">
+		<div class="flex shrink-0 gap-2">
 			{#if showLogButton}
-				<Button size="sm" variant="outline" onclick={handleOpenLogs} class="min-w-[60px]">
+				<Button size="sm" variant="outline" onclick={handleOpenLogs}>
 					{m.local_platform_logs()}
 				</Button>
 			{/if}
 			{#if !podmanInstalled}
 				{#if isWindows}
 					{@const docUrl = `https://studio.302.ai/${getLocale()}/docs/advanced/local-sandbox/windows`}
-					<Button
-						size="sm"
-						variant="outline"
-						onclick={() => window.open(docUrl, "_blank")}
-						class="min-w-[80px]"
-					>
-						<ExternalLink class="mr-1.5 h-3.5 w-3.5" />
+					<Button size="sm" variant="outline" onclick={() => window.open(docUrl, "_blank")}>
+						<ExternalLink class="mr-1 h-3.5 w-3.5" />
 						{m.local_platform_install_guide()}
 					</Button>
 				{/if}
-				<Button
-					size="sm"
-					onclick={handleInstallPodman}
-					disabled={isPodmanInstalling}
-					class="min-w-[80px]"
-				>
+				<Button size="sm" onclick={handleInstallPodman} disabled={isPodmanInstalling}>
 					{#if isPodmanInstalling}
-						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+						<LoaderCircle class="mr-1.5 h-4 w-4 animate-spin" />
 					{/if}
 					{primaryButtonLabel}
 				</Button>

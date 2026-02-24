@@ -62,6 +62,10 @@ class LocalEnvState {
 	// Installation logs
 	installLogs = $state<InstallLogEntry[]>([]);
 
+	// Sandbox startup logs
+	sandboxLogs = $state<string[]>([]);
+	sandboxFailed = $state(false);
+
 	// WSL restart required notification
 	wslRestartRequired = $state<{
 		reason: string;
@@ -73,6 +77,18 @@ class LocalEnvState {
 	private unsubscribeHealthCheck: (() => void) | null = null;
 	private unsubscribeSandboxHealth: (() => void) | null = null;
 	private unsubscribeSandboxState: (() => void) | null = null;
+	private unsubscribeSandboxInstallLog: (() => void) | null = null;
+
+	// Sandbox-related install-log steps that should be synced to sandboxLogs
+	private readonly sandboxInstallLogSteps = [
+		"podman-machine-start",
+		"podman-machine-start-recovery",
+		"podman-machine-stop-recovery",
+		"podman-machine-recover",
+		"podman-compose-up",
+		"podman-compose-pull",
+		"podman-compose-stop",
+	];
 
 	// Health check resolvers for waiting on first health check after start
 	private healthCheckResolvers: Array<() => void> = [];
@@ -225,25 +241,35 @@ class LocalEnvState {
 		}
 
 		this.sandboxStarting = true;
+		this.sandboxFailed = false;
+		this.sandboxLogs = [];
 		this.broadcastSandboxState({ starting: true });
 		this.sandboxHealthStatus = "unknown";
 		try {
 			const result = await window.electronAPI.localVibeService.startPodmanMachine();
 
-			// Print Podman machine output
+			// Capture Podman machine output
 			if (result.output) {
 				console.log("[Local Vibe] startPodmanMachine:", result.output);
+				this.sandboxLogs.push(`[INFO] [podman-machine] ${result.output}`);
 			}
 			if (result.error) {
 				console.error("[Local Vibe] startPodmanMachine error:", result.error);
+				this.sandboxLogs.push(`[ERROR] [podman-machine] ${result.error}`);
 			}
 
-			// Print docker-compose output
+			// Capture docker-compose output
 			if (result.composeOutput) {
 				console.log("[Local Vibe] docker-compose up:", result.composeOutput);
+				this.sandboxLogs.push(`[INFO] [docker-compose] ${result.composeOutput}`);
 			}
 			if (result.composeError) {
 				console.error("[Local Vibe] docker-compose error:", result.composeError);
+				this.sandboxLogs.push(`[ERROR] [docker-compose] ${result.composeError}`);
+			}
+
+			if (!result.isOk) {
+				this.sandboxFailed = true;
 			}
 
 			// Toggle sandbox running state on success
@@ -276,12 +302,14 @@ class LocalEnvState {
 		try {
 			const result = await window.electronAPI.localVibeService.stopLocalSandboxByIpc();
 
-			// Print command output with [Local Vibe] prefix
+			// Capture command output
 			if (result.output) {
 				console.log("[Local Vibe] stopLocalSandboxByIpc:", result.output);
+				this.sandboxLogs.push(`[INFO] [stop-sandbox] ${result.output}`);
 			}
 			if (result.error) {
 				console.error("[Local Vibe] stopLocalSandboxByIpc error:", result.error);
+				this.sandboxLogs.push(`[ERROR] [stop-sandbox] ${result.error}`);
 			}
 
 			// Toggle sandbox running state on success
@@ -440,11 +468,48 @@ class LocalEnvState {
 	}
 
 	/**
+	 * Check if an install-log step is related to sandbox operations
+	 */
+	private isSandboxInstallLogStep(step: string): boolean {
+		return this.sandboxInstallLogSteps.some(
+			(sandboxStep) => step === sandboxStep || step.startsWith(sandboxStep),
+		);
+	}
+
+	/**
+	 * Format install-log entry for sandbox logs
+	 * Only shows step and data, filtering out start/complete type markers
+	 */
+	private formatSandboxLog(entry: InstallLogEntry): string | null {
+		// Skip start and complete markers, only show actual output
+		if (entry.type === "start" || entry.type === "complete") {
+			return null;
+		}
+		return `[${entry.step}] ${entry.data}`;
+	}
+
+	/**
 	 * Start listening to Sandbox-related broadcast channels
 	 */
 	startSandboxListening(): void {
 		// Sync initial state first
 		this.syncInitialState();
+
+		// Subscribe to install-log channel for sandbox-related logs
+		// This ensures real-time log updates while sandbox is starting/stopping
+		if (!this.unsubscribeSandboxInstallLog) {
+			this.unsubscribeSandboxInstallLog = window.electronAPI.onInstallLog(
+				(data: Omit<InstallLogEntry, "ts">) => {
+					if (this.isSandboxInstallLogStep(data.step)) {
+						const entry: InstallLogEntry = { ...data, ts: Date.now() };
+						const formatted = this.formatSandboxLog(entry);
+						if (formatted) {
+							this.sandboxLogs = [...this.sandboxLogs, formatted];
+						}
+					}
+				},
+			);
+		}
 
 		// Subscribe to local-sandbox-health-check channel
 		if (!this.unsubscribeSandboxHealth) {
@@ -504,6 +569,11 @@ class LocalEnvState {
 		if (this.unsubscribeSandboxState) {
 			this.unsubscribeSandboxState();
 			this.unsubscribeSandboxState = null;
+		}
+
+		if (this.unsubscribeSandboxInstallLog) {
+			this.unsubscribeSandboxInstallLog();
+			this.unsubscribeSandboxInstallLog = null;
 		}
 	}
 

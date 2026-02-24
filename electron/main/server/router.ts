@@ -6,6 +6,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { serve } from "@hono/node-server";
 import type { ModelProvider } from "@shared/storage/provider";
+import type { CodeAgentType } from "@shared/storage/code-agent";
 import type { ChatMessage, McpServer, Skill, ThinkingBudgetType } from "@shared/types";
 import {
 	ToolLoopAgent as Agent,
@@ -25,6 +26,7 @@ import { codeAgentService, ssoService, tabService } from "../services";
 import { chatParametersService } from "../services/chat-parameters-service";
 import { mcpService } from "../services/mcp-service";
 import { storageService } from "../services/storage-service";
+import { codeAgentGlobalConfigsStorage } from "../services/storage-service/code-agent/code-agent-storage";
 import { createCitationsFetch } from "./citations-processor";
 import { createClaudeCodeFetch } from "./claude-code-processor";
 import { THINKING_BUDGET_MAP } from "./constant";
@@ -74,7 +76,7 @@ export type RouterRequestBody = {
 	inTaskOrchestrationMode?: boolean;
 	workspacePath?: string;
 	thinkingBudget?: ThinkingBudgetType;
-	vibeMode?: string;
+	vibeMode?: CodeAgentType;
 	contextSummary?: string;
 	compressedMessageCount?: number;
 };
@@ -1406,20 +1408,19 @@ app.post("/generate-suggestions", async (c) => {
 			}
 
 			const suggestions = JSON.parse(cleanText);
-			if (Array.isArray(suggestions) && suggestions.length > 0) {
+			if (Array.isArray(suggestions)) {
 				console.log("[Suggestions] Parsed suggestions:", suggestions);
 				return c.json({ suggestions: suggestions.slice(0, count) });
-			} else {
-				console.log("[Suggestions] Invalid suggestions format");
-				return c.json({ suggestions: [] });
 			}
+			console.log("[Suggestions] Invalid suggestions format");
+			return c.json({ error: "Invalid suggestions format" }, 500);
 		} catch (parseError) {
 			console.error("[Suggestions] Failed to parse JSON:", parseError);
-			return c.json({ suggestions: [] });
+			return c.json({ error: "Failed to parse suggestions" }, 500);
 		}
 	} catch (error) {
 		console.error("[Suggestions] Failed to generate suggestions:", error);
-		return c.json({ suggestions: [] });
+		return c.json({ error: "Failed to generate suggestions" }, 500);
 	}
 });
 
@@ -1579,6 +1580,14 @@ app.post("/chat/302ai-code-agent", async (c) => {
 		thinkingBudget,
 		vibeMode,
 	} = await c.req.json<RouterRequestBody>();
+
+	// Persist lastVibeMode when it changes
+	const currentVibeMode = vibeMode ?? "remote";
+	const { data: globalConfigs } = await codeAgentGlobalConfigsStorage.getGlobalConfigs();
+	if (globalConfigs.lastVibeMode !== currentVibeMode) {
+		await codeAgentGlobalConfigsStorage.setLastVibeMode(currentVibeMode);
+		console.log("[302ai-code-agent] Updated lastVibeMode to:", currentVibeMode);
+	}
 
 	const { data: codeAgentConfig } = await codeAgentService.getCodeAgentConfig(threadId);
 	const { sandboxId } = await codeAgentService.getClaudeCodeSandboxId(threadId);

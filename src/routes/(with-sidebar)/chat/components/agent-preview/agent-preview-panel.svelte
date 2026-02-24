@@ -318,18 +318,13 @@
 				return;
 			}
 
-			// Handle deployment update from any source (including self)
-			// This is needed when onFinish saves deployment info and we need to refresh the UI
-			if (
-				message.type === "fileListUpdated" &&
-				message.sourceInstanceId === agentPreviewState.syncIdentifier
-			) {
-				// Force re-check deployment info by clearing the restored key
-				lastRestoredKey = "";
-				// Trigger a state restore to pick up the new deployment info
-				untrack(() => {
-					restoreState(sandboxId, sessionId);
-				});
+			// Deployment updates are handled by a dedicated sync event and should refresh
+			// preview immediately in both current window and other windows.
+			if (message.type === "deploymentUpdated") {
+				deployment.url = message.url;
+				deployment.deploymentId = message.deploymentId;
+				iframeRefreshKey++;
+				return;
 			}
 
 			// Handle file deletion: when file list is updated, check if the currently

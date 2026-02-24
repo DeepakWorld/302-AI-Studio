@@ -230,6 +230,10 @@
 	[data-slot="dialog-content"][data-mcp-import-dialog] {
 		max-width: 42rem !important;
 	}
+	[data-slot="dialog-content"][data-mcp-selector-dialog] {
+		width: min(600px, calc(100vw - 2rem)) !important;
+		max-width: none !important;
+	}
 
 	/* Search keyword highlighting with fade-out animation */
 	mark.search-highlight {
@@ -264,6 +268,24 @@
 		100% {
 			background-color: transparent;
 		}
+	}
+
+	/* Streaming text fade-in animation for AI chat responses */
+	@keyframes streaming-fade {
+		from {
+			opacity: 0;
+			filter: blur(2px);
+			transform: translateY(2px);
+		}
+		to {
+			opacity: 1;
+			filter: blur(0);
+			transform: translateY(0);
+		}
+	}
+
+	.streaming-fade-in {
+		animation: streaming-fade 250ms ease-out forwards;
 	}
 }
 

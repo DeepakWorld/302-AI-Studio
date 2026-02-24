@@ -8,17 +8,26 @@
 	} from "$lib/stores/code-agent/local-env-state.svelte";
 	import { LoaderCircle } from "@lucide/svelte";
 	import { onMount } from "svelte";
+	import LogDialog from "./log-dialog.svelte";
 	import PlatformServiceCard from "./platform-service-card.svelte";
 	import StatusIndicator from "./status-indicator.svelte";
 
 	let { isOpen = $bindable(true) }: { isOpen?: boolean } = $props();
+
+	// Local UI state for log dialog
+	let isSandboxLogOpen = $state(false);
 
 	// Sandbox Logic - use derived state from localEnvState
 	let sandboxRunning = $derived(localEnvState.sandboxRunning);
 	let isSandboxLoading = $derived(localEnvState.sandboxStarting);
 	let podmanInstalled = $derived(localEnvState.podmanInstalled);
 	let healthStatus = $derived(localEnvState.sandboxHealthStatus);
+	let sandboxLogs = $derived(localEnvState.sandboxLogs);
+	let sandboxFailed = $derived(localEnvState.sandboxFailed);
 	let fileDirectory = $state("");
+
+	// Show log button when there are logs, or sandbox is starting/failed
+	let showLogButton = $derived(sandboxLogs.length > 0 || isSandboxLoading || sandboxFailed);
 
 	// Helper to get status indicator props
 	function getHealthStatusProps(status: SandboxHealthStatus) {
@@ -40,12 +49,14 @@
 
 	async function handleStartSandbox() {
 		if (sandboxRunning) {
-			// Stop sandbox
 			await localEnvState.stopSandbox();
 		} else {
-			// Start sandbox
 			await localEnvState.startSandbox();
 		}
+	}
+
+	function handleOpenLogs() {
+		isSandboxLogOpen = true;
 	}
 
 	async function handleOpenDirectory() {
@@ -101,18 +112,32 @@
 				</button>
 			</div>
 		</div>
-		<Button
-			size="sm"
-			variant={sandboxRunning ? "destructive" : "default"}
-			onclick={handleStartSandbox}
-			disabled={isSandboxLoading || !podmanInstalled}
-		>
-			{#if isSandboxLoading}
-				<LoaderCircle class="h-4 w-4 animate-spin" />
-				{sandboxRunning ? m.local_platform_stopping() : m.local_platform_starting()}
-			{:else}
-				{sandboxRunning ? m.local_platform_close() : m.local_platform_one_click_start()}
+		<div class="flex gap-2">
+			{#if showLogButton}
+				<Button size="sm" variant="outline" onclick={handleOpenLogs} class="min-w-[60px]">
+					{m.local_platform_logs()}
+				</Button>
 			{/if}
-		</Button>
+			<Button
+				size="sm"
+				variant={sandboxRunning ? "destructive" : "default"}
+				onclick={handleStartSandbox}
+				disabled={isSandboxLoading || !podmanInstalled}
+			>
+				{#if isSandboxLoading}
+					<LoaderCircle class="h-4 w-4 animate-spin" />
+					{sandboxRunning ? m.local_platform_stopping() : m.local_platform_starting()}
+				{:else}
+					{sandboxRunning ? m.local_platform_close() : m.local_platform_one_click_start()}
+				{/if}
+			</Button>
+		</div>
 	</div>
 </PlatformServiceCard>
+
+<!-- Log Dialog -->
+<LogDialog
+	bind:open={isSandboxLogOpen}
+	title={m.local_platform_local_sandbox()}
+	logs={sandboxLogs}
+/>

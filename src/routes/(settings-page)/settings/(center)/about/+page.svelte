@@ -61,7 +61,7 @@
 	] as const;
 </script>
 
-<div class="mx-auto flex h-full w-full max-w-2xl flex-col items-center overflow-y-auto">
+<div class="mx-auto flex w-full flex-col items-center">
 	<div class="flex items-center justify-center py-8">
 		<div class="flex items-center gap-y-[22px] flex-col">
 			<ModelIcon modelName="ai302" className="size-[62px]" forceApplyClassName />
@@ -87,7 +87,7 @@
 	</div>
 
 	<!-- Changelog Section -->
-	<div class="w-full flex-1 px-4 pb-6">
+	<div class="w-full px-4 pb-6">
 		<div class="gap-settings-gap flex flex-col">
 			<Label class="text-label-fg font-normal">{m.changelog_title()}</Label>
 			<ChangelogList

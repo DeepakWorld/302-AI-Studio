@@ -1,7 +1,7 @@
 import type { ChatMessage } from "$lib/types/chat";
 import type { ModelProvider } from "@shared/storage/provider";
 import type { Model } from "@shared/types";
-import type { FallbackModelConfig } from "./title-generation";
+import { withGenerationFallback, type FallbackModelConfig } from "./generation-fallback";
 
 export interface GenerateContextSummaryRequest {
 	messages: ChatMessage[];
@@ -16,10 +16,6 @@ export interface GenerateContextSummaryRequest {
 export interface GenerateContextSummaryResponse {
 	summary: string;
 }
-
-// Fallback model configuration
-const FALLBACK_MODEL_ID = "gpt-4o-mini";
-const FALLBACK_RETRY_DELAY = 500;
 
 async function generateContextSummaryRequest(
 	messages: ChatMessage[],
@@ -67,61 +63,21 @@ export async function generateContextSummary(
 ): Promise<string | null> {
 	const port = serverPort ?? 8089;
 
-	try {
-		// First attempt with configured model
-		return await generateContextSummaryRequest(
-			messages,
-			model.id,
-			provider,
-			port,
-			previousSummary,
-			language,
-			signal,
-		);
-	} catch (error) {
-		// Check if aborted before retry
-		if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-		console.error("Context summary generation failed with configured model:", error);
-
-		// Wait before retrying with fallback
-		console.log(`Retrying context summary generation after ${FALLBACK_RETRY_DELAY}ms...`);
-		await new Promise((resolve) => setTimeout(resolve, FALLBACK_RETRY_DELAY));
-
-		// Determine fallback model and provider
-		let fallbackModelId: string;
-		let fallbackProvider: ModelProvider | undefined;
-
-		if (fallbackConfig) {
-			// Use provided fallback config (current chat model)
-			fallbackModelId = fallbackConfig.model.id;
-			fallbackProvider = fallbackConfig.provider;
-			console.log(`Using chat model as fallback: ${fallbackModelId}`);
-		} else {
-			// Use hardcoded gpt-4o-mini
-			fallbackModelId = FALLBACK_MODEL_ID;
-			fallbackProvider = provider;
-			console.log(`Using default fallback model: ${fallbackModelId}`);
-		}
-
-		// If fallback model is the same as original, give up
-		if (fallbackModelId === model.id && fallbackProvider?.id === provider?.id) {
-			console.error("Fallback model is same as original, giving up");
-			return null;
-		}
-
-		try {
-			return await generateContextSummaryRequest(
+	return await withGenerationFallback({
+		operation: "context summary generation",
+		model,
+		provider,
+		fallbackConfig,
+		signal,
+		request: (modelId, selectedProvider) =>
+			generateContextSummaryRequest(
 				messages,
-				fallbackModelId,
-				fallbackProvider,
+				modelId,
+				selectedProvider,
 				port,
 				previousSummary,
 				language,
 				signal,
-			);
-		} catch (fallbackError) {
-			console.error("Context summary generation failed with fallback model:", fallbackError);
-			return null;
-		}
-	}
+			),
+	});
 }
