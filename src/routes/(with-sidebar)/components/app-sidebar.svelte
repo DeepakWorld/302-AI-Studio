@@ -3,13 +3,13 @@
 	import * as Collapsible from "$lib/components/ui/collapsible";
 	import { Input } from "$lib/components/ui/input";
 	import * as Sidebar from "$lib/components/ui/sidebar";
+	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import { m } from "$lib/paraglide/messages";
 	import { persistedClaudeCodeSandboxState } from "$lib/stores/code-agent/claude-code-sandbox-state.svelte";
 	import { sidebarSearchState } from "$lib/stores/sidebar-search-state.svelte";
 	import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
 	import { threadsState } from "$lib/stores/threads-state.svelte";
 	import { TIME_GROUP_ORDER, TimeGroup } from "$lib/types/time-group";
-	import type { MessagePart } from "$lib/utils/attachment-converter";
 	import { ChevronDown } from "@lucide/svelte";
 	import type { CodeAgentConfigMetadata, CodeAgentMetadata } from "@shared/storage/code-agent";
 	import { onMount } from "svelte";
@@ -33,17 +33,38 @@
 	let deleteTargetThreadId = $state<string | null>(null);
 	let deleteSandboxId = $state<string | null>(null);
 	let deleteSessionId = $state<string | null>(null);
+	const searchSkeletonItems = Array.from({ length: 6 }, (_, index) => index);
 
 	onMount(() => {
 		// Initialize search state for this tab
 		sidebarSearchState.initializeForTab();
 
 		// Register focus callback
-		const cleanup = sidebarSearchState.registerFocusCallback(() => {
+		const cleanupFocus = sidebarSearchState.registerFocusCallback(() => {
 			searchInputElement?.focus();
 		});
 
-		return cleanup;
+		// 监听其他标签页的搜索词变化
+		let cleanupSearchSync: (() => void) | undefined;
+		if (typeof window !== "undefined" && window.electronAPI?.onSidebarSearchChanged) {
+			cleanupSearchSync = window.electronAPI.onSidebarSearchChanged((data) => {
+				sidebarSearchState.applyBroadcastUpdate(data.query);
+			});
+		}
+
+		// 监听其他标签页的搜索结果更新
+		let cleanupSearchResultsSync: (() => void) | undefined;
+		if (typeof window !== "undefined" && window.electronAPI?.onSidebarSearchResultsUpdated) {
+			cleanupSearchResultsSync = window.electronAPI.onSidebarSearchResultsUpdated((data) => {
+				sidebarSearchState.applySearchResultsBroadcast(data.query, data.resultIds);
+			});
+		}
+
+		return () => {
+			cleanupFocus();
+			cleanupSearchSync?.();
+			cleanupSearchResultsSync?.();
+		};
 	});
 
 	const DAY_IN_MS = 1000 * 60 * 60 * 24;
@@ -90,67 +111,7 @@
 
 	const filteredThreadList = $derived.by(async () => {
 		if (!sidebarSearchState.searchQuery.trim()) return threadsState.threads;
-
-		const threads = threadsState.threads;
-		const searchTerm = sidebarSearchState.searchQuery.toLowerCase().trim();
-
-		// Check if we have initial search results from tab creation
-		const initialResultIds = sidebarSearchState.getInitialSearchResultIds();
-		if (initialResultIds && initialResultIds.length > 0) {
-			// Use pre-computed results - just filter by IDs
-			const resultSet = new Set(initialResultIds);
-			const results = threads.filter((t) => resultSet.has(t.threadId));
-			// Cache for future tab creation
-			sidebarSearchState.setCachedSearchResultIds(initialResultIds);
-			return results;
-		}
-
-		const { storageService } = window.electronAPI;
-
-		// Filter threads by title or message content
-		const filtered = await Promise.all(
-			threads.map(async (threadData) => {
-				// Check title first
-				if (threadData.thread.title.toLowerCase().includes(searchTerm)) {
-					return { match: true, threadData };
-				}
-
-				// Check message content
-				try {
-					const messagesData = await storageService.getItem(
-						`app-chat-messages:${threadData.threadId}`,
-					);
-					const messages = messagesData;
-					if (Array.isArray(messages)) {
-						const hasMatchingMessage = messages.some((msg) => {
-							if (Array.isArray(msg.parts)) {
-								return msg.parts.some((part: MessagePart) => {
-									if (part.type === "text" && typeof part.text === "string") {
-										return part.text.toLowerCase().includes(searchTerm);
-									}
-									return false;
-								});
-							}
-							return false;
-						});
-						if (hasMatchingMessage) {
-							return { match: true, threadData };
-						}
-					}
-				} catch (error) {
-					console.warn(`Failed to load messages for thread ${threadData.threadId}:`, error);
-				}
-
-				return { match: false, threadData };
-			}),
-		);
-
-		const results = filtered.filter((item) => item.match).map((item) => item.threadData);
-
-		// Cache result IDs for future tab creation
-		sidebarSearchState.setCachedSearchResultIds(results.map((t) => t.threadId));
-
-		return results;
+		return sidebarSearchState.searchThreads(threadsState.threads);
 	});
 
 	const groupedThreadList = $derived.by(() => {
@@ -424,28 +385,42 @@
 		<Sidebar.Group>
 			<Sidebar.GroupContent class="flex flex-col gap-y-1 px-3">
 				{#if sidebarSearchState.searchQuery.trim()}
-					{#await filteredThreadList then threads}
-						{#each threads as threadData (threadData.threadId)}
-							{@const { threadId, thread, isFavorite } = threadData}
-							{#await getCodeAgentInfo(threadId) then agentInfo}
-								<ThreadItem
-									{threadId}
-									{thread}
-									{isFavorite}
-									isActive={threadId === threadsState.activeThreadId}
-									isCodeAgent={agentInfo.isCodeAgent}
-									sandboxId={agentInfo.sandboxId || ""}
-									sessionId={agentInfo.sessionId || ""}
-									onThreadClick={handleThreadClick}
-									onToggleFavorite={() => threadsState.toggleFavorite(threadId)}
-									onRenameThread={handleRenameThread}
-									onThreadGenerateTitle={handleThreadGenerateTitle}
-									onThreadClearMessages={handleThreadClearMessages}
-									onThreadDelete={handleThreadDelete}
-									onThreadDeleteWithDialog={handleThreadDeleteWithDialog}
-								/>
-							{/await}
-						{/each}
+					{#await filteredThreadList}
+						<div class="flex flex-col gap-y-1 px-3">
+							{#each searchSkeletonItems as item (item)}
+								<Sidebar.MenuSkeleton class="h-10 rounded-[10px] px-3">
+									<Skeleton class="size-4 rounded-sm ml-auto opacity-60" />
+								</Sidebar.MenuSkeleton>
+							{/each}
+						</div>
+					{:then threads}
+						{#if threads.length === 0}
+							<div class="px-3 py-2 text-sm text-muted-foreground">
+								{m.no_search_results()}
+							</div>
+						{:else}
+							{#each threads as threadData (threadData.threadId)}
+								{@const { threadId, thread, isFavorite } = threadData}
+								{#await getCodeAgentInfo(threadId) then agentInfo}
+									<ThreadItem
+										{threadId}
+										{thread}
+										{isFavorite}
+										isActive={threadId === threadsState.activeThreadId}
+										isCodeAgent={agentInfo.isCodeAgent}
+										sandboxId={agentInfo.sandboxId || ""}
+										sessionId={agentInfo.sessionId || ""}
+										onThreadClick={handleThreadClick}
+										onToggleFavorite={() => threadsState.toggleFavorite(threadId)}
+										onRenameThread={handleRenameThread}
+										onThreadGenerateTitle={handleThreadGenerateTitle}
+										onThreadClearMessages={handleThreadClearMessages}
+										onThreadDelete={handleThreadDelete}
+										onThreadDeleteWithDialog={handleThreadDeleteWithDialog}
+									/>
+								{/await}
+							{/each}
+						{/if}
 					{/await}
 				{:else if groupedThreadList}
 					{#each TIME_GROUP_ORDER as groupKey (groupKey)}

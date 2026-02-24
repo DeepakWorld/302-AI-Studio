@@ -180,7 +180,9 @@ export type BroadcastEvent =
 	| "apply-default-model"
 	| "models-deleted"
 	| "local-sandbox-state-changed"
-	| "thread-busy-state-changed";
+	| "thread-busy-state-changed"
+	| "sidebar-search-results-updated"
+	| "sidebar-search-changed";
 
 export interface BroadcastEventData {
 	broadcastEvent: BroadcastEvent;

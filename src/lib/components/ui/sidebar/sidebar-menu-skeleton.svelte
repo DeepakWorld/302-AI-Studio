@@ -7,12 +7,14 @@
 		ref = $bindable(null),
 		class: className,
 		showIcon = false,
+		width = "70%",
 		children,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLElement>> & {
 		showIcon?: boolean;
+		width?: string;
 	} = $props();
-	const width = `${Math.floor(Math.random() * 40) + 50}%`;
+	const skeletonWidth = width;
 </script>
 
 <div
@@ -28,7 +30,7 @@
 	<Skeleton
 		class="h-4 max-w-(--skeleton-width) flex-1"
 		data-sidebar="menu-skeleton-text"
-		style="--skeleton-width: {width};"
+		style="--skeleton-width: {skeletonWidth};"
 	/>
 	{@render children?.()}
 </div>

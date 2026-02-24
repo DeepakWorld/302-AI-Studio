@@ -134,6 +134,26 @@ if (process.contextIsolated) {
 				ipcRenderer.on("broadcast-event", listener);
 				return () => ipcRenderer.removeListener("broadcast-event", listener);
 			},
+			onSidebarSearchChanged: (callback: (data: { query: string }) => void) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "sidebar-search-changed") {
+						callback(eventData.data as { query: string });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
+			onSidebarSearchResultsUpdated: (
+				callback: (data: { query: string; resultIds: string[] }) => void,
+			) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "sidebar-search-results-updated") {
+						callback(eventData.data as { query: string; resultIds: string[] });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
 			onApplyDefaultModel: (callback: (data: { model: unknown }) => void) => {
 				const listener = (_: unknown, eventData: BroadcastEventData) => {
 					if (eventData.broadcastEvent === "apply-default-model") {
