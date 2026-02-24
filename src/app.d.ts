@@ -80,6 +80,9 @@ declare global {
 					callback: (data: { releaseNotes: string; releaseName: string }) => void,
 				) => () => void;
 				onUpdateError: (callback: (data: { message: string }) => void) => () => void;
+				onDownloadProgress: (
+					callback: (data: { percent: number; transferred: number; total: number }) => void,
+				) => () => void;
 			};
 			aiApplication: {
 				onAiApplicationsLoading: (callback: (loading: boolean) => void) => () => void;
