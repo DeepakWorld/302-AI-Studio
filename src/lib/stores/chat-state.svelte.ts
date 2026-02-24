@@ -1,13 +1,9 @@
 import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
-import { afterChatFinished } from "$lib/hooks/chat-hook.svelte";
+import { onChatFinishPostPersist, onChatFinishPrePersist } from "$lib/hooks/chat-hook.svelte";
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages.js";
-import {
-	clearPendingResultMetadata,
-	DynamicChatTransport,
-	pendingResultMetadata,
-} from "$lib/transport/dynamic-chat-transport";
-import type { ChatMessage, MessageMetadata } from "$lib/types/chat";
+import { DynamicChatTransport } from "$lib/transport/dynamic-chat-transport";
+import type { ChatMessage } from "$lib/types/chat";
 import {
 	convertAttachmentsToMessageParts,
 	type MessagePart,
@@ -29,7 +25,6 @@ import { toast } from "svelte-sonner";
 
 import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 
-import { emitter, EventNames } from "$lib/event/emitter";
 import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 import { resolvePrompt } from "@shared/utils/chat-parameters";
 import { claudeCodeSandboxState, codeAgentGlobalConfigsState, codeAgentState } from "./code-agent";
@@ -44,7 +39,6 @@ import {
 	persistedProviderState,
 	providerState,
 } from "./provider-state.svelte";
-import { sessionState } from "./session-state.svelte";
 import { tabBarState } from "./tab-bar-state.svelte";
 
 const { broadcastService, threadService, storageService, pluginService } = window.electronAPI;
@@ -1685,165 +1679,24 @@ export const chat = new Chat({
 		console.error("[Chat onError]", error);
 	},
 	onFinish: async ({ messages, isAbort, isDisconnect, isError }) => {
-		const onFinishStartTime = performance.now();
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		console.log("[onFinish] Stream completion received at:", new Date().toISOString());
-		console.log("更新完成", $state.snapshot(messages));
-		console.debug("[onFinish] messages", JSON.stringify($state.snapshot(messages), null, 2));
-		console.log("[onFinish] isAbort:", isAbort, "isDisconnect:", isDisconnect, "isError:", isError);
-
-		const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
-		if (lastUserMessage) {
-			const updatedMessages = messages.map((msg) => {
-				if (msg.id === lastUserMessage.id) {
-					return {
-						...msg,
-						metadata: {
-							...msg.metadata,
-							userPromptTemplateContent: chatParameters.userPromptTemplateContent,
-							userPromptTemplateVariables: chatParameters.userPromptTemplateVariables,
-							userPromptTemplateMap: chatParameters.userPromptTemplateMap,
-						},
-					};
-				}
-				return msg;
-			});
-
-			// Update both messages array and persisted state
-			chat.messages = updatedMessages;
-			messages = updatedMessages;
-		}
-
-		// Save systemPrompt to the last assistant message
-		const lastAssistantMessage = [...messages].reverse().find((msg) => msg.role === "assistant");
-		if (lastAssistantMessage && chatParameters.systemPromptContent) {
-			const resolvedSystemPrompt = resolvePrompt(chatParameters.systemPromptContent, {
-				modelId: chatState.selectedModel?.id ?? "",
-				language: generalSettings.language,
-				cachedMap: chatParameters.systemPromptMap,
-				variables: chatParameters.systemPromptVariables,
-			});
-
-			const updatedMessages = messages.map((msg) => {
-				if (msg.id === lastAssistantMessage.id) {
-					return {
-						...msg,
-						metadata: {
-							...msg.metadata,
-							systemPromptContent: resolvedSystemPrompt.content,
-							systemPromptVariables: [...chatParameters.systemPromptVariables],
-							systemPromptMap: { ...chatParameters.systemPromptMap },
-						},
-					};
-				}
-				return msg;
-			});
-
-			chat.messages = updatedMessages;
-			messages = updatedMessages;
-		}
-
-		const codeAgentEnabled = codeAgentState.enabled;
-		console.log("onFinish: async ({ messages }) pendingResultMetadata", pendingResultMetadata);
-		if (codeAgentEnabled && pendingResultMetadata) {
-			const lastMessage = messages[messages.length - 1];
-			if (lastMessage && lastMessage.role === "assistant") {
-				const currentMetadata = (lastMessage.metadata as MessageMetadata) || {};
-				lastMessage.metadata = {
-					...currentMetadata,
-					result: pendingResultMetadata,
-				};
-				console.log("[ChatState] Merged result metadata into message:", pendingResultMetadata);
-			}
-			clearPendingResultMetadata();
-		}
-
-		console.log("onFinish: async ({ messages }) codeAgentEnabled", codeAgentEnabled);
-		console.log(
-			"onFinish: async ({ messages }) autoDeploy",
-			codeAgentGlobalConfigsState.autoDeploy,
-		);
-
-		const isDeployCommand =
-			lastUserMessage?.parts.some(
-				(part) => part.type === "text" && part.text.trim() === "/deploy",
-			) ?? false;
-
-		emitter.emit(EventNames.CHAT_FINISHED, {
-			canDeploy: codeAgentEnabled && (codeAgentGlobalConfigsState.autoDeploy || isDeployCommand),
-			lastMessage: messages[messages.length - 1],
+		const { messages: updatedMessages, onFinishStartTime } = await onChatFinishPrePersist({
+			messages,
+			isAbort,
+			isDisconnect,
+			isError,
+			chatState,
+			codeAgentEnabled: codeAgentState.enabled,
+			autoDeploy: codeAgentGlobalConfigsState.autoDeploy,
 		});
-		console.log(
-			"[onFinish] CHAT_FINISHED emitted, elapsed:",
-			(performance.now() - onFinishStartTime).toFixed(2),
-			"ms",
-		);
 
-		persistedMessagesState.current = messages;
+		persistedMessagesState.current = updatedMessages;
 
-		sessionState.latestUsedModel = chatState.selectedModel ?? null;
-
-		// Execute after send message hook
-		try {
-			const lastMessage = messages[messages.length - 1];
-			const userMessage = messages[messages.length - 2]; // Assuming last is AI, second-to-last is user
-
-			if (lastMessage && userMessage && chatState.selectedModel && chatState.currentProvider) {
-				const messageContext = {
-					messages: messages,
-					userMessage: userMessage,
-					model: chatState.selectedModel,
-					provider: chatState.currentProvider,
-					parameters: {
-						temperature: chatState.temperature,
-						topP: chatState.topP,
-						maxTokens: chatState.maxTokens,
-						frequencyPenalty: chatState.frequencyPenalty,
-						presencePenalty: chatState.presencePenalty,
-					},
-					options: {
-						isThinkingActive: chatState.isThinkingActive,
-						isOnlineSearchActive: chatState.isOnlineSearchActive,
-						isMCPActive: chatState.isMCPActive,
-						mcpServerIds: chatState.mcpServerIds,
-						autoParseUrl: preferencesSettings.autoParseUrl,
-						speedOptions: {
-							enabled: preferencesSettings.streamOutputEnabled,
-							speed: preferencesSettings.streamSpeed,
-						},
-					},
-				};
-
-				const response = {
-					message: lastMessage,
-					usage: undefined,
-					model: chatState.selectedModel.id,
-					finishReason: "stop",
-					metadata: {},
-				};
-
-				// Serialize context and response to remove Svelte Proxy objects
-				const serializedContext = JSON.parse(JSON.stringify(messageContext));
-				const serializedResponse = JSON.parse(JSON.stringify(response));
-
-				await pluginService.executeAfterSendMessageHook(serializedContext, serializedResponse);
-				console.log("[ChatState] After send message hook executed successfully");
-			}
-		} catch (hookError) {
-			console.error("[ChatState] After send message hook failed:", hookError);
-			// Continue execution even if hook fails
-		}
-
-		await afterChatFinished({
+		await onChatFinishPostPersist({
 			messages,
 			chatState,
 			persistedChatParamsState,
 			persistedMessagesState,
+			onFinishStartTime,
 		});
-		console.log(
-			"[onFinish] Callback complete, total elapsed:",
-			(performance.now() - onFinishStartTime).toFixed(2),
-			"ms",
-		);
 	},
 });

@@ -3,13 +3,20 @@ import { generateSuggestions } from "$lib/api/suggestions-generation";
 import { generateTitle, type FallbackModelConfig } from "$lib/api/title-generation";
 import { emitter, EventNames } from "$lib/event/emitter";
 import { m } from "$lib/paraglide/messages";
+import { chatParameters } from "$lib/stores/chat-paramters/chat-parameters.svelte";
 import { generalSettings } from "$lib/stores/general-settings.state.svelte";
 import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
+import { sessionState } from "$lib/stores/session-state.svelte";
 import { tabBarState } from "$lib/stores/tab-bar-state.svelte";
-import type { ChatMessage } from "$lib/types/chat";
+import {
+	clearPendingResultMetadata,
+	pendingResultMetadata,
+} from "$lib/transport/dynamic-chat-transport";
+import type { ChatMessage, MessageMetadata } from "$lib/types/chat";
 import type { ModelProvider } from "@shared/storage/provider";
 import type { Model, ThreadParmas } from "@shared/types";
+import { resolvePrompt } from "@shared/utils/chat-parameters";
 
 type PersistedStateLike<T> = {
 	current: T;
@@ -38,6 +45,213 @@ type AfterChatFinishedContext = {
 	persistedChatParamsState: PersistedStateLike<ThreadParmas>;
 	persistedMessagesState: PersistedStateLike<ChatMessage[]>;
 };
+
+export type OnChatFinishPrePersistArgs = {
+	messages: ChatMessage[];
+	isAbort: boolean;
+	isDisconnect: boolean;
+	isError: boolean;
+	chatState: AfterChatFinishedChatState;
+	codeAgentEnabled: boolean;
+	autoDeploy: boolean;
+};
+
+export type OnChatFinishPrePersistResult = {
+	messages: ChatMessage[];
+	onFinishStartTime: number;
+};
+
+export async function onChatFinishPrePersist(
+	args: OnChatFinishPrePersistArgs,
+): Promise<OnChatFinishPrePersistResult> {
+	let { messages } = args;
+	const { isAbort, isDisconnect, isError, chatState, codeAgentEnabled, autoDeploy } = args;
+	const onFinishStartTime = performance.now();
+
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	console.log("[onFinish] Stream completion received at:", new Date().toISOString());
+	console.log("更新完成", $state.snapshot(messages));
+	console.debug("[onFinish] messages", JSON.stringify($state.snapshot(messages), null, 2));
+	console.log("[onFinish] isAbort:", isAbort, "isDisconnect:", isDisconnect, "isError:", isError);
+
+	const lastUserMessage = [...messages].reverse().find((msg) => msg.role === "user");
+	if (lastUserMessage) {
+		const updatedMessages = messages.map((msg) => {
+			if (msg.id === lastUserMessage.id) {
+				return {
+					...msg,
+					metadata: {
+						...msg.metadata,
+						userPromptTemplateContent: chatParameters.userPromptTemplateContent,
+						userPromptTemplateVariables: chatParameters.userPromptTemplateVariables,
+						userPromptTemplateMap: chatParameters.userPromptTemplateMap,
+					},
+				};
+			}
+			return msg;
+		});
+
+		chatState.messages = updatedMessages;
+		messages = updatedMessages;
+	}
+
+	// Save systemPrompt to the last assistant message
+	const lastAssistantMessage = [...messages].reverse().find((msg) => msg.role === "assistant");
+	if (lastAssistantMessage && chatParameters.systemPromptContent) {
+		const resolvedSystemPrompt = resolvePrompt(chatParameters.systemPromptContent, {
+			modelId: chatState.selectedModel?.id ?? "",
+			language: generalSettings.language,
+			cachedMap: chatParameters.systemPromptMap,
+			variables: chatParameters.systemPromptVariables,
+		});
+
+		const updatedMessages = messages.map((msg) => {
+			if (msg.id === lastAssistantMessage.id) {
+				return {
+					...msg,
+					metadata: {
+						...msg.metadata,
+						systemPromptContent: resolvedSystemPrompt.content,
+						systemPromptVariables: [...chatParameters.systemPromptVariables],
+						systemPromptMap: { ...chatParameters.systemPromptMap },
+					},
+				};
+			}
+			return msg;
+		});
+
+		chatState.messages = updatedMessages;
+		messages = updatedMessages;
+	}
+
+	console.log("onFinish: async ({ messages }) pendingResultMetadata", pendingResultMetadata);
+	if (codeAgentEnabled && pendingResultMetadata) {
+		const lastMessage = messages[messages.length - 1];
+		if (lastMessage && lastMessage.role === "assistant") {
+			const currentMetadata = (lastMessage.metadata as MessageMetadata) || {};
+			lastMessage.metadata = {
+				...currentMetadata,
+				result: pendingResultMetadata,
+			};
+			console.log("[ChatState] Merged result metadata into message:", pendingResultMetadata);
+		}
+		clearPendingResultMetadata();
+	}
+
+	console.log("onFinish: async ({ messages }) codeAgentEnabled", codeAgentEnabled);
+	console.log("onFinish: async ({ messages }) autoDeploy", autoDeploy);
+
+	const isDeployCommand =
+		lastUserMessage?.parts.some((part) => part.type === "text" && part.text.trim() === "/deploy") ??
+		false;
+
+	emitter.emit(EventNames.CHAT_FINISHED, {
+		canDeploy: codeAgentEnabled && (autoDeploy || isDeployCommand),
+		lastMessage: messages[messages.length - 1],
+	});
+	console.log(
+		"[onFinish] CHAT_FINISHED emitted, elapsed:",
+		(performance.now() - onFinishStartTime).toFixed(2),
+		"ms",
+	);
+
+	return { messages, onFinishStartTime };
+}
+
+export type OnChatFinishPostPersistArgs = {
+	messages: ChatMessage[];
+	chatState: AfterChatFinishedChatState & {
+		temperature: number | null;
+		topP: number | null;
+		maxTokens: number | null;
+		frequencyPenalty: number | null;
+		presencePenalty: number | null;
+		isThinkingActive: boolean;
+		isOnlineSearchActive: boolean;
+		isMCPActive: boolean;
+		mcpServerIds: string[];
+	};
+	persistedChatParamsState: PersistedStateLike<ThreadParmas>;
+	persistedMessagesState: PersistedStateLike<ChatMessage[]>;
+	onFinishStartTime: number;
+};
+
+export async function onChatFinishPostPersist(args: OnChatFinishPostPersistArgs): Promise<void> {
+	const {
+		messages,
+		chatState,
+		persistedChatParamsState,
+		persistedMessagesState,
+		onFinishStartTime,
+	} = args;
+	const { pluginService } = window.electronAPI;
+
+	sessionState.latestUsedModel = chatState.selectedModel ?? null;
+
+	// Execute after send message hook
+	try {
+		const lastMessage = messages[messages.length - 1];
+		const userMessage = messages[messages.length - 2]; // Assuming last is AI, second-to-last is user
+
+		if (lastMessage && userMessage && chatState.selectedModel && chatState.currentProvider) {
+			const messageContext = {
+				messages: messages,
+				userMessage: userMessage,
+				model: chatState.selectedModel,
+				provider: chatState.currentProvider,
+				parameters: {
+					temperature: chatState.temperature,
+					topP: chatState.topP,
+					maxTokens: chatState.maxTokens,
+					frequencyPenalty: chatState.frequencyPenalty,
+					presencePenalty: chatState.presencePenalty,
+				},
+				options: {
+					isThinkingActive: chatState.isThinkingActive,
+					isOnlineSearchActive: chatState.isOnlineSearchActive,
+					isMCPActive: chatState.isMCPActive,
+					mcpServerIds: chatState.mcpServerIds,
+					autoParseUrl: preferencesSettings.autoParseUrl,
+					speedOptions: {
+						enabled: preferencesSettings.streamOutputEnabled,
+						speed: preferencesSettings.streamSpeed,
+					},
+				},
+			};
+
+			const response = {
+				message: lastMessage,
+				usage: undefined,
+				model: chatState.selectedModel.id,
+				finishReason: "stop",
+				metadata: {},
+			};
+
+			// Serialize context and response to remove Svelte Proxy objects
+			const serializedContext = JSON.parse(JSON.stringify(messageContext));
+			const serializedResponse = JSON.parse(JSON.stringify(response));
+
+			await pluginService.executeAfterSendMessageHook(serializedContext, serializedResponse);
+			console.log("[ChatState] After send message hook executed successfully");
+		}
+	} catch (hookError) {
+		console.error("[ChatState] After send message hook failed:", hookError);
+		// Continue execution even if hook fails
+	}
+
+	await afterChatFinished({
+		messages,
+		chatState,
+		persistedChatParamsState,
+		persistedMessagesState,
+	});
+
+	console.log(
+		"[onFinish] Callback complete, total elapsed:",
+		(performance.now() - onFinishStartTime).toFixed(2),
+		"ms",
+	);
+}
 
 function buildFallbackConfigIfNeeded(
 	primaryProvider: ModelProvider | undefined,
