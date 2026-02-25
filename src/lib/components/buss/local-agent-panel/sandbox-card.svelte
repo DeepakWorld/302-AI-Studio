@@ -114,7 +114,7 @@
 		</div>
 		<div class="flex gap-2">
 			{#if showLogButton}
-				<Button size="sm" variant="outline" onclick={handleOpenLogs} class="min-w-[60px]">
+				<Button size="sm" variant="secondary" onclick={handleOpenLogs} class="min-w-[60px]">
 					{m.local_platform_logs()}
 				</Button>
 			{/if}
