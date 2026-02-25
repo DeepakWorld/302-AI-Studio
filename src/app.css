@@ -287,6 +287,11 @@
 	.streaming-fade-in {
 		animation: streaming-fade 250ms ease-out forwards;
 	}
+
+	::selection {
+		background-color: var(--primary);
+		color: #ffffff;
+	}
 }
 
 /* Design System tokens for new buss components */
