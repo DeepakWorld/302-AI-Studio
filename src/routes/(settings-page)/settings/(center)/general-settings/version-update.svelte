@@ -9,13 +9,11 @@
 	} from "$lib/components/buss/settings";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
-	import { Progress } from "$lib/components/ui/progress/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import { m } from "$lib/paraglide/messages.js";
 	import { changelogState } from "$lib/stores/changelog-state.svelte";
 	import { generalSettings } from "$lib/stores/general-settings.state.svelte";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
-	import FileDownIcon from "@lucide/svelte/icons/file-down";
 	import Loader2Icon from "@lucide/svelte/icons/loader-2";
 	import type { UpdateChannel } from "@shared/storage/general-settings";
 	import { onMount } from "svelte";
@@ -28,13 +26,11 @@
 		onUpdateNotAvailable,
 		onUpdateDownloaded,
 		onUpdateError,
-		onDownloadProgress,
 	} = window.electronAPI.updater;
 
 	let checking = $state(false);
 	let downloading = $state(false);
 	let updateDownloaded = $state(false);
-	let downloadProgress = $state({ percent: 0, transferred: 0, total: 0 });
 
 	let isUpdating = $derived(checking || downloading);
 
@@ -55,15 +51,6 @@
 					? m.downloading_update()
 					: m.check_update(),
 	);
-
-	// Format bytes to human readable string
-	function formatBytes(bytes: number): string {
-		if (bytes === 0) return "0 B";
-		const k = 1024;
-		const sizes = ["B", "KB", "MB", "GB"];
-		const i = Math.floor(Math.log(bytes) / Math.log(k));
-		return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-	}
 
 	async function handleCheckUpdate() {
 		checking = true;
@@ -107,37 +94,24 @@
 		const cleanupAvailable = onUpdateAvailable(() => {
 			checking = false;
 			downloading = true;
-			downloadProgress = { percent: 0, transferred: 0, total: 0 };
 			toast.success(m.update_available());
 		});
 
 		const cleanupNotAvailable = onUpdateNotAvailable(() => {
 			checking = false;
 			downloading = false;
-			downloadProgress = { percent: 0, transferred: 0, total: 0 };
 			toast.success(m.update_not_available());
 		});
 
 		const cleanupDownloaded = onUpdateDownloaded((_data) => {
 			checking = false;
 			downloading = false;
-			downloadProgress = {
-				percent: 100,
-				transferred: downloadProgress.total,
-				total: downloadProgress.total,
-			};
 			updateDownloaded = true;
-		});
-
-		const cleanupProgress = onDownloadProgress((data) => {
-			downloadProgress = data;
-			console.log("Download progress:", data);
 		});
 
 		const cleanupError = onUpdateError((data) => {
 			checking = false;
 			downloading = false;
-			downloadProgress = { percent: 0, transferred: 0, total: 0 };
 			toast.error(m.update_error(), {
 				description: data.message,
 			});
@@ -148,7 +122,6 @@
 			cleanupAvailable?.();
 			cleanupNotAvailable?.();
 			cleanupDownloaded?.();
-			cleanupProgress?.();
 			cleanupError?.();
 		};
 	});
@@ -182,26 +155,6 @@
 	{/snippet}
 
 	<SettingInfoItem label={m.version_information()} value={appInfo.version} action={updateButton} />
-
-	<!-- Download progress -->
-	{#if downloading && downloadProgress.percent > 0}
-		<div class="rounded-settings-item bg-muted/50 p-3 space-y-2">
-			<div class="flex items-center justify-between text-sm">
-				<div class="flex items-center gap-2">
-					<FileDownIcon class="size-4 text-primary animate-pulse" />
-					<span class="text-muted-fg">{m.downloading_update()}</span>
-				</div>
-				<span class="text-muted-fg font-medium">{downloadProgress.percent.toFixed(1)}%</span>
-			</div>
-			<Progress value={downloadProgress.percent} class="h-2" />
-			<div class="flex justify-between text-xs text-muted-fg">
-				<span>{formatBytes(downloadProgress.transferred)}</span>
-				{#if downloadProgress.total > 0}
-					<span>{formatBytes(downloadProgress.total)}</span>
-				{/if}
-			</div>
-		</div>
-	{/if}
 
 	<!-- New version notification -->
 	{#if hasNewerVersion && latestVersionNumber}

@@ -1,13 +1,12 @@
+import { isMac } from "@electron/main/constants";
 import type { UpdateChannel } from "@shared/storage/general-settings";
-import { autoUpdater, dialog, net, type IpcMainInvokeEvent } from "electron";
-import * as fs from "fs";
-import * as path from "path";
+import { app, autoUpdater, dialog, type IpcMainInvokeEvent } from "electron";
 import { broadcastService } from "../broadcast-service";
 import { generalSettingsService } from "../settings-service/general-settings-service";
 import { generalSettingsStorage } from "../storage-service/general-settings-storage";
+import { windowService } from "../window-service";
 
 const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000;
-const DOWNLOAD_MONITOR_INTERVAL = 1000;
 
 export class UpdaterService {
 	private checkInterval: NodeJS.Timeout | null = null;
@@ -17,30 +16,34 @@ export class UpdaterService {
 	private currentChannel: UpdateChannel = "stable";
 	private isChecking = false;
 
-	// Download monitoring
-	private downloadInterval: NodeJS.Timeout | null = null;
-	private targetFileSize: number = 0;
-	private isMonitoringDownload = false;
-
 	constructor() {
-		// Only support Windows
-		if (process.platform === "win32") {
+		const platform = process.platform;
+
+		if (platform === "darwin" || platform === "win32") {
+			// Initialize with stable channel, will be updated in initializeAutoCheck
 			this.updateFeedUrl = this.buildUpdateFeedUrl("stable");
 			this.setupAutoUpdater();
 			this.initializeAutoCheck();
 		} else {
 			this.updateFeedUrl = "";
-			console.warn("Auto-update only supported on Windows");
+			console.warn("Auto-update not supported on this platform");
 		}
 	}
 
 	private buildUpdateFeedUrl(channel: UpdateChannel): string {
 		const server = "https://updater.302.ai";
 		const appId = "302-ai-studio";
+		const platform = process.platform;
 
-		// Windows Squirrel expects base URL without version
-		// It will automatically request /RELEASES file
-		return `${server}/update/${appId}/${channel}/${process.platform}/${process.arch}`;
+		if (platform === "win32") {
+			// Windows Squirrel expects base URL without version
+			// It will automatically request /RELEASES file
+			return `${server}/update/${appId}/${channel}/${platform}/${process.arch}`;
+		}
+
+		// macOS Squirrel needs version in URL for update check
+		const version = app.getVersion();
+		return `${server}/update/${appId}/${channel}/${platform}/${process.arch}/${version}`;
 	}
 
 	private updateFeedUrlForChannel(channel: UpdateChannel) {
@@ -75,46 +78,21 @@ export class UpdaterService {
 			broadcastService.broadcastChannelToAll("updater:update-checking");
 		});
 
-		autoUpdater.on("update-available", async () => {
+		autoUpdater.on("update-available", () => {
 			console.log("Update available");
 			this.isChecking = false;
 			broadcastService.broadcastChannelToAll("updater:update-available");
-
-			// Try to fetch file size from server for progress calculation
-			this.targetFileSize = await this.fetchUpdateFileSize();
-			console.log(`Target file size: ${this.targetFileSize} bytes`);
-
-			// Start monitoring download progress via directory
-			this.startDownloadMonitoring();
 		});
 
 		autoUpdater.on("update-not-available", () => {
 			console.log("Update not available");
 			this.isChecking = false;
-
-			// Stop any ongoing download monitoring
-			this.stopDownloadMonitoring();
-
 			broadcastService.broadcastChannelToAll("updater:update-not-available");
 		});
 
 		autoUpdater.on("update-downloaded", async (_event, releaseNotes, releaseName) => {
 			console.log("Update downloaded");
 			this.updateDownloaded = true;
-
-			// Save target size before stopping monitoring (which resets it)
-			const totalSize = this.targetFileSize;
-
-			// Stop monitoring download progress
-			this.stopDownloadMonitoring();
-
-			// Broadcast 100% progress
-			broadcastService.broadcastChannelToAll("updater:download-progress", {
-				percent: 100,
-				transferred: totalSize,
-				total: totalSize,
-			});
-
 			broadcastService.broadcastChannelToAll("updater:update-downloaded", {
 				releaseNotes,
 				releaseName,
@@ -127,9 +105,6 @@ export class UpdaterService {
 		autoUpdater.on("error", (error) => {
 			console.error("Update error:", error);
 			this.isChecking = false;
-
-			// Stop any ongoing download monitoring
-			this.stopDownloadMonitoring();
 
 			// Check if this is a "no releases available" error (common on Windows)
 			// These errors should be treated as "no update available" rather than errors
@@ -169,150 +144,9 @@ export class UpdaterService {
 		}
 	}
 
-	// ******************************* Download Monitoring Methods ******************************* //
-
-	/**
-	 * Get the Squirrel download directory for Windows
-	 */
-	private getSquirrelDownloadDir(): string {
-		// Windows: %LOCALAPPDATA%\SquirrelTemp
-		return path.join(process.env.LOCALAPPDATA || "", "SquirrelTemp");
-	}
-
-	/**
-	 * Find the update file (nupkg) in the download directory
-	 */
-	private findUpdateFile(downloadDir: string): { name: string; size: number } | null {
-		if (!fs.existsSync(downloadDir)) {
-			return null;
-		}
-
-		try {
-			const files = fs.readdirSync(downloadDir);
-
-			// Windows: Look for nupkg files
-			const updateFiles = files.filter(
-				(file) =>
-					file.endsWith(".nupkg") ||
-					file.endsWith(".nupkg.temp") ||
-					file.endsWith(".nupkg.broken") ||
-					file.endsWith(".zip"),
-			);
-
-			if (updateFiles.length > 0) {
-				const sortedFiles = updateFiles
-					.map((name) => {
-						const filePath = path.join(downloadDir, name);
-						const stats = fs.statSync(filePath);
-						return { name, size: stats.size, mtime: stats.mtime };
-					})
-					.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-
-				return { name: sortedFiles[0].name, size: sortedFiles[0].size };
-			}
-
-			return null;
-		} catch (error) {
-			console.error("Error finding update file:", error);
-			return null;
-		}
-	}
-
-	/**
-	 * Start monitoring the download directory for progress
-	 */
-	private startDownloadMonitoring() {
-		if (this.isMonitoringDownload) {
-			return;
-		}
-
-		this.isMonitoringDownload = true;
-		const downloadDir = this.getSquirrelDownloadDir();
-
-		console.log(`Starting download monitoring: ${downloadDir}`);
-
-		this.downloadInterval = setInterval(() => {
-			const updateFile = this.findUpdateFile(downloadDir);
-
-			if (!updateFile) {
-				return;
-			}
-
-			const downloadedSize = updateFile.size;
-
-			// Use targetFileSize from server if available, otherwise use estimated size
-			const totalSize = this.targetFileSize > 0 ? this.targetFileSize : 100 * 1024 * 1024;
-			const percent = Math.min((downloadedSize / totalSize) * 100, 99);
-
-			// Broadcast progress to all windows
-			broadcastService.broadcastChannelToAll("updater:download-progress", {
-				percent: Math.round(percent * 100) / 100,
-				transferred: downloadedSize,
-				total: totalSize,
-			});
-		}, DOWNLOAD_MONITOR_INTERVAL);
-	}
-
-	/**
-	 * Stop monitoring download progress
-	 */
-	private stopDownloadMonitoring() {
-		if (this.downloadInterval) {
-			clearInterval(this.downloadInterval);
-			this.downloadInterval = null;
-		}
-		this.isMonitoringDownload = false;
-		this.targetFileSize = 0;
-		console.log("Download monitoring stopped");
-	}
-
-	/**
-	 * Fetch update file size from server
-	 */
-	private fetchUpdateFileSize(): Promise<number> {
-		return new Promise((resolve) => {
-			try {
-				const request = net.request(this.updateFeedUrl);
-
-				let data = "";
-
-				request.on("response", (response) => {
-					response.on("data", (chunk) => {
-						data += chunk.toString();
-					});
-
-					response.on("end", () => {
-						try {
-							const json = JSON.parse(data);
-							const fileSize = json.file_size || 0;
-							console.log(`Fetched file size from server: ${fileSize} bytes`);
-							resolve(fileSize);
-						} catch {
-							resolve(0);
-						}
-					});
-				});
-
-				request.on("error", () => {
-					resolve(0);
-				});
-
-				request.end();
-			} catch {
-				resolve(0);
-			}
-		});
-	}
-
 	private checkForUpdates() {
 		if (this.isChecking) {
 			console.log("Update check already in progress, skipping...");
-			return;
-		}
-
-		// Only check for updates on Windows
-		if (process.platform !== "win32") {
-			this.isChecking = false;
 			return;
 		}
 
@@ -357,6 +191,7 @@ export class UpdaterService {
 			if (response === 0) {
 				// User clicked "Restart Now"
 				UpdaterService.isInstallingUpdate = true;
+				if (isMac) windowService.setCMDQ(true);
 				autoUpdater.quitAndInstall();
 			}
 		} catch (error) {
@@ -366,6 +201,7 @@ export class UpdaterService {
 
 	private _quitAndInstall() {
 		UpdaterService.isInstallingUpdate = true;
+		if (isMac) windowService.setCMDQ(true);
 		autoUpdater.quitAndInstall();
 	}
 
@@ -411,7 +247,6 @@ export class UpdaterService {
 
 	destroy() {
 		this.stopAutoCheck();
-		this.stopDownloadMonitoring();
 	}
 }
 
