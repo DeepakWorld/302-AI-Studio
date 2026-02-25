@@ -6,6 +6,7 @@ import type {
 	Tab,
 	TabDragGhostClear,
 	TabDragGhostHover,
+	TabUIState,
 	Theme,
 	ThreadParmas,
 } from "@shared/types";
@@ -121,6 +122,7 @@ declare global {
 			onWslRestartRequired: (
 				callback: (data: { reason: string; message: string }) => void,
 			) => () => void;
+			onTabRequestSnapshot: (callback: () => Promise<TabUIState> | TabUIState) => () => void;
 		};
 		windowId: string;
 		tab: Tab;

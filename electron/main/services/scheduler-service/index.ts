@@ -17,6 +17,10 @@ export const CRON_EXPRESSION = {
 	 * Run every 60 seconds (1 minute)
 	 */
 	EVERY_60_SECONDS: "*/60 * * * * *",
+	/**
+	 * Run every 5 minutes
+	 */
+	EVERY_5_MINUTES: "0 */5 * * * * *",
 } as const;
 
 export class SchedulerService {

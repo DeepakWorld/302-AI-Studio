@@ -8,6 +8,7 @@ import type {
 	Tab,
 	TabDragGhostClear,
 	TabDragGhostHover,
+	TabUIState,
 	Theme,
 } from "@shared/types";
 import { contextBridge, ipcRenderer } from "electron";
@@ -355,6 +356,19 @@ if (process.contextIsolated) {
 				const listener = (_: unknown, data: { reason: string; message: string }) => callback(data);
 				ipcRenderer.on("wsl-restart-required", listener);
 				return () => ipcRenderer.removeListener("wsl-restart-required", listener);
+			},
+			onTabRequestSnapshot: (callback: () => Promise<TabUIState> | TabUIState) => {
+				const listener = async () => {
+					try {
+						const snapshot = await callback();
+						ipcRenderer.send("tab:snapshot-data", snapshot);
+					} catch (error) {
+						console.error("Failed to generate snapshot:", error);
+						ipcRenderer.send("tab:snapshot-data", null);
+					}
+				};
+				ipcRenderer.on("tab:request-snapshot", listener);
+				return () => ipcRenderer.removeListener("tab:request-snapshot", listener);
 			},
 		});
 

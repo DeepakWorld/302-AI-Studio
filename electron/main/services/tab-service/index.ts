@@ -1,5 +1,5 @@
 import type { ChatMessage, Tab, TabType, ThreadParmas } from "@shared/types";
-import { BrowserWindow, WebContentsView, type IpcMainInvokeEvent } from "electron";
+import { BrowserWindow, ipcMain, WebContentsView, type IpcMainInvokeEvent } from "electron";
 import { isNull, isUndefined } from "es-toolkit";
 import { nanoid } from "nanoid";
 import { stringify } from "superjson";
@@ -11,12 +11,18 @@ import {
 	withLoadHandlers,
 } from "../../mixins/web-contents-mixins";
 import { TempStorage } from "../../utils/temp-storage";
+import { emitter } from "../broadcast-service";
 import { shortcutService } from "../shortcut-service";
 import { storageService } from "../storage-service";
 import { providerStorage } from "../storage-service/provider-storage";
 import { sessionStorage } from "../storage-service/session-storage";
 import { tabStorage } from "../storage-service/tab-storage";
 import { threadStorage } from "../storage-service/thread-storage";
+import { threadStateService } from "../thread-state-service";
+import { LRUTabManager, type TabUsageMetrics } from "./lru-tab-manager";
+import { MemoryManager } from "./memory-manager";
+import { createElectronSnapshotProvider } from "./memory-snapshot";
+import { ViewLoadTracker } from "./view-load-tracker";
 
 type TabConfig = {
 	title: string;
@@ -35,6 +41,11 @@ const TAB_CONFIGS: Record<TabType, TabConfig> = {
 
 const getTabConfig = (type: TabType) => TAB_CONFIGS[type] || TAB_CONFIGS.chat;
 
+interface TabAccessInfo {
+	lastAccessTime: number;
+	isBusy: boolean;
+}
+
 export class TabService {
 	private tabViewMap: Map<string, WebContentsView>;
 	private tabMap: Map<string, Tab>;
@@ -42,6 +53,13 @@ export class TabService {
 	private windowActiveTabId: Map<number, string>;
 	private windowShellView: Map<number, WebContentsView>;
 	private tempFileRegistry: Map<string, string[]>; // tabId -> tempFilePaths[]
+	private tabAccessHistory: Map<string, TabAccessInfo>;
+	private tabWindowMap: Map<string, number>; // tabId -> windowId
+	private pendingDestroyTabs: Set<string>;
+	private pendingDestroyTimers: Map<string, NodeJS.Timeout>;
+	private memoryManager: MemoryManager;
+	private memoryManagerStarted: boolean;
+	private initialLoadTracker: ViewLoadTracker;
 
 	constructor() {
 		this.tabViewMap = new Map();
@@ -50,6 +68,336 @@ export class TabService {
 		this.windowActiveTabId = new Map();
 		this.windowShellView = new Map();
 		this.tempFileRegistry = new Map();
+		this.tabAccessHistory = new Map();
+		this.tabWindowMap = new Map();
+		this.pendingDestroyTabs = new Set();
+		this.pendingDestroyTimers = new Map();
+		this.memoryManager = new MemoryManager({ getSnapshot: createElectronSnapshotProvider() });
+		this.memoryManagerStarted = false;
+		this.initialLoadTracker = new ViewLoadTracker();
+
+		// Listen for thread busy state changes to handle pending destructions
+		emitter.on(
+			"thread-busy-state-changed",
+			(data: { threadId: string; isBusy: boolean; reason?: string }) => {
+				if (!data.isBusy) {
+					this.checkPendingDestruction(data.threadId);
+				}
+			},
+		);
+	}
+
+	async startMemoryManagerAfterInitialLoad(timeoutMs: number = 10_000) {
+		if (this.memoryManagerStarted) return;
+
+		await this.initialLoadTracker.waitForAll(timeoutMs);
+		this.startMemoryManager();
+	}
+
+	private startMemoryManager() {
+		if (this.memoryManagerStarted) return;
+		this.memoryManagerStarted = true;
+		this.memoryManager.start(() => this.checkAndSleepTabs());
+		this.memoryManager.requestImmediateCheck();
+	}
+
+	private trackInitialViewLoad(view: WebContentsView) {
+		if (this.memoryManagerStarted) return;
+		this.initialLoadTracker.track(view);
+	}
+
+	private requestMemoryCheckOnNewView() {
+		if (!this.memoryManagerStarted) return;
+		this.memoryManager.requestImmediateCheck();
+	}
+
+	private async checkAndSleepTabs() {
+		const windows = BrowserWindow.getAllWindows();
+		const focusedWindow = BrowserWindow.getFocusedWindow();
+
+		for (const window of windows) {
+			if (window.isDestroyed()) continue;
+
+			const isFocused = focusedWindow && window.id === focusedWindow.id;
+			const maxBackgroundTabs = isFocused ? 10 : 5;
+
+			const activeTabId = this.windowActiveTabId.get(window.id);
+			const views = this.windowTabView.get(window.id) || [];
+			const metrics: TabUsageMetrics[] = [];
+
+			for (const view of views) {
+				let tabId: string | undefined;
+				for (const [id, v] of this.tabViewMap.entries()) {
+					if (v === view) {
+						tabId = id;
+						break;
+					}
+				}
+
+				if (tabId) {
+					const tab = this.tabMap.get(tabId);
+					const isThreadBusy = tab?.threadId
+						? threadStateService.isThreadBusy(tab.threadId)
+						: false;
+
+					const access = this.tabAccessHistory.get(tabId) || {
+						lastAccessTime: 0,
+						isBusy: false,
+					};
+					metrics.push({
+						tabId,
+						lastAccessTime: access.lastAccessTime,
+						isBusy: isThreadBusy,
+						isActive: tabId === activeTabId,
+					});
+				}
+			}
+
+			const tabsToSleep = LRUTabManager.calculateEvictions(metrics, maxBackgroundTabs);
+
+			for (const tabId of tabsToSleep) {
+				await this.sleepTab(tabId);
+			}
+		}
+	}
+
+	private checkPendingDestruction(threadId: string) {
+		// Find if any pending destroy tab belongs to this thread
+		for (const tabId of this.pendingDestroyTabs) {
+			const tab = this.tabMap.get(tabId);
+			if (tab && tab.threadId === threadId) {
+				console.log(
+					`[TabService] Thread ${threadId} is no longer busy, executing pending destruction for tab ${tabId}`,
+				);
+
+				// Cancel any existing timer for this tab to prevent duplicates
+				const existingTimer = this.pendingDestroyTimers.get(tabId);
+				if (existingTimer) {
+					clearTimeout(existingTimer);
+				}
+
+				// Use a small delay to ensure frontend persistence is complete
+				const timer = setTimeout(() => {
+					this.pendingDestroyTimers.delete(tabId);
+					this.forceDestroyTab(tabId);
+				}, 5000);
+				this.pendingDestroyTimers.set(tabId, timer);
+			}
+		}
+	}
+
+	private forceDestroyTab(tabId: string) {
+		// Guard: if tab was resurrected, it's no longer in pendingDestroyTabs — skip destruction
+		if (!this.pendingDestroyTabs.has(tabId)) {
+			console.log(
+				`[TabService] Tab ${tabId} is no longer pending destruction (resurrected?), skipping`,
+			);
+			return;
+		}
+
+		this.pendingDestroyTabs.delete(tabId);
+		this.pendingDestroyTimers.delete(tabId);
+		const view = this.tabViewMap.get(tabId);
+		if (view && !view.webContents.isDestroyed()) {
+			console.log(`[TabService] Force destroying tab ${tabId}`);
+			view.webContents.close({ waitForBeforeUnload: false });
+		} else {
+			// Cleanup maps if view is already gone
+			console.log(`[TabService] Cleaning up metadata for already destroyed tab ${tabId}`);
+			this.tabViewMap.delete(tabId);
+			this.tabMap.delete(tabId);
+			this.tabWindowMap.delete(tabId);
+		}
+	}
+
+	/**
+	 * Attempt to resurrect a tab that is pending destruction for a specific thread.
+	 * If found, it re-attaches the view to the target window and restores its state.
+	 */
+	private async resurrectTab(targetWindow: BrowserWindow, threadId: string): Promise<Tab | null> {
+		let pendingTabId: string | undefined;
+
+		// 1. Search in pending list
+		for (const tabId of this.pendingDestroyTabs) {
+			const tab = this.tabMap.get(tabId);
+			if (tab && tab.threadId === threadId) {
+				pendingTabId = tabId;
+				break;
+			}
+		}
+
+		if (!pendingTabId) return null;
+
+		const tab = this.tabMap.get(pendingTabId);
+		const view = this.tabViewMap.get(pendingTabId);
+
+		if (!tab || !view || view.webContents.isDestroyed()) {
+			this.pendingDestroyTabs.delete(pendingTabId); // Cleanup invalid entry
+			return null;
+		}
+
+		console.log(
+			`[TabService] Resurrecting pending tab ${pendingTabId} for thread ${threadId} into window ${targetWindow.id}`,
+		);
+
+		// 2. Remove from pending list (Rescue it)
+		this.pendingDestroyTabs.delete(pendingTabId);
+
+		// 3. Cancel any pending destruction timer
+		const pendingTimer = this.pendingDestroyTimers.get(pendingTabId);
+		if (pendingTimer) {
+			clearTimeout(pendingTimer);
+			this.pendingDestroyTimers.delete(pendingTabId);
+			console.log(
+				`[TabService] Cancelled pending destruction timer for resurrected tab ${pendingTabId}`,
+			);
+		}
+
+		// 4. Update Window Mapping
+		const oldWindowId = this.tabWindowMap.get(pendingTabId);
+		this.tabWindowMap.set(pendingTabId, targetWindow.id);
+
+		// 5. Handle Cross-Window migration if necessary
+		if (oldWindowId !== targetWindow.id) {
+			// Update renderer's window context
+			view.webContents
+				.executeJavaScript(
+					`
+				window.windowId = "${targetWindow.id}";
+				if (window.dispatchEvent) {
+					window.dispatchEvent(new CustomEvent('windowIdChanged', {
+						detail: { newWindowId: "${targetWindow.id}" }
+					}));
+				}
+			`,
+				)
+				.catch((err) => console.error("Failed to update windowId during resurrection:", err));
+
+			// Rebind shortcuts
+			shortcutService.getEngine().attachToView(view, targetWindow.id, pendingTabId);
+		}
+
+		// 6. Re-attach View
+		this.attachViewToWindow(targetWindow, view);
+
+		// 7. Add to Window Views list
+		const views = this.windowTabView.get(targetWindow.id) || [];
+		if (!views.includes(view)) {
+			views.push(view);
+			this.windowTabView.set(targetWindow.id, views);
+		}
+
+		// 8. Update Storage (Add it back to UI)
+		// We do this BEFORE switchActiveTab to ensure state consistency
+		const windowIdStr = targetWindow.id.toString();
+		const tabState = await tabStorage.getItemInternal("tab-bar-state");
+		if (!isNull(tabState)) {
+			const currentTabs = tabState[windowIdStr]?.tabs || [];
+			// Mark as active
+			const restoredTab = { ...tab, active: true };
+			const updatedTabs = [...currentTabs.map((t) => ({ ...t, active: false })), restoredTab];
+			tabState[windowIdStr] = { tabs: updatedTabs };
+			await tabStorage.setItemInternal("tab-bar-state", tabState);
+		}
+
+		// 9. Finally switch focus
+		await this.switchActiveTab(targetWindow, pendingTabId);
+
+		return tab;
+	}
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private async getSnapshotFromRenderer(view: WebContentsView, tabId: string): Promise<any> {
+		return new Promise((resolve) => {
+			const cleanup = () => {
+				ipcMain.removeListener("tab:snapshot-data", listener);
+				clearTimeout(timeout);
+			};
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const listener = (event: any, snapshot: any) => {
+				if (event.sender.id === view.webContents.id) {
+					cleanup();
+					resolve(snapshot);
+				}
+			};
+
+			ipcMain.on("tab:snapshot-data", listener);
+
+			// Request snapshot
+			view.webContents.send("tab:request-snapshot");
+
+			// Timeout after 500ms (we don't want to block sleep too long)
+			const timeout = setTimeout(() => {
+				console.warn(`[TabService] Snapshot timeout for tab ${tabId}`);
+				cleanup();
+				resolve(null);
+			}, 500);
+		});
+	}
+
+	private async sleepTab(tabId: string) {
+		console.log(`[TabService] Sleeping tab ${tabId}`);
+		const view = this.tabViewMap.get(tabId);
+		const tab = this.tabMap.get(tabId);
+
+		if (!view || !tab) return;
+		if (view.webContents.isDestroyed()) return;
+
+		// 1. Snapshot UI state
+		try {
+			// Request snapshot from renderer via IPC
+			const uiState = await this.getSnapshotFromRenderer(view, tabId);
+
+			if (uiState) {
+				tab.uiState = uiState;
+				console.log(`[TabService] Captured UI state for tab ${tabId}`, uiState);
+			}
+
+			tab.isSleeping = true;
+			this.tabMap.set(tabId, tab);
+
+			// Update storage so state persists across restarts (optional but good)
+			// We need to find which window this tab belongs to to update storage
+			// This is expensive, so maybe skip for now or do it efficiently
+		} catch (error) {
+			console.error(`[TabService] Failed to snapshot tab ${tabId}:`, error);
+		}
+
+		// 2. Remove view from window
+		const window = this.findWindowForTab(tabId);
+		if (window) {
+			window.contentView.removeChildView(view);
+			// Remove from windowTabView list
+			const views = this.windowTabView.get(window.id) || [];
+			const updatedViews = views.filter((v) => v !== view);
+			this.windowTabView.set(window.id, updatedViews);
+		}
+
+		// 3. Destroy WebContents
+		view.webContents.close({ waitForBeforeUnload: true });
+		this.tabViewMap.delete(tabId);
+		// Note: We keep tab in tabMap
+	}
+
+	private async wakeTab(
+		window: BrowserWindow,
+		tabId: string,
+	): Promise<WebContentsView | undefined> {
+		const tab = this.tabMap.get(tabId);
+		if (!tab) return undefined;
+
+		console.log(`[TabService] Waking tab ${tabId}`);
+		tab.isSleeping = false;
+		// Recreate view
+		const view = await this.newWebContentsView(window.id, tab);
+
+		// Add to window views list
+		const views = this.windowTabView.get(window.id) || [];
+		views.push(view);
+		this.windowTabView.set(window.id, views);
+
+		return view;
 	}
 
 	private scheduleWindowResize(window: BrowserWindow) {
@@ -98,6 +446,9 @@ export class TabService {
 			// autoOpenDevTools: !!MAIN_WINDOW_VITE_DEV_SERVER_URL,
 		});
 
+		this.trackInitialViewLoad(view);
+		this.requestMemoryCheckOnNewView();
+
 		// Attach shortcut engine to tab view
 		shortcutService.getEngine().attachToView(view, windowId, tab.id);
 
@@ -110,8 +461,16 @@ export class TabService {
 		const capturedTab = tab;
 		withLifecycleHandlers(view, {
 			onDestroyed: async () => {
-				console.log(`Tab ${capturedTabId} webContents destroyed, cleaning up...`);
+				const currentTab = this.tabMap.get(capturedTabId);
+				if (currentTab?.isSleeping) {
+					console.log(
+						`Tab ${capturedTabId} is sleeping, preserving metadata but cleaning view maps`,
+					);
+					this.tabViewMap.delete(capturedTabId);
+					return;
+				}
 
+				console.log(`Tab ${capturedTabId} webContents destroyed, cleaning up all mappings`);
 				// === Business cleanup: handle private chat and empty thread data ===
 				if (capturedTab.threadId) {
 					// Parallel query for thread and messages
@@ -134,6 +493,7 @@ export class TabService {
 				// === Technical cleanup: remove mappings ===
 				this.tabViewMap.delete(capturedTabId);
 				this.tabMap.delete(capturedTabId);
+				this.tabWindowMap.delete(capturedTabId);
 
 				const windowViews = this.windowTabView.get(capturedWindowId);
 				if (!isUndefined(windowViews)) {
@@ -164,7 +524,7 @@ export class TabService {
 		view.setBounds({ x: 0, y: TITLE_BAR_HEIGHT + 1, width, height: height - TITLE_BAR_HEIGHT - 1 });
 	}
 
-	private switchActiveTab(window: BrowserWindow, newActiveTabId: string) {
+	private async switchActiveTab(window: BrowserWindow, newActiveTabId: string) {
 		const activeTabId = this.windowActiveTabId.get(window.id);
 		if (!isUndefined(activeTabId)) {
 			const prevView = this.tabViewMap.get(activeTabId);
@@ -173,13 +533,41 @@ export class TabService {
 			}
 		}
 
-		const newView = this.tabViewMap.get(newActiveTabId);
-		if (!isUndefined(newView)) {
+		let newView = this.tabViewMap.get(newActiveTabId);
+
+		// Check if tab needs waking
+		if (!newView) {
+			const tab = this.tabMap.get(newActiveTabId);
+			if (tab?.isSleeping) {
+				newView = await this.wakeTab(window, newActiveTabId);
+				if (newView) {
+					this.attachViewToWindow(window, newView);
+					// Ensure it's correctly sized
+					const { width, height } = window.getContentBounds();
+					newView.setBounds({
+						x: 0,
+						y: TITLE_BAR_HEIGHT + 1,
+						width,
+						height: height - TITLE_BAR_HEIGHT - 1,
+					});
+				}
+			}
+		}
+
+		if (!isUndefined(newView) && newView !== null) {
 			newView.setVisible(true);
 			newView.webContents.focus();
 		}
 
 		this.windowActiveTabId.set(window.id, newActiveTabId);
+
+		// Update access history
+		const accessInfo = this.tabAccessHistory.get(newActiveTabId) || {
+			lastAccessTime: 0,
+			isBusy: false,
+		};
+		accessInfo.lastAccessTime = Date.now();
+		this.tabAccessHistory.set(newActiveTabId, accessInfo);
 	}
 
 	private cleanupTabTempFiles(tabId: string) {
@@ -214,6 +602,7 @@ export class TabService {
 				tabView.setVisible(false);
 			}
 			this.tabMap.set(tab.id, tab);
+			this.tabWindowMap.set(tab.id, window.id);
 			views.push(tabView);
 		}
 
@@ -221,7 +610,7 @@ export class TabService {
 
 		if (activeTabView && activeTabId) {
 			this.attachViewToWindow(window, activeTabView);
-			this.switchActiveTab(window, activeTabId);
+			await this.switchActiveTab(window, activeTabId);
 		}
 
 		this.scheduleWindowResize(window);
@@ -229,6 +618,7 @@ export class TabService {
 
 	initWindowShellView(shellWindowId: number, shellView: WebContentsView) {
 		this.windowShellView.set(shellWindowId, shellView);
+		this.trackInitialViewLoad(shellView);
 	}
 
 	getTabById(tabId: string): Tab | undefined {
@@ -371,6 +761,22 @@ export class TabService {
 
 	removeTab(window: BrowserWindow, tabId: string) {
 		console.log("Removing Tab --->", tabId);
+
+		// Check if busy
+		const tab = this.tabMap.get(tabId);
+		const isThreadBusy = tab?.threadId ? threadStateService.isThreadBusy(tab.threadId) : false;
+
+		if (isThreadBusy) {
+			console.log(`[TabService] Tab ${tabId} is busy, deferring destruction.`);
+			const view = this.tabViewMap.get(tabId);
+			if (view) {
+				window.contentView.removeChildView(view);
+				// view.setVisible(false); // Should be hidden by removeChildView
+			}
+			this.pendingDestroyTabs.add(tabId);
+			return;
+		}
+
 		const view = this.tabViewMap.get(tabId);
 		if (!isUndefined(view)) {
 			window.contentView.removeChildView(view);
@@ -378,6 +784,7 @@ export class TabService {
 		} else {
 			this.tabViewMap.delete(tabId);
 			this.tabMap.delete(tabId);
+			this.tabWindowMap.delete(tabId);
 		}
 	}
 
@@ -392,6 +799,7 @@ export class TabService {
 
 		// Add to tab map
 		this.tabMap.set(tab.id, tab);
+		this.tabWindowMap.set(tab.id, window.id);
 
 		// Add to window's view list
 		const windowViews = this.windowTabView.get(window.id) || [];
@@ -401,7 +809,7 @@ export class TabService {
 		}
 
 		// Switch to this tab
-		this.switchActiveTab(window, tab.id);
+		await this.switchActiveTab(window, tab.id);
 
 		this.scheduleWindowResize(window);
 	}
@@ -409,12 +817,12 @@ export class TabService {
 	/**
 	 * Transfer a tab from one window to another while preserving the WebContentsView
 	 */
-	transferTabToWindow(
+	async transferTabToWindow(
 		fromWindow: BrowserWindow,
 		toWindow: BrowserWindow,
 		tabId: string,
 		tab: Tab,
-	): void {
+	): Promise<void> {
 		console.log(`Transferring Tab ${tabId} from window ${fromWindow.id} to window ${toWindow.id}`);
 
 		const view = this.tabViewMap.get(tabId);
@@ -461,6 +869,7 @@ export class TabService {
 
 		// Update tab data
 		this.tabMap.set(tabId, tab);
+		this.tabWindowMap.set(tabId, toWindow.id);
 
 		// Add to target window's view list
 		const toWindowViews = this.windowTabView.get(toWindow.id) || [];
@@ -468,14 +877,22 @@ export class TabService {
 		this.windowTabView.set(toWindow.id, toWindowViews);
 
 		// Switch to this tab in target window
-		this.switchActiveTab(toWindow, tabId);
+		await this.switchActiveTab(toWindow, tabId);
 	}
 
-	focusTabInWindow(window: BrowserWindow, tabId: string): void {
+	async focusTabInWindow(window: BrowserWindow, tabId: string): Promise<void> {
 		if (window.isDestroyed()) return;
 
 		const view = this.tabViewMap.get(tabId);
-		if (isUndefined(view)) return;
+
+		if (isUndefined(view)) {
+			// Tab might be sleeping, try to wake via switchActiveTab
+			const tab = this.tabMap.get(tabId);
+			if (tab?.isSleeping) {
+				await this.switchActiveTab(window, tabId);
+			}
+			return;
+		}
 
 		// Ensure the view is attached to the window and visible
 		if (view.webContents.isDestroyed()) {
@@ -487,7 +904,7 @@ export class TabService {
 		window.contentView.removeChildView(view);
 		window.contentView.addChildView(view);
 
-		this.switchActiveTab(window, tabId);
+		await this.switchActiveTab(window, tabId);
 
 		view.webContents.focus();
 	}
@@ -503,6 +920,12 @@ export class TabService {
 		type: TabType = "chat",
 		active: boolean = true,
 	): Promise<{ tabId: string | null }> {
+		// Try to resurrect pending tab first
+		const resurrectedTab = await this.resurrectTab(targetWindow, threadId);
+		if (resurrectedTab) {
+			return { tabId: resurrectedTab.id };
+		}
+
 		const windowId = targetWindow.id.toString();
 
 		const { getHref } = getTabConfig(type);
@@ -518,9 +941,10 @@ export class TabService {
 
 		const view = await this.newWebContentsView(targetWindow.id, newTab);
 		this.attachViewToWindow(targetWindow, view);
-		this.switchActiveTab(targetWindow, newTab.id);
+		await this.switchActiveTab(targetWindow, newTab.id);
 
 		this.tabMap.set(newTab.id, newTab);
+		this.tabWindowMap.set(newTab.id, targetWindow.id);
 
 		const windowViews = this.windowTabView.get(targetWindow.id) || [];
 		if (!windowViews.includes(view)) {
@@ -573,9 +997,10 @@ export class TabService {
 
 		const view = await this.newWebContentsView(targetWindow.id, newTab);
 		this.attachViewToWindow(targetWindow, view);
-		this.switchActiveTab(targetWindow, newTab.id);
+		await this.switchActiveTab(targetWindow, newTab.id);
 
 		this.tabMap.set(newTab.id, newTab);
+		this.tabWindowMap.set(newTab.id, targetWindow.id);
 
 		const windowViews = this.windowTabView.get(targetWindow.id) || [];
 		if (!windowViews.includes(view)) {
@@ -613,6 +1038,12 @@ export class TabService {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return null;
 
+		// Try to resurrect pending tab first
+		const resurrectedTab = await this.resurrectTab(window, threadId);
+		if (resurrectedTab) {
+			return stringify(resurrectedTab);
+		}
+
 		// ========== CHECK: Prevent duplicate tabs for the same thread ==========
 		const windowId = window.id.toString();
 		const tabState = await tabStorage.getItemInternal("tab-bar-state");
@@ -647,7 +1078,7 @@ export class TabService {
 							}));
 							tabState[wId] = { tabs: updatedTabs };
 							await tabStorage.setItemInternal("tab-bar-state", tabState);
-							this.focusTabInWindow(window, existingTab.id);
+							await this.focusTabInWindow(window, existingTab.id);
 							return stringify(existingTab);
 						} else {
 							// Different window - this shouldn't happen in normal flow
@@ -695,9 +1126,10 @@ export class TabService {
 
 		const view = await this.newWebContentsView(window.id, newTab);
 		this.attachViewToWindow(window, view);
-		this.switchActiveTab(window, newTab.id);
+		await this.switchActiveTab(window, newTab.id);
 
 		this.tabMap.set(newTab.id, newTab);
+		this.tabWindowMap.set(newTab.id, window.id);
 
 		const windowViews = this.windowTabView.get(window.id) || [];
 		if (!windowViews.includes(view)) {
@@ -809,9 +1241,10 @@ export class TabService {
 
 		const view = await this.newWebContentsView(window.id, newTab);
 		this.attachViewToWindow(window, view);
-		this.switchActiveTab(window, newTab.id);
+		await this.switchActiveTab(window, newTab.id);
 
 		this.tabMap.set(newTab.id, newTab);
+		this.tabWindowMap.set(newTab.id, window.id);
 
 		const windowViews = this.windowTabView.get(window.id) || [];
 		if (!windowViews.includes(view)) {
@@ -839,8 +1272,12 @@ export class TabService {
 	}
 
 	async handleActivateTab(event: IpcMainInvokeEvent, tabId: string) {
+		const tab = this.tabMap.get(tabId);
+		if (!tab) return;
+
 		const view = this.tabViewMap.get(tabId);
-		if (isUndefined(view)) return;
+		// If view is missing and not sleeping, something is wrong
+		if (isUndefined(view) && !tab.isSleeping) return;
 
 		const callerWindow = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(callerWindow)) return;
@@ -858,7 +1295,7 @@ export class TabService {
 				`[TabService] Tab ${tabId} is in window ${tabWindow.id}, but called from window ${callerWindow.id}. Focusing target window instead.`,
 			);
 			// Focus the correct window and activate the tab
-			this.focusTabInWindow(tabWindow, tabId);
+			await this.focusTabInWindow(tabWindow, tabId);
 
 			// Update storage
 			const targetWindowId = tabWindow.id.toString();
@@ -884,9 +1321,11 @@ export class TabService {
 		}
 
 		// Tab is in the correct window, activate it
-		callerWindow.contentView.removeChildView(view);
-		callerWindow.contentView.addChildView(view);
-		this.switchActiveTab(callerWindow, tabId);
+		if (view) {
+			callerWindow.contentView.removeChildView(view);
+			callerWindow.contentView.addChildView(view);
+		}
+		await this.switchActiveTab(callerWindow, tabId);
 
 		// ========== ATOMIC UPDATE: Update active state in storage ==========
 		const windowId = callerWindow.id.toString();
@@ -904,15 +1343,10 @@ export class TabService {
 	}
 
 	private findWindowForTab(tabId: string): BrowserWindow | null {
-		// Search all windows to find which one contains this tab
-		for (const [windowId, views] of this.windowTabView.entries()) {
-			const view = this.tabViewMap.get(tabId);
-			if (view && views.includes(view)) {
-				const window = BrowserWindow.fromId(windowId);
-				return window && !window.isDestroyed() ? window : null;
-			}
-		}
-		return null;
+		const windowId = this.tabWindowMap.get(tabId);
+		if (isUndefined(windowId)) return null;
+		const window = BrowserWindow.fromId(windowId);
+		return window && !window.isDestroyed() ? window : null;
 	}
 
 	async getActiveTab(event: IpcMainInvokeEvent): Promise<Tab | null> {
@@ -950,7 +1384,7 @@ export class TabService {
 		if (isUndefined(view)) return;
 
 		if (newActiveTabId && this.windowActiveTabId.get(window.id) === tabId) {
-			this.switchActiveTab(window, newActiveTabId);
+			await this.switchActiveTab(window, newActiveTabId);
 		}
 
 		// Business cleanup (private chat data) handled automatically in onDestroyed
@@ -961,7 +1395,7 @@ export class TabService {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return;
 
-		this.switchActiveTab(window, tabId);
+		await this.switchActiveTab(window, tabId);
 
 		// Business cleanup (private chat data) handled automatically in onDestroyed
 		for (const tabIdToClose of tabIdsToClose) {
@@ -980,7 +1414,7 @@ export class TabService {
 		if (isNull(window)) return;
 
 		if (shouldSwitchActive) {
-			this.switchActiveTab(window, tabId);
+			await this.switchActiveTab(window, tabId);
 		}
 
 		// Business cleanup (private chat data) handled automatically in onDestroyed
@@ -1060,10 +1494,10 @@ export class TabService {
 		return this.windowShellView.get(windowId);
 	}
 
-	selectTab(windowId: number, tabId: string): void {
+	async selectTab(windowId: number, tabId: string): Promise<void> {
 		const window = BrowserWindow.fromId(windowId);
 		if (!window) return;
-		this.switchActiveTab(window, tabId);
+		await this.switchActiveTab(window, tabId);
 	}
 
 	/**
@@ -1128,7 +1562,7 @@ export class TabService {
 			}
 
 			this.attachViewToWindow(window, newView);
-			this.switchActiveTab(window, tabId);
+			await this.switchActiveTab(window, tabId);
 
 			return true;
 		} catch (error) {
