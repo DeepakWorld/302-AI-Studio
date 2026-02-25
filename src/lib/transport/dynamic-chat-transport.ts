@@ -125,26 +125,15 @@ export class DynamicChatTransport<
 													const data = JSON.parse(jsonStr);
 													if (data.type === "error" && data.errorText) {
 														console.warn(
-															"[DynamicChatTransport] Intercepted error:",
-															data.errorText,
+															"[DynamicChatTransport] Captured deploy error into metadata:",
+															data.errorText.slice(0, 200),
 														);
-														// Convert error to text-delta to show in UI
-														const errorId = "error-" + Date.now();
-														const errorStart = {
-															type: "text-start",
-															id: errorId,
-														};
-														const errorDelta = {
-															type: "text-delta",
-															id: errorId,
-															delta: `\n\n> **Error**: ${data.errorText}\n\n`,
-														};
-														controller.enqueue(
-															encoder.encode(`data: ${JSON.stringify(errorStart)}\n\n`),
-														);
-														controller.enqueue(
-															encoder.encode(`data: ${JSON.stringify(errorDelta)}\n\n`),
-														);
+														// Store error in metadata for auto-retry instead of showing in chat
+														if (!pendingResultMetadata) {
+															pendingResultMetadata = {} as ResultMetadata;
+														}
+														// eslint-disable-next-line @typescript-eslint/no-explicit-any
+														(pendingResultMetadata as any).deployError = data.errorText;
 														continue;
 													}
 												}

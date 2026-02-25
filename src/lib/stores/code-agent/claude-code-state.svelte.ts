@@ -83,6 +83,8 @@ class ClaudeCodeAgentState {
 
 	isUpdatingThinkingBudget = $state(false);
 
+	#lastDeployApiError: string | null = null;
+
 	model = $derived(persistedClaudeCodeAgentState.current?.model ?? "");
 	currentSessionId = $derived(persistedClaudeCodeAgentState.current?.currentSessionId ?? "");
 	sandboxId = $derived(persistedClaudeCodeAgentState.current?.sandboxId ?? "");
@@ -101,9 +103,11 @@ class ClaudeCodeAgentState {
 	async handleChatFinished({
 		canDeploy,
 		lastMessage,
+		sendRetryMessage,
 	}: {
 		canDeploy: boolean;
 		lastMessage: ChatMessage;
+		sendRetryMessage?: (content: string) => Promise<void>;
 	}) {
 		if (!canDeploy || !lastMessage || lastMessage.role !== "assistant") return;
 
@@ -115,6 +119,17 @@ class ClaudeCodeAgentState {
 
 		if (deployInfo) {
 			await this.finalizeDeployment(deployInfo);
+			return;
+		}
+
+		// Deploy was attempted but failed — try auto-retry if possible
+		if (sendRetryMessage) {
+			const errorText = this.extractDeployErrorFromMessage(lastMessage) || this.#lastDeployApiError;
+			this.#lastDeployApiError = null;
+
+			if (errorText) {
+				await this.attemptDeployRetry(errorText, sendRetryMessage);
+			}
 		}
 	}
 
@@ -140,13 +155,18 @@ class ClaudeCodeAgentState {
 				console.log("[ClaudeCodeAgentState] Deployment successful:", result);
 				return result;
 			} else {
+				const errorMsg =
+					result.error || `Deploy API returned success=false (status: ${result.status})`;
 				console.error("[ClaudeCodeAgentState] Deployment failed:", result);
 				toast.error(`${m.toast_deploy_failed()}`);
+				this.#lastDeployApiError = errorMsg;
 				return null;
 			}
 		} catch (error) {
+			const errorMsg = String(error);
 			console.error("[ClaudeCodeAgentState] Deployment error:", error);
-			toast.error(`${m.toast_deploy_failed()}: ${String(error)}`);
+			toast.error(`${m.toast_deploy_failed()}: ${errorMsg}`);
+			this.#lastDeployApiError = errorMsg;
 			return null;
 		} finally {
 			agentPreviewState.isDeploying = false;
@@ -191,6 +211,45 @@ class ClaudeCodeAgentState {
 			deployInfo.id,
 		);
 		console.log("[ClaudeCodeAgentState] Deploy detected:", { isDeploy: true, deployInfo });
+	}
+
+	/**
+	 * Extract deploy error text from the assistant message.
+	 * First checks metadata (stored by DynamicChatTransport), then falls back
+	 * to the `> **Error**: <text>` pattern in message text.
+	 */
+	private extractDeployErrorFromMessage(message: ChatMessage): string | null {
+		// Check metadata for deploy error (stored silently by DynamicChatTransport)
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const metadata = message.metadata as any;
+		if (metadata?.result?.deployError) {
+			return metadata.result.deployError;
+		}
+
+		// Fallback: check for error text pattern in message text
+		const textContent = message.parts
+			.filter((part): part is { type: "text"; text: string } => part.type === "text")
+			.map((part) => part.text)
+			.join("\n");
+
+		const errorMatch = textContent.match(/> \*\*Error\*\*:\s*(.+)/s);
+		return errorMatch ? errorMatch[1].trim() : null;
+	}
+
+	/**
+	 * Send the deploy error back to the AI model so it can attempt to fix the issue.
+	 */
+	private async attemptDeployRetry(
+		errorText: string,
+		sendRetryMessage: (content: string) => Promise<void>,
+	): Promise<void> {
+		console.log(`[ClaudeCodeAgentState] Sending deploy error to model: ${errorText.slice(0, 200)}`);
+
+		// Delay to let UI settle
+		await new Promise((resolve) => setTimeout(resolve, 1500));
+
+		const retryContent = `${m.deploy_retry_prompt()}\n\n${errorText}`;
+		await sendRetryMessage(retryContent);
 	}
 
 	async handleThreadTitleUpdated({ title }: { title: string }) {
