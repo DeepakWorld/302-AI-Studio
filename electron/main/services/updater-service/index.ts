@@ -2,6 +2,7 @@ import { isMac } from "@electron/main/constants";
 import type { UpdateChannel } from "@shared/storage/general-settings";
 import { app, autoUpdater, dialog, type IpcMainInvokeEvent } from "electron";
 import { broadcastService } from "../broadcast-service";
+import { localVibeService } from "../local-vibe-service";
 import { generalSettingsService } from "../settings-service/general-settings-service";
 import { generalSettingsStorage } from "../storage-service/general-settings-storage";
 import { windowService } from "../window-service";
@@ -190,16 +191,21 @@ export class UpdaterService {
 
 			if (response === 0) {
 				// User clicked "Restart Now"
-				UpdaterService.isInstallingUpdate = true;
-				if (isMac) windowService.setCMDQ(true);
-				autoUpdater.quitAndInstall();
+				await this._quitAndInstall();
 			}
 		} catch (error) {
 			console.error("Failed to show update dialog:", error);
 		}
 	}
 
-	private _quitAndInstall() {
+	private async _quitAndInstall() {
+		try {
+			console.log("[Updater] Stopping local sandbox before update install...");
+			await localVibeService.stopLocalSandbox();
+			console.log("[Updater] Local sandbox stopped");
+		} catch (error) {
+			console.error("[Updater] Failed to stop local sandbox (proceeding):", error);
+		}
 		UpdaterService.isInstallingUpdate = true;
 		if (isMac) windowService.setCMDQ(true);
 		autoUpdater.quitAndInstall();
@@ -211,7 +217,7 @@ export class UpdaterService {
 	}
 
 	async quitAndInstall(_event: IpcMainInvokeEvent): Promise<void> {
-		this._quitAndInstall();
+		await this._quitAndInstall();
 	}
 
 	static isInstallingUpdateNow(): boolean {
