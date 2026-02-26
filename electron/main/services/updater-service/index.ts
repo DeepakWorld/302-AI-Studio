@@ -199,16 +199,28 @@ export class UpdaterService {
 	}
 
 	private async _quitAndInstall() {
+		// Set this flag immediately to prevent other quit handlers (like window-all-closed or before-quit)
+		// from trying to stop the sandbox concurrently.
+		UpdaterService.isInstallingUpdate = true;
+
 		try {
 			console.log("[Updater] Stopping local sandbox before update install...");
-			await localVibeService.stopLocalSandbox();
-			console.log("[Updater] Local sandbox stopped");
+			const result = await localVibeService.stopLocalSandbox();
+			if (result.isOk) {
+				console.log("[Updater] Local sandbox stopped successfully");
+			} else {
+				console.error("[Updater] Failed to stop local sandbox:", result.error);
+			}
 		} catch (error) {
-			console.error("[Updater] Failed to stop local sandbox (proceeding):", error);
+			console.error("[Updater] Exception during local sandbox stop (proceeding):", error);
 		}
-		UpdaterService.isInstallingUpdate = true;
+
 		if (isMac) windowService.setCMDQ(true);
-		autoUpdater.quitAndInstall();
+
+		// Add a small delay to ensure OS has time to clean up processes before relaunch
+		setTimeout(() => {
+			autoUpdater.quitAndInstall();
+		}, 1000);
 	}
 
 	// ******************************* IPC Methods ******************************* //

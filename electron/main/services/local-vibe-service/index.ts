@@ -2215,6 +2215,14 @@ export class LocalVibeService {
 	 * On success, broadcasts non-healthy status via "podman-health" channel
 	 */
 	private async _stopLocalSandbox(): Promise<{ isOk: boolean; output?: string; error?: string }> {
+		// If another operation is already in progress, don't start a new one.
+		// For stop operations, if it's already stopping or operating, we can treat it as success
+		// or at least avoid redundant/conflicting commands.
+		if (this.isOperating) {
+			console.log("[Local Vibe] Operation already in progress, skipping redundant stop request");
+			return { isOk: true, output: "Stop already in progress" };
+		}
+
 		const platform = process.platform;
 		this.isOperating = true;
 
