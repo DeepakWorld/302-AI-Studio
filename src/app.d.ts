@@ -50,6 +50,9 @@ declare global {
 			onSidebarSearchResultsUpdated: (
 				callback: (data: { query: string; resultIds: string[] }) => void,
 			) => () => void;
+			onSidebarSearchNavigate: (
+				callback: (data: { threadId: string; query: string }) => void,
+			) => () => void;
 			onApplyDefaultModel: (callback: (data: { model: unknown }) => void) => () => void;
 			onModelsDeleted: (
 				callback: (data: { deletedModelIds: string[]; providerId?: string }) => void,

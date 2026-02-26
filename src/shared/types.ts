@@ -182,7 +182,8 @@ export type BroadcastEvent =
 	| "local-sandbox-state-changed"
 	| "thread-busy-state-changed"
 	| "sidebar-search-results-updated"
-	| "sidebar-search-changed";
+	| "sidebar-search-changed"
+	| "sidebar-search-navigate";
 
 export interface BroadcastEventData {
 	broadcastEvent: BroadcastEvent;

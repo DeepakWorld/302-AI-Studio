@@ -55,6 +55,16 @@ class SearchHighlightState {
 		this.#hasScrolled = false;
 	}
 
+	applySearchKeyword(keyword: string): void {
+		const trimmed = keyword.trim();
+		if (!trimmed) {
+			this.clearSearch();
+			return;
+		}
+		this.#searchKeyword = trimmed;
+		this.#hasScrolled = false;
+	}
+
 	/**
 	 * Reset the initialization flag (for testing or re-navigation)
 	 */

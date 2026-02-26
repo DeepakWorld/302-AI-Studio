@@ -237,6 +237,12 @@
 		const existingTab = currentTabs?.find((tab) => tab.threadId === threadId);
 		if (existingTab) {
 			await tabBarState.handleActivateTab(existingTab.id);
+			if (searchData?.query) {
+				await window.electronAPI.broadcastService.broadcastToAll("sidebar-search-navigate", {
+					threadId,
+					query: searchData.query,
+				});
+			}
 		} else {
 			// Pass search query and result IDs when creating new tab from search results
 			await tabBarState.handleNewTabForExistingThread(

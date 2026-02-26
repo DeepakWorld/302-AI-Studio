@@ -155,6 +155,15 @@ if (process.contextIsolated) {
 				ipcRenderer.on("broadcast-event", listener);
 				return () => ipcRenderer.removeListener("broadcast-event", listener);
 			},
+			onSidebarSearchNavigate: (callback: (data: { threadId: string; query: string }) => void) => {
+				const listener = (_: unknown, eventData: BroadcastEventData) => {
+					if (eventData.broadcastEvent === "sidebar-search-navigate") {
+						callback(eventData.data as { threadId: string; query: string });
+					}
+				};
+				ipcRenderer.on("broadcast-event", listener);
+				return () => ipcRenderer.removeListener("broadcast-event", listener);
+			},
 			onApplyDefaultModel: (callback: (data: { model: unknown }) => void) => {
 				const listener = (_: unknown, eventData: BroadcastEventData) => {
 					if (eventData.broadcastEvent === "apply-default-model") {

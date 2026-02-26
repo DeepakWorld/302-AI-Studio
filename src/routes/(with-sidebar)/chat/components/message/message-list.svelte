@@ -90,6 +90,14 @@
 		}
 	}
 
+	function clearSearchHighlights(container: HTMLElement): void {
+		const highlights = container.querySelectorAll("mark.search-highlight");
+		for (const mark of highlights) {
+			const text = document.createTextNode(mark.textContent ?? "");
+			mark.replaceWith(text);
+		}
+	}
+
 	const containerClass = $derived.by(() => {
 		switch (generalSettings.layoutMode) {
 			case "wide":
@@ -235,6 +243,8 @@
 		setTimeout(() => {
 			if (!messageListContainer) return;
 
+			clearSearchHighlights(messageListContainer);
+
 			// Apply DOM highlighting to all messages
 			highlightKeywordInDOM(messageListContainer, keyword);
 
@@ -261,6 +271,11 @@
 	});
 
 	onMount(() => {
+		const cleanupSearchNavigate = window.electronAPI?.onSidebarSearchNavigate?.((data) => {
+			if (data.threadId !== chatState.id) return;
+			searchHighlightState.applySearchKeyword(data.query);
+		});
+
 		const handleScreenshot = async (data: { threadId: string }) => {
 			if (data.threadId === chatState.id && messageListContainer) {
 				// 检查是否有消息（使用内存中的实时数据）
@@ -332,6 +347,7 @@
 		const cleanup = window.electronAPI?.onScreenshotTriggered?.(handleScreenshot);
 
 		return () => {
+			cleanupSearchNavigate?.();
 			cleanup?.();
 		};
 	});
