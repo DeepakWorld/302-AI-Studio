@@ -14,6 +14,12 @@ export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(packageJson.version ?? "0.0.0"),
 	},
+	server: {
+		watch: {
+			// 忽略本地 sandbox workspace，避免 tsconfig 变更触发全量 reload
+			ignored: ["**/ai302/workspace/**"],
+		},
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit(),
