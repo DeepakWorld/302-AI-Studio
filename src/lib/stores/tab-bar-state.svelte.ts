@@ -1,6 +1,8 @@
 import { PersistedState } from "$lib/hooks/persisted-state.svelte";
 import { m } from "$lib/paraglide/messages";
+import { MAX_TABS_PER_WINDOW, NEW_TAB_THROTTLE_MS } from "@shared/constants/tab";
 import type { Tab, TabState, TabType } from "@shared/types";
+import { throttle } from "es-toolkit";
 import { isNull, isUndefined } from "es-toolkit/predicate";
 import { match } from "ts-pattern";
 
@@ -15,7 +17,7 @@ $effect.root(() => {
 		persistedTabState.current;
 	});
 });
-const { tabService, windowService, threadService } = window.electronAPI;
+const { tabService, windowService, threadService, broadcastService } = window.electronAPI;
 
 class TabBarState {
 	#windowId = $state<string>(window.windowId);
@@ -127,7 +129,7 @@ class TabBarState {
 							// Re-check backend state to avoid creating duplicates due to sync lag
 							const backendTabs = await this.getCurrentWindowTabs();
 							if ((backendTabs?.length ?? 0) === 0) {
-								await this.handleNewTab(m.title_new_chat());
+								await this.#doHandleNewTab(m.title_new_chat());
 								// Ensure UI reflects the backend-created tab immediately even if
 								// cross-process sync is delayed or missed.
 								await persistedTabState.refresh();
@@ -314,7 +316,22 @@ class TabBarState {
 		);
 	}
 
-	async handleNewTab(
+	handleNewTab = throttle(
+		(
+			title: string,
+			type: TabType = "chat",
+			active = true,
+			href?: string,
+			content?: string,
+			previewId?: string,
+		) => {
+			this.#doHandleNewTab(title, type, active, href, content, previewId);
+		},
+		NEW_TAB_THROTTLE_MS,
+		{ edges: ["leading"] },
+	);
+
+	async #doHandleNewTab(
 		title: string,
 		type: TabType = "chat",
 		active = true,
@@ -326,6 +343,17 @@ class TabBarState {
 		// Use real window.windowId to ensure correct behavior
 		const currentWindowId = this.currentWindowId;
 		const currentTabs = await this.getCurrentWindowTabs();
+
+		// Tab limit check
+		if (currentTabs.length >= MAX_TABS_PER_WINDOW) {
+			const activeThreadId = currentTabs.find((t) => t.active)?.threadId;
+			broadcastService.broadcastToAll("show-toast", {
+				type: "warning",
+				message: m.toast_tab_limit_reached(),
+				threadId: activeThreadId,
+			});
+			return;
+		}
 
 		const shouldCreateNewTab = await match(type)
 			.with("settings", async () => {
@@ -370,7 +398,15 @@ class TabBarState {
 		}
 	}
 
-	async handleNewTabForExistingThread(
+	handleNewTabForExistingThread = throttle(
+		(threadId: string, initialSearchQuery?: string, initialSearchResultIds?: string[]) => {
+			this.#doHandleNewTabForExistingThread(threadId, initialSearchQuery, initialSearchResultIds);
+		},
+		NEW_TAB_THROTTLE_MS,
+		{ edges: ["leading"] },
+	);
+
+	async #doHandleNewTabForExistingThread(
 		threadId: string,
 		initialSearchQuery?: string,
 		initialSearchResultIds?: string[],
@@ -401,6 +437,17 @@ class TabBarState {
 
 		// Thread doesn't exist in current window - create a new tab in current window
 		console.log(`[TabBarState] Thread ${threadId} not found in current window, creating new tab`);
+
+		// Tab limit check (reuse currentWindowTabs from above, no extra IPC call)
+		if (currentWindowTabs && currentWindowTabs.length >= MAX_TABS_PER_WINDOW) {
+			const activeThreadId = currentWindowTabs.find((t) => t.active)?.threadId;
+			broadcastService.broadcastToAll("show-toast", {
+				type: "warning",
+				message: m.toast_tab_limit_reached(),
+				threadId: activeThreadId,
+			});
+			return;
+		}
 
 		const threadData = await threadService.getThread(threadId);
 		if (!threadData) {

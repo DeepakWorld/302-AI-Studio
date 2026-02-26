@@ -812,6 +812,7 @@
 	"button_deploy_sandbox": "Deploy Project",
 	"toast_deploy_sandbox_success": "Project deployed successfully",
 	"toast_deploy_sandbox_failed": "Failed to deploy project",
+	"toast_tab_limit_reached": "Tab limit reached. Please close unused tabs and try again.",
 	"label_file_tree_refresh": "Refresh",
 	"label_file_tree_empty": "No files",
 	"label_file_tree_create_file": "New File",

@@ -1,4 +1,5 @@
 import type { ChatMessage, Tab, TabType, ThreadParmas } from "@shared/types";
+import { MAX_TABS_PER_WINDOW } from "@shared/constants/tab";
 import { BrowserWindow, ipcMain, WebContentsView, type IpcMainInvokeEvent } from "electron";
 import { isNull, isUndefined } from "es-toolkit";
 import { nanoid } from "nanoid";
@@ -926,6 +927,8 @@ export class TabService {
 			return { tabId: resurrectedTab.id };
 		}
 
+		if (this.isTabLimitReached(targetWindow.id)) return { tabId: null };
+
 		const windowId = targetWindow.id.toString();
 
 		const { getHref } = getTabConfig(type);
@@ -982,6 +985,8 @@ export class TabService {
 		href: string,
 		active: boolean = true,
 	): Promise<{ tabId: string | null }> {
+		if (this.isTabLimitReached(targetWindow.id)) return { tabId: null };
+
 		const windowId = targetWindow.id.toString();
 
 		const newTabId = nanoid();
@@ -1037,6 +1042,7 @@ export class TabService {
 	): Promise<string | null> {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return null;
+		if (this.isTabLimitReached(window.id)) return null;
 
 		// Try to resurrect pending tab first
 		const resurrectedTab = await this.resurrectTab(window, threadId);
@@ -1167,6 +1173,7 @@ export class TabService {
 	): Promise<string | null> {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (isNull(window)) return null;
+		if (this.isTabLimitReached(window.id)) return null;
 
 		const { title: tabTitle, getHref } = getTabConfig(type);
 		const newTabId = nanoid();
@@ -1347,6 +1354,21 @@ export class TabService {
 		if (isUndefined(windowId)) return null;
 		const window = BrowserWindow.fromId(windowId);
 		return window && !window.isDestroyed() ? window : null;
+	}
+
+	/**
+	 * Check if the tab limit has been reached for a given window.
+	 * Uses in-memory windowTabView for zero I/O cost.
+	 */
+	private isTabLimitReached(windowId: number): boolean {
+		const views = this.windowTabView.get(windowId) || [];
+		if (views.length >= MAX_TABS_PER_WINDOW) {
+			console.warn(
+				`[TabService] Tab limit (${MAX_TABS_PER_WINDOW}) reached for window ${windowId}`,
+			);
+			return true;
+		}
+		return false;
 	}
 
 	async getActiveTab(event: IpcMainInvokeEvent): Promise<Tab | null> {
