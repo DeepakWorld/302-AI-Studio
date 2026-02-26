@@ -262,6 +262,8 @@ class TabBarState {
 			// Also close the backend tab view
 			await tabService.handleTabClose(tabId, null);
 		}
+
+		await broadcastService.broadcastToAll("thread-list-updated", {});
 	}
 
 	async handleTabCloseOthers(tabId: string) {
@@ -281,6 +283,8 @@ class TabBarState {
 		this.#safeUpdateWindowTabs(this.#windowId, remainingTabs);
 
 		await tabService.handleTabCloseOthers(tabId, tabIdsToClose);
+
+		await broadcastService.broadcastToAll("thread-list-updated", {});
 	}
 
 	async handleTabCloseOffside(tabId: string) {
