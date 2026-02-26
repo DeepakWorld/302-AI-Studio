@@ -31,6 +31,7 @@
 	import terseAndEffectiveType from "./preset-prompt-templates/terse-and-effective-type.json";
 	import universalType from "./preset-prompt-templates/universal-type.json";
 
+	let customTypeCache: string | null = null;
 	const PRESET_PROMPT_MAP: Record<string, string> = {
 		"universal-type": JSON.stringify(universalType),
 		"terse-and-effective-type": JSON.stringify(terseAndEffectiveType),
@@ -40,12 +41,29 @@
 	function handlePresetChange(newValue: string) {
 		if (!newValue || !chatParameters.systemPromptEditorRef) return;
 
+		const currentType = chatParameters.systemPromptPresetType;
+
+		if (currentType === "custom-type") {
+			customTypeCache = chatParameters.systemPromptRawJson;
+		}
+
+		if (newValue === "custom-type") {
+			chatParameters.startPresetChange(newValue);
+
+			if (customTypeCache) {
+				chatParameters.systemPromptEditorRef.dispatchCommand(
+					UPDATE_CONTENT_COMMAND,
+					customTypeCache,
+				);
+			}
+
+			return;
+		}
+
 		const prompt = PRESET_PROMPT_MAP[newValue];
 
-		// 1. First: mark as preset update (before editor triggers onchange)
 		chatParameters.startPresetChange(newValue);
 
-		// 2. Then: dispatch command to update editor content
 		if (prompt) {
 			chatParameters.systemPromptEditorRef.dispatchCommand(UPDATE_CONTENT_COMMAND, prompt);
 		}
