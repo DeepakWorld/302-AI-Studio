@@ -82,7 +82,7 @@
 					<div class="flex-1">
 						<SettingSearchInput bind:value={searchTerm} placeholder={m.mcp_search_placeholder()} />
 					</div>
-					<Button variant="outline" size="sm" onclick={() => (currentView = "add")}>
+					<Button variant="outline" onclick={() => (currentView = "add")}>
 						<Plus class="h-4 w-4" />
 						{m.mcp_add()}
 					</Button>

@@ -92,10 +92,10 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="absolute -top-2 -left-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow-sm border border-border"
+			class="absolute -top-2 -left-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow-sm border border-border overflow-hidden"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<Checkbox checked={selected} onCheckedChange={handleCheckboxChange} class="h-4 w-4" />
+			<Checkbox checked={selected} onCheckedChange={handleCheckboxChange} class="h-6 w-6" />
 		</div>
 	{/if}
 
