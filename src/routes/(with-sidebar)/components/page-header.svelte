@@ -74,6 +74,7 @@
 	let lastAppliedKeyword = $state("");
 	let matchCountTimeout: ReturnType<typeof setTimeout> | null = null;
 	let matchCountObserver: MutationObserver | null = null;
+	let wasSearchInputOpened = $state(false);
 
 	let caseSensitive = $state(false);
 	let wholeWord = $state(false);
@@ -110,8 +111,12 @@
 	});
 
 	$effect(() => {
-		if (chatState.isSearchInput && !searchInputValue && searchHighlightState.searchKeyword) {
+		if (chatState.isSearchInput && !wasSearchInputOpened && searchHighlightState.searchKeyword) {
 			searchInputValue = searchHighlightState.searchKeyword;
+			wasSearchInputOpened = true;
+		}
+		if (!chatState.isSearchInput) {
+			wasSearchInputOpened = false;
 		}
 	});
 
