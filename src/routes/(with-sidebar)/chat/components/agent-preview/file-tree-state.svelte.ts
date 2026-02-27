@@ -661,6 +661,86 @@ export class FileTreeState {
 	}
 
 	/**
+	 * Rename folder
+	 * - Local mode: uses Electron IPC to rename on local filesystem
+	 * - Remote mode: uses HTTP sandbox API
+	 */
+	async renameFolder(oldPath: string, newPath: string, newName: string): Promise<boolean> {
+		if (!this.sandboxId) {
+			toast.error(m.toast_file_operation_sandbox_id_not_available());
+			return false;
+		}
+
+		if (this.isStreaming) {
+			toast.error(m.toast_file_operation_streaming());
+			return false;
+		}
+
+		if (this.operatingPaths.has(oldPath)) {
+			return false;
+		}
+
+		this.operatingPaths = addToSet(this.operatingPaths, oldPath);
+		const toastId = toast.loading(m.toast_file_renaming());
+
+		try {
+			if (codeAgentState.type === "local") {
+				// Local mode: IPC → rename on local filesystem directly
+				const stripWorkspace = (p: string) => {
+					const rel = p.startsWith(DEFAULT_WORKSPACE_PATH)
+						? p.slice(DEFAULT_WORKSPACE_PATH.length)
+						: p;
+					return rel.startsWith("/") ? rel.slice(1) : rel;
+				};
+				const result = await window.electronAPI.localVibeService.renameWorkspaceDirectory(
+					stripWorkspace(oldPath),
+					stripWorkspace(newPath),
+				);
+				if (!result.success) {
+					toast.error(result.error || m.toast_file_rename_folder_failed(), { id: toastId });
+					return false;
+				}
+			} else {
+				// Remote mode: HTTP sandbox API
+				const apiKey = this.get302ApiKey();
+				if (!apiKey) {
+					toast.error(m.toast_file_operation_api_key_not_found(), { id: toastId });
+					return false;
+				}
+				const response = await renameSandboxFile(this.sandboxId, oldPath, newPath);
+				if (!response.success) {
+					toast.error(response.error || m.toast_file_rename_folder_failed(), { id: toastId });
+					return false;
+				}
+			}
+
+			toast.success(m.toast_file_rename_folder_success(), { id: toastId });
+
+			// Update the folder and all its children paths in the local file list
+			const newFiles = this.files.map((f) => {
+				if (f.path === oldPath) return { ...f, path: newPath, name: newName };
+				if (f.path.startsWith(`${oldPath}/`))
+					return { ...f, path: f.path.replace(oldPath, newPath) };
+				return f;
+			});
+
+			// Update selected file path if it was inside the renamed folder
+			const newSelected = this.selectedFile?.startsWith(`${oldPath}/`)
+				? this.selectedFile.replace(oldPath, newPath)
+				: this.selectedFile;
+
+			await this.updateFilesAndRebuild(newFiles, newSelected);
+			return true;
+		} catch (e) {
+			const errorMsg = e instanceof Error ? e.message : m.toast_file_rename_folder_failed();
+			toast.error(errorMsg, { id: toastId });
+			return false;
+		} finally {
+			this.operatingPaths = removeFromSet(this.operatingPaths, oldPath);
+		}
+	}
+
+	/**
 	 * Delete file or folder
 	 */
 	async deleteFile(path: string): Promise<boolean> {

@@ -288,6 +288,45 @@ export class LocalVibeService {
 	}
 
 	/**
+	 * Rename a workspace directory via IPC
+	 * @param oldSubPath - old subdirectory path relative to workspace (e.g. "projects/myFolder")
+	 * @param newSubPath - new subdirectory path relative to workspace (e.g. "projects/newFolder")
+	 */
+	async renameWorkspaceDirectory(
+		_event: IpcMainInvokeEvent,
+		oldSubPath: string,
+		newSubPath: string,
+	): Promise<{ success: boolean; error?: string }> {
+		const composeDir = this.getRuntimeComposeDir();
+		const workspaceDir = path.join(composeDir, "workspace");
+
+		// Prevent directory traversal
+		const safeOldPath = oldSubPath.replace(/\.\./g, "");
+		const safeNewPath = newSubPath.replace(/\.\./g, "");
+		const oldDir = path.join(workspaceDir, safeOldPath);
+		const newDir = path.join(workspaceDir, safeNewPath);
+
+		// Safety: ensure both paths are inside workspaceDir
+		if (!oldDir.startsWith(workspaceDir) || !newDir.startsWith(workspaceDir)) {
+			console.error("[LocalVibeService] Path traversal attempt blocked:", oldSubPath, newSubPath);
+			return { success: false, error: "Invalid path" };
+		}
+
+		try {
+			if (!fs.existsSync(oldDir)) {
+				return { success: false, error: "Source path not found" };
+			}
+			fs.renameSync(oldDir, newDir);
+			console.log("[LocalVibeService] Renamed workspace directory:", oldDir, "->", newDir);
+			return { success: true };
+		} catch (error) {
+			console.error("[LocalVibeService] Failed to rename workspace directory:", error);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return { success: false, error: errorMessage };
+		}
+	}
+
+	/**
 	 * List existing work directories in ai302/workspace
 	 * Returns array of directory names (not full paths)
 	 */

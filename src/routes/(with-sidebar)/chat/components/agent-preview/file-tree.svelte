@@ -6,8 +6,8 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { Input } from "$lib/components/ui/input";
 	import { m } from "$lib/paraglide/messages";
-	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent";
+	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import {
 		ArrowDownToLine,
 		File,
@@ -62,6 +62,9 @@
 	let renameDialogOpen = $state(false);
 	let renameInputValue = $state("");
 	let renamingInProgress = $state(false);
+	const renamingNodeType = $derived(
+		renamingPath ? fileTreeState.files.find((f) => f.path === renamingPath)?.type : null,
+	);
 
 	// UI-specific state for create file dialog
 	let createFilePath = $state<string | null>(null); // The directory to create file in
@@ -142,9 +145,6 @@
 
 	// Handle rename
 	async function handleRename(file: SandboxFileInfo) {
-		if (file.type === "dir") {
-			return;
-		}
 		renamingPath = file.path;
 		renameInputValue = file.name;
 		renameDialogOpen = true;
@@ -178,7 +178,13 @@
 		}
 
 		renamingInProgress = true;
-		const success = await fileTreeState.renameFile(oldPath, newPath, newName);
+		const nodeType = fileTreeState.files.find((f) => f.path === oldPath)?.type;
+		let success: boolean;
+		if (nodeType === "dir") {
+			success = await fileTreeState.renameFolder(oldPath, newPath, newName);
+		} else {
+			success = await fileTreeState.renameFile(oldPath, newPath, newName);
+		}
 		renamingInProgress = false;
 
 		if (success) {
@@ -468,6 +474,17 @@
 			</ContextMenu.Item>
 
 			{#if isDir}
+				<!-- Rename Folder -->
+				<ContextMenu.Item
+					onSelect={() => handleRename(node)}
+					disabled={isOperating || isModificationDisabled}
+				>
+					{#if isOperating}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}{/if}
+					<span>{m.title_button_rename()}</span>
+				</ContextMenu.Item>
+
 				<!-- Paste -->
 				<ContextMenu.Item
 					onSelect={() => handlePaste(node)}
@@ -890,7 +907,11 @@
 		<Dialog.Content class="min-w-[400px]">
 			<Dialog.Header>
 				<Dialog.Title>{m.title_button_rename()}</Dialog.Title>
-				<Dialog.Description>{m.text_description_rename_file()}</Dialog.Description>
+				<Dialog.Description>
+					{renamingNodeType === "dir"
+						? m.text_description_rename_folder()
+						: m.text_description_rename_file()}
+				</Dialog.Description>
 			</Dialog.Header>
 
 			<Input
