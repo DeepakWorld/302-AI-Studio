@@ -659,7 +659,10 @@
 
 {#if !highlighter}
 	{#if props.code.trim()}
-		<div class="rounded-xl overflow-hidden border border-border my-7 bg-card">
+		<div
+			data-code-block-wrapper
+			class="rounded-xl overflow-hidden border border-border my-7 bg-card"
+		>
 			<div
 				class="flex justify-between items-center px-4 py-2 bg-muted border-b border-border min-h-10"
 			>
@@ -699,7 +702,7 @@
 		</div>
 	{/if}
 {:else if props.code.trim() && lines.length > 0}
-	<div class="rounded-xl overflow-hidden border border-border my-7 bg-card">
+	<div data-code-block-wrapper class="rounded-xl overflow-hidden border border-border my-7 bg-card">
 		<div
 			class="flex justify-between items-center px-4 py-2 bg-muted border-b border-border min-h-10"
 		>

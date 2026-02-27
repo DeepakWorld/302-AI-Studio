@@ -51,6 +51,38 @@
 	}
 
 	/**
+	 * Expand all collapsed code blocks before searching
+	 */
+	function expandAllCollapsedCodeBlocks(): void {
+		const codeBlockWrappers = document.querySelectorAll("[data-code-block-wrapper]");
+
+		for (const wrapper of codeBlockWrappers) {
+			const preElements = wrapper.querySelectorAll("pre");
+			for (const pre of preElements) {
+				const classList = pre.classList;
+				const hasMaxH = Array.from(classList).some((cls) => cls.startsWith("max-h-"));
+
+				if (hasMaxH) {
+					// Find the collapse toggle button by finding button with ChevronDown svg
+					const buttons = wrapper.querySelectorAll("button");
+					for (const btn of buttons) {
+						const svg = btn.querySelector("svg");
+						if (svg) {
+							// Check if this is the collapse toggle (has rotate-180 class when collapsed)
+							const svgClasses = svg.getAttribute("class") || "";
+							if (svgClasses.includes("rotate-180")) {
+								// This is a collapsed button, click to expand
+								(btn as HTMLElement).click();
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/**
 	 * Highlight search keywords in DOM by wrapping matching text nodes with <mark> tags
 	 */
 	function highlightKeywordInDOM(container: HTMLElement, keyword: string): void {
@@ -336,8 +368,12 @@
 			// Clear existing highlights first
 			clearSearchHighlights(messageListContainer);
 
-			// Wait for DOM to update after clearing
+			// Expand all collapsed code blocks before searching
+			expandAllCollapsedCodeBlocks();
+
+			// Wait for DOM to update after clearing and expanding code blocks
 			await tick();
+			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			// Apply new highlighting
 			highlightKeywordInDOM(messageListContainer, keywordForTimeout);
