@@ -45,6 +45,9 @@
 	// Initialize search highlight state immediately (before effects run)
 	if (browser) {
 		searchHighlightState.initializeForTab();
+		if (searchHighlightState.searchKeyword) {
+			chatState.handleSearchInputStateChange(true);
+		}
 	}
 
 	/**

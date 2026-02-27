@@ -24,6 +24,7 @@
 		WholeWord,
 		X,
 	} from "@lucide/svelte";
+	import { onMount } from "svelte";
 
 	async function handleNewSettingsTab() {
 		await window.electronAPI.windowService.handleOpenSettingsWindow();
@@ -105,6 +106,12 @@
 	$effect(() => {
 		if (chatState.isSearchInput && searchInputRef) {
 			searchInputRef.focus();
+		}
+	});
+
+	$effect(() => {
+		if (chatState.isSearchInput && !searchInputValue && searchHighlightState.searchKeyword) {
+			searchInputValue = searchHighlightState.searchKeyword;
 		}
 	});
 
@@ -251,6 +258,18 @@
 			}
 		});
 	}
+
+	onMount(() => {
+		const cleanupSearchNavigate = window.electronAPI?.onSidebarSearchNavigate?.((data) => {
+			if (data.threadId !== chatState.id) return;
+			chatState.handleSearchInputStateChange(true);
+			searchInputValue = data.query;
+		});
+
+		return () => {
+			cleanupSearchNavigate?.();
+		};
+	});
 </script>
 
 <div
