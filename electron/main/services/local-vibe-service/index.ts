@@ -1131,31 +1131,51 @@ export class LocalVibeService {
 	}
 
 	/**
+	 * Detects the Python user-level Scripts directory.
+	 */
+	private async detectPythonScriptsPath(): Promise<string | null> {
+		if (process.platform !== "win32") return null;
+		try {
+			const { stdout } = await execAsync("python -m site --user-base");
+			const userBase = stdout.trim();
+			if (userBase) {
+				const scriptsPath = path.join(userBase, "Scripts");
+				return fs.existsSync(scriptsPath) ? scriptsPath : null;
+			}
+		} catch (_e) {
+			// Python not available
+		}
+		return null;
+	}
+
+	/**
 	 * Refreshes process.env.PATH on Windows by reading the latest user PATH from registry.
-	 * This is needed after installing tools like Scoop or Python that modify the user PATH,
-	 * because the current Electron process still has the old PATH from startup.
+	 * Also injects detected Python Scripts to the current process memory.
 	 */
 	private async refreshWindowsPath(): Promise<void> {
 		if (process.platform !== "win32") return;
 
 		try {
-			// Read current user PATH from registry
-			const { stdout } = await execAsync(
+			const { stdout: userPathRaw } = await execAsync(
 				"powershell.exe -Command \"[Environment]::GetEnvironmentVariable('Path', 'User')\"",
 			);
-			const userPath = stdout.trim();
+			const userPath = userPathRaw.trim();
 
-			if (userPath) {
-				// Get system PATH (Machine level)
-				const { stdout: systemPathOut } = await execAsync(
-					"powershell.exe -Command \"[Environment]::GetEnvironmentVariable('Path', 'Machine')\"",
-				);
-				const systemPath = systemPathOut.trim();
+			const { stdout: systemPathRaw } = await execAsync(
+				"powershell.exe -Command \"[Environment]::GetEnvironmentVariable('Path', 'Machine')\"",
+			);
+			const systemPath = systemPathRaw.trim();
 
-				// Combine: user PATH + system PATH
-				process.env.PATH = `${userPath};${systemPath}`;
-				console.log("[LocalVibeService] Refreshed process PATH from registry");
+			let combinedPath = `${userPath};${systemPath}`;
+
+			// Memory injection only: ensure current process can see Python tools
+			const scriptsPath = await this.detectPythonScriptsPath();
+			if (scriptsPath && !combinedPath.toLowerCase().includes(scriptsPath.toLowerCase())) {
+				combinedPath = `${scriptsPath};${combinedPath}`;
 			}
+
+			process.env.PATH = combinedPath;
+			console.log("[LocalVibeService] Refreshed process PATH (in-memory)");
 		} catch (error) {
 			console.error("[LocalVibeService] Failed to refresh PATH:", error);
 		}
@@ -1215,7 +1235,26 @@ export class LocalVibeService {
 		isOk: boolean;
 		isValid: boolean;
 	}> {
-		return this.checkCommand("podman-compose --version");
+		const basicCheck = await this.checkCommand("podman-compose --version");
+		if (basicCheck.isValid) return basicCheck;
+
+		// On Windows, podman-compose (via pip) is often in %APPDATA%\Python\PythonXX\Scripts
+		if (process.platform === "win32") {
+			const scriptsPath = await this.detectPythonScriptsPath();
+			if (scriptsPath) {
+				const fullPath = path.join(scriptsPath, "podman-compose.exe");
+				if (fs.existsSync(fullPath)) {
+					try {
+						await execAsync(`"${fullPath}" --version`);
+						return { isOk: true, isValid: true };
+					} catch (_e) {
+						// Not actually valid
+					}
+				}
+			}
+		}
+
+		return basicCheck;
 	}
 
 	/**
@@ -1615,6 +1654,26 @@ export class LocalVibeService {
 	}
 
 	/**
+	 * Persists a path to the Windows User Environment PATH variable.
+	 */
+	private async persistPathToUserRegistry(pathToAdd: string): Promise<void> {
+		if (process.platform !== "win32") return;
+		try {
+			const psCommand = `
+				$target = "${pathToAdd}";
+				$oldPath = [Environment]::GetEnvironmentVariable("Path", "User");
+				if ($oldPath -split ";" -notcontains $target) {
+					$newPath = if ([string]::IsNullOrWhiteSpace($oldPath)) { $target } else { "$oldPath;$target" };
+					[Environment]::SetEnvironmentVariable("Path", $newPath, "User");
+				}
+			`;
+			await execAsync(`powershell.exe -Command "${psCommand.replace(/\n/g, " ")}"`);
+		} catch (error) {
+			console.error("[LocalVibeService] Failed to persist path:", error);
+		}
+	}
+
+	/**
 	 * Installs podman-compose on the current platform
 	 *
 	 * Platform-specific installation:
@@ -1643,11 +1702,20 @@ export class LocalVibeService {
 				// Refresh PATH so pip is available in this process
 				await this.refreshWindowsPath();
 			}
-			return this.runCommandWithBroadcast(
+			const result = await this.runCommandWithBroadcast(
 				"pip",
 				["install", "podman-compose"],
 				"install-podman-compose",
 			);
+			if (result.isOk) {
+				const scriptsPath = await this.detectPythonScriptsPath();
+				if (scriptsPath) {
+					await this.persistPathToUserRegistry(scriptsPath);
+					console.log("[LocalVibeService] Persisted Python Scripts to registry after install");
+				}
+				await this.refreshWindowsPath();
+			}
+			return result;
 		} else if (platform === "darwin") {
 			// macOS: Install via Homebrew
 			return this.runCommandWithBroadcast(
