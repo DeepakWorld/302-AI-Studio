@@ -497,16 +497,23 @@ class ClaudeCodeAgentState {
 			this.selectedWorkspacePath,
 		];
 
+		// Extract actual path from composite key format "sandboxId:path"
+		const actualWorkspacePath = (() => {
+			if (workspacePath === "new") return "";
+			const idx = workspacePath.indexOf(":");
+			return idx !== -1 ? workspacePath.substring(idx + 1) : workspacePath;
+		})();
+
 		const updateData = isExistingMode
 			? {
 					sandboxId,
 					currentSessionId: sessionId,
-					currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
+					currentWorkspacePath: actualWorkspacePath,
 				}
 			: {
 					sandboxId: sandboxId === "auto" ? "" : sandboxId,
 					currentSessionId: "",
-					currentWorkspacePath: workspacePath === "new" ? "" : workspacePath,
+					currentWorkspacePath: actualWorkspacePath,
 				};
 
 		this.updateState(updateData);
@@ -534,7 +541,15 @@ class ClaudeCodeAgentState {
 		];
 		this.selectedSessionId = currentSessionId === "" ? "new" : currentSessionId;
 		this.selectedSandboxId = sandboxId === "" ? "auto" : sandboxId;
-		this.selectedWorkspacePath = currentWorkspacePath === "" ? "new" : currentWorkspacePath;
+
+		// Construct composite key for workspace path so the dropdown can match correctly
+		if (currentWorkspacePath === "") {
+			this.selectedWorkspacePath = "new";
+		} else if (sandboxId && sandboxId !== "" && sandboxId !== "auto") {
+			this.selectedWorkspacePath = `${sandboxId}:${currentWorkspacePath}`;
+		} else {
+			this.selectedWorkspacePath = currentWorkspacePath;
+		}
 	}
 }
 

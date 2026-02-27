@@ -211,7 +211,7 @@ class ClaudeCodeSandboxState {
 			group.items.push({
 				key: compositeKey,
 				label: workspacePath,
-				value: workspacePath,
+				value: compositeKey,
 			});
 		}
 
@@ -336,10 +336,10 @@ class ClaudeCodeSandboxState {
 					targetSandbox.sessionInfos.find((sessionInfo) => sessionInfo.sessionId === sessionId)
 						?.note || "";
 
-				// Sync workspacePath when selecting a session
+				// Sync workspacePath when selecting a session (use composite key format)
 				const session = targetSandbox.sessionInfos.find((s) => s.sessionId === sessionId);
 				if (session?.workspacePath) {
-					claudeCodeAgentState.selectedWorkspacePath = session.workspacePath;
+					claudeCodeAgentState.selectedWorkspacePath = `${targetSandbox.sandboxId}:${session.workspacePath}`;
 				}
 			}
 		}
@@ -366,9 +366,34 @@ class ClaudeCodeSandboxState {
 		}
 	}
 
-	handleWorkspaceSelected(workspacePath: string): void {
-		claudeCodeAgentState.selectedWorkspacePath = workspacePath;
-		// Note: According to requirements, we do NOT reset session to "new" when selecting a workspace
+	handleWorkspaceSelected(compositeKeyOrNew: string): void {
+		if (compositeKeyOrNew === "new") {
+			claudeCodeAgentState.selectedWorkspacePath = "new";
+			// Sync sandbox to auto when selecting new workspace
+			claudeCodeAgentState.selectedSandboxId = "auto";
+			claudeCodeAgentState.selectedSandboxRemark = "";
+			return;
+		}
+
+		// Parse composite key format "sandboxId:workspacePath" to extract sandbox ID
+		const separatorIndex = compositeKeyOrNew.indexOf(":");
+		if (separatorIndex !== -1) {
+			const sandboxId = compositeKeyOrNew.substring(0, separatorIndex);
+
+			// Update workspace path (store the composite key so the dropdown can match)
+			claudeCodeAgentState.selectedWorkspacePath = compositeKeyOrNew;
+
+			// Sync sandbox selection to match the workspace's sandbox
+			claudeCodeAgentState.selectedSandboxId = sandboxId;
+			const sandbox = persistedClaudeCodeSandboxState.current.find(
+				(s) => s.sandboxId === sandboxId,
+			);
+			if (sandbox) {
+				claudeCodeAgentState.selectedSandboxRemark = sandbox.sandboxRemark;
+			}
+		} else {
+			claudeCodeAgentState.selectedWorkspacePath = compositeKeyOrNew;
+		}
 	}
 
 	async deleteSession(sandboxId: string, sessionId: string): Promise<boolean> {
