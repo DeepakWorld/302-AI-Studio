@@ -11,6 +11,11 @@ class SearchHighlightState {
 	// Whether initial scroll has been performed
 	#hasScrolled = $state(false);
 
+	// Search options
+	#caseSensitive = $state(false);
+	#wholeWord = $state(false);
+	#regex = $state(false);
+
 	/**
 	 * Initialize from window.tab if available
 	 * Reads the initialSearchQuery passed when creating a tab from search results
@@ -22,7 +27,6 @@ class SearchHighlightState {
 		const tab = window.tab as { initialSearchQuery?: string };
 		if (tab?.initialSearchQuery) {
 			this.#searchKeyword = tab.initialSearchQuery.trim();
-			console.log("[SearchHighlight] Initialized with keyword:", this.#searchKeyword);
 		}
 	}
 
@@ -49,11 +53,56 @@ class SearchHighlightState {
 	}
 
 	/**
+	 * Get case sensitive option
+	 */
+	get caseSensitive(): boolean {
+		return this.#caseSensitive;
+	}
+
+	/**
+	 * Set case sensitive option
+	 */
+	setCaseSensitive(value: boolean): void {
+		this.#caseSensitive = value;
+	}
+
+	/**
+	 * Get whole word option
+	 */
+	get wholeWord(): boolean {
+		return this.#wholeWord;
+	}
+
+	/**
+	 * Set whole word option
+	 */
+	setWholeWord(value: boolean): void {
+		this.#wholeWord = value;
+	}
+
+	/**
+	 * Get regex option
+	 */
+	get regex(): boolean {
+		return this.#regex;
+	}
+
+	/**
+	 * Set regex option
+	 */
+	setRegex(value: boolean): void {
+		this.#regex = value;
+	}
+
+	/**
 	 * Clear the search highlighting state
 	 */
 	clearSearch(): void {
 		this.#searchKeyword = "";
 		this.#hasScrolled = false;
+		this.#caseSensitive = false;
+		this.#wholeWord = false;
+		this.#regex = false;
 	}
 
 	applySearchKeyword(keyword: string): void {
@@ -73,6 +122,9 @@ class SearchHighlightState {
 		this.hasInitialized = false;
 		this.#searchKeyword = "";
 		this.#hasScrolled = false;
+		this.#caseSensitive = false;
+		this.#wholeWord = false;
+		this.#regex = false;
 	}
 }
 

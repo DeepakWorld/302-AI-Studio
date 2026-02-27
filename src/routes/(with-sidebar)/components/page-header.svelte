@@ -11,14 +11,17 @@
 	import { searchHighlightState } from "$lib/stores/search-highlight-state.svelte";
 	import { cn } from "$lib/utils";
 	import {
+		CaseSensitive,
 		ChevronDown,
 		ChevronUp,
+		Code,
 		Ghost,
 		MessageCircleQuestionMark,
 		ScanSearch,
 		Search,
 		Server,
 		Settings,
+		WholeWord,
 		X,
 	} from "@lucide/svelte";
 
@@ -71,6 +74,34 @@
 	let matchCountTimeout: ReturnType<typeof setTimeout> | null = null;
 	let matchCountObserver: MutationObserver | null = null;
 
+	let caseSensitive = $state(false);
+	let wholeWord = $state(false);
+	let useRegex = $state(false);
+
+	function toggleCaseSensitive() {
+		caseSensitive = !caseSensitive;
+		searchHighlightState.setCaseSensitive(caseSensitive);
+		reapplySearch();
+	}
+
+	function toggleWholeWord() {
+		wholeWord = !wholeWord;
+		searchHighlightState.setWholeWord(wholeWord);
+		reapplySearch();
+	}
+
+	function toggleRegex() {
+		useRegex = !useRegex;
+		searchHighlightState.setRegex(useRegex);
+		reapplySearch();
+	}
+
+	function reapplySearch() {
+		if (searchInputValue.trim()) {
+			searchHighlightState.applySearchKeyword(searchInputValue.trim());
+		}
+	}
+
 	$effect(() => {
 		if (chatState.isSearchInput && searchInputRef) {
 			searchInputRef.focus();
@@ -96,6 +127,9 @@
 			searchInputValue = "";
 			totalMatches = 0;
 			currentMatchIndex = 0;
+			caseSensitive = false;
+			wholeWord = false;
+			useRegex = false;
 			return;
 		}
 
@@ -164,6 +198,9 @@
 		searchHighlightState.clearSearch();
 		totalMatches = 0;
 		currentMatchIndex = 0;
+		caseSensitive = false;
+		wholeWord = false;
+		useRegex = false;
 		chatState.handleSearchInputStateChange(false);
 	}
 
@@ -301,8 +338,47 @@
 						class="h-7 w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
 						onkeydown={handleSearchInputKeydown}
 					/>
+					<button
+						class={cn(
+							"flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
+							caseSensitive
+								? "text-foreground bg-icon-btn-active"
+								: "text-muted-foreground hover:text-foreground",
+						)}
+						title="区分大小写"
+						onclick={toggleCaseSensitive}
+					>
+						<CaseSensitive class="size-3.5" />
+					</button>
+					<button
+						class={cn(
+							"flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
+							wholeWord
+								? "text-foreground bg-icon-btn-active"
+								: "text-muted-foreground hover:text-foreground",
+						)}
+						title="全字匹配"
+						onclick={toggleWholeWord}
+					>
+						<WholeWord class="size-3.5" />
+					</button>
+					<button
+						class={cn(
+							"flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
+							useRegex
+								? "text-foreground bg-icon-btn-active"
+								: "text-muted-foreground hover:text-foreground",
+						)}
+						title="正则表达式"
+						onclick={toggleRegex}
+					>
+						<Code class="size-3.5" />
+					</button>
 					{#if searchInputValue && totalMatches > 0}
 						<span class="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
+							<span class="min-w-[2.5rem] text-center">
+								{currentMatchIndex}/{totalMatches}
+							</span>
 							<button
 								class="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
 								onclick={handlePrevMatch}
@@ -310,9 +386,6 @@
 							>
 								<ChevronUp class="size-3.5" />
 							</button>
-							<span class="min-w-[2.5rem] text-center">
-								{currentMatchIndex}/{totalMatches}
-							</span>
 							<button
 								class="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
 								onclick={handleNextMatch}

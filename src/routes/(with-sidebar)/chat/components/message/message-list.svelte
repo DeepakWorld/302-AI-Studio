@@ -40,6 +40,7 @@
 	let showMinimap = $state(false);
 	let searchHighlightTimeout: ReturnType<typeof setTimeout> | null = null;
 	let appliedKeyword = $state("");
+	let lastAppliedOptions = $state({ caseSensitive: false, wholeWord: false, regex: false });
 
 	// Initialize search highlight state immediately (before effects run)
 	if (browser) {
@@ -51,7 +52,6 @@
 	 */
 	function highlightKeywordInDOM(container: HTMLElement, keyword: string): void {
 		if (!keyword) return;
-		console.log("[highlightKeywordInDOM] Starting with keyword:", keyword);
 
 		const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
 		const textNodes: Text[] = [];
@@ -59,11 +59,28 @@
 		while ((node = walker.nextNode())) {
 			textNodes.push(node as Text);
 		}
-		console.log("[highlightKeywordInDOM] Found text nodes:", textNodes.length);
 
-		const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const regex = new RegExp(`(${escapedKeyword})`, "gi");
-		let matchCount = 0;
+		const caseSensitive = searchHighlightState.caseSensitive;
+		const wholeWord = searchHighlightState.wholeWord;
+		const useRegex = searchHighlightState.regex;
+
+		let pattern: string;
+		if (useRegex) {
+			pattern = keyword;
+		} else {
+			const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			pattern = wholeWord ? `\\b${escapedKeyword}\\b` : escapedKeyword;
+		}
+
+		let flags = caseSensitive ? "g" : "gi";
+		let regex: RegExp;
+		try {
+			regex = new RegExp(`(${pattern})`, flags);
+		} catch (e) {
+			console.error("[highlightKeywordInDOM] Invalid regex pattern:", e);
+			return;
+		}
+
 		for (const textNode of textNodes) {
 			const text = textNode.textContent || "";
 			if (regex.test(text)) {
@@ -76,7 +93,6 @@
 					parent.nodeName === "MARK"
 				)
 					continue;
-				console.log("[highlightKeywordInDOM] Found match in:", text.substring(0, 50));
 				const fragment = document.createDocumentFragment();
 				let lastIndex = 0;
 				let match;
@@ -89,7 +105,6 @@
 					mark.textContent = match[1];
 					fragment.appendChild(mark);
 					lastIndex = match.index + match[0].length;
-					matchCount++;
 				}
 				if (lastIndex < text.length) {
 					fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
@@ -97,7 +112,6 @@
 				parent.replaceChild(fragment, textNode);
 			}
 		}
-		console.log("[highlightKeywordInDOM] Total matches:", matchCount);
 	}
 
 	function clearSearchHighlights(container: HTMLElement): void {
@@ -270,6 +284,9 @@
 	// Effect to apply DOM highlighting and scroll to first match
 	$effect(() => {
 		const keyword = searchHighlightState.searchKeyword;
+		const caseSensitive = searchHighlightState.caseSensitive;
+		const wholeWord = searchHighlightState.wholeWord;
+		const useRegex = searchHighlightState.regex;
 
 		// Reset appliedKeyword when search is cleared
 		if (!keyword) {
@@ -281,8 +298,14 @@
 			return;
 		}
 
-		// Skip if keyword hasn't changed
-		if (keyword === appliedKeyword) {
+		// Skip if keyword and options haven't changed
+		const currentOptions = { caseSensitive, wholeWord, regex: useRegex };
+		const optionsChanged =
+			lastAppliedOptions.caseSensitive !== currentOptions.caseSensitive ||
+			lastAppliedOptions.wholeWord !== currentOptions.wholeWord ||
+			lastAppliedOptions.regex !== currentOptions.regex;
+
+		if (keyword === appliedKeyword && !optionsChanged) {
 			return;
 		}
 
@@ -298,6 +321,7 @@
 		// Debounce to avoid race conditions on rapid input
 		// Note: Don't update appliedKeyword here - wait until timeout completes
 		const keywordForTimeout = keyword;
+		const optionsForTimeout = { caseSensitive, wholeWord, regex: useRegex };
 		searchHighlightTimeout = setTimeout(async () => {
 			// Check if the keyword is still valid (not cleared or changed)
 			if (searchHighlightState.searchKeyword !== keywordForTimeout) {
@@ -317,6 +341,7 @@
 
 			// Only update appliedKeyword after successful completion
 			appliedKeyword = keywordForTimeout;
+			lastAppliedOptions = optionsForTimeout;
 
 			// Wait for DOM to update after highlighting
 			await tick();
