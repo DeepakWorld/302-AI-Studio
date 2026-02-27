@@ -8,8 +8,19 @@
 	import { chatState } from "$lib/stores/chat-state.svelte";
 	import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
+	import { searchHighlightState } from "$lib/stores/search-highlight-state.svelte";
 	import { cn } from "$lib/utils";
-	import { Ghost, MessageCircleQuestionMark, Server, Settings } from "@lucide/svelte";
+	import {
+		ChevronDown,
+		ChevronUp,
+		Ghost,
+		MessageCircleQuestionMark,
+		ScanSearch,
+		Search,
+		Server,
+		Settings,
+		X,
+	} from "@lucide/svelte";
 
 	async function handleNewSettingsTab() {
 		await window.electronAPI.windowService.handleOpenSettingsWindow();
@@ -51,6 +62,158 @@
 	// 		agentPreviewState.openSkillsOnlyMode();
 	// 	}
 	// }
+
+	let searchInputValue = $state("");
+	let totalMatches = $state(0);
+	let currentMatchIndex = $state(0);
+	let searchInputRef: HTMLInputElement | null = $state(null);
+	let lastAppliedKeyword = $state("");
+	let matchCountTimeout: ReturnType<typeof setTimeout> | null = null;
+	let matchCountObserver: MutationObserver | null = null;
+
+	$effect(() => {
+		if (chatState.isSearchInput && searchInputRef) {
+			searchInputRef.focus();
+		}
+	});
+
+	$effect(() => {
+		const trimmed = searchInputValue.trim();
+		if (trimmed && trimmed !== lastAppliedKeyword) {
+			lastAppliedKeyword = trimmed;
+			searchHighlightState.applySearchKeyword(trimmed);
+		} else if (!trimmed && lastAppliedKeyword) {
+			lastAppliedKeyword = "";
+			searchHighlightState.clearSearch();
+			totalMatches = 0;
+			currentMatchIndex = 0;
+		}
+	});
+
+	$effect(() => {
+		if (!chatState.isSearchInput) {
+			searchHighlightState.clearSearch();
+			searchInputValue = "";
+			totalMatches = 0;
+			currentMatchIndex = 0;
+			return;
+		}
+
+		if (!searchInputValue.trim()) return;
+
+		// Clear previous timeout and observer
+		if (matchCountTimeout) {
+			clearTimeout(matchCountTimeout);
+		}
+		if (matchCountObserver) {
+			matchCountObserver.disconnect();
+		}
+
+		const timeout = setTimeout(() => {
+			const marks = document.querySelectorAll("mark.search-highlight");
+			totalMatches = marks.length;
+			if (totalMatches > 0 && currentMatchIndex === 0) {
+				currentMatchIndex = 1;
+			}
+		}, 100);
+
+		const observer = new MutationObserver(() => {
+			const marks = document.querySelectorAll("mark.search-highlight");
+			totalMatches = marks.length;
+			if (totalMatches > 0 && currentMatchIndex === 0) {
+				currentMatchIndex = 1;
+			}
+		});
+
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+
+		matchCountTimeout = timeout;
+		matchCountObserver = observer;
+
+		return () => {
+			clearTimeout(timeout);
+			observer.disconnect();
+		};
+	});
+
+	function handleSearchInputKeydown(event: KeyboardEvent) {
+		if (event.key === "Escape") {
+			chatState.handleSearchInputStateChange(false);
+		} else if (event.key === "Enter") {
+			if (event.shiftKey) {
+				handlePrevMatch();
+			} else {
+				handleNextMatch();
+			}
+		} else if (event.key === "ArrowDown") {
+			event.preventDefault();
+			handleNextMatch();
+		} else if (event.key === "ArrowUp") {
+			event.preventDefault();
+			handlePrevMatch();
+		}
+	}
+
+	function handleClearSearch() {
+		searchInputValue = "";
+		searchHighlightState.clearSearch();
+		totalMatches = 0;
+		currentMatchIndex = 0;
+		chatState.handleSearchInputStateChange(false);
+	}
+
+	function handleNextMatch() {
+		if (totalMatches === 0) return;
+
+		const marks = document.querySelectorAll("mark.search-highlight") as NodeListOf<HTMLElement>;
+		if (marks.length === 0) return;
+
+		currentMatchIndex = currentMatchIndex >= totalMatches ? 1 : currentMatchIndex + 1;
+		scrollToMatch(marks, currentMatchIndex - 1);
+	}
+
+	function handlePrevMatch() {
+		if (totalMatches === 0) return;
+
+		const marks = document.querySelectorAll("mark.search-highlight") as NodeListOf<HTMLElement>;
+		if (marks.length === 0) return;
+
+		currentMatchIndex = currentMatchIndex <= 1 ? totalMatches : currentMatchIndex - 1;
+		scrollToMatch(marks, currentMatchIndex - 1);
+	}
+
+	function scrollToMatch(marks: NodeListOf<HTMLElement>, index: number) {
+		const mark = marks[index];
+		if (!mark) return;
+
+		const viewport = document.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
+		if (!viewport) {
+			mark.scrollIntoView({ behavior: "smooth", block: "center" });
+			return;
+		}
+
+		const markRect = mark.getBoundingClientRect();
+		const viewportRect = viewport.getBoundingClientRect();
+		const scrollTop =
+			viewport.scrollTop +
+			markRect.top -
+			viewportRect.top -
+			viewport.offsetHeight / 2 +
+			markRect.height / 2;
+		viewport.scrollTo({ top: Math.max(0, scrollTop), behavior: "smooth" });
+
+		mark.classList.add("search-highlight-current");
+		marks.forEach((m, i) => {
+			if (i !== index) {
+				m.classList.remove("search-highlight-current");
+			}
+		});
+	}
 </script>
 
 <div
@@ -111,6 +274,63 @@
 				)}
 			/>
 		</ButtonWithTooltip> -->
+
+		<div class="relative">
+			<ButtonWithTooltip
+				class={cn(
+					"hover:!bg-icon-btn-hover",
+					chatState.isSearchInput && "!bg-icon-btn-active hover:!bg-icon-btn-active",
+				)}
+				tooltipSide="bottom"
+				tooltip={m.tooltip_search_content()}
+				onclick={() => chatState.handleSearchInputStateChange(!chatState.isSearchInput)}
+			>
+				<ScanSearch class={cn("size-5", chatState.isSearchInput && "!text-icon-btn-active-fg")} />
+			</ButtonWithTooltip>
+
+			{#if chatState.isSearchInput}
+				<div
+					class="absolute right-0 top-full mt-1 flex h-9 items-center gap-1 rounded-md border border-input bg-background px-2 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
+				>
+					<Search class="text-muted-foreground size-4 shrink-0" />
+					<input
+						bind:this={searchInputRef}
+						bind:value={searchInputValue}
+						type="text"
+						placeholder={m.tooltip_search_content()}
+						class="h-7 w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+						onkeydown={handleSearchInputKeydown}
+					/>
+					{#if searchInputValue && totalMatches > 0}
+						<span class="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
+							<button
+								class="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
+								onclick={handlePrevMatch}
+								disabled={totalMatches === 0}
+							>
+								<ChevronUp class="size-3.5" />
+							</button>
+							<span class="min-w-[2.5rem] text-center">
+								{currentMatchIndex}/{totalMatches}
+							</span>
+							<button
+								class="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
+								onclick={handleNextMatch}
+								disabled={totalMatches === 0}
+							>
+								<ChevronDown class="size-3.5" />
+							</button>
+						</span>
+					{/if}
+					<button
+						class="cursor-pointer text-muted-foreground hover:text-foreground flex size-5 items-center justify-center rounded transition-colors"
+						onclick={handleClearSearch}
+					>
+						<X class="size-3" />
+					</button>
+				</div>
+			{/if}
+		</div>
 
 		<ButtonWithTooltip
 			class={cn(

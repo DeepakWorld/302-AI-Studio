@@ -245,6 +245,7 @@ export class ShortcutActionsHandler {
 
 	private handleSearch(): void {
 		sidebarSearchState.triggerFocus();
+		chatState.handleSearchInputStateChange(!chatState.isSearchInput);
 	}
 
 	private handleToggleSidebarRight(): void {

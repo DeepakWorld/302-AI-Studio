@@ -206,6 +206,7 @@ class ChatState {
 	loadingAttachmentIds = $state(new Set<string>());
 	isParametersOpen = $state(false);
 	isCreateSkillMode = $state(false);
+	private _isSearchInput = $state(false);
 
 	async handleSendMessage() {}
 
@@ -1542,6 +1543,14 @@ class ChatState {
 
 	handlePrivateChatActiveChange(active: boolean) {
 		this.isPrivateChatActive = active;
+	}
+
+	handleSearchInputStateChange(value: boolean) {
+		this._isSearchInput = value;
+	}
+
+	get isSearchInput() {
+		return this._isSearchInput;
 	}
 
 	handleTemperatureChange(value: number | null) {

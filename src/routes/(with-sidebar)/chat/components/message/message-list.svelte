@@ -11,7 +11,7 @@
 	import { cn } from "$lib/utils";
 	import { ArrowDown, ArrowUp } from "@lucide/svelte";
 	import { domToPng } from "modern-screenshot";
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import { toast } from "svelte-sonner";
 	import AssistantMessage from "./assistant-message.svelte";
 	import CompressionBanner from "./compression-banner.svelte";
@@ -38,6 +38,8 @@
 	let showScrollToTop = $state(false);
 	let showScrollToBottom = $state(false);
 	let showMinimap = $state(false);
+	let searchHighlightTimeout: ReturnType<typeof setTimeout> | null = null;
+	let appliedKeyword = $state("");
 
 	// Initialize search highlight state immediately (before effects run)
 	if (browser) {
@@ -49,14 +51,19 @@
 	 */
 	function highlightKeywordInDOM(container: HTMLElement, keyword: string): void {
 		if (!keyword) return;
+		console.log("[highlightKeywordInDOM] Starting with keyword:", keyword);
+
 		const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
 		const textNodes: Text[] = [];
 		let node;
 		while ((node = walker.nextNode())) {
 			textNodes.push(node as Text);
 		}
+		console.log("[highlightKeywordInDOM] Found text nodes:", textNodes.length);
+
 		const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		const regex = new RegExp(`(${escapedKeyword})`, "gi");
+		let matchCount = 0;
 		for (const textNode of textNodes) {
 			const text = textNode.textContent || "";
 			if (regex.test(text)) {
@@ -69,6 +76,7 @@
 					parent.nodeName === "MARK"
 				)
 					continue;
+				console.log("[highlightKeywordInDOM] Found match in:", text.substring(0, 50));
 				const fragment = document.createDocumentFragment();
 				let lastIndex = 0;
 				let match;
@@ -81,6 +89,7 @@
 					mark.textContent = match[1];
 					fragment.appendChild(mark);
 					lastIndex = match.index + match[0].length;
+					matchCount++;
 				}
 				if (lastIndex < text.length) {
 					fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
@@ -88,6 +97,7 @@
 				parent.replaceChild(fragment, textNode);
 			}
 		}
+		console.log("[highlightKeywordInDOM] Total matches:", matchCount);
 	}
 
 	function clearSearchHighlights(container: HTMLElement): void {
@@ -95,6 +105,30 @@
 		for (const mark of highlights) {
 			const text = document.createTextNode(mark.textContent ?? "");
 			mark.replaceWith(text);
+		}
+
+		// Merge adjacent text nodes
+		const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+		const nodesToMerge: Text[] = [];
+		let currentNode: Text | null;
+		let lastTextNode: Text | null = null;
+
+		while ((currentNode = walker.nextNode() as Text)) {
+			if (lastTextNode && currentNode.previousSibling === lastTextNode) {
+				nodesToMerge.push(lastTextNode);
+				nodesToMerge.push(currentNode);
+			}
+			lastTextNode = currentNode;
+		}
+
+		// Merge nodes in pairs
+		for (let i = 0; i < nodesToMerge.length - 1; i += 2) {
+			const node1 = nodesToMerge[i];
+			const node2 = nodesToMerge[i + 1];
+			if (node1 && node2 && node2.previousSibling === node1) {
+				node1.textContent = node1.textContent + node2.textContent;
+				node2.remove();
+			}
 		}
 	}
 
@@ -236,17 +270,56 @@
 	// Effect to apply DOM highlighting and scroll to first match
 	$effect(() => {
 		const keyword = searchHighlightState.searchKeyword;
-		if (!keyword || searchHighlightState.hasScrolled) return;
-		if (messages.length === 0 || !messageListContainer) return;
 
-		// Wait for DOM to render, then apply highlighting and scroll instantly
-		setTimeout(() => {
+		// Reset appliedKeyword when search is cleared
+		if (!keyword) {
+			// Immediately clear highlights when search is cleared
+			if (messageListContainer) {
+				clearSearchHighlights(messageListContainer);
+			}
+			appliedKeyword = "";
+			return;
+		}
+
+		// Skip if keyword hasn't changed
+		if (keyword === appliedKeyword) {
+			return;
+		}
+
+		if (messages.length === 0 || !messageListContainer) {
+			return;
+		}
+
+		// Clear previous timeout to avoid race conditions
+		if (searchHighlightTimeout) {
+			clearTimeout(searchHighlightTimeout);
+		}
+
+		// Debounce to avoid race conditions on rapid input
+		// Note: Don't update appliedKeyword here - wait until timeout completes
+		const keywordForTimeout = keyword;
+		searchHighlightTimeout = setTimeout(async () => {
+			// Check if the keyword is still valid (not cleared or changed)
+			if (searchHighlightState.searchKeyword !== keywordForTimeout) {
+				return;
+			}
+
 			if (!messageListContainer) return;
 
+			// Clear existing highlights first
 			clearSearchHighlights(messageListContainer);
 
-			// Apply DOM highlighting to all messages
-			highlightKeywordInDOM(messageListContainer, keyword);
+			// Wait for DOM to update after clearing
+			await tick();
+
+			// Apply new highlighting
+			highlightKeywordInDOM(messageListContainer, keywordForTimeout);
+
+			// Only update appliedKeyword after successful completion
+			appliedKeyword = keywordForTimeout;
+
+			// Wait for DOM to update after highlighting
+			await tick();
 
 			// Scroll to first highlight mark using viewport (instant, no animation)
 			const highlightMark = messageListContainer.querySelector("mark.search-highlight");
@@ -264,9 +337,32 @@
 					viewport.scrollTo({ top: Math.max(0, scrollTop), behavior: "instant" });
 				}
 			} else {
-				scrollToFirstMatch(keyword);
+				scrollToFirstMatch(keywordForTimeout);
 			}
 			searchHighlightState.markScrolled();
+		}, 100);
+	});
+
+	// Effect to re-apply highlighting when messages change (e.g., new messages arrive)
+	$effect(() => {
+		const keyword = searchHighlightState.searchKeyword;
+		// Track messages to trigger effect on changes
+		if (!keyword || !messageListContainer) return;
+
+		// Only re-apply if keyword matches current search state
+		if (keyword !== appliedKeyword) return;
+
+		// Check if highlights already exist
+		const existingHighlights = messageListContainer.querySelectorAll("mark.search-highlight");
+		if (existingHighlights.length > 0) return;
+
+		// Wait for DOM update after messages change
+		setTimeout(() => {
+			if (!messageListContainer || !keyword) return;
+			if (keyword !== appliedKeyword) return;
+
+			clearSearchHighlights(messageListContainer);
+			highlightKeywordInDOM(messageListContainer, keyword);
 		}, 50);
 	});
 

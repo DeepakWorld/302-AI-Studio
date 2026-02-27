@@ -41,10 +41,11 @@ class SearchHighlightState {
 	}
 
 	/**
-	 * Mark that scrolling has been completed
+	 * Mark scrolling state
+	 * @param value - true to mark as scrolled, false to reset
 	 */
-	markScrolled(): void {
-		this.#hasScrolled = true;
+	markScrolled(value: boolean = true): void {
+		this.#hasScrolled = value;
 	}
 
 	/**

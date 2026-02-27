@@ -235,7 +235,7 @@
 		max-width: none !important;
 	}
 
-	/* Search keyword highlighting with fade-out animation */
+	/* Search keyword highlighting */
 	mark.search-highlight {
 		background-color: rgba(255, 213, 0, 0.5);
 		color: inherit;
@@ -243,55 +243,45 @@
 		border-radius: 2px;
 		scroll-margin-top: 100px;
 		scroll-margin-bottom: 100px;
-		animation: highlight-fade 3s ease-in-out forwards;
 	}
 
-	@keyframes highlight-fade {
-		0%,
-		70% {
-			background-color: rgba(255, 213, 0, 0.5);
-		}
-		100% {
-			background-color: transparent;
-		}
+	/* Current search match (like browser Ctrl+F) */
+	mark.search-highlight-current {
+		background-color: #ff6b00 !important;
+		color: white !important;
+		padding: 0 2px;
+		border-radius: 2px;
+		scroll-margin-top: 100px;
+		scroll-margin-bottom: 100px;
 	}
 
-	.dark mark.search-highlight {
-		animation: highlight-fade-dark 3s ease-in-out forwards;
+	.dark mark.search-highlight-current {
+		background-color: #ff8c00 !important;
+		color: white !important;
 	}
+}
 
-	@keyframes highlight-fade-dark {
-		0%,
-		70% {
-			background-color: rgba(255, 213, 0, 0.35);
-		}
-		100% {
-			background-color: transparent;
-		}
+/* Streaming text fade-in animation for AI chat responses */
+@keyframes streaming-fade {
+	from {
+		opacity: 0;
+		filter: blur(2px);
+		transform: translateY(2px);
 	}
+	to {
+		opacity: 1;
+		filter: blur(0);
+		transform: translateY(0);
+	}
+}
 
-	/* Streaming text fade-in animation for AI chat responses */
-	@keyframes streaming-fade {
-		from {
-			opacity: 0;
-			filter: blur(2px);
-			transform: translateY(2px);
-		}
-		to {
-			opacity: 1;
-			filter: blur(0);
-			transform: translateY(0);
-		}
-	}
+.streaming-fade-in {
+	animation: streaming-fade 250ms ease-out forwards;
+}
 
-	.streaming-fade-in {
-		animation: streaming-fade 250ms ease-out forwards;
-	}
-
-	::selection {
-		background-color: var(--primary);
-		color: #ffffff;
-	}
+::selection {
+	background-color: var(--primary);
+	color: #ffffff;
 }
 
 /* Design System tokens for new buss components */
