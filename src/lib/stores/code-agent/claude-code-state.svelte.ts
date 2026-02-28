@@ -13,7 +13,10 @@ import {
 } from "@shared/storage/code-agent";
 import { toast } from "svelte-sonner";
 import { agentPreviewState } from "../agent-preview-state.svelte";
+import { persistedClaudeCodeSandboxState } from "./claude-code-sandbox-state.svelte";
+import { codeAgentState } from "./code-agent-state.svelte";
 import { BUILTIN_SKILLS } from "./constant";
+import { persistedLocalClaudeCodeSessionsState } from "./local-claude-code-sandbox-state.svelte";
 
 export interface ClaudeCodeSandboxInfo {
 	sandboxId: string;
@@ -252,11 +255,40 @@ class ClaudeCodeAgentState {
 		await sendRetryMessage(retryContent);
 	}
 
+	/**
+	 * 获取当前 session 的备注，支持 local 和 remote 模式
+	 */
+	#getCurrentSessionNote(): string | null {
+		if (codeAgentState.type === "local") {
+			const sessionId = this.currentSessionId;
+			if (!sessionId) return null;
+			const localSessions = persistedLocalClaudeCodeSessionsState.current;
+			const session = localSessions.find((s) => s.session_id === sessionId);
+			return session?.note ?? null;
+		}
+
+		// Remote 模式
+		const sandboxId = this.sandboxId;
+		const sessionId = this.currentSessionId;
+		const sandbox = persistedClaudeCodeSandboxState.current.find((s) => s.sandboxId === sandboxId);
+		if (!sandbox) return null;
+		const session = sandbox.sessionInfos.find((s) => s.sessionId === sessionId);
+		return session?.note ?? null;
+	}
+
 	async handleThreadTitleUpdated({ title }: { title: string }) {
 		// If the note was manually set by user, do not overwrite it
 		if (this.isManualNote) {
 			return;
 		}
+
+		// Only auto-update when session note is empty
+		// This ensures notes survive cross-device sync (isManualNote is local-only)
+		const currentNote = this.#getCurrentSessionNote();
+		if (currentNote) {
+			return;
+		}
+
 		await this.updateSessionRemark(title);
 	}
 
