@@ -25,14 +25,6 @@ export class LocalVibeService {
 	private runtimePort: number | null = null;
 	private isOperating = false;
 
-	/**
-	 * Internal sandbox lifecycle state.
-	 * - 'idle': sandbox was never started (or was stopped) in this process lifetime.
-	 *   After app restart this defaults to 'idle', preventing stale health-check HTTP calls.
-	 * - 'running': sandbox was successfully started by this process.
-	 */
-	private sandboxStatus: "running" | "idle" = "idle";
-
 	constructor() {
 		try {
 			const dir = this.getRuntimeComposeDir();
@@ -375,12 +367,6 @@ export class LocalVibeService {
 		isRunning: boolean;
 		isOperating: boolean;
 	}> {
-		// If this process never started the sandbox (or it was stopped),
-		// skip the HTTP health check entirely — avoids false-positives after app restart.
-		if (this.sandboxStatus === "idle") {
-			return { isRunning: false, isOperating: this.isOperating };
-		}
-
 		// sandboxStatus === 'running': verify with an actual health check
 		const result = await this.checkLocalSandboxHealth();
 		return { isRunning: result.isHealth, isOperating: this.isOperating };
@@ -1357,12 +1343,6 @@ export class LocalVibeService {
 		isHealth: boolean;
 		error?: string;
 	}> {
-		// If the sandbox was never started (or was stopped) by this process,
-		// there is no point making an HTTP health-check call.
-		if (this.sandboxStatus === "idle") {
-			return { isOk: true, isHealth: false };
-		}
-
 		try {
 			await getLocalSandboxHealthStatus();
 			return { isOk: true, isHealth: true };
@@ -2418,7 +2398,6 @@ export class LocalVibeService {
 			return { isOk: false, error: errorMessage };
 		} finally {
 			this.isOperating = false;
-			this.sandboxStatus = "idle";
 		}
 	}
 
@@ -2471,9 +2450,6 @@ export class LocalVibeService {
 				console.error("[Local Vibe] forceStopPodman machine stop error:", e);
 			}
 		}
-
-		// 3. Mark internal state as idle
-		this.sandboxStatus = "idle";
 	}
 
 	/**
@@ -2562,8 +2538,6 @@ export class LocalVibeService {
 				// Start local sandbox health check
 				await new Promise((resolve) => setTimeout(resolve, 3000));
 				await this.startLocalSandboxHealthCheck();
-
-				this.sandboxStatus = "running";
 
 				return {
 					isOk: true,
@@ -2724,8 +2698,6 @@ export class LocalVibeService {
 			// Start local sandbox health check
 			await new Promise((resolve) => setTimeout(resolve, 3000));
 			await this.startLocalSandboxHealthCheck();
-
-			this.sandboxStatus = "running";
 
 			return {
 				isOk: true,
