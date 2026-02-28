@@ -246,24 +246,28 @@ class TabBarState {
 	}
 
 	async handleTabClose(tabId: string) {
-		if (!this.#windowId) return;
+		try {
+			if (!this.#windowId) return;
 
-		const currentTabs = this.#isShellView ? this.tabs : await this.getCurrentWindowTabs();
+			const currentTabs = this.#isShellView ? this.tabs : await this.getCurrentWindowTabs();
 
-		if (currentTabs.length > 1) {
-			const newActiveTabId = await this.#handleTabRemovalWithActiveState(tabId, currentTabs);
+			if (currentTabs.length > 1) {
+				const newActiveTabId = await this.#handleTabRemovalWithActiveState(tabId, currentTabs);
 
-			await tabService.handleTabClose(tabId, newActiveTabId);
-		} else {
-			// Clear tabs - the $effect fallback will create a new tab
-			// We don't create explicitly to avoid race conditions with the reactive system
-			this.#safeUpdateWindowTabs(this.#windowId, []);
+				await tabService.handleTabClose(tabId, newActiveTabId);
+			} else {
+				// Clear tabs - the $effect fallback will create a new tab
+				// We don't create explicitly to avoid race conditions with the reactive system
+				this.#safeUpdateWindowTabs(this.#windowId, []);
 
-			// Also close the backend tab view
-			await tabService.handleTabClose(tabId, null);
+				// Also close the backend tab view
+				await tabService.handleTabClose(tabId, null);
+			}
+		} catch (e) {
+			console.warn(e);
+		} finally {
+			await broadcastService.broadcastToAll("thread-list-updated", {});
 		}
-
-		await broadcastService.broadcastToAll("thread-list-updated", {});
 	}
 
 	async handleTabCloseOthers(tabId: string) {
