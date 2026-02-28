@@ -204,23 +204,16 @@ export class UpdaterService {
 		UpdaterService.isInstallingUpdate = true;
 
 		try {
-			console.log("[Updater] Stopping local sandbox before update install...");
-			const result = await localVibeService.stopLocalSandbox();
-			if (result.isOk) {
-				console.log("[Updater] Local sandbox stopped successfully");
-			} else {
-				console.error("[Updater] Failed to stop local sandbox:", result.error);
-			}
+			console.log("[Updater] Force stopping podman before update install...");
+			await localVibeService.forceStopPodman();
+			console.log("[Updater] Podman force stopped");
 		} catch (error) {
-			console.error("[Updater] Exception during local sandbox stop (proceeding):", error);
+			console.error("[Updater] forceStopPodman failed (proceeding):", error);
 		}
 
 		if (isMac) windowService.setCMDQ(true);
 
-		// Add a small delay to ensure OS has time to clean up processes before relaunch
-		setTimeout(() => {
-			autoUpdater.quitAndInstall();
-		}, 1000);
+		autoUpdater.quitAndInstall();
 	}
 
 	// ******************************* IPC Methods ******************************* //
