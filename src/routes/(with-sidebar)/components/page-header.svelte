@@ -369,7 +369,7 @@
 								? "text-foreground bg-icon-btn-active"
 								: "text-muted-foreground hover:text-foreground",
 						)}
-						title="区分大小写"
+						title={m.search_case_sensitive()}
 						onclick={toggleCaseSensitive}
 					>
 						<CaseSensitive class="size-3.5" />
@@ -381,7 +381,7 @@
 								? "text-foreground bg-icon-btn-active"
 								: "text-muted-foreground hover:text-foreground",
 						)}
-						title="全字匹配"
+						title={m.search_whole_word()}
 						onclick={toggleWholeWord}
 					>
 						<WholeWord class="size-3.5" />
@@ -393,7 +393,7 @@
 								? "text-foreground bg-icon-btn-active"
 								: "text-muted-foreground hover:text-foreground",
 						)}
-						title="正则表达式"
+						title={m.search_regex()}
 						onclick={toggleRegex}
 					>
 						<Code class="size-3.5" />
