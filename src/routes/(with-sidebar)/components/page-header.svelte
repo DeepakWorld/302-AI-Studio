@@ -353,7 +353,7 @@
 				<div
 					class="absolute right-0 top-full mt-1 flex h-9 items-center gap-1 rounded-md border border-input bg-background px-2 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
 				>
-					<Search class="text-muted-foreground size-4 shrink-0" />
+					<Search class="text-foreground/70 size-4 shrink-0" />
 					<input
 						bind:this={searchInputRef}
 						bind:value={searchInputValue}
@@ -367,7 +367,7 @@
 							"flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
 							caseSensitive
 								? "text-foreground bg-icon-btn-active"
-								: "text-muted-foreground hover:text-foreground",
+								: "text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover",
 						)}
 						title={m.search_case_sensitive()}
 						onclick={toggleCaseSensitive}
@@ -379,7 +379,7 @@
 							"flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
 							wholeWord
 								? "text-foreground bg-icon-btn-active"
-								: "text-muted-foreground hover:text-foreground",
+								: "text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover",
 						)}
 						title={m.search_whole_word()}
 						onclick={toggleWholeWord}
@@ -391,7 +391,7 @@
 							"flex size-5 cursor-pointer items-center justify-center rounded transition-colors",
 							useRegex
 								? "text-foreground bg-icon-btn-active"
-								: "text-muted-foreground hover:text-foreground",
+								: "text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover",
 						)}
 						title={m.search_regex()}
 						onclick={toggleRegex}
@@ -399,19 +399,19 @@
 						<Code class="size-3.5" />
 					</button>
 					{#if searchInputValue && totalMatches > 0}
-						<span class="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
+						<span class="flex items-center gap-0.5 text-xs text-foreground tabular-nums">
 							<span class="min-w-[2.5rem] text-center">
 								{currentMatchIndex}/{totalMatches}
 							</span>
 							<button
-								class="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
+								class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
 								onclick={handlePrevMatch}
 								disabled={totalMatches === 0}
 							>
 								<ChevronUp class="size-3.5" />
 							</button>
 							<button
-								class="cursor-pointer text-muted-foreground hover:text-foreground flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
+								class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
 								onclick={handleNextMatch}
 								disabled={totalMatches === 0}
 							>
@@ -420,7 +420,7 @@
 						</span>
 					{/if}
 					<button
-						class="cursor-pointer text-muted-foreground hover:text-foreground flex size-5 items-center justify-center rounded transition-colors"
+						class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex size-5 items-center justify-center rounded transition-colors"
 						onclick={handleClearSearch}
 					>
 						<X class="size-3" />
