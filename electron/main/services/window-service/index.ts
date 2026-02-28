@@ -741,15 +741,19 @@ export class WindowService {
 		const { shouldUseDarkColors } = nativeTheme;
 		const language = await generalSettingsStorage.getLanguage();
 
-		// Fixed window size
-		const windowWidth = 900;
-		const windowHeight = 650;
+		// Get the focused window to determine initial size and position
 		const focusedWindow = BrowserWindow.getFocusedWindow();
+		let windowWidth = 1000;
+		let windowHeight = 700;
 		let windowX: number | undefined;
 		let windowY: number | undefined;
 
 		if (focusedWindow && !focusedWindow.isDestroyed()) {
 			const bounds = focusedWindow.getBounds();
+			// Use the focused window's size, but ensure it's not smaller than minimum
+			windowWidth = Math.max(bounds.width, 800);
+			windowHeight = Math.max(bounds.height, 600);
+
 			// Get the display where the focused window is located
 			const display = screen.getDisplayNearestPoint({
 				x: bounds.x + bounds.width / 2,
