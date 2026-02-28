@@ -398,27 +398,29 @@
 					>
 						<Code class="size-3.5" />
 					</button>
-					{#if searchInputValue && totalMatches > 0}
-						<span class="flex items-center gap-0.5 text-xs text-foreground tabular-nums">
-							<span class="min-w-[2.5rem] text-center">
+					<span class="flex items-center gap-0.5 text-xs text-foreground tabular-nums">
+						<span class="min-w-[2.5rem] text-center w-14">
+							{#if searchInputValue && totalMatches > 0}
 								{currentMatchIndex}/{totalMatches}
-							</span>
-							<button
-								class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
-								onclick={handlePrevMatch}
-								disabled={totalMatches === 0}
-							>
-								<ChevronUp class="size-3.5" />
-							</button>
-							<button
-								class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
-								onclick={handleNextMatch}
-								disabled={totalMatches === 0}
-							>
-								<ChevronDown class="size-3.5" />
-							</button>
+							{:else}
+								没有结果
+							{/if}
 						</span>
-					{/if}
+						<button
+							class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
+							onclick={handlePrevMatch}
+							disabled={totalMatches === 0}
+						>
+							<ChevronUp class="size-3.5" />
+						</button>
+						<button
+							class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex items-center justify-center rounded p-0.5 transition-colors disabled:opacity-50"
+							onclick={handleNextMatch}
+							disabled={totalMatches === 0}
+						>
+							<ChevronDown class="size-3.5" />
+						</button>
+					</span>
 					<button
 						class="cursor-pointer text-foreground/70 hover:text-foreground hover:bg-icon-btn-hover flex size-5 items-center justify-center rounded transition-colors"
 						onclick={handleClearSearch}
