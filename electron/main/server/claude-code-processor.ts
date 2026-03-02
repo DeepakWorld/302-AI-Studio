@@ -161,6 +161,38 @@ class ClaudeCodeProcessor {
 	// Store result metadata to merge with pre_deploy_check
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private resultMetadata: any = null;
+	// Track the current SSE event type for handling non-JSON error payloads
+	private currentSSEEventType: string | null = null;
+
+	/**
+	 * Parse a raw SSE event block into its event type and concatenated data.
+	 * Handles multi-line payloads where continuation lines lack a "data:" prefix.
+	 */
+	private parseSSEEvent(raw: string): { eventType: string | null; data: string | null } {
+		const lines = raw.split("\n");
+		let eventType: string | null = null;
+		const dataLines: string[] = [];
+		let hasData = false;
+
+		for (const line of lines) {
+			if (line.startsWith("event:")) {
+				eventType = line.substring(6).trim();
+			} else if (line.startsWith("data: ")) {
+				dataLines.push(line.substring(6));
+				hasData = true;
+			} else if (line.startsWith("data:")) {
+				dataLines.push(line.substring(5));
+				hasData = true;
+			} else if (hasData && line.trim()) {
+				dataLines.push(line);
+			}
+		}
+
+		return {
+			eventType,
+			data: dataLines.length > 0 ? dataLines.join("\n") : null,
+		};
+	}
 
 	constructor(preGeneratedMessageId?: string) {
 		if (preGeneratedMessageId) {
@@ -184,9 +216,17 @@ class ClaudeCodeProcessor {
 		this.buffer = events.pop() ?? "";
 
 		for (const event of events) {
-			const lines = event.split("\n");
-			for (const line of lines) {
-				const processed = this.processLine(line);
+			const { eventType, data } = this.parseSSEEvent(event);
+
+			// Set event type context for processLine
+			if (eventType) {
+				this.currentSSEEventType = eventType;
+			}
+
+			// Process concatenated data as a single line
+			if (data) {
+				const fullData = "data: " + data;
+				const processed = this.processLine(fullData);
 				if (processed) {
 					processedEvents.push(processed);
 				}
@@ -202,8 +242,9 @@ class ClaudeCodeProcessor {
 			return null;
 		}
 
-		// Skip event: lines (SSE event type markers)
+		// Track SSE event type for handling non-JSON payloads
 		if (line.startsWith("event:")) {
+			this.currentSSEEventType = line.substring(6).trim();
 			return null;
 		}
 
@@ -216,15 +257,31 @@ class ClaudeCodeProcessor {
 
 		// Handle [DONE] marker
 		if (jsonStr === "[DONE]") {
+			this.currentSSEEventType = null;
 			return "data: [DONE]";
 		}
 
 		try {
 			const data = JSON.parse(jsonStr) as ClaudeCodeEvent;
+			this.currentSSEEventType = null;
 			return this.transformEvent(data);
 		} catch (e) {
-			// If JSON parsing fails, log and skip
+			// If JSON parsing fails and this is an SSE error event, treat as plain-text error
+			if (this.currentSSEEventType === "error" && jsonStr) {
+				console.log("[ClaudeCodeProcessor] Handling plain-text SSE error:", jsonStr.slice(0, 200));
+				this.currentSSEEventType = null;
+				return this.handleErrorPayload({
+					error: {
+						message: jsonStr,
+						type: "deploy_error",
+						code: "deploy_failed",
+						param: null,
+					},
+				});
+			}
+			// Otherwise log and skip
 			console.log("[ClaudeCodeProcessor] JSON parse failed for:", jsonStr, "Error:", e);
+			this.currentSSEEventType = null;
 			return null;
 		}
 	}
@@ -380,6 +437,16 @@ class ClaudeCodeProcessor {
 	 */
 	private handleErrorPayload(data: OpenAIErrorPayload): string | null {
 		const results: string[] = [];
+
+		// Ensure start event is sent before error (required by AI SDK)
+		if (!this.hasStarted) {
+			this.hasStarted = true;
+			const startEvent = {
+				type: "start",
+				messageId: this.messageId,
+			};
+			results.push(`data: ${JSON.stringify(startEvent)}`);
+		}
 
 		// Send error event with message from upstream
 		const errorEvent = {
@@ -924,9 +991,20 @@ class ClaudeCodeProcessor {
 			return "";
 		}
 
-		const finalLine = this.processLine(this.buffer);
+		// Process remaining buffer as a single event
+		const { eventType, data } = this.parseSSEEvent(this.buffer);
 		this.buffer = "";
-		let result = finalLine ? `${finalLine}\n\n` : "";
+
+		if (eventType) {
+			this.currentSSEEventType = eventType;
+		}
+
+		let result = "";
+		if (data) {
+			const fullData = "data: " + data;
+			const finalLine = this.processLine(fullData);
+			result = finalLine ? `${finalLine}\n\n` : "";
+		}
 
 		// If we have a pending finish event, append it with [DONE] marker
 		if (this.pendingFinishEvent) {

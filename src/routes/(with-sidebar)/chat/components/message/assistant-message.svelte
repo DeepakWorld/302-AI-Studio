@@ -488,7 +488,7 @@
 		{#each messagePartsWithExtractedReasoning() as part, partIndex (partIndex)}
 			{#if part.type === "text"}
 				{#if preferencesSettings.autoDisableMarkdown}
-					<div class="whitespace-pre-wrap text-sm leading-relaxed">
+					<div class="whitespace-pre-wrap break-all text-sm leading-relaxed">
 						{part.text}
 					</div>
 				{:else}

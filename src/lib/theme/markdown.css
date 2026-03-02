@@ -1,6 +1,8 @@
 .prose {
 	color: #374151;
 	max-width: 65ch;
+	overflow-wrap: anywhere;
+	word-break: break-word;
 }
 
 /* .prose.max-w-none {

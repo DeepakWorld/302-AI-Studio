@@ -61,6 +61,7 @@
 	let triggerRef = $state<HTMLElement | null>(null);
 	let isCompact = $state(false);
 	let windowTabsInfo = $derived(tabBarState.windowTabsInfo);
+	let isTabBusy = $derived(threadBusyState.isBusy(tab.threadId));
 	let displayTitle = $derived.by(() => {
 		if (threadBusyState.getReason(tab.threadId) === "generating-title") {
 			return m.label_generating_title();
@@ -163,16 +164,18 @@
 			{#if !isCompact}
 				<span class="max-w-tab-title min-w-0 flex-1 truncate text-xs">{displayTitle}</span>
 			{/if}
-			{#if closable}
+			{#if closable && !isTabBusy}
 				<Button
 					title={isCompact ? displayTitle : m.label_button_close()}
 					variant="ghost"
 					size="icon"
+					disabled={isTabBusy}
 					class={cn(
 						"p-tab-close h-auto w-auto shrink-0 rounded bg-transparent transition-colors",
 						isActive
 							? "hover:bg-tab-btn-hover-active dark:hover:bg-tab-btn-hover-active"
 							: "hover:bg-tab-btn-hover-inactive dark:hover:bg-tab-btn-hover-inactive hover:text-tab-btn-hover-fg dark:hover:text-tab-btn-hover-fg",
+						isTabBusy && "opacity-50 cursor-not-allowed",
 					)}
 					onclick={(e) => {
 						e.stopPropagation();
@@ -251,15 +254,18 @@
 
 		<ContextMenu.Separator />
 
-		<ContextMenu.Item onSelect={() => onTabClose(tab.id)} disabled={!closable}>
+		<ContextMenu.Item onSelect={() => onTabClose(tab.id)} disabled={!closable || isTabBusy}>
 			{m.label_button_close()}
 		</ContextMenu.Item>
 
-		<ContextMenu.Item onSelect={() => onTabCloseOthers(tab.id)} disabled={!closable}>
+		<ContextMenu.Item onSelect={() => onTabCloseOthers(tab.id)} disabled={!closable || isTabBusy}>
 			{m.label_button_close_others()}
 		</ContextMenu.Item>
 
-		<ContextMenu.Item onSelect={() => onTabCloseOffside(tab.id)} disabled={!offsideClosable}>
+		<ContextMenu.Item
+			onSelect={() => onTabCloseOffside(tab.id)}
+			disabled={!offsideClosable || isTabBusy}
+		>
 			{m.label_button_close_offside()}
 		</ContextMenu.Item>
 	</ContextMenu.Content>

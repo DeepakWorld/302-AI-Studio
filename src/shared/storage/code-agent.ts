@@ -108,6 +108,7 @@ export const codeAgentGlobalConfigs = type({
 	apiKey: "string",
 	autoDeploy: "boolean",
 	notificationsEnabled: "boolean",
+	lastVibeMode: "'local' | 'remote'",
 });
 export type CodeAgentGlobalConfigs = typeof codeAgentGlobalConfigs.infer;
 

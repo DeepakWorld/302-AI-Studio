@@ -2,6 +2,7 @@ import { isMac } from "@electron/main/constants";
 import type { UpdateChannel } from "@shared/storage/general-settings";
 import { app, autoUpdater, dialog, type IpcMainInvokeEvent } from "electron";
 import { broadcastService } from "../broadcast-service";
+import { localVibeService } from "../local-vibe-service";
 import { generalSettingsService } from "../settings-service/general-settings-service";
 import { generalSettingsStorage } from "../storage-service/general-settings-storage";
 import { windowService } from "../window-service";
@@ -190,18 +191,28 @@ export class UpdaterService {
 
 			if (response === 0) {
 				// User clicked "Restart Now"
-				UpdaterService.isInstallingUpdate = true;
-				if (isMac) windowService.setCMDQ(true);
-				autoUpdater.quitAndInstall();
+				await this._quitAndInstall();
 			}
 		} catch (error) {
 			console.error("Failed to show update dialog:", error);
 		}
 	}
 
-	private _quitAndInstall() {
+	private async _quitAndInstall() {
+		// Set this flag immediately to prevent other quit handlers (like window-all-closed or before-quit)
+		// from trying to stop the sandbox concurrently.
 		UpdaterService.isInstallingUpdate = true;
+
+		try {
+			console.log("[Updater] Force stopping podman before update install...");
+			await localVibeService.forceStopPodman();
+			console.log("[Updater] Podman force stopped");
+		} catch (error) {
+			console.error("[Updater] forceStopPodman failed (proceeding):", error);
+		}
+
 		if (isMac) windowService.setCMDQ(true);
+
 		autoUpdater.quitAndInstall();
 	}
 
@@ -211,7 +222,7 @@ export class UpdaterService {
 	}
 
 	async quitAndInstall(_event: IpcMainInvokeEvent): Promise<void> {
-		this._quitAndInstall();
+		await this._quitAndInstall();
 	}
 
 	static isInstallingUpdateNow(): boolean {

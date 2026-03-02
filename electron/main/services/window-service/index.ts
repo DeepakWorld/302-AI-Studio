@@ -106,6 +106,7 @@ export class WindowService {
 			if (isNull(windowsTabs)) {
 				const { shellWindow } = await this.createShellWindow();
 				this.setMainWindow(shellWindow.id);
+				void tabService.startMemoryManagerAfterInitialLoad();
 				return;
 			}
 
@@ -130,6 +131,7 @@ export class WindowService {
 			}
 
 			await tabStorage.initWindowMapping(newWindowIds, windowsTabs);
+			void tabService.startMemoryManagerAfterInitialLoad();
 		} finally {
 			this.isInitializing = false;
 		}
@@ -358,7 +360,7 @@ export class WindowService {
 						targetWindow.focus();
 
 						// 激活该 tab
-						tabService.focusTabInWindow(targetWindow, existingTab.id);
+						await tabService.focusTabInWindow(targetWindow, existingTab.id);
 
 						// 更新 storage 中的 active 状态
 						const updatedTabs = windowData.tabs.map((t) => ({
@@ -427,7 +429,7 @@ export class WindowService {
 			if (isUndefined(tab)) return;
 
 			// Focus the tab view
-			tabService.focusTabInWindow(targetWindow, tabId);
+			await tabService.focusTabInWindow(targetWindow, tabId);
 
 			// Update storage to set this tab as active
 			const tabState = await tabStorage.getItemInternal("tab-bar-state");
@@ -511,7 +513,7 @@ export class WindowService {
 		const newShellWindowId = shellWindow.id;
 
 		tabService.initWindowShellView(newShellWindowId, shellView);
-		tabService.transferTabToWindow(fromWindow, shellWindow, triggerTabId, triggerTab);
+		await tabService.transferTabToWindow(fromWindow, shellWindow, triggerTabId, triggerTab);
 
 		// ========== ATOMIC UPDATE: Update both windows in a single transaction ==========
 		const tabState = await tabStorage.getItemInternal("tab-bar-state");
@@ -555,7 +557,7 @@ export class WindowService {
 		if (!shouldCloseSourceWindow && tabState[sourceWindowId]?.tabs.length > 0) {
 			const newActiveTab = tabState[sourceWindowId].tabs.find((tab) => tab.active);
 			if (newActiveTab) {
-				tabService.focusTabInWindow(fromWindow, newActiveTab.id);
+				await tabService.focusTabInWindow(fromWindow, newActiveTab.id);
 			}
 		}
 
@@ -590,7 +592,7 @@ export class WindowService {
 		const movedTab = { ...triggerTab, active: true };
 
 		// Transfer the tab to the target window (preserving WebContentsView)
-		tabService.transferTabToWindow(fromWindow, targetWindow, triggerTabId, movedTab);
+		await tabService.transferTabToWindow(fromWindow, targetWindow, triggerTabId, movedTab);
 
 		// ========== ATOMIC UPDATE: Update both windows in a single transaction ==========
 		const tabState = await tabStorage.getItemInternal("tab-bar-state");
@@ -653,7 +655,7 @@ export class WindowService {
 		if (!shouldCloseSourceWindow && tabState[sourceWindowId]?.tabs.length > 0) {
 			const newActiveTab = tabState[sourceWindowId].tabs.find((tab) => tab.active);
 			if (newActiveTab) {
-				tabService.focusTabInWindow(fromWindow, newActiveTab.id);
+				await tabService.focusTabInWindow(fromWindow, newActiveTab.id);
 			}
 		}
 
@@ -878,7 +880,7 @@ export class WindowService {
 						targetWindow.focus();
 
 						// 激活该 tab
-						tabService.focusTabInWindow(targetWindow, existingTab.id);
+						await tabService.focusTabInWindow(targetWindow, existingTab.id);
 
 						// 更新 storage 中的 active 状态
 						const updatedTabs = windowData.tabs.map((t) => ({

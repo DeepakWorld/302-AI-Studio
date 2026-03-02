@@ -449,11 +449,11 @@
 			</Button>
 		</div>
 		<!-- Skills Hub Link -->
-		<div class="mt-3 text-sm text-muted-foreground">
+		<div class="flex flex-row items-center mt-3 text-sm text-muted-foreground">
 			{m.skills_hub_hint_prefix()}
 			<button
 				type="button"
-				class="inline-flex items-center gap-1 text-violet-500 hover:text-violet-600 hover:underline cursor-pointer"
+				class="flex flex-row mx-1 gap-1 items-center text-primary hover:underline-offset-2 hover:underline cursor-pointer"
 				onclick={() =>
 					window.electronAPI.windowService.handleNavigateToUrl(
 						"302 Skills Hub",
@@ -461,7 +461,7 @@
 						"https://skills.302.ai",
 					)}
 			>
-				<ShoppingBag class="h-4 w-4" />
+				<ShoppingBag class="h-3 w-3" />
 				{m.skills_hub_link_text()}
 			</button>
 			{m.skills_hub_hint_suffix()}

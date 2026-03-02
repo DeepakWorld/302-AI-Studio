@@ -22,6 +22,6 @@
 		type="text"
 		{placeholder}
 		{oninput}
-		class="rounded-settings-item !bg-settings-item-bg hover:ring-ring hover:ring-1 h-settings-item pl-10"
+		class="rounded-settings-item !bg-settings-item-bg hover:ring-ring hover:ring-1 py-0 pl-10"
 	/>
 </div>

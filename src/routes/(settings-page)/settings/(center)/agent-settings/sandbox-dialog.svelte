@@ -97,7 +97,7 @@
 		if (!sandbox || !targetSession) return;
 
 		if (codeAgentState.type !== "remote") {
-			toast.error("No 302.AI provider available");
+			toast.error(m.toast_deploy_no_302_provider());
 			return;
 		}
 
@@ -108,7 +108,7 @@
 		});
 
 		if (result.success) {
-			toast.success("Update session remark success");
+			toast.success(m.update_session_remark_success());
 
 			// Mark isManualNote = true for any thread that uses this session
 			try {
@@ -125,7 +125,7 @@
 			// Refresh sessions
 			await claudeCodeSandboxState.refreshSessions(sandbox.sandboxId);
 		} else {
-			toast.error(result.error || "Update session remark failed");
+			toast.error(result.error || m.update_session_remark_failed());
 		}
 	}
 

@@ -6,6 +6,7 @@ import type {
 	Tab,
 	TabDragGhostClear,
 	TabDragGhostHover,
+	TabUIState,
 	Theme,
 	ThreadParmas,
 } from "@shared/types";
@@ -45,6 +46,13 @@ declare global {
 			onTriggerSendMessage: (callback: (data: { threadId: string }) => void) => () => void;
 			onTriggerCreateSkillSummary: (callback: (data: { threadId: string }) => void) => () => void;
 			onSidebarStateChanged: (callback: (data: { open: boolean }) => void) => () => void;
+			onSidebarSearchChanged: (callback: (data: { query: string }) => void) => () => void;
+			onSidebarSearchResultsUpdated: (
+				callback: (data: { query: string; resultIds: string[] }) => void,
+			) => () => void;
+			onSidebarSearchNavigate: (
+				callback: (data: { threadId: string; query: string }) => void,
+			) => () => void;
 			onApplyDefaultModel: (callback: (data: { model: unknown }) => void) => () => void;
 			onModelsDeleted: (
 				callback: (data: { deletedModelIds: string[]; providerId?: string }) => void,
@@ -117,6 +125,7 @@ declare global {
 			onWslRestartRequired: (
 				callback: (data: { reason: string; message: string }) => void,
 			) => () => void;
+			onTabRequestSnapshot: (callback: () => Promise<TabUIState> | TabUIState) => () => void;
 		};
 		windowId: string;
 		tab: Tab;

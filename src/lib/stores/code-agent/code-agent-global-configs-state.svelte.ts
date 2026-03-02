@@ -9,6 +9,7 @@ function getInitialData() {
 		apiKey: "",
 		autoDeploy: true,
 		notificationsEnabled: false,
+		lastVibeMode: "remote" as const,
 	};
 	return initialData;
 }
@@ -24,6 +25,7 @@ class CodeAgentGlobalConfigsState {
 	notificationsEnabled = $derived(
 		persistedCodeAgentGlobalConfigsState.current?.notificationsEnabled ?? false,
 	);
+	lastVibeMode = $derived(persistedCodeAgentGlobalConfigsState.current?.lastVibeMode ?? "remote");
 
 	constructor() {
 		$effect.root(() => {

@@ -6,6 +6,7 @@
 	import { m } from "$lib/paraglide/messages.js";
 	import { agentPreviewState } from "$lib/stores/agent-preview-state.svelte";
 	import { chatState } from "$lib/stores/chat-state.svelte";
+	import { codeAgentGlobalConfigsState } from "$lib/stores/code-agent";
 	import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte";
 	import { preferencesSettings } from "$lib/stores/preferences-settings.state.svelte";
 	import { MAX_ATTACHMENT_COUNT } from "$lib/utils/file-preview";
@@ -22,8 +23,12 @@
 		selectedMode === "chat"
 			? m.title_chat_mode_description()
 			: codeAgentState.type === "local"
-				? m.title_local_mode_description()
-				: m.title_code_agent_description(),
+				? m.title_local_mode_description({
+						type: `<span class="text-primary">${m.title_local()}</span>`,
+					})
+				: m.title_code_agent_description({
+						type: `<span class="text-primary">${m.title_remote()}</span>`,
+					}),
 	);
 
 	function handleModeSelect(key: string) {
@@ -47,6 +52,8 @@
 				}
 			}
 		}
+
+		codeAgentState.updateType(codeAgentGlobalConfigsState.lastVibeMode);
 	}
 
 	function handleSettingsClick() {
@@ -104,6 +111,7 @@
 	</div>
 
 	{#if !chatState.hasMessages}
-		<p class="text-xs text-muted-foreground">{description}</p>
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+		<p class="text-xs text-muted-foreground">{@html description}</p>
 	{/if}
 </div>

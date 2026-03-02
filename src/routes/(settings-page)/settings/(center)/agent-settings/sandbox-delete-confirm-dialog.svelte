@@ -11,11 +11,15 @@
 	import { formatDateTimeShort } from "$lib/utils/date-format";
 	import { toast } from "svelte-sonner";
 	import { Loader2 } from "@lucide/svelte";
-	import type { ClaudeCodeSandboxInfo, LocalSessionInfo } from "@shared/storage/code-agent";
+	import type {
+		CodeAgentType,
+		ClaudeCodeSandboxInfo,
+		LocalSessionInfo,
+	} from "@shared/storage/code-agent";
 
 	interface Props {
 		open?: boolean;
-		mode?: "local" | "remote";
+		mode?: CodeAgentType;
 		sandbox?: ClaudeCodeSandboxInfo | null;
 		session?: LocalSessionInfo | null;
 		onClose?: () => void;

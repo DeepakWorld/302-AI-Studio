@@ -94,6 +94,12 @@ if (!gotTheLock) {
 	// explicitly with Cmd + Q.
 	app.on("window-all-closed", async () => {
 		if (!isMac) {
+			// Skip if we are currently installing an update, as updater service handles its own stop logic
+			if (UpdaterService.isInstallingUpdateNow()) {
+				console.log("[Main] Update installation in progress, skipping window-all-closed handler");
+				return;
+			}
+
 			// Stop local sandbox before quitting (for Windows/Linux)
 			console.log("[Main] All windows closed, stopping local sandbox...");
 			await localVibeService.stopLocalSandbox();

@@ -5,6 +5,12 @@ export const TabType = type(
 );
 export type TabType = typeof TabType.infer;
 
+export const TabUIState = type({
+	"scrollPosition?": "number",
+	"inputValue?": "string",
+});
+export type TabUIState = typeof TabUIState.infer;
+
 export const Tab = type({
 	id: "string",
 	title: "string",
@@ -17,6 +23,8 @@ export const Tab = type({
 	"previewId?": "string", // Optional preview identifier for htmlPreview tabs
 	"initialSearchQuery?": "string", // Optional search query to inherit when tab is created
 	"initialSearchResultIds?": "string[]", // Optional pre-computed search result thread IDs
+	"uiState?": TabUIState,
+	"isSleeping?": "boolean",
 });
 export type Tab = typeof Tab.infer;
 

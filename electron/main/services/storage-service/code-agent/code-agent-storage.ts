@@ -1,4 +1,8 @@
-import { CodeAgentConfigMetadata, type CodeAgentGlobalConfigs } from "@shared/storage/code-agent";
+import {
+	type CodeAgentType,
+	CodeAgentConfigMetadata,
+	type CodeAgentGlobalConfigs,
+} from "@shared/storage/code-agent";
 import { prefixStorage } from "@shared/types";
 import { isNull } from "es-toolkit";
 import { StorageService } from "..";
@@ -38,6 +42,7 @@ class CodeAgentGlobalConfigsStorage extends StorageService<CodeAgentGlobalConfig
 			apiKey: "",
 			autoDeploy: true,
 			notificationsEnabled: false,
+			lastVibeMode: "remote" as const,
 		};
 		try {
 			const data = await this.getItemInternal("code-agent-global-configs");
@@ -46,6 +51,18 @@ class CodeAgentGlobalConfigsStorage extends StorageService<CodeAgentGlobalConfig
 		} catch (error) {
 			console.error("Error getting global configs:", error);
 			return { isOK: false, data: defaultData };
+		}
+	}
+
+	async setLastVibeMode(mode: CodeAgentType): Promise<{ isOK: boolean }> {
+		try {
+			const { data: currentData } = await this.getGlobalConfigs();
+			const updatedData = { ...currentData, lastVibeMode: mode };
+			await this.setItemInternal("code-agent-global-configs", updatedData);
+			return { isOK: true };
+		} catch (error) {
+			console.error("Error setting lastVibeMode:", error);
+			return { isOK: false };
 		}
 	}
 }

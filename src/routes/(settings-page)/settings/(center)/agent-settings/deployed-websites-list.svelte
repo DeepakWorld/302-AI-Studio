@@ -140,10 +140,10 @@
 <Dialog.Root bind:open={isOpen}>
 	<Dialog.Content class="min-w-2xl">
 		<Dialog.Header>
-			<Dialog.Title class="flex items-center justify-between">
+			<Dialog.Title class="flex items-center relative">
 				<span>{m.title_deployed_websites ? m.title_deployed_websites() : "Deployed Websites"}</span>
 				<ButtonWithTooltip
-					class="hover:!bg-chat-action-hover mr-8"
+					class="hover:!bg-chat-action-hover absolute left-[98px]"
 					tooltip={m.label_button_reload()}
 					onclick={handleRefresh}
 					disabled={isLoading}

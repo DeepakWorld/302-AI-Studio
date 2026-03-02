@@ -327,7 +327,7 @@
 			<div class="flex items-center gap-1">
 				<ButtonWithTooltip
 					tooltip={m.taskboard_auto_decompose()}
-					class="border border-purple-500 hover:bg-purple-500/10"
+					class=" hover:!bg-chat-action-hover"
 					onclick={() => (decomposeDialogOpen = true)}
 					size="icon-sm"
 				>

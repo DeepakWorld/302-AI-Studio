@@ -89,11 +89,11 @@
 		<CollapsibleContent class="space-y-2">
 			<div class="pt-3">
 				{#if preferencesSettings.autoDisableMarkdown}
-					<div class="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+					<div class="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap break-all">
 						{text}
 					</div>
 				{:else}
-					<div class="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+					<div class="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap break-all">
 						{text.replace(/\\n/g, "\n").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
 					</div>
 				{/if}

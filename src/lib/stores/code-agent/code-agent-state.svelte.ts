@@ -105,7 +105,12 @@ class CodeAgentState {
 		}
 
 		if (this.currentAgentId === "claude-code") {
-			await claudeCodeAgentState.handleChatFinished(event);
+			await claudeCodeAgentState.handleChatFinished({
+				...event,
+				sendRetryMessage: async (content: string) => {
+					await chatState.sendMessage({ content });
+				},
+			});
 		}
 
 		// Send notification if in Vibe mode and tab is inactive
