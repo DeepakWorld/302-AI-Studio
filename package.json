@@ -46,17 +46,16 @@
 		"test:e2e": "playwright test",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"generate:ipc": "tsx scripts/generate-ipc.ts",
-		"postinstall": "pre-commit install --install-hooks --hook-type commit-msg"
+		"postinstall": ""
 	},
 	"devDependencies": {
 		"@ai-sdk/anthropic": "3.0.0",
 		"@ai-sdk/openai": "3.0.0",
 		"@ai-sdk/svelte": "4.0.1",
-		"vite": "^7.1.6",
+		"@codemirror/language": "^6.0.0",
 		"@electron-addons/electron-forge-maker-nsis": "^7.0.2",
 		"@electron-forge/cli": "^7.9.0",
 		"@electron-forge/maker-deb": "^7.9.0",
-                "@codemirror/language": "^6.0.0",
 		"@electron-forge/maker-dmg": "^7.9.0",
 		"@electron-forge/maker-rpm": "^7.9.0",
 		"@electron-forge/maker-squirrel": "^7.9.0",
@@ -120,7 +119,7 @@
 		"typescript": "^5.9.2",
 		"typescript-eslint": "^8.43.0",
 		"vaul-svelte": "1.0.0-next.7",
-		"vite": "^7.1.5",
+		"vite": "^7.1.6",
 		"vitest": "^3.2.4"
 	},
 	"dependencies": {
@@ -185,7 +184,8 @@
 		"svelte-image-viewer": "^5.0.0",
 		"svelte-lexical": "^0.6.3",
 		"ts-pattern": "^5.9.0",
-		"xlsx": "^0.18.5"
+		"xlsx": "^0.18.5",
+		"zod": "^4.4.3"
 	},
 	"packageManager": "pnpm@10.18.3+sha512.bbd16e6d7286fd7e01f6b3c0b3c932cda2965c06a908328f74663f10a9aea51f1129eea615134bf992831b009eabe167ecb7008b597f40ff9bc75946aadfb08d",
 	"pnpm": {
