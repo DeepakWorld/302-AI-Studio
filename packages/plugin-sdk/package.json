@@ -52,9 +52,11 @@
 	"peerDependencies": {
 		"ai": ">=5.0.0"
 	},
+"dependencies": {
+  "tsup": "^8.0.0"
+},
 	"devDependencies": {
 		"@types/node": "^22.0.0",
-		"tsup": "^8.0.0",
 		"typescript": "^5.6.0"
 	}
 }
