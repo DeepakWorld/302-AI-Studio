@@ -29,10 +29,9 @@ COPY package.json pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy built Electron/Vite outputs from the builder stage
+# Copy built Electron/Vite outputs from the builder stage (using the unified out/ directory)
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
 COPY --from=builder /app/out ./out
-COPY --from=builder /app/.vite ./.vite
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
