@@ -31,7 +31,7 @@ RUN pnpm install --frozen-lockfile --prod
 
 # Copy built outputs from builder stage
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
-COPY --from=builder /app/build ./build   # <-- matches adapter output
+COPY --from=builder /app/.vite/renderer/main_window ./main_window
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
