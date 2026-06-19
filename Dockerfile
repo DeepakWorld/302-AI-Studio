@@ -25,6 +25,8 @@ RUN pnpm --filter @302ai/studio-plugin-sdk build
 # CORRECTED: Use pnpm exec to correctly resolve local node_modules bins
 RUN pnpm exec svelte-kit sync
 
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm exec vite build
+
 # Build the main SvelteKit application using pnpm exec
 RUN pnpm exec vite build
 
