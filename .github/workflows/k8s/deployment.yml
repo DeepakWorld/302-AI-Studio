@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-studio-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-studio
+  template:
+    metadata:
+      labels:
+        app: ai-studio
+    spec:
+      containers:
+      - name: ai-studio
+        image: aiacrstudiodemo.azurecr.io/ai-studio:latest
+        ports:
+        - containerPort: 3000

@@ -16,6 +16,9 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the application source
 COPY . .
 
+# Explicitly re-link/install dependencies for the sub-package to generate missing .bin links
+RUN pnpm --filter @302ai/studio-plugin-sdk install --no-frozen-lockfile
+
 # Build the sub-package (plugin-sdk)
 RUN pnpm --filter @302ai/studio-plugin-sdk build
 

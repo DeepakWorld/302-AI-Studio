@@ -1,0 +1,44 @@
+name: Deploy AI Studio to AKS
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Login to Azure
+      - name: Azure CLI Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Set variables
+      - name: Set environment variables
+        run: |
+          echo "ACR_NAME=aiacrstudiodemo" >> $GITHUB_ENV
+          echo "AKS_NAME=ai-studio-aks" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP=AIStudioRG" >> $GITHUB_ENV
+
+      # Build and push Docker image to ACR
+      - name: Build and Push Docker Image
+        run: |
+          az acr build --registry $ACR_NAME --image ai-studio:${{ github.sha }} .
+
+      # Get AKS credentials
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_NAME --overwrite-existing
+
+      # Deploy to AKS
+      - name: Deploy to AKS
+        run: |
+          kubectl set image deployment/ai-studio-deployment ai-studio=aiacrstudiodemo.azurecr.io/ai-studio:${{ github.sha }}
+          kubectl rollout status deployment/ai-studio-deployment
