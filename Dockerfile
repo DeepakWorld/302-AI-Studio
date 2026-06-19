@@ -12,6 +12,9 @@ COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
 COPY patches ./patches
 
+# Disable postinstall hooks (skip dev-only scripts)
+ENV NPM_CONFIG_IGNORE_SCRIPTS=true
+
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
