@@ -2,30 +2,22 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Install pnpm globally
 RUN npm install -g pnpm
 
 COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
 
-# Change from strict frozen lockfile to allow workspace resolution sync
 RUN pnpm install --no-frozen-lockfile --prod=false --recursive
 
-# Copy the rest of the application source
 COPY . .
 
-# Ensure plugin-sdk has its own node_modules populated
 RUN pnpm --filter @302ai/studio-plugin-sdk install --no-frozen-lockfile
-
-# Build the plugin-sdk
 RUN pnpm --filter @302ai/studio-plugin-sdk build
 
-# Run SvelteKit sync
 RUN pnpm exec svelte-kit sync
 
-# Build the main SvelteKit application with increased heap size safely scoped
-RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm exec vite build
-
+# This runs your build script, which delegates to Electron Forge/Vite
+RUN pnpm exec vite build
 
 # Stage 2: Runtime (lean image)
 FROM node:22-alpine
@@ -33,18 +25,15 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy manifests
 COPY package.json pnpm-lock.yaml ./
 
-# Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy built outputs from builder stage (Adjusted to .vite/build/ or dist)
+# Copy built Electron/Vite outputs from the builder stage
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
-COPY --from=builder /app/.vite/build ./build
-COPY --from=builder /app/.vite ./vite
+COPY --from=builder /app/out ./out
+COPY --from=builder /app/.vite ./.vite
 
-# Healthcheck for container orchestration (Kubernetes/AKS)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
