@@ -1,47 +1,46 @@
-name: Deploy AI Studio to Azure
+name: Deploy AI Studio to AKS
 
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_ENDPOINT: ${{ secrets.OPENAI_ENDPOINT }}
+      COSMOS_DB_URI: ${{ secrets.COSMOS_DB_URI }}
+      COSMOS_DB_KEY: ${{ secrets.COSMOS_DB_KEY }}
+      AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+      AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+      AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+      AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+      ACR_NAME: ${{ secrets.ACR_NAME }}
+
     steps:
-      # Checkout repo
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # Setup Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      # Install pnpm
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      # Install dependencies
-      - name: Install dependencies
-        run: pnpm install
-
-      # Build project
-      - name: Build project
-        run: pnpm build
-
-      # Login to Azure
-      - name: Azure CLI Login
-        uses: azure/login@v1
+      - name: Log in to Azure
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Deploy to Azure Web App
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ai-studio-app
-          slot-name: production
-          package: .
+      - name: Log in to ACR
+        run: az acr login --name $ACR_NAME
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t $ACR_NAME.azurecr.io/ai-studio:latest .
+          docker push $ACR_NAME.azurecr.io/ai-studio:latest
+
+      - name: Get AKS credentials
+        run: az aks get-credentials --name $AKS_CLUSTER_NAME --resource-group $AKS_RESOURCE_GROUP --overwrite-existing
+
+      - name: Deploy to AKS
+        run: |
+          kubectl set image deployment/ai-studio ai-studio=$ACR_NAME.azurecr.io/ai-studio:latest
+          kubectl apply -f k8s/service.yaml

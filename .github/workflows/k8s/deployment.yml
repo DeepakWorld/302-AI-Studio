@@ -1,7 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ai-studio-deployment
+  name: ai-studio
+  labels:
+    app: ai-studio
 spec:
   replicas: 2
   selector:
@@ -13,7 +15,43 @@ spec:
         app: ai-studio
     spec:
       containers:
-      - name: ai-studio
-        image: aiacrstudiodemo.azurecr.io/ai-studio:latest
-        ports:
-        - containerPort: 3000
+        - name: ai-studio
+          image: <your-acr-name>.azurecr.io/ai-studio:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-studio-secrets
+                  key: OPENAI_API_KEY
+            - name: OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: ai-studio-secrets
+                  key: OPENAI_ENDPOINT
+            - name: COSMOS_DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ai-studio-secrets
+                  key: COSMOS_DB_URI
+            - name: COSMOS_DB_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-studio-secrets
+                  key: COSMOS_DB_KEY
+            - name: AZURE_STORAGE_ACCOUNT
+              valueFrom:
+                secretKeyRef:
+                  name: ai-studio-secrets
+                  key: AZURE_STORAGE_ACCOUNT
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-studio-secrets
+                  key: AZURE_STORAGE_KEY
+            - name: AZURE_STORAGE_CONTAINER
+              valueFrom:
+                secretKeyRef:
+                  name: ai-studio-secrets
+                  key: AZURE_STORAGE_CONTAINER

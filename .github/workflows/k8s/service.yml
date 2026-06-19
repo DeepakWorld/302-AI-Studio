@@ -2,11 +2,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ai-studio-service
+  labels:
+    app: ai-studio
 spec:
   type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
   selector:
     app: ai-studio
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 3000

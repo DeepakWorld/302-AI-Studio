@@ -3,42 +3,56 @@ name: Deploy AI Studio to AKS
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    steps:
-      # Checkout repo
-      - name: Checkout code
-        uses: actions/checkout@v3
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_ENDPOINT: ${{ secrets.OPENAI_ENDPOINT }}
+      COSMOS_DB_URI: ${{ secrets.COSMOS_DB_URI }}
+      COSMOS_DB_KEY: ${{ secrets.COSMOS_DB_KEY }}
+      AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+      AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+      AZURE_STORAGE_CONTAINER: ${{ secrets.AZURE_STORAGE_CONTAINER }}
+      AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+      AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+      ACR_NAME: ${{ secrets.ACR_NAME }}
 
-      # Login to Azure
-      - name: Azure CLI Login
-        uses: azure/login@v1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Set variables
-      - name: Set environment variables
+      - name: Build image in ACR
         run: |
-          echo "ACR_NAME=aiacrstudiodemo" >> $GITHUB_ENV
-          echo "AKS_NAME=ai-studio-aks" >> $GITHUB_ENV
-          echo "RESOURCE_GROUP=AIStudioRG" >> $GITHUB_ENV
+          az acr build \
+            --registry $ACR_NAME \
+            --image ai-studio:latest \
+            .
 
-      # Build and push Docker image to ACR
-      - name: Build and Push Docker Image
+      - name: Get AKS credentials
+        run: az aks get-credentials --name $AKS_CLUSTER_NAME --resource-group $AKS_RESOURCE_GROUP --overwrite-existing
+
+      - name: Create Kubernetes secrets
         run: |
-          az acr build --registry $ACR_NAME --image ai-studio:${{ github.sha }} .
+          kubectl delete secret ai-studio-secrets --ignore-not-found
+          kubectl create secret generic ai-studio-secrets \
+            --from-literal=OPENAI_API_KEY=$OPENAI_API_KEY \
+            --from-literal=OPENAI_ENDPOINT=$OPENAI_ENDPOINT \
+            --from-literal=COSMOS_DB_URI=$COSMOS_DB_URI \
+            --from-literal=COSMOS_DB_KEY=$COSMOS_DB_KEY \
+            --from-literal=AZURE_STORAGE_ACCOUNT=$AZURE_STORAGE_ACCOUNT \
+            --from-literal=AZURE_STORAGE_KEY=$AZURE_STORAGE_KEY \
+            --from-literal=AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER
 
-      # Get AKS credentials
-      - name: Get AKS Credentials
-        run: |
-          az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_NAME --overwrite-existing
-
-      # Deploy to AKS
       - name: Deploy to AKS
         run: |
-          kubectl set image deployment/ai-studio-deployment ai-studio=aiacrstudiodemo.azurecr.io/ai-studio:${{ github.sha }}
-          kubectl rollout status deployment/ai-studio-deployment
+          kubectl apply -f k8s/deployment.yml
+          kubectl apply -f k8s/service.yml
