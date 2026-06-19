@@ -8,23 +8,12 @@ COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
 COPY patches ./patches
 
-# Disable postinstall hooks
-ENV NPM_CONFIG_IGNORE_SCRIPTS=true
-
+# Install all deps (including tsup)
 RUN pnpm install --frozen-lockfile --prod=false
 
 COPY . .
 
-# Run svelte-kit sync BEFORE vite build
+# Build SDK before app
 RUN pnpm -C packages/plugin-sdk build
 RUN pnpm exec svelte-kit sync
 RUN pnpm exec vite build
-
-
-# Stage 2: Runtime
-FROM node:20-alpine
-WORKDIR /app
-RUN npm install -g pnpm
-COPY --from=builder /app ./
-EXPOSE 3000
-CMD ["pnpm", "start"]
