@@ -10,25 +10,23 @@ COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
 COPY patches ./patches
 
-# Install all dependencies
-RUN pnpm install --frozen-lockfile
+# Install all dependencies (recursive for workspaces)
+RUN pnpm install --frozen-lockfile --prod=false --recursive
 
 # Copy the rest of the application source
 COPY . .
 
-# Force install/link dependencies for the sub-package
+# Ensure plugin-sdk has its own node_modules populated
 RUN pnpm --filter @302ai/studio-plugin-sdk install --no-frozen-lockfile
 
-# Build the sub-package
+# Build the plugin-sdk
 RUN pnpm --filter @302ai/studio-plugin-sdk build
 
-# CORRECTED: Use pnpm exec to correctly resolve local node_modules bins
+# Run SvelteKit sync
 RUN pnpm exec svelte-kit sync
 
-# Build the main SvelteKit application and allocate 4GB/8GB of heap memory
-RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm exec vite build
-
-# Build the main SvelteKit application using pnpm exec
+# Build the main SvelteKit application with increased heap size
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN pnpm exec vite build
 
 
@@ -47,7 +45,6 @@ RUN pnpm install --frozen-lockfile --prod
 
 # Copy built outputs from builder stage
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
-# Update the build output folder below if your adapter outputs to 'dist' or 'output'
 COPY --from=builder /app/build ./build 
 COPY --from=builder /app/.vite ./vite
 
