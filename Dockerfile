@@ -25,17 +25,14 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy manifests
 COPY package.json pnpm-lock.yaml ./
 
-# Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy built outputs from builder stage
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
-COPY --from=builder /app/build ./build   # <-- correct output folder
+COPY --from=builder /app/build ./build   # <-- matches adapter output
 
-# Healthcheck for container orchestration
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
