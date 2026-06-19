@@ -1,5 +1,5 @@
-# Stage 1: Build dependencies and sub-packages
-FROM node:20-alpine AS builder
+# Stage 1: Build dependencies and sub-packages using Node 22
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install pnpm globally
@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the application source
 COPY . .
 
-# Explicitly install/relink dependencies inside the sub-package to generate missing .bin links
+# Force re-link dependencies for the sub-package
 RUN pnpm --filter @302ai/studio-plugin-sdk install --no-frozen-lockfile
 
 # Build the plugin-sdk
