@@ -14,6 +14,9 @@ ENV NPM_CONFIG_IGNORE_SCRIPTS=true
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+
+# Run svelte-kit sync BEFORE vite build
+RUN pnpm exec svelte-kit sync
 RUN pnpm exec vite build
 
 # Stage 2: Runtime
