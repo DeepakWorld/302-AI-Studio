@@ -1,18 +1,27 @@
-# Use Node.js base image
-FROM node:18-alpine
-
-# Set working directory
+# Stage 1: Build
+FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm install --production
+# Install pnpm
+RUN npm install -g pnpm
 
-# Copy source code
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY packages ./packages
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Build the app
 COPY . .
+RUN pnpm build
 
-# Expose port
+# Stage 2: Runtime
+FROM node:18-alpine
+WORKDIR /app
+
+# Copy built app from builder
+COPY --from=builder /app ./
+
 EXPOSE 3000
-
-# Start the app
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]
