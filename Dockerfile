@@ -5,10 +5,8 @@ WORKDIR /app
 # Install pnpm globally
 RUN npm install -g pnpm
 
-# Copy workspace configuration and manifests
 COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
-COPY patches ./patches
 
 # Change from strict frozen lockfile to allow workspace resolution sync
 RUN pnpm install --no-frozen-lockfile --prod=false --recursive
