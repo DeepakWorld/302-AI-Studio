@@ -16,15 +16,19 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the application source
 COPY . .
 
-# Build the sub-package first
+# Force install/link dependencies for the sub-package to generate missing .bin links (like tsup)
+RUN pnpm --filter @302ai/studio-plugin-sdk install --no-frozen-lockfile
+
+# Build the sub-package
 RUN pnpm --filter @302ai/studio-plugin-sdk build
 
 # Run SvelteKit sync at the root
 RUN svelte-kit sync
 
-# Build the main SvelteKit application (Outputs to .svelte-kit/output or dist/build)
+# Build the main SvelteKit application
 RUN vite build
 
+# ... [Stage 2: Runtime remains unchanged below] ...
 
 # Stage 2: Runtime (lean image)
 FROM node:22-alpine
