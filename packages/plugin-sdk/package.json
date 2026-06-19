@@ -3,9 +3,9 @@
 	"version": "1.0.0",
 	"description": "Plugin SDK for 302.AI Studio - Build plugins for AI chat application",
 	"type": "module",
-	"main": "./dist/index.js",
 	"module": "./dist/index.js",
 	
+"main": "./dist/index.js",
 "types": "./dist/index.d.ts",
 "exports": {
   ".": {
@@ -13,7 +13,6 @@
     "import": "./dist/index.js",
     "require": "./dist/index.cjs"
   }
-
 
 	},
 	"files": [
