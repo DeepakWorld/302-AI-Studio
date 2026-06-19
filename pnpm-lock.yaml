@@ -90,6 +90,9 @@ importers:
       '@lexical/utils':
         specifier: 0.33.1
         version: 0.33.1
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
       '@lobehub/icons-static-svg':
         specifier: ^1.66.0
         version: 1.66.0

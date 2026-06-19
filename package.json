@@ -146,6 +146,7 @@
 		"@lexical/rich-text": "0.33.1",
 		"@lexical/selection": "0.33.1",
 		"@lexical/utils": "0.33.1",
+		"@lezer/highlight": "^1.2.3",
 		"@lobehub/icons-static-svg": "^1.66.0",
 		"@modelcontextprotocol/sdk": "^1.20.0",
 		"@opendocsg/pdf2md": "^0.2.2",
