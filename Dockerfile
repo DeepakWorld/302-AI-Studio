@@ -10,13 +10,16 @@ COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
 COPY patches ./patches
 
-# Install all dependencies (ensuring devDependencies are included)
+# Install all dependencies at the root
 RUN pnpm install --frozen-lockfile
 
 # Copy the rest of the application source
 COPY . .
 
-# Build the plugin-sdk first using workspace filtering
+# Explicitly install/relink dependencies inside the sub-package to generate missing .bin links
+RUN pnpm --filter @302ai/studio-plugin-sdk install --no-frozen-lockfile
+
+# Build the plugin-sdk
 RUN pnpm --filter @302ai/studio-plugin-sdk build
 
 # Run SvelteKit sync
