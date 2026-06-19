@@ -52,6 +52,7 @@
 		"@ai-sdk/anthropic": "3.0.0",
 		"@ai-sdk/openai": "3.0.0",
 		"@ai-sdk/svelte": "4.0.1",
+		"vite": "^7.1.6",
 		"@electron-addons/electron-forge-maker-nsis": "^7.0.2",
 		"@electron-forge/cli": "^7.9.0",
 		"@electron-forge/maker-deb": "^7.9.0",
