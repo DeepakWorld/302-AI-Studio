@@ -1,4 +1,4 @@
-# Stage 1: Build dependencies and sub-packages using Node 22
+# Stage 1: Build dependencies and sub-packages
 FROM node:22-alpine AS builder
 WORKDIR /app
 
@@ -10,23 +10,20 @@ COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
 COPY patches ./patches
 
-# Install all workspace dependencies at the root
+# Install all dependencies
 RUN pnpm install --frozen-lockfile
 
 # Copy the rest of the application source
 COPY . .
 
-# Explicitly re-link/install dependencies for the sub-package to generate missing .bin links
-RUN pnpm --filter @302ai/studio-plugin-sdk install --no-frozen-lockfile
-
-# Build the sub-package (plugin-sdk)
+# Build the sub-package first
 RUN pnpm --filter @302ai/studio-plugin-sdk build
 
-# Run SvelteKit sync for the main app
-RUN pnpm --filter 302-ai-studio exec svelte-kit sync
+# Run SvelteKit sync at the root
+RUN svelte-kit sync
 
-# Build the main application
-RUN pnpm --filter 302-ai-studio exec vite build
+# Build the main SvelteKit application (Outputs to .svelte-kit/output or dist/build)
+RUN vite build
 
 
 # Stage 2: Runtime (lean image)
@@ -35,16 +32,17 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy manifests and patches
+# Copy manifests and patches so the lockfile resolves patches correctly
 COPY package.json pnpm-lock.yaml ./
 COPY patches ./patches
 
-# Install dependencies cleanly
-RUN pnpm install --frozen-lockfile
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
 
-# Copy built outputs from builder
+# Copy built outputs from builder stage
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
-COPY --from=builder /app/build ./build
+# Update the build output folder below if your adapter outputs to 'dist' or 'output'
+COPY --from=builder /app/build ./build 
 COPY --from=builder /app/.vite ./vite
 
 # Healthcheck for container orchestration (Kubernetes/AKS)
