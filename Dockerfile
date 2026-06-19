@@ -11,7 +11,7 @@ COPY patches ./patches
 # Disable postinstall hooks
 ENV NPM_CONFIG_IGNORE_SCRIPTS=true
 
-RUN pnpm install --frozen-lockfile --dev
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
