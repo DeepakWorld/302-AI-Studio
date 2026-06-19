@@ -33,15 +33,15 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy manifests and patches so the lockfile resolves patches correctly
+# Copy manifests
 COPY package.json pnpm-lock.yaml ./
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy built outputs from builder stage
+# Copy built outputs from builder stage (Adjusted to .vite/build/ or dist)
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
-COPY --from=builder /app/build ./build
+COPY --from=builder /app/.vite/build ./build
 COPY --from=builder /app/.vite ./vite
 
 # Healthcheck for container orchestration (Kubernetes/AKS)
