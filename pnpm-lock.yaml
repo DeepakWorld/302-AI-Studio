@@ -150,6 +150,9 @@ importers:
       hono:
         specifier: ^4.9.10
         version: 4.9.10
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
       katex:
         specifier: ^0.16.25
         version: 0.16.25
