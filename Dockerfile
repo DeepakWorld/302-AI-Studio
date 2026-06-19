@@ -27,3 +27,28 @@ RUN pnpm --filter 302-ai-studio exec svelte-kit sync
 
 # Build the main application
 RUN pnpm --filter 302-ai-studio exec vite build
+
+
+# Stage 2: Runtime
+FROM node:22-alpine
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+# Copy only manifests
+COPY package.json pnpm-lock.yaml ./
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy built outputs from builder
+COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/.vite ./vite
+
+EXPOSE 3000
+CMD ["pnpm", "start"]
+
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:3000/health || exit 1
