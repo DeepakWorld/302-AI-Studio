@@ -16,8 +16,8 @@ RUN pnpm --filter @302ai/studio-plugin-sdk build
 
 RUN pnpm exec svelte-kit sync
 
-# This runs your build script, which delegates to Electron Forge/Vite
-RUN pnpm exec vite build
+# Build the application with increased heap memory to prevent OOM crashes
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm exec vite build
 
 # Stage 2: Runtime (lean image)
 FROM node:22-alpine
