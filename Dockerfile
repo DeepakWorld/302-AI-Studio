@@ -35,7 +35,6 @@ RUN npm install -g pnpm
 
 # Copy manifests and patches so the lockfile resolves patches correctly
 COPY package.json pnpm-lock.yaml ./
-COPY patches ./patches
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
