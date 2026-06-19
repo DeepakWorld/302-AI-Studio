@@ -14,7 +14,7 @@ ENV NPM_CONFIG_IGNORE_SCRIPTS=true
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-RUN pnpm build
+RUN pnpm run build
 
 # Stage 2: Runtime
 FROM node:20-alpine
