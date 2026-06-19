@@ -35,12 +35,12 @@ WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy manifests and patches so the lockfile resolves patches correctly
+# Copy manifests and patches
 COPY package.json pnpm-lock.yaml ./
 COPY patches ./patches
 
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
+# Install dependencies cleanly
+RUN pnpm install --frozen-lockfile
 
 # Copy built outputs from builder
 COPY --from=builder /app/packages/plugin-sdk/dist ./packages/plugin-sdk/dist
