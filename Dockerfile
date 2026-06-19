@@ -10,8 +10,8 @@ COPY package.json pnpm-lock.yaml ./
 COPY packages ./packages
 COPY patches ./patches
 
-# Install all dependencies (recursive for workspaces)
-RUN pnpm install --frozen-lockfile --prod=false --recursive
+# Change from strict frozen lockfile to allow workspace resolution sync
+RUN pnpm install --no-frozen-lockfile --prod=false --recursive
 
 # Copy the rest of the application source
 COPY . .
