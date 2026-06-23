@@ -4,7 +4,7 @@
  * Types for provider plugins that add AI provider functionality
  */
 
-import type { PluginAPI } from "./api";
+import type { PluginAPI } from "./api.js";
 import type {
 	AIResponse,
 	AuthContext,
@@ -14,9 +14,8 @@ import type {
 	ErrorHandleResult,
 	MessageContext,
 	StreamChunk,
-} from "./hooks";
-import type { Model, ModelProvider } from "./shared";
-
+} from "./hooks.js";
+import type { Model, ModelProvider } from "./shared.js";
 /* ============================================================================
  * Provider Definition
  * ========================================================================= */
@@ -160,4 +159,4 @@ export type {
 	ErrorContext,
 	ErrorHandleResult,
 	ComponentRegistry,
-} from "./hooks";
+} from "./hooks.js";

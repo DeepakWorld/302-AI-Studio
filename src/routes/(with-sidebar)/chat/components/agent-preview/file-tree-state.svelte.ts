@@ -14,7 +14,9 @@ import {
 	type AgentPreviewSyncEnvelope,
 } from "$lib/stores/agent-preview-state.svelte";
 import { chatState } from "$lib/stores/chat-state.svelte";
-import { claudeCodeAgentState, codeAgentState } from "$lib/stores/code-agent";
+// After
+import { claudeCodeAgentState } from "$lib/stores/code-agent/claude-code-state.svelte.ts";
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte.ts";
 import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 import { toast } from "svelte-sonner";
 import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
@@ -686,57 +688,39 @@ export class FileTreeState {
 		try {
 			if (codeAgentState.type === "local") {
 				// Local mode: IPC → rename on local filesystem directly
+				// Call localVibeService copy directly
 				const stripWorkspace = (p: string) => {
 					const rel = p.startsWith(DEFAULT_WORKSPACE_PATH)
 						? p.slice(DEFAULT_WORKSPACE_PATH.length)
 						: p;
 					return rel.startsWith("/") ? rel.slice(1) : rel;
 				};
-				const result = await window.electronAPI.localVibeService.renameWorkspaceDirectory(
-					stripWorkspace(oldPath),
-					stripWorkspace(newPath),
+
+				const copyResult = await window.electronAPI.localVibeService.copyToWorkspaceByIpc(
+					folderPath,
+					stripWorkspace(fullTargetPath)
 				);
-				if (!result.success) {
-					toast.error(result.error || m.toast_file_rename_folder_failed(), { id: toastId });
+
+				if (!copyResult.success) {
+					toast.error(copyResult.error || m.toast_file_upload_folder_failed(), { id: uploadToastId });
 					return false;
 				}
+
+				toast.success(m.toast_file_upload_folder_success(), { id: uploadToastId });
+				await this.refreshFileTree();
+				return true;
+
 			} else {
-				// Remote mode: HTTP sandbox API
-				const apiKey = this.get302ApiKey();
-				if (!apiKey) {
-					toast.error(m.toast_file_operation_api_key_not_found(), { id: toastId });
-					return false;
-				}
-				const response = await renameSandboxFile(this.sandboxId, oldPath, newPath);
-				if (!response.success) {
-					toast.error(response.error || m.toast_file_rename_folder_failed(), { id: toastId });
-					return false;
-				}
+				// Remote Mode: Not supported via standard directory inputs directly without zipping
+				toast.error("Folder upload is not supported in remote mode via this action");
+				return false;
 			}
-
-			toast.success(m.toast_file_rename_folder_success(), { id: toastId });
-
-			// Update the folder and all its children paths in the local file list
-			const newFiles = this.files.map((f) => {
-				if (f.path === oldPath) return { ...f, path: newPath, name: newName };
-				if (f.path.startsWith(`${oldPath}/`))
-					return { ...f, path: f.path.replace(oldPath, newPath) };
-				return f;
-			});
-
-			// Update selected file path if it was inside the renamed folder
-			const newSelected = this.selectedFile?.startsWith(`${oldPath}/`)
-				? this.selectedFile.replace(oldPath, newPath)
-				: this.selectedFile;
-
-			await this.updateFilesAndRebuild(newFiles, newSelected);
-			return true;
 		} catch (e) {
-			const errorMsg = e instanceof Error ? e.message : m.toast_file_rename_folder_failed();
-			toast.error(errorMsg, { id: toastId });
+			const errorMsg = e instanceof Error ? e.message : m.toast_file_upload_folder_failed();
+			toast.error(errorMsg);
 			return false;
 		} finally {
-			this.operatingPaths = removeFromSet(this.operatingPaths, oldPath);
+			this.operatingPaths = removeFromSet(this.operatingPaths, targetPath);
 		}
 	}
 

@@ -2,9 +2,11 @@
 	import Button from "$lib/components/ui/button/button.svelte";
 	import * as m from "$lib/paraglide/messages";
 	import { chatState } from "$lib/stores/chat-state.svelte";
-	import { codeAgentSendMessageButtonState, codeAgentState } from "$lib/stores/code-agent";
-	import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte";
-	import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
+	// After
+import { codeAgentState } from "$lib/stores/code-agent/code-agent-state.svelte.ts";
+import { codeAgentSendMessageButtonState } from "$lib/stores/code-agent/code-agent-send-message-button-state.svelte.ts";
+import { codeAgentTaskboardState } from "$lib/stores/code-agent/code-agent-taskboard-state.svelte.ts";
+import { localEnvState } from "$lib/stores/code-agent/local-env-state.svelte";
 	import { persistedProviderState } from "$lib/stores/provider-state.svelte";
 	import { cn } from "$lib/utils.js";
 	import { toast } from "svelte-sonner";

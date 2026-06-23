@@ -2,7 +2,7 @@ import { defineCustomClientStrategy } from "$lib/paraglide/runtime";
 
 defineCustomClientStrategy("custom-sessionStorage", {
 	getLocale: () => {
-		const locale = localStorage.getItem("user-locale") ?? "zh";
+		const locale = localStorage.getItem("user-locale") ?? "en";
 		// console.log("[locale-strategy] getLocale:", locale);
 		return locale;
 	},

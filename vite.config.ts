@@ -4,10 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 import { readFileSync } from "node:fs";
 import path from "path";
 import { defineConfig } from "vite";
-import { ipcServiceGenerator } from "./vite-plugins/ipc-service-generator";
-
+import { ipcServiceGenerator } from "./vite-plugins/ipc-service-generator/index.js";
 const packageJson = JSON.parse(
-	readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
+	readFileSync(new URL("./package.json", import.meta.url), "utf-8")
 ) as { version?: string };
 
 export default defineConfig({

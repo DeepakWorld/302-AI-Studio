@@ -9,21 +9,21 @@
  * import { BaseProviderPlugin, type Model, type ModelProvider } from "@302ai/studio-plugin-sdk";
  *
  * export class MyProviderPlugin extends BaseProviderPlugin {
- *   protected providerId = "my-provider";
- *   protected providerName = "My Provider";
- *   protected apiType = "openai";
- *   protected defaultBaseUrl = "https://api.example.com/v1";
- *   protected websites = {
- *     official: "https://example.com",
- *     apiKey: "https://example.com/api-keys",
- *     docs: "https://docs.example.com",
- *     models: "https://docs.example.com/models",
- *   };
+ * protected providerId = "my-provider";
+ * protected providerName = "My Provider";
+ * protected apiType = "openai";
+ * protected defaultBaseUrl = "[https://api.example.com/v1](https://api.example.com/v1)";
+ * protected websites = {
+ * official: "[https://example.com](https://example.com)",
+ * apiKey: "[https://example.com/api-keys](https://example.com/api-keys)",
+ * docs: "[https://docs.example.com](https://docs.example.com)",
+ * models: "[https://docs.example.com/models](https://docs.example.com/models)",
+ * };
  *
- *   async onFetchModels(provider: ModelProvider): Promise<Model[]> {
- *     // Fetch models from your API
- *     return [];
- *   }
+ * async onFetchModels(provider: ModelProvider): Promise<Model[]> {
+ * // Fetch models from your API
+ * return [];
+ * }
  * }
  * ```
  */
@@ -39,7 +39,7 @@ export type {
 	PluginStatus,
 	PluginMetadata,
 	InstalledPlugin,
-} from "./metadata";
+} from "./metadata.js";
 
 // Shared Business Types
 export type {
@@ -53,7 +53,7 @@ export type {
 	ChatTools,
 	CustomUIDataTypes,
 	ChatMessage,
-} from "./shared";
+} from "./shared.js";
 
 // UI Types
 export type {
@@ -62,7 +62,7 @@ export type {
 	WindowOptions,
 	RequestOptions,
 	ComponentRegistry,
-} from "./ui";
+} from "./ui.js";
 
 // Hook Types
 export type {
@@ -76,7 +76,7 @@ export type {
 	AIResponse,
 	ErrorContext,
 	ErrorHandleResult,
-} from "./hooks";
+} from "./hooks.js";
 
 // API Types
 export type {
@@ -87,16 +87,16 @@ export type {
 	PluginLoggerAPI,
 	PluginHttpAPI,
 	PluginI18nAPI,
-} from "./api";
+} from "./api.js";
 
 // Provider Types
-export type { ProviderDefinition, ProviderPlugin } from "./provider";
+export type { ProviderDefinition, ProviderPlugin } from "./provider.js";
 
 /* ============================================================================
  * Base Classes
  * ========================================================================= */
 
-export { BaseProviderPlugin } from "./base-provider-plugin";
+export { BaseProviderPlugin } from "./base-provider-plugin.js";
 
 /* ============================================================================
  * Version

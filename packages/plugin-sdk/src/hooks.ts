@@ -4,9 +4,8 @@
  * Types for plugin hooks, contexts, and responses
  */
 
-import type { ChatMessage, Model, ModelProvider } from "./shared";
-import type { ComponentRegistry } from "./ui";
-
+import type { ChatMessage, Model, ModelProvider } from "./shared.js";
+import type { ComponentRegistry } from "./ui.js";
 /* ============================================================================
  * Hook Handler Types
  * ========================================================================= */

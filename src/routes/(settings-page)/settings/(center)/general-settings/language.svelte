@@ -7,16 +7,17 @@
 	import type { LanguageCode } from "@shared/storage/general-settings";
 
 	const languages = [
+{
+			key: "en",
+			nativeName: "English",
+			prefix: "🇺🇸",
+		},
 		{
 			key: "zh",
 			nativeName: "中文",
 			prefix: "🇨🇳",
 		},
-		{
-			key: "en",
-			nativeName: "English",
-			prefix: "🇺🇸",
-		},
+		
 	];
 
 	const options: SelectOption[] = languages.map((lang) => ({

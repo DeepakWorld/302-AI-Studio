@@ -1,7 +1,7 @@
 import * as ts from "typescript";
 import * as path from "path";
 import { glob } from "glob";
-import type { ServiceMethod, GenericParameter } from "./types";
+import type { ServiceMethod, GenericParameter } from "./types.js";
 
 /**
  * TypeScript service parser
@@ -114,7 +114,7 @@ export class TypeScriptServiceParser {
 			const name = param.name.getText();
 			const type = this.getTypeText(param.type, classGenericParams);
 			const isEventParam = this.isEventParameter(param);
-			const isOptional = !!param.questionToken; // 检测可选参数标识符 ?
+			const isOptional = !!param.questionToken;
 			return { name, type, isEventParam, isOptional };
 		});
 	}
@@ -155,12 +155,12 @@ export class TypeScriptServiceParser {
 				name: typeParam.name.text,
 			};
 
-			// 解析约束 (extends)
+			// Parse extends constraints
 			if (typeParam.constraint) {
 				param.constraint = this.getTypeText(typeParam.constraint);
 			}
 
-			// 解析默认类型
+			// Parse default types
 			if (typeParam.default) {
 				param.defaultType = this.getTypeText(typeParam.default);
 			}
@@ -179,12 +179,12 @@ export class TypeScriptServiceParser {
 				name: typeParam.name.text,
 			};
 
-			// 解析约束 (extends)
+			// Parse extends constraints
 			if (typeParam.constraint) {
 				param.constraint = this.getTypeText(typeParam.constraint);
 			}
 
-			// 解析默认类型
+			// Parse default types
 			if (typeParam.default) {
 				param.defaultType = this.getTypeText(typeParam.default);
 			}

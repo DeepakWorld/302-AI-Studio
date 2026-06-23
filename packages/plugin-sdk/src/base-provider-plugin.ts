@@ -16,9 +16,9 @@ import type {
 	ErrorContext,
 	ErrorHandleResult,
 	ComponentRegistry,
-} from "./provider";
-import type { PluginAPI } from "./api";
-import type { Model, ModelProvider } from "./shared";
+} from "./provider.js";
+import type { PluginAPI, PluginStorageAPI, PluginHookAPI, PluginUIAPI, PluginLoggerAPI, PluginHttpAPI, PluginI18nAPI } from "./api.js";
+import type { Model, ModelProvider } from "./shared.js";
 
 /**
  * Base Provider Plugin Class

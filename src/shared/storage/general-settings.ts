@@ -1,5 +1,5 @@
 export type LayoutMode = "default" | "wide" | "ultra-wide";
-export type LanguageCode = "zh" | "en";
+export type LanguageCode = "en" | "zh";
 export type UpdateChannel = "stable" | "beta";
 
 export interface GeneralSettingsState {

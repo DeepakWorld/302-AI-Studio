@@ -5,9 +5,9 @@
  * This is the safe API that plugins can use to interact with the application
  */
 
-import type { PluginMetadata } from "./metadata";
-import type { DialogOptions, DialogResult, RequestOptions, WindowOptions } from "./ui";
-import type { HookHandler } from "./hooks";
+import type { PluginMetadata } from "./metadata.js";
+import type { DialogOptions, DialogResult, RequestOptions, WindowOptions } from "./ui.js";
+import type { HookHandler } from "./hooks.js";
 
 /* ============================================================================
  * Plugin API Interface

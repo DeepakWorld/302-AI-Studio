@@ -8,7 +8,6 @@ import {
 	ssoService,
 	ghostWindowService,
 	shortcutService,
-	localVibeService,
 	codeAgentService,
 	windowService,
 	deepLinkService,
@@ -18,6 +17,7 @@ import {
 	appService,
 	dataService,
 	externalLinkService,
+	localVibeService,
 	mcpService,
 	notificationService,
 	providerService,
@@ -181,62 +181,6 @@ export function registerIpcHandlers() {
 	);
 	ipcMain.handle("shortcutService:getConflicts", (event) => shortcutService.getConflicts(event));
 	ipcMain.handle("shortcutService:getSyncInfo", (event) => shortcutService.getSyncInfo(event));
-
-	// localVibeService service registration
-	ipcMain.handle("localVibeService:copyToWorkspaceByIpc", (event, sourcePath, containerPath) =>
-		localVibeService.copyToWorkspaceByIpc(event, sourcePath, containerPath),
-	);
-	ipcMain.handle("localVibeService:getComposeDirectory", (event) =>
-		localVibeService.getComposeDirectory(event),
-	);
-	ipcMain.handle("localVibeService:openComposeDirectory", (event) =>
-		localVibeService.openComposeDirectory(event),
-	);
-	ipcMain.handle("localVibeService:openWorkspaceDirectory", (event, subPath) =>
-		localVibeService.openWorkspaceDirectory(event, subPath),
-	);
-	ipcMain.handle("localVibeService:deleteWorkspaceDirectory", (event, subPath) =>
-		localVibeService.deleteWorkspaceDirectory(event, subPath),
-	);
-	ipcMain.handle("localVibeService:renameWorkspaceDirectory", (event, oldSubPath, newSubPath) =>
-		localVibeService.renameWorkspaceDirectory(event, oldSubPath, newSubPath),
-	);
-	ipcMain.handle("localVibeService:listWorkspaceDirectories", (event) =>
-		localVibeService.listWorkspaceDirectories(event),
-	);
-	ipcMain.handle("localVibeService:getLocalBaseUrl", (event) =>
-		localVibeService.getLocalBaseUrl(event),
-	);
-	ipcMain.handle("localVibeService:getSandboxStatus", (event) =>
-		localVibeService.getSandboxStatus(event),
-	);
-	ipcMain.handle("localVibeService:triggerSystemRestart", (event) =>
-		localVibeService.triggerSystemRestart(event),
-	);
-	ipcMain.handle("localVibeService:validPodman", (event) => localVibeService.validPodman(event));
-	ipcMain.handle("localVibeService:startPodmanHealthCheck", (event) =>
-		localVibeService.startPodmanHealthCheck(event),
-	);
-	ipcMain.handle("localVibeService:installWSL", (event) => localVibeService.installWSL(event));
-	ipcMain.handle("localVibeService:installScoop", (event) => localVibeService.installScoop(event));
-	ipcMain.handle("localVibeService:installHomebrew", (event) =>
-		localVibeService.installHomebrew(event),
-	);
-	ipcMain.handle("localVibeService:installPodman", (event) =>
-		localVibeService.installPodman(event),
-	);
-	ipcMain.handle("localVibeService:initPodmanMachine", (event) =>
-		localVibeService.initPodmanMachine(event),
-	);
-	ipcMain.handle("localVibeService:stopLocalSandboxByIpc", (event) =>
-		localVibeService.stopLocalSandboxByIpc(event),
-	);
-	ipcMain.handle("localVibeService:ensureLocalSandboxRunning", (event) =>
-		localVibeService.ensureLocalSandboxRunning(event),
-	);
-	ipcMain.handle("localVibeService:startPodmanMachine", (event) =>
-		localVibeService.startPodmanMachine(event),
-	);
 
 	// codeAgentService service registration
 	ipcMain.handle(
@@ -492,6 +436,62 @@ export function registerIpcHandlers() {
 		externalLinkService.openExternalLink(event, url),
 	);
 
+	// localVibeService service registration
+	ipcMain.handle("localVibeService:copyToWorkspaceByIpc", (event, sourcePath, containerPath) =>
+		localVibeService.copyToWorkspaceByIpc(event, sourcePath, containerPath),
+	);
+	ipcMain.handle("localVibeService:getComposeDirectory", (event) =>
+		localVibeService.getComposeDirectory(event),
+	);
+	ipcMain.handle("localVibeService:openComposeDirectory", (event) =>
+		localVibeService.openComposeDirectory(event),
+	);
+	ipcMain.handle("localVibeService:openWorkspaceDirectory", (event, subPath) =>
+		localVibeService.openWorkspaceDirectory(event, subPath),
+	);
+	ipcMain.handle("localVibeService:deleteWorkspaceDirectory", (event, subPath) =>
+		localVibeService.deleteWorkspaceDirectory(event, subPath),
+	);
+	ipcMain.handle("localVibeService:renameWorkspaceDirectory", (event, oldSubPath, newSubPath) =>
+		localVibeService.renameWorkspaceDirectory(event, oldSubPath, newSubPath),
+	);
+	ipcMain.handle("localVibeService:listWorkspaceDirectories", (event) =>
+		localVibeService.listWorkspaceDirectories(event),
+	);
+	ipcMain.handle("localVibeService:getLocalBaseUrl", (event) =>
+		localVibeService.getLocalBaseUrl(event),
+	);
+	ipcMain.handle("localVibeService:getSandboxStatus", (event) =>
+		localVibeService.getSandboxStatus(event),
+	);
+	ipcMain.handle("localVibeService:triggerSystemRestart", (event) =>
+		localVibeService.triggerSystemRestart(event),
+	);
+	ipcMain.handle("localVibeService:validPodman", (event) => localVibeService.validPodman(event));
+	ipcMain.handle("localVibeService:startPodmanHealthCheck", (event) =>
+		localVibeService.startPodmanHealthCheck(event),
+	);
+	ipcMain.handle("localVibeService:installWSL", (event) => localVibeService.installWSL(event));
+	ipcMain.handle("localVibeService:installScoop", (event) => localVibeService.installScoop(event));
+	ipcMain.handle("localVibeService:installHomebrew", (event) =>
+		localVibeService.installHomebrew(event),
+	);
+	ipcMain.handle("localVibeService:installPodman", (event) =>
+		localVibeService.installPodman(event),
+	);
+	ipcMain.handle("localVibeService:initPodmanMachine", (event) =>
+		localVibeService.initPodmanMachine(event),
+	);
+	ipcMain.handle("localVibeService:stopLocalSandboxByIpc", (event) =>
+		localVibeService.stopLocalSandboxByIpc(event),
+	);
+	ipcMain.handle("localVibeService:ensureLocalSandboxRunning", (event) =>
+		localVibeService.ensureLocalSandboxRunning(event),
+	);
+	ipcMain.handle("localVibeService:startPodmanMachine", (event) =>
+		localVibeService.startPodmanMachine(event),
+	);
+
 	// mcpService service registration
 	ipcMain.handle("mcpService:getToolsFromServer", (event, server) =>
 		mcpService.getToolsFromServer(event, server),
@@ -619,26 +619,6 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("shortcutService:updateShortcuts");
 	ipcMain.removeHandler("shortcutService:getConflicts");
 	ipcMain.removeHandler("shortcutService:getSyncInfo");
-	ipcMain.removeHandler("localVibeService:copyToWorkspaceByIpc");
-	ipcMain.removeHandler("localVibeService:getComposeDirectory");
-	ipcMain.removeHandler("localVibeService:openComposeDirectory");
-	ipcMain.removeHandler("localVibeService:openWorkspaceDirectory");
-	ipcMain.removeHandler("localVibeService:deleteWorkspaceDirectory");
-	ipcMain.removeHandler("localVibeService:renameWorkspaceDirectory");
-	ipcMain.removeHandler("localVibeService:listWorkspaceDirectories");
-	ipcMain.removeHandler("localVibeService:getLocalBaseUrl");
-	ipcMain.removeHandler("localVibeService:getSandboxStatus");
-	ipcMain.removeHandler("localVibeService:triggerSystemRestart");
-	ipcMain.removeHandler("localVibeService:validPodman");
-	ipcMain.removeHandler("localVibeService:startPodmanHealthCheck");
-	ipcMain.removeHandler("localVibeService:installWSL");
-	ipcMain.removeHandler("localVibeService:installScoop");
-	ipcMain.removeHandler("localVibeService:installHomebrew");
-	ipcMain.removeHandler("localVibeService:installPodman");
-	ipcMain.removeHandler("localVibeService:initPodmanMachine");
-	ipcMain.removeHandler("localVibeService:stopLocalSandboxByIpc");
-	ipcMain.removeHandler("localVibeService:ensureLocalSandboxRunning");
-	ipcMain.removeHandler("localVibeService:startPodmanMachine");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxModel");
 	ipcMain.removeHandler("codeAgentService:checkClaudeCodeSandbox");
 	ipcMain.removeHandler("codeAgentService:updateClaudeCodeSandboxesByIpc");
@@ -711,6 +691,26 @@ export function removeIpcHandlers() {
 	ipcMain.removeHandler("dataService:selectFolderForUpload");
 	ipcMain.removeHandler("dataService:exportChatToFile");
 	ipcMain.removeHandler("externalLinkService:openExternalLink");
+	ipcMain.removeHandler("localVibeService:copyToWorkspaceByIpc");
+	ipcMain.removeHandler("localVibeService:getComposeDirectory");
+	ipcMain.removeHandler("localVibeService:openComposeDirectory");
+	ipcMain.removeHandler("localVibeService:openWorkspaceDirectory");
+	ipcMain.removeHandler("localVibeService:deleteWorkspaceDirectory");
+	ipcMain.removeHandler("localVibeService:renameWorkspaceDirectory");
+	ipcMain.removeHandler("localVibeService:listWorkspaceDirectories");
+	ipcMain.removeHandler("localVibeService:getLocalBaseUrl");
+	ipcMain.removeHandler("localVibeService:getSandboxStatus");
+	ipcMain.removeHandler("localVibeService:triggerSystemRestart");
+	ipcMain.removeHandler("localVibeService:validPodman");
+	ipcMain.removeHandler("localVibeService:startPodmanHealthCheck");
+	ipcMain.removeHandler("localVibeService:installWSL");
+	ipcMain.removeHandler("localVibeService:installScoop");
+	ipcMain.removeHandler("localVibeService:installHomebrew");
+	ipcMain.removeHandler("localVibeService:installPodman");
+	ipcMain.removeHandler("localVibeService:initPodmanMachine");
+	ipcMain.removeHandler("localVibeService:stopLocalSandboxByIpc");
+	ipcMain.removeHandler("localVibeService:ensureLocalSandboxRunning");
+	ipcMain.removeHandler("localVibeService:startPodmanMachine");
 	ipcMain.removeHandler("mcpService:getToolsFromServer");
 	ipcMain.removeHandler("mcpService:closeServer");
 	ipcMain.removeHandler("notificationService:notifyTaskCompleted");
